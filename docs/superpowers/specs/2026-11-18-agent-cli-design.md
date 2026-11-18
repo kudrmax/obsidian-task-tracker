@@ -242,3 +242,27 @@ The reviews found reads the screens build in their own code. Each becomes a core
 ## Decisions
 
 (Filled in while building: each gap a builder decides, in one line.)
+
+Backend (2026-11-18):
+
+1. The column read is `TaskService.columnView(screen, column)` → `ColumnList` (`listView`'s `{ showsHeaders, groups }` plus `sections`, `columnSections`' answer): it reads a screen the frontend already has (`ColumnSource`, a `screen(date, filter)` or `firstStepScreen` answer), so it carries that screen's filter and reads no file. Door: `tasks.columnView`.
+2. `placeOf(item)` is `Promise<TaskPlace>` (`{ kind: inbox | backlog | soon | done }` or `{ kind: today | day, date }`): it reads the file for a subtask's task, as `screenOf` does. One rule, `placeOfTask`, gives it and By project's stage mark.
+3. A task stands on its slot's day before its due date (`dayOfTask`'s order): a task due on the 20th with a slot on the 22nd is placed on the 22nd, its `due` the 20th. By project's stage mark now shows such a task's slot day (it showed the due date). The screen still shows it in the 20th's list and on the 22nd's timeline.
+4. `dayOfTask` takes the day's boundary and every caller passes it (`TaskItem.day`, `screenOf`, `reveal`, `placeOf`, the menus' Today/Tomorrow, `itemsAt`, which passed none).
+5. `ridesNow(item, day)` is sync on `TaskService` (`TimelineSpans.ridesNow`); `landing`'s `ridesNow` is the same rule. Neither frontend works it out today, so neither needs to switch.
+6. `projectNodeNamed(name)` → `{ node, candidates }`: the candidates are the names the search's match finds, best first, then names a typo apart (≤ 2 letters, or a quarter of a long name, `lettersApart`), at most five. It came out of the hand check: «Окружение в Сербб» found nothing by the search's match.
+7. `openTasks(filter?)` → `{ item, place }[]`, so `all` reads places once.
+8. `--done` reads a new `projectHistory(node)`: a live project's closed tasks By project (own, then subprojects), parts of kind `done`. A done project's screen already shows its closed tasks, so `projectHistory` is empty for it and its parts stay `own` / `subproject`; `project.status` says `done`.
+9. A folder with `--no-subprojects` still shows its branch: the core keeps a folder's branch with Subprojects off (`projectSections`), as the screen does. The spec's «empty by design» line is not what the screen does, so the program follows the screen.
+10. `DayService` gained `week(this | next)`, `days(from, count)`, `dayNamed(text)`, `weekday(date)` and `side(date)` (past, today, future: the program's `relation` for a day that is none of today, tomorrow, yesterday). Door: `days.*`.
+11. `rules.repeatSentence(rule)`: `repeat` in words for every rule, a weekly schedule too (`Every week on Mon, Wed`), where the screen draws the week's letters.
+12. `ref` is the task key `[section, index, path, raw]` as JSON, its UTF-8 bytes in hex: no list's name can show in it. The id is left out (it lives one run). `task <ref>` resolves it with `find(key, "")`.
+13. A task's fields with no value are left out: none, false, an empty text or list (`collapsed` shows only when true, `next` only on the step); `time.passed` always shows. Subtasks carry no `section` (their task's).
+14. `reminder`: the core's `live` is `lockScreen`. `labels` are the labels' titles as the screen writes them (`Not_now` → `Not now`).
+15. `calendars.sources[].words` is the sources window's line (`SourceWords.sub`), plus `updated`, the time it shows, when there is one. With no feeds in the program, Google's row reads its file (`Updated today`, `file missing`), never «not logged in».
+16. An empty tasks file answers `sections: []` for a list (the column draws nothing), `tasks: []` for `all`.
+17. Every command but `help` answers `tasksFileMissing` without the tasks file; an error the program doesn't expect is code `failed`.
+18. `projects[].depth` is the tree's depth (`path.length - 1`): a done project at the tree's top is 0, where the panel draws it one step under the Done tile.
+19. Options: `--project` / `--no-project` only on today, day, week, soon, inbox, backlog, all; `--no-subprojects` with `--project` or on `project`; `--days` (1 to 62) only on `week`; `--done` only on `project`; anything else is `badArgument`. `project` and `search` take every word that follows as the name or the query. No command is `help`.
+20. `time.passed` of a task in `all`, `search`, `project` is judged on its place's day; on a day's timeline, on that day.
+21. `help`'s labels for the assistant come from the Assistant page's option rows (Best task's Label and Skip label), each with the label chosen and what it means.
