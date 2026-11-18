@@ -1,5 +1,5 @@
 import type { App } from "obsidian";
-import { MockPort, type WriteDelay } from "../../../obsidian/stand/MockPort";
+import { keptZoom, MockPort, type WriteDelay, ZOOM_KEY } from "../../../obsidian/stand/MockPort";
 import { calendarFile, type ListKey, longListsFile, type MockFile, oneColumnFile, sectionsFile, subtasksFile, twoColumnsFile } from "../../../obsidian/stand/mockData";
 import { KEYS, takesKeys } from "../../../obsidian/ui/engine/keys";
 import type { Place } from "../../../obsidian/ui/engine/layout/Layout";
@@ -23,6 +23,23 @@ const STEPS: Readonly<Record<string, { place: Place; file?: () => MockFile }>> =
 	"step-long-lists": { place: "twoColumns", file: longListsFile },
 	"step-calendar": { place: "calendar", file: () => calendarFile(new Date()) },
 	"whole-screen": { place: "leaf" },
+};
+
+/** The device's storage for the calendar's zoom, as Obsidian's local storage keeps it; a page whose storage is blocked keeps nothing. */
+const load = (): unknown => {
+	try {
+		const text = window.localStorage.getItem(ZOOM_KEY);
+		return text === null ? null : JSON.parse(text);
+	} catch {
+		return null;
+	}
+};
+const save = (value: unknown): void => {
+	try {
+		window.localStorage.setItem(ZOOM_KEY, JSON.stringify(value));
+	} catch {
+		/* kept for this page only */
+	}
 };
 
 /** The note the stand's block sits in, as Obsidian's reading view lays it out. */
@@ -99,7 +116,7 @@ class StandPage {
 	}
 
 	private mount(el: HTMLElement, place: Place, sourcePath: string): MountedScreen {
-		const screen = mountScreen(el, { port: this.port, place, app: this.app, sourcePath, haptics: this.haptics });
+		const screen = mountScreen(el, { port: this.port, place, app: this.app, sourcePath, haptics: this.haptics, zoom: keptZoom(load, save) });
 		this.screens.add(screen);
 		return screen;
 	}

@@ -15,6 +15,8 @@ export interface ScreenHost {
 	/** The note a field's links are made from. */
 	readonly sourcePath: string;
 	readonly haptics: { tap(): void };
+	/** The calendar's largest hour, in pixels (the zoom's levels in the settings): a pinch stops there. */
+	readonly zoomMost: number;
 }
 
 export const HostContext = createContext<ScreenHost | null>(null);

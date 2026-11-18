@@ -33,6 +33,9 @@ export const DESIGN = {
 	sectionGap: 10,
 	/** A subtask's indent under its task: one level of a carried card's depth. */
 	subtaskIndent: 20,
+	/** A card's height and the gap between cards at the default card size: the calendar's stack lays its cards out by them. */
+	cardHeight: 35,
+	cardGap: 2,
 } as const;
 
 export type DesignMeasure = keyof typeof DESIGN;
@@ -55,6 +58,8 @@ export const DESIGN_TOKENS: Readonly<Record<DesignMeasure, string>> = {
 	groupHead: "--tc-group-head-h",
 	sectionGap: "--tc-space-10",
 	subtaskIndent: "--tc-subtask-indent",
+	cardHeight: "--tc-card-h",
+	cardGap: "--tc-card-gap",
 };
 
 /** The custom properties the code sets on elements; styles.css does the arithmetic with them. */
@@ -84,8 +89,6 @@ export const PROPERTY = {
 	length: "--tc-len",
 	/** A task card's left edge in the items area: further in when it lies over another card or an event. */
 	x: "--tc-x",
-	/** How far a block of the engine's timeline stands from the items' right edge: blocks that overlap stand side by side. */
-	xEnd: "--tc-x-end",
 	/** The bottom of the last task card: a stack that runs past midnight lengthens the day. */
 	stackEnd: "--tc-stack-end",
 	/** Empty room over the day's first hour and under its last, so the now line can stand in the middle near them. */
@@ -94,6 +97,12 @@ export const PROPERTY = {
 	scrolled: "--tc-scrolled",
 	scrolledBelow: "--tc-scrolled-below",
 	roomBottom: "--tc-room-bottom",
+	/** An event's calendar colour: its fill, bar and title are mixed from it per theme in the stylesheet. */
+	eventColor: "--tc-event-color",
+	/** How far under the calendar's top a pinch holds its minute: the scroll margin of the mark the calendar reveals at every step. */
+	anchorOffset: "--tc-anchor-offset",
+	/** How high a block or event of the calendar lies among the others: a card lying over another is drawn over it. */
+	stackZ: "--tc-stack-z",
 	eventBg: "--tc-event-bg",
 	eventBar: "--tc-event-bar",
 	eventText: "--tc-event-text",

@@ -20,9 +20,21 @@ const MOUSE_DISTANCE_PX = 4;
 
 /** The plus is carried by this id: on its button, and as a row of the list it is over. */
 export const PLUS = "plus";
+/** The plus, or the calendar's new place: either opens a new task's field where it is let go. */
+const isPlus = (id: UniqueIdentifier): boolean => id === PLUS || id === NEW_SLOT;
 
 /** Whether a touch starts on the plus: it moves at once, a card only after the long press. */
 const onPlus = (event: Event): boolean => (event.target as Element | null)?.closest?.("[data-plus]") != null;
+
+/**
+ * Empty time on the calendar is carried as a new task's place (F101): a long press there (the mouse: a drag) lifts it at
+ * that minute, it follows the finger by the snap step, and let go the new task's field opens where it stands. A press on
+ * something of its own there (a block, an event, a dot, a field) is that thing's.
+ */
+export const NEW_SLOT = "new-slot";
+const ownPress = (event: Event, context: SensorContext | undefined): boolean => context?.active.id === NEW_SLOT && (event.target as Element | null)?.closest?.("[data-own-press]") != null;
+/** What dnd-kit tells a sensor's activator besides the event: the draggable it would lift. */
+type SensorContext = { readonly active: { readonly id: UniqueIdentifier } };
 
 /**
  * Sensors as dnd-kit's custom sensors are made (a sensor's activators filter what may start it). A card is lifted by the
@@ -31,7 +43,10 @@ const onPlus = (event: Event): boolean => (event.target as Element | null)?.clos
  * per event name).
  */
 class CardTouchSensor extends TouchSensor {
-	static override activators = TouchSensor.activators.map((activator) => ({ ...activator, handler: (event: Parameters<typeof activator.handler>[0], options: Parameters<typeof activator.handler>[1]) => !onPlus(event.nativeEvent) && activator.handler(event, options) }));
+	static override activators = TouchSensor.activators.map((activator) => ({ ...activator, handler: (event: Parameters<typeof activator.handler>[0], options: Parameters<typeof activator.handler>[1], context?: SensorContext) => !onPlus(event.nativeEvent) && !ownPress(event.nativeEvent, context) && activator.handler(event, options) }));
+}
+class CardMouseSensor extends MouseSensor {
+	static override activators = MouseSensor.activators.map((activator) => ({ ...activator, handler: (event: Parameters<typeof activator.handler>[0], options: Parameters<typeof activator.handler>[1], context?: SensorContext) => !ownPress(event.nativeEvent, context) && activator.handler(event, options) }));
 }
 class PlusTouchSensor extends PointerSensor {
 	static override activators = PointerSensor.activators.map((activator) => ({ ...activator, handler: (event: Parameters<typeof activator.handler>[0], options: Parameters<typeof activator.handler>[1]) => event.nativeEvent.pointerType === "touch" && onPlus(event.nativeEvent) && activator.handler(event, options) }));
@@ -107,7 +122,7 @@ export interface DragProps {
 export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 	const api = useScreenApi();
 	const sensors = useSensors(
-		useSensor(MouseSensor, { activationConstraint: { distance: MOUSE_DISTANCE_PX } }),
+		useSensor(CardMouseSensor, { activationConstraint: { distance: MOUSE_DISTANCE_PX } }),
 		useSensor(CardTouchSensor, { activationConstraint: { delay: LONG_PRESS_MS, tolerance: LONG_PRESS_TOLERANCE_PX } }),
 		useSensor(PlusTouchSensor, { activationConstraint: { distance: MOUSE_DISTANCE_PX } }),
 	);
@@ -131,10 +146,12 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 		const underPointer = pointerWithin(args);
 		/** Over the calendar the target is the calendar itself: the card's place there is at the minute under its top, among no rows. */
 		const onCalendar = underPointer.some((hit) => hit.id === CALENDAR_TARGET || hit.id === CALENDAR_ROOM);
-		if (onCalendar && args.active.id !== PLUS) {
+		if (onCalendar) {
 			lastOver.current = CALENDAR_TARGET;
 			return [{ id: CALENDAR_TARGET }];
 		}
+		/** The calendar's new place stays the calendar's: off it, it stands where it last stood there. */
+		if (args.active.id === NEW_SLOT) return [];
 		/** Where two lists meet, the pointer is in both: the card stays in its own until the pointer has left it. */
 		const own = String(args.active.data.current?.sortable?.containerId ?? "");
 		const ofOwn = (hit: { readonly id: UniqueIdentifier; readonly data?: { readonly droppableContainer?: { readonly data: { readonly current?: { readonly sortable?: { readonly containerId: UniqueIdentifier } } } } } }) => hit.id === `${LIST_TARGET}${own}` || hit.data?.droppableContainer?.data.current?.sortable?.containerId === own;
@@ -142,7 +159,6 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 		/** Between the lists, under no list at all, the card stays in its own: only the pointer inside another list moves it there. */
 		/** The plus over no list is no list's row: nothing is under it. */
 		if (args.active.id === PLUS && underPointer.length === 0) return [];
-		if (args.active.id === PLUS && onCalendar) return [];
 		const hits = inOwn.length > 0 ? inOwn : underPointer.length > 0 ? underPointer : rectIntersection(args).filter(ofOwn);
 		let overId = getFirstCollision(hits, "id");
 		if (overId !== null) {
@@ -190,7 +206,16 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 	 * that list's row at the place under the pointer, and from then on the rows part around it as they do for a card. Over
 	 * no list, it is no list's row.
 	 */
-	const plusOver = (event: { readonly activatorEvent: Event; readonly delta: { readonly x: number; readonly y: number }; readonly active: Sortable }, over: (Sortable & { readonly rect: { readonly top: number; readonly height: number } }) | null) => {
+	const plusOver = (event: { readonly activatorEvent: Event; readonly delta: { readonly x: number; readonly y: number }; readonly active: Sortable & { readonly rect: { readonly current: { readonly translated: { readonly top: number } | null } } } }, over: (Sortable & { readonly rect: { readonly top: number; readonly height: number }; readonly data: { readonly current?: unknown } }) | null) => {
+		if (over?.id === CALENDAR_TARGET) {
+			api.getState().setPlusAt(null);
+			const top = event.active.id === NEW_SLOT ? (getEventCoordinates(event.activatorEvent)?.y ?? 0) + event.delta.y : event.active.rect.current.translated?.top;
+			const minute = top === undefined ? null : ((over.data.current as CalendarData | undefined)?.minuteAt(top) ?? null);
+			if (minute !== null) api.getState().setPlusMinute(minute);
+			return;
+		}
+		if (event.active.id === NEW_SLOT) return;
+		api.getState().setPlusMinute(null);
 		if (!over) return api.getState().setPlusAt(null);
 		const overId = String(over.id);
 		const own = containerOf(event.active);
@@ -207,9 +232,12 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 	const dropPlus = (event: DragEndEvent) => {
 		const list = containerOf(event.active);
 		const order = orderAfter(event.active, event.over);
+		const minute = api.getState().plusMinute;
 		api.getState().setPlusAt(null);
+		api.getState().setPlusMinute(null);
 		api.getState().release("drag");
-		if (list === null) return;
+		if (minute !== null) return api.getState().openEntry({ list: "day", before: null, dayOffset: api.getState().dayOffset, at: minute });
+		if (list === null || event.active.id === NEW_SLOT) return;
 		const rows = rowsOf(list);
 		const index = order.indexOf(PLUS);
 		const near = (id: string | undefined) => rows.find((row) => row.id === id);
@@ -252,8 +280,10 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 	};
 	const move = (event: DragMoveEvent) => {
 		const { active: lifted, over } = event;
-		if (lifted.id === PLUS) plusOver(event, over);
-		else if (over?.id === CALENDAR_TARGET) overCalendar(event, over);
+		if (isPlus(lifted.id)) {
+			plusOver(event, over);
+			if (lifted.id === NEW_SLOT || over?.id === CALENDAR_TARGET) return;
+		} else if (over?.id === CALENDAR_TARGET) overCalendar(event, over);
 		if (refusedNow.current) return;
 		const container = containerOf(lifted);
 		if (container === null) return api.getState().setLiftedDepth(null);
@@ -271,9 +301,10 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 		refusedNow.current = false;
 		const liftX = getEventCoordinates(event.activatorEvent)?.x ?? 0;
 		swipe.current = new SwipeLevel(null, 0, liftX, performance.now());
-		if (lifted.id === PLUS) {
+		if (isPlus(lifted.id)) {
 			screen.openEntry(null);
-			setActive(PLUS);
+			screen.select(null);
+			setActive(String(lifted.id));
 			return onLift();
 		}
 		screen.lift(String(lifted.id));
@@ -295,7 +326,7 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 	 */
 	const overList = (event: DragOverEvent) => {
 		const { active: lifted, over } = event;
-		if (lifted.id === PLUS) return plusOver(event, over);
+		if (isPlus(lifted.id)) return plusOver(event, over);
 		if (over?.id === CALENDAR_TARGET) return overCalendar(event, over);
 		const into = crossing(lifted, over);
 		if (!into) {
@@ -316,7 +347,7 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 	const end = (event: DragEndEvent) => {
 		const { active: lifted, over } = event;
 		setActive(null);
-		if (lifted.id === PLUS) return dropPlus(event);
+		if (isPlus(lifted.id)) return dropPlus(event);
 		const id = String(lifted.id);
 		const container = containerOf(lifted);
 		if (container === null || refusedNow.current) return api.getState().drop(id, null);
@@ -333,8 +364,9 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 		api.getState().drop(id, still || !api.getState().takes(id, to) ? null : to);
 	};
 	const cancel = () => {
-		if (active === PLUS) {
+		if (active !== null && isPlus(active)) {
 			api.getState().setPlusAt(null);
+			api.getState().setPlusMinute(null);
 			api.getState().release("drag");
 		} else if (active) api.getState().drop(active, null);
 		setActive(null);
@@ -424,6 +456,12 @@ export function useCalendarDrop(minuteAt: (y: number) => number): { readonly roo
 	return { room: room.setNodeRef, canvas: canvas.setNodeRef };
 }
 
+/** The calendar's empty time as the new task's place a long press lifts (`NEW_SLOT`): its node and listeners go on the calendar's canvas. */
+export function useNewSlot(): { readonly ref: (element: HTMLElement | null) => void; readonly listeners: ReturnType<typeof useDraggable>["listeners"] } {
+	const { setNodeRef, listeners } = useDraggable({ id: NEW_SLOT });
+	return { ref: setNodeRef, listeners };
+}
+
 /** The calendar's blocks as dnd-kit's «multiple containers» container: its items stand still, each block placed by its minute. */
 export function CalendarBlocks({ ids, children }: { readonly ids: readonly string[]; readonly children: ReactNode }) {
 	return (
@@ -465,15 +503,21 @@ function crossing(active: Sortable & { readonly rect: { readonly current: { read
 
 /** A list's sortable tasks: `ids` keeps its identity between draws, or dnd-kit stops gliding (stage 0, finding 4). */
 export function SortableList({ list, ids, children }: { readonly list: ListId; readonly ids: readonly string[]; readonly children: ReactNode }) {
-	const { setNodeRef } = useDroppable({ id: `${LIST_TARGET}${list}`, data: { items: ids } });
 	const strategy = useMemo(() => finalOrderStrategy(ids), [ids]);
 	return (
 		<SortableContext id={list} items={ids as string[]} strategy={strategy}>
-			<div ref={setNodeRef} className="tc-list-target">
-				{children}
-			</div>
+			{children}
 		</SortableContext>
 	);
+}
+
+/**
+ * A list's own drop target, for when no row of it is under the pointer: the whole room the list scrolls in, the empty
+ * room under its last card included (Decision 27: a block carried under Today's last card stays on the calendar
+ * otherwise). Goes on the list's scroller.
+ */
+export function useListTarget(list: ListId, ids: readonly string[]): (element: HTMLElement | null) => void {
+	return useDroppable({ id: `${LIST_TARGET}${list}`, data: { items: ids } }).setNodeRef;
 }
 
 /**

@@ -1,5 +1,16 @@
-import type { Block, CardFace, Destination, ListData, ListId, MenuItem, Now, Row, ScreenData, ScreenPort } from "../ui/engine/port";
+import type { AllDayEvent, Block, CardFace, DayEvent, Destination, ListData, ListId, MenuItem, Now, Row, ScreenData, ScreenPort } from "../ui/engine/port";
 import { addDays, DAY_START_HOUR, dateOf, dayOf, fileText, LIST_KEYS, type ListKey, type MockFile, type MockSection, type MockTask, minuteOf, mockFile } from "./mockData";
+
+/** The calendar's largest hour on the stand: the settings' default zoom levels end at 224 px an hour. */
+export const ZOOM_MOST = 224;
+/** Where the stand keeps the calendar's zoom on the device. */
+export const ZOOM_KEY = "task-calendar-stand-zoom";
+
+/** The calendar's zoom kept by `load` and `save` (the device's storage): an hour's height, or the whole day. */
+export function keptZoom(load: () => unknown, save: (value: number | "wholeDay") => void): { readonly kept: number | "wholeDay" | null; keep(zoom: number | "wholeDay"): void; readonly most: number } {
+	const value = load();
+	return { kept: value === "wholeDay" || (typeof value === "number" && value > 0) ? value : null, keep: save, most: ZOOM_MOST };
+}
 
 /** The write delays the stand offers: none, a real write and its read-back, a slow one. */
 export const WRITE_DELAYS = [0, 30, 300] as const;
@@ -9,9 +20,16 @@ const MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const LEVEL_COLORS = { p1: "red", p2: "orange" } as const;
 const pad = (n: number) => String(n).padStart(2, "0");
-/** A task put on the calendar without a time of its own takes this long. */
-const TIMED_LENGTH = 60;
+/** A minute from the day's start as the clock writes it: «14:15». */
+const clockOf = (minute: number) => {
+	const clock = DAY_START_HOUR * 60 + minute;
+	return `${pad(Math.floor(clock / 60) % 24)}:${pad(clock % 60)}`;
+};
 const DAY_MINUTES = 24 * 60;
+/** Another day opens at this hour (the «Scroll to hour» setting's default), minutes from the day's start. */
+const OPENS_AT = (9 - DAY_START_HOUR) * 60;
+/** An event's menu: its one row. */
+const EVENT_MENU: readonly MenuItem[] = [{ id: "open-calendar", label: "Open in Calendar" }];
 
 /** The lists a menu sends a task to, by the item's id. */
 const MENU: readonly MenuItem[] = [
@@ -31,7 +49,8 @@ export class MockPort implements ScreenPort {
 	private ahead: MockFile | null = null;
 	private inFlight = 0;
 	private readonly listeners = new Set<() => void>();
-	private readonly cache = new Map<number, ScreenData>();
+	/** Reads by day, as of the clock's minute: what rides the now line and what is past changes with it. */
+	private readonly cache = new Map<string, ScreenData>();
 	private added = 0;
 	delay: WriteDelay = 30;
 
@@ -73,10 +92,12 @@ export class MockPort implements ScreenPort {
 	// The port.
 
 	read(dayOffset: number): ScreenData {
-		let data = this.cache.get(dayOffset);
+		const key = `${dayOffset}@${minuteOf(this.clock())}`;
+		let data = this.cache.get(key);
 		if (!data) {
+			if (this.cache.size > 16) this.cache.clear();
 			data = this.screenOf(this.file, dayOffset);
-			this.cache.set(dayOffset, data);
+			this.cache.set(key, data);
 		}
 		return data;
 	}
@@ -97,14 +118,17 @@ export class MockPort implements ScreenPort {
 		return this.screenOf(file, to.dayOffset);
 	}
 
-	/** The stand's refusals: Soon takes no task with a time (F161's simplest); only today's calendar takes a time (the stand draws no other day's blocks). */
-	takes(id: string, to: Destination): boolean {
-		if (to.at !== undefined && to.dayOffset !== 0) return false;
-		return !(to.list === "soon" && this.findBy(this.ahead ?? this.file, (t) => t.id === id)?.task.slot);
+	/** The stand refuses nothing (Decision 27): every list and every day's calendar takes a task; the refusal stays for part 2's project mode (F161). */
+	takes(id: string, _to: Destination): boolean {
+		return this.findBy(this.ahead ?? this.file, (t) => t.id === id) !== null;
 	}
 
 	async move(id: string, to: Destination): Promise<void> {
 		await this.write((file) => this.apply(file, id, to));
+	}
+
+	clockAt(minute: number): string {
+		return clockOf(minute);
 	}
 
 	/** The plus's place, the simplest: the end of Inbox's tasks outside any section. */
@@ -112,23 +136,32 @@ export class MockPort implements ScreenPort {
 		return { list: "inbox", section: null, before: null, dayOffset, depth: 0 };
 	}
 
+	/** A new task (F190): Inbox and Soon without a date, a day's list with its date; on a day's calendar its time too, no length, at the end of Now (today) or Soon. */
 	async add(text: string, at: Destination): Promise<string> {
 		const id = `x${++this.added}`;
 		await this.write((file) => {
 			const task = this.newTask(text.trim(), null, id);
-			this.nest(file, task, { ...at, depth: at.depth ?? 0 }, at.section === undefined ? null : this.sectionFor(file, at));
 			task.due = at.list === "day" ? dateOf(addDays(this.day(), at.dayOffset)) : null;
+			if (at.at !== undefined) {
+				task.slot = { start: at.at, end: null };
+				const sections = this.listOf(file, "day", at.dayOffset);
+				sections[sections.length - 1].tasks.push(task);
+				return;
+			}
+			this.nest(file, task, { ...at, depth: at.depth ?? 0 }, at.section === undefined ? null : this.sectionFor(file, at));
 		});
 		return id;
 	}
 
 	menu(id: string): readonly MenuItem[] {
+		if (this.file.events.some((e) => e.id === id) || this.file.allDay.some((e) => e.id === id)) return EVENT_MENU;
 		const found = this.findBy(this.file, (t) => t.id === id);
 		const here = found?.list === "inbox" ? "inbox" : found?.list === "now" ? "day" : "soon";
 		return MENU.filter((item) => item.id !== here);
 	}
 
 	async act(id: string, item: string): Promise<void> {
+		if (item === EVENT_MENU[0].id) return;
 		const list = item as ListId;
 		const first = this.screenOf(this.file, 0).lists[list].rows.find((row) => row.kind === "task");
 		await this.move(id, { list, before: first?.id ?? null, dayOffset: 0 });
@@ -155,22 +188,31 @@ export class MockPort implements ScreenPort {
 	/**
 	 * A move's rules, the simplest: before a task, into its section and under its parent; at a list's end, into its last
 	 * section. To Inbox or Soon a task loses its date and its time; to today's list it is due today without a time; to
-	 * another day's list it is due that day in Soon. Onto today's calendar (`at`) it is due today at that minute, keeping
-	 * its length (a task without a time takes an hour), at the end of Now.
+	 * another day's list it is due that day in Soon. Onto a day's calendar (`at`) it is due that day at that minute (Now for
+	 * today, Soon for another day), keeping its length (none when it had no time) unless `end` says; a task already timed
+	 * that day keeps its place in the file.
 	 */
 	private apply(file: MockFile, id: string, to: Destination): void {
 		const found = this.findBy(file, (t) => t.id === id);
 		if (!found || id === to.before) return;
 		const { task } = found;
-		this.take(file, id);
-		const length = task.slot ? task.slot.end - task.slot.start : TIMED_LENGTH;
-		task.slot = null;
-		task.due = to.list === "day" ? dateOf(addDays(this.day(), to.dayOffset)) : null;
+		const due = to.list === "day" ? dateOf(addDays(this.day(), to.dayOffset)) : null;
 		if (to.at !== undefined) {
-			task.slot = { start: to.at, end: Math.min(DAY_MINUTES, to.at + length) };
-			file.now[file.now.length - 1].tasks.push(task);
+			const length = task.slot && task.slot.end !== null ? task.slot.end - task.slot.start : null;
+			const end = to.end !== undefined ? to.end : length === null ? null : Math.min(DAY_MINUTES, to.at + length);
+			const home = to.dayOffset === 0 ? "now" : "soon";
+			const stays = task.slot !== null && task.due === due && file[home].some((section) => section.tasks.includes(task));
+			task.slot = { start: to.at, end };
+			task.due = due;
+			if (stays) return;
+			this.take(file, id);
+			const sections = this.listOf(file, "day", to.dayOffset);
+			sections[sections.length - 1].tasks.push(task);
 			return;
 		}
+		this.take(file, id);
+		task.slot = null;
+		task.due = due;
 		if (to.section !== undefined) return this.nest(file, task, to, this.sectionFor(file, to));
 		if (to.depth !== undefined) return this.nest(file, task, to);
 		const into = to.before ? this.containerOf(file, to.before) : null;
@@ -289,10 +331,18 @@ export class MockPort implements ScreenPort {
 			lists: {
 				inbox: this.listData("Inbox", file.inbox, cards, null, () => true),
 				soon: this.listData("Soon", file.soon, cards, null, (t) => t.due === null),
-				day: this.listData(this.titleOf(dayOffset), today ? file.now : file.soon, cards, shown, today ? (t) => t.slot === null : (t) => t.due === shown),
+				day: this.listData(this.titleOf(dayOffset), today ? file.now : file.soon, cards, shown, today ? (t) => t.slot === null : (t) => t.due === shown && t.slot === null),
 			},
 			cards,
-			day: { title: this.titleOf(dayOffset), isToday: today, blocks: today ? this.blocksOf(file, cards) : [], hours: Array.from({ length: 24 }, (_, i) => pad((DAY_START_HOUR + i) % 24)) },
+			day: {
+				title: this.titleOf(dayOffset),
+				isToday: today,
+				blocks: this.blocksOf(file, cards, shown, today),
+				events: this.eventsOf(file, dayOffset),
+				allDay: file.allDay.map((e): AllDayEvent => ({ id: e.id, title: e.title, past: dayOffset < 0, color: e.color })),
+				hours: Array.from({ length: 24 }, (_, i) => pad((DAY_START_HOUR + i) % 24)),
+				opensAt: OPENS_AT,
+			},
 		};
 	}
 
@@ -303,7 +353,7 @@ export class MockPort implements ScreenPort {
 			if (t.status === "x") return;
 			cards[t.id] = this.faceOf(t, day);
 			rows.push({ kind: "task", id: t.id, depth });
-			for (const child of t.children) walk(child, depth + 1);
+			if (!t.folded) for (const child of t.children) walk(child, depth + 1);
 		};
 		for (const s of sections) {
 			if (s.name !== null) rows.push({ kind: "section", id: s.id, title: s.name });
@@ -326,31 +376,46 @@ export class MockPort implements ScreenPort {
 		};
 	}
 
-	/** Today's timed tasks; those that overlap side by side, each in the first lane free at its start, a group as wide as its most lanes. */
-	private blocksOf(file: MockFile, cards: Record<string, CardFace>): Block[] {
-		const spans: { id: string; start: number; end: number }[] = [];
-		for (const s of file.now) for (const t of s.tasks) {
-			if (!t.slot || t.status === "x") continue;
-			cards[t.id] = this.faceOf(t, dateOf(this.day()));
-			spans.push({ id: t.id, start: t.slot.start, end: t.slot.end });
-		}
-		spans.sort((a, b) => a.start - b.start);
+	/**
+	 * The shown day's timed tasks, open ones only. An open task of today whose time has passed rides the now line: drawn at
+	 * the present minute, its length kept, its time in the file as it was (the design's «Едет за линией»; at its very minute
+	 * it still stands). A folded task's block is named by its next open step.
+	 */
+	private blocksOf(file: MockFile, cards: Record<string, CardFace>, shown: string, today: boolean): Block[] {
+		const present = minuteOf(this.clock());
 		const blocks: Block[] = [];
-		let group: { id: string; start: number; end: number; lane: number }[] = [];
-		const close = () => {
-			const lanes = Math.max(1, ...group.map((g) => g.lane + 1));
-			for (const g of group) blocks.push({ id: g.id, start: g.start, end: g.end, lane: g.lane, lanes });
-			group = [];
-		};
-		for (const span of spans) {
-			if (group.length && span.start >= Math.max(...group.map((g) => g.end))) close();
-			const busy = new Set(group.filter((g) => g.end > span.start).map((g) => g.lane));
-			let lane = 0;
-			while (busy.has(lane)) lane++;
-			group.push({ ...span, lane });
-		}
-		close();
+		for (const key of ["now", "soon"] as const)
+			for (const s of file[key])
+				for (const t of s.tasks) {
+					if (!t.slot || t.status === "x" || t.due !== shown) continue;
+					cards[t.id] = this.faceOf(t, shown);
+					const { start: from, end } = t.slot;
+					const length = end === null ? null : end - from;
+					blocks.push({
+						id: t.id,
+						start: today && present > from ? present : from,
+						length,
+						from,
+						clock: clockOf(from),
+						endClock: end === null ? null : clockOf(end),
+						startParts: [String(Math.floor((DAY_START_HOUR * 60 + from) / 60) % 24), pad(from % 60)],
+						lengthParts: length === null ? null : length < 60 ? [String(length), "MIN"] : [length % 60 ? `${Math.floor(length / 60)}:${pad(length % 60)}` : String(length / 60), "H"],
+						step: t.folded ? this.nextStep(t) : null,
+					});
+				}
 		return blocks;
+	}
+
+	/** A folded task's next open step: its first open subtask, and that one's first open subtask, deeper as far as they go. */
+	private nextStep(t: MockTask): string | null {
+		const open = t.children.find((c) => c.status !== "x");
+		return open ? (this.nextStep(open) ?? open.title) : null;
+	}
+
+	/** The day's events: every made-up event each day; over once its end is past the present minute, and every one of a past day. */
+	private eventsOf(file: MockFile, dayOffset: number): DayEvent[] {
+		const present = minuteOf(this.clock());
+		return file.events.map((e) => ({ id: e.id, title: e.title, start: e.start, end: e.end, color: e.color, past: dayOffset < 0 || (dayOffset === 0 && e.end <= present) }));
 	}
 
 	private titleOf(dayOffset: number): string {

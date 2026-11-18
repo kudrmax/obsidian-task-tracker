@@ -7,7 +7,7 @@ import { detectHaptics, type HapticsHost } from "../ui/haptics";
 import { clearPriorityColors, showPriorityColors } from "../ui/priorityColors";
 import { addWindowDocument } from "../ui/windowDocuments";
 import { calendarFile, type ListKey, longListsFile, type MockFile, oneColumnFile, sectionsFile, subtasksFile, twoColumnsFile } from "./mockData";
-import { MockPort, WRITE_DELAYS, type WriteDelay } from "./MockPort";
+import { keptZoom, MockPort, WRITE_DELAYS, type WriteDelay, ZOOM_KEY } from "./MockPort";
 
 /** The stand's own view type and code block language: never the plugin's. */
 export const STAND_VIEW = "task-calendar-stand";
@@ -64,7 +64,7 @@ class StandView extends ItemView {
 		this.unmount();
 		this.contentEl.empty();
 		this.contentEl.addClass("tc-view");
-		this.screen = mountScreen(this.contentEl, { port: this.stand.port, place: this.stand.leafPlace, app: this.app, sourcePath: "", haptics: haptics() });
+		this.screen = mountScreen(this.contentEl, { port: this.stand.port, place: this.stand.leafPlace, app: this.app, sourcePath: "", haptics: haptics(), zoom: this.stand.zoom() });
 		this.stand.screens.add(this.screen);
 	}
 
@@ -89,7 +89,7 @@ class StandBlock extends MarkdownRenderChild {
 
 	override onload(): void {
 		this.containerEl.addClass("tc-stand-block");
-		this.screen = mountScreen(this.containerEl, { port: this.stand.port, place: "note", app: this.stand.app, sourcePath: this.path, haptics: haptics() });
+		this.screen = mountScreen(this.containerEl, { port: this.stand.port, place: "note", app: this.stand.app, sourcePath: this.path, haptics: haptics(), zoom: this.stand.zoom() });
 		this.stand.screens.add(this.screen);
 	}
 
@@ -122,6 +122,14 @@ export default class TaskCalendarStand extends Plugin {
 	readonly screens = new Set<MountedScreen>();
 	/** What a leaf shows: the whole screen, or a step alone (one column, then two) with plain tasks. */
 	leafPlace: Place = "leaf";
+
+	/** The calendar's zoom, kept on this device by Obsidian's local storage. */
+	zoom() {
+		return keptZoom(
+			() => this.app.loadLocalStorage(ZOOM_KEY),
+			(value) => this.app.saveLocalStorage(ZOOM_KEY, value),
+		);
+	}
 
 	/** Shows `place` in every open leaf, with its tasks: the first step's dozen, or the whole made-up file. */
 	private async showStep(place: Place, file: MockFile | undefined = place === "column" ? oneColumnFile() : place === "twoColumns" ? twoColumnsFile() : undefined): Promise<void> {

@@ -1,7 +1,7 @@
 import { defaultRangeExtractor, type Range, useVirtualizer } from "@tanstack/react-virtual";
 import { type CSSProperties, memo, useCallback, useEffect, useMemo, useState } from "react";
 import { PROPERTY } from "../../design";
-import { PLUS, SortableList, SortableRow } from "../drag/Drag";
+import { PLUS, SortableList, SortableRow, useListTarget } from "../drag/Drag";
 import { descendantsOf } from "../drag/tree";
 import { useAnchor } from "../layers/Layers";
 import type { Destination, ListId, Row } from "../port";
@@ -52,6 +52,14 @@ export const TaskList = memo(function TaskList({ list }: { readonly list: ListId
 	/** Every row is in the sortable list: headers move aside like cards; a card goes after a header into its section. */
 	const ids = useMemo(() => withPlus.map((row) => row.id), [withPlus]);
 	const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
+	const target = useListTarget(list, ids);
+	const setRoom = useCallback(
+		(element: HTMLDivElement | null) => {
+			setScroller(element);
+			target(element);
+		},
+		[target],
+	);
 	/**
 	 * While a card is carried, its own row stays mounted however far the list scrolls under it (TanStack Virtual's
 	 * `rangeExtractor`): dnd-kit carries it by that row. The rows from it to those in sight are mounted with it, so the rows
@@ -95,7 +103,7 @@ export const TaskList = memo(function TaskList({ list }: { readonly list: ListId
 
 	const items = virtualizer.getVirtualItems();
 	return (
-		<div className="tc-list" ref={setScroller} data-list={list}>
+		<div className="tc-list" ref={setRoom} data-list={list}>
 			<div className="tc-list-items" style={{ height: virtualizer.getTotalSize() }}>
 				<div className="tc-list-block" style={{ transform: `translateY(${items[0]?.start ?? 0}px)` }}>
 					<SortableList list={list} ids={ids}>
@@ -163,7 +171,7 @@ type Drawn = Row | { readonly kind: "entry"; readonly id: string; readonly depth
 function withEntry(rows: readonly Drawn[], list: ListId, entry: Destination | null): readonly Drawn[] {
 	if (!entry) return rows;
 	const { list: where, section, before } = entry;
-	if (where !== list) return rows;
+	if (where !== list || entry.at !== undefined) return rows;
 	let at = before === null ? -1 : rows.findIndex((row) => row.id === before);
 	if (at < 0) {
 		const head = section === null || section === undefined ? -1 : rows.findIndex((row) => row.id === section);

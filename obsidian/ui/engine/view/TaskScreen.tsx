@@ -1,4 +1,4 @@
-import { type CSSProperties, type TouchEvent, useEffect } from "react";
+import { type CSSProperties, type MouseEvent, type TouchEvent, useEffect } from "react";
 import { PROPERTY } from "../../design";
 import { Drag, type Grab, type Landing } from "../drag/Drag";
 import { Layers } from "../layers/Layers";
@@ -31,6 +31,11 @@ const carried = (id: string, grab: Grab, landing: Landing) => (
 	</div>
 );
 
+/** A tap anywhere but on a calendar's task or its dots lets the selected task go (F102). */
+const letSelectionGo = (event: MouseEvent, store: ScreenStore) => {
+	if (!(event.target as Element | null)?.closest?.(".tc-block, .tc-grips")) store.getState().select(null);
+};
+
 /**
  * The screen (spec, principle 1): one React tree over one store per mounted screen, the same in every place; the place
  * goes to the layout and nowhere else.
@@ -42,7 +47,7 @@ export function TaskScreen({ store, host, place }: { readonly store: ScreenStore
 			<HostContext.Provider value={host}>
 				<Layers>
 					<Drag doc={host.doc} carried={carried} plus={CARRIED_PLUS} onLift={() => host.haptics.tap()}>
-						<div className={`task-calendar is-engine is-${place}`} onTouchStart={keepTouch} onTouchMove={keepTouch} onTouchEnd={keepTouch}>
+						<div className={`task-calendar is-engine is-${place}`} onTouchStart={keepTouch} onTouchMove={keepTouch} onTouchEnd={keepTouch} onClick={(event) => letSelectionGo(event, store)}>
 							<Layout place={place} />
 						</div>
 					</Drag>

@@ -17,10 +17,28 @@ export interface MockTask {
 	status: " " | "/" | "x";
 	/** `YYYY-MM-DD`. */
 	due: string | null;
-	/** A time today, minutes from the day's start. */
-	slot: { start: number; end: number } | null;
+	/** A time on its due day, minutes from the day's start; no end: no length. */
+	slot: { start: number; end: number | null } | null;
 	description: string | null;
 	children: MockTask[];
+	/** Its subtasks folded under its card. */
+	folded?: boolean;
+}
+
+/** A calendar's event, every day at the same minutes from the day's start; `color` its calendar's. */
+export interface MockEvent {
+	id: string;
+	title: string;
+	start: number;
+	end: number;
+	color: string;
+}
+
+/** An all-day event, every day. */
+export interface MockAllDay {
+	id: string;
+	title: string;
+	color: string;
 }
 
 export interface MockSection {
@@ -30,7 +48,10 @@ export interface MockSection {
 	tasks: MockTask[];
 }
 
-export type MockFile = Record<ListKey, MockSection[]>;
+export type MockFile = Record<ListKey, MockSection[]> & { events: MockEvent[]; allDay: MockAllDay[] };
+
+/** The made-up calendars' colours (the design's palette: work, Google, pink, green). */
+export const CALENDAR_COLORS = { work: "#0A84FF", google: "#FF9F0A", pink: "#FF375F", green: "#30D158" } as const;
 
 /** The day starts at 5:00: before it, today is still yesterday's date. */
 export const DAY_START_HOUR = 5;
@@ -105,8 +126,16 @@ export function mockFile(clock: Date): MockFile {
 	];
 	const backlog = [section(null, Array.from({ length: 80 }, () => task(title())))];
 	const done = [section(null, Array.from({ length: 30 }, () => task(title(), { status: "x" })))];
-	return { inbox, now, soon, backlog, done };
+	const events: MockEvent[] = [
+		{ id: "ev1", title: "Стендап", start: quarter(at - 150), end: quarter(at - 150) + 30, color: CALENDAR_COLORS.work },
+		{ id: "ev2", title: "Встреча с дизайнером", start: quarter(at + 60), end: quarter(at + 60) + 60, color: CALENDAR_COLORS.google },
+		{ id: "ev3", title: "Планирование квартала", start: quarter(at + 180), end: quarter(at + 180) + 90, color: CALENDAR_COLORS.work },
+		{ id: "ev4", title: "Звонок с клиентом", start: quarter(at + 210), end: quarter(at + 210) + 30, color: CALENDAR_COLORS.pink },
+	].filter((e) => e.start >= 0 && e.end <= 24 * 60);
+	return { inbox, now, soon, backlog, done, events, allDay: [{ id: "ad1", title: "День рождения Кости", color: CALENDAR_COLORS.green }] };
 }
+
+const noEvents = (): Pick<MockFile, "events" | "allDay"> => ({ events: [], allDay: [] });
 
 /** The file as a tasks file's text (docs/plugin/file.md): the checks' oracle reads it, never the screen's state. */
 export function fileText(file: MockFile, clock: Date): string {
@@ -116,7 +145,8 @@ export function fileText(file: MockFile, clock: Date): string {
 		return `${pad(Math.floor(clockMinute / 60) % 24)}:${pad(clockMinute % 60)}`;
 	};
 	const line = (t: MockTask, depth: number): string[] => {
-		const fields = [t.level ? `${t.level} ` : "", t.title, t.due ? ` 📅 ${t.due}` : "", t.slot ? ` 📌 ${dateOf(day)} ${time(t.slot.start)}-${time(t.slot.end)}` : ""].join("");
+		const slot = (due: string, s: NonNullable<MockTask["slot"]>) => ` 📌 ${due} ${time(s.start)}${s.end === null ? "" : `-${time(s.end)}`}`;
+		const fields = [t.level ? `${t.level} ` : "", t.title, t.due ? ` 📅 ${t.due}` : "", t.slot ? slot(t.due ?? dateOf(day), t.slot) : "", t.folded ? " 📁" : ""].join("");
 		const own = `${"\t".repeat(depth)}- [${t.status}] ${fields}`;
 		const description = t.description ? [`${"\t".repeat(depth + 1)}- ${t.description}`] : [];
 		return [own, ...description, ...t.children.flatMap((c) => line(c, depth + 1))];
@@ -137,7 +167,7 @@ export function fileText(file: MockFile, clock: Date): string {
 export function oneColumnFile(): MockFile {
 	const names = ["Купить молоко", "Позвонить маме", "Оплатить свет", "Записаться к врачу", "Прочитать книгу", "Починить велосипед", "Ответить Косте", "Собрать документы", "Заказать билеты", "Разобрать почту", "Полить цветы", "Спланировать неделю"];
 	const tasks: MockTask[] = names.map((title, i) => ({ id: `c${i + 1}`, title, level: null, status: " ", due: null, slot: null, description: null, children: [] }));
-	return { inbox: [{ id: "c-s1", name: null, tasks }], now: [{ id: "c-s2", name: null, tasks: [] }], soon: [{ id: "c-s3", name: null, tasks: [] }], backlog: [{ id: "c-s4", name: null, tasks: [] }], done: [{ id: "c-s5", name: null, tasks: [] }] };
+	return { inbox: [{ id: "c-s1", name: null, tasks }], now: [{ id: "c-s2", name: null, tasks: [] }], soon: [{ id: "c-s3", name: null, tasks: [] }], backlog: [{ id: "c-s4", name: null, tasks: [] }], done: [{ id: "c-s5", name: null, tasks: [] }], ...noEvents() };
 }
 
 /** The stand's second step: two columns, Inbox and Soon, of plain tasks, to carry tasks between them. */
@@ -167,28 +197,45 @@ export function sectionsFile(): MockFile {
 }
 
 /**
- * The stand's calendar step: Soon, today's list and today's calendar, a dozen plain tasks in Soon and in today's list,
- * and five blocks today from the hour after the present one (two of them overlapping), all within the day.
+ * The stand's calendar step: Soon, today's list and today's calendar. A dozen plain tasks in Soon and in today's list; on
+ * today's calendar, from the hour after the present one: blocks with a length (two of them overlapping), tasks without a
+ * length (one standing close under a block, so they stack; one starting on a long block's body), a folded task named by
+ * its next step; one task whose time has passed, riding the now line; events (one over, two overlapping, one under a
+ * task) and an all-day event. All within the day.
  */
 export function calendarFile(clock: Date): MockFile {
 	const file = oneColumnFile();
 	const today = dateOf(dayOf(clock));
-	const plain = (id: string, title: string, due: string | null, slot: MockTask["slot"] = null): MockTask => ({ id, title, level: null, status: " ", due, slot, description: null, children: [] });
+	const plain = (id: string, title: string, due: string | null, slot: MockTask["slot"] = null, children: MockTask[] = []): MockTask => ({ id, title, level: null, status: " ", due, slot, description: null, children });
 	file.soon[0].tasks = ["Купить подарок", "Сдать отчёт", "Написать письмо", "Забрать посылку", "Обновить резюме", "Сходить в зал"].map((title, i) => plain(`g${i + 1}`, title, null));
 	file.inbox[0].tasks = [];
 	/** The blocks start an hour after the present hour, never so late that the last would leave the day. */
-	const hour = Math.min(Math.max(0, Math.floor(minuteOf(clock) / 60) * 60), 24 * 60 - 9 * 60);
-	const blocks: [string, number, number][] = [
+	const hour = Math.min(Math.max(0, Math.floor(minuteOf(clock) / 60) * 60), 24 * 60 - 10 * 60);
+	const blocks: [string, number, number | null][] = [
 		["Созвон с командой", hour + 60, 30],
+		["Заметки к созвону", hour + 65, null],
 		["Обед", hour + 120, 60],
+		["Позвонить в банк", hour + 150, null],
 		["Ревью дизайна", hour + 240, 60],
 		["Звонок врачу", hour + 270, 30],
 		["Тренировка", hour + 360, 90],
 	];
+	const folded = plain("k8", "Переезд", today, { start: hour + 480, end: null }, [{ ...plain("k9", "Найти грузчиков", null), status: "x" }, plain("k10", "Упаковать книги", null), plain("k11", "Заказать машину", null)]);
+	folded.folded = true;
+	const late = Math.max(0, hour - 45);
 	file.now[0].tasks = [
 		...["Разобрать почту", "Полить цветы", "Ответить Косте", "Оплатить свет", "Купить молоко", "Позвонить маме"].map((title, i) => plain(`h${i + 1}`, title, today)),
-		...blocks.map(([title, start, length], i) => plain(`k${i + 1}`, title, today, { start, end: start + length })),
+		...blocks.map(([title, start, length], i) => plain(`k${i + 1}`, title, today, { start, end: length === null ? null : start + length })),
+		folded,
+		...(late < minuteOf(clock) ? [plain("k12", "Прошедшая по времени", today, { start: late, end: late + 30 })] : []),
 	];
+	file.events = [
+		{ id: "ev1", title: "Стендап", start: Math.max(0, hour - 120), end: Math.max(0, hour - 120) + 30, color: CALENDAR_COLORS.work },
+		{ id: "ev2", title: "Встреча с дизайнером", start: hour + 330, end: hour + 390, color: CALENDAR_COLORS.google },
+		{ id: "ev3", title: "Планирование квартала", start: hour + 420, end: hour + 510, color: CALENDAR_COLORS.work },
+		{ id: "ev4", title: "Звонок с клиентом", start: hour + 450, end: hour + 480, color: CALENDAR_COLORS.pink },
+	];
+	file.allDay = [{ id: "ad1", title: "День рождения Кости", color: CALENDAR_COLORS.green }];
 	return file;
 }
 

@@ -1,3 +1,4 @@
+import { DESIGN } from "../../design";
 import { createStore, type StoreApi } from "zustand/vanilla";
 import type { Destination, ListId, MenuItem, Now, ScreenData, ScreenPort } from "../port";
 import { share } from "./share";
@@ -7,7 +8,10 @@ export type Stop = "inbox" | "soon" | "calendar";
 export const STOPS: readonly Stop[] = ["inbox", "soon", "calendar"];
 
 /** The one gesture that holds the pointer (spec, «Which gesture holds the pointer»). */
-export type Gesture = "drag" | "ribbon";
+export type Gesture = "drag" | "ribbon" | "resize" | "zoom";
+
+/** Where the calendar was zoomed to: an hour's height, or the whole day whatever the calendar's height. */
+export type Zoom = number | "wholeDay";
 
 /** An open layer (spec, «Layers and focus»): the task's menu, with what the port offers in it. */
 export type Layer = { readonly kind: "menu"; readonly id: string; readonly items: readonly MenuItem[] };
@@ -40,6 +44,14 @@ export interface ScreenState {
 	readonly entry: Destination | null;
 	/** Where the carried plus would open the field: a list and the index among its rows, where they part for it. */
 	readonly plusAt: { readonly into: ListId; readonly index: number } | null;
+	/** Where the carried plus would open the field on the calendar: a minute of the shown day, where its place stands. */
+	readonly plusMinute: number | null;
+	/** The calendar's zoom (spec, «Time scale»): kept on the device by the host. */
+	readonly zoom: Zoom;
+	/** The calendar's selected task: its two dots show, to resize it (F102); a tap elsewhere lets it go. */
+	readonly selected: string | null;
+	/** The task being resized by a dot, and which: its moving edge's time shows on a pill. */
+	readonly resizing: { readonly id: string; readonly edge: "start" | "end" } | null;
 	/** Counts the fields opened: each new one (after Enter) is a fresh, empty field. */
 	readonly entrySeq: number;
 	/** Tasks new in the last read: their rows come in; a row merely scrolled into sight does not. */
@@ -70,6 +82,16 @@ export interface ScreenActions {
 	closeLayer(): void;
 	act(id: string, item: string): void;
 	setPlusAt(at: { readonly into: ListId; readonly index: number } | null): void;
+	setPlusMinute(minute: number | null): void;
+	setZoom(zoom: Zoom): void;
+	/** A minute of the day as the clock writes it (the port's): «14:15». */
+	clockOf(minute: number): string;
+	/** Selects a task on the calendar (null: none). */
+	select(id: string | null): void;
+	/** A dot taken: the task's time changes as it is pulled (`resizeTo`, the port's preview), written at the end (null: put back). */
+	startResize(id: string, edge: "start" | "end"): void;
+	resizeTo(id: string, to: Destination): void;
+	endResize(id: string, to: Destination | null): void;
 	/** Opens the new task's field at `at`, or at the port's place for new tasks; null closes it. */
 	openEntry(at?: Destination | null): void;
 	/** The field one level deeper (1) or shallower (-1), as Tab and Shift+Tab do. */
@@ -90,8 +112,11 @@ const MINUTE_MS = 60_000;
 /** Days kept for regions sliding out: as many as fast strokes can leave sliding at once. */
 const LEFT_KEPT = 4;
 
-/** One store per mounted screen, over its port (spec, «Screen state»). */
-export function createScreenStore(port: ScreenPort): ScreenStore {
+/** Gestures during which data that arrives waits (spec, principle 5): what the finger holds stays still under it. */
+const HOLDING: readonly (Gesture | null)[] = ["drag", "resize"];
+
+/** One store per mounted screen, over its port (spec, «Screen state»); `zoom`, the calendar's zoom the host kept. */
+export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx): ScreenStore {
 	/** Writes of the screen's own not yet read back: their reads come together once the last is in. */
 	let writing = 0;
 	/** The screen as it stood when the carried task was lifted: its place's home, a drop's in-flight write drawn in it. */
@@ -101,7 +126,7 @@ export function createScreenStore(port: ScreenPort): ScreenStore {
 		/** The port's data again; held while a drag or a drop's write keeps the screen still (spec, principle 5). */
 		const refresh = () => {
 			const s = get();
-			if (s.gesture === "drag" || writing > 0) {
+			if (HOLDING.includes(s.gesture) || writing > 0) {
 				if (!s.pending) set({ pending: true });
 				return;
 			}
@@ -143,6 +168,38 @@ export function createScreenStore(port: ScreenPort): ScreenStore {
 			entry: null,
 			entrySeq: 0,
 			plusAt: null,
+			plusMinute: null,
+			zoom,
+			selected: null,
+			resizing: null,
+			setPlusMinute(plusMinute) {
+				if (get().plusMinute !== plusMinute) set({ plusMinute });
+			},
+			setZoom(next) {
+				if (get().zoom !== next) set({ zoom: next });
+			},
+			clockOf(minute) {
+				return port.clockAt(minute);
+			},
+			select(id) {
+				if (get().selected !== id) set({ selected: id });
+			},
+			startResize(id, edge) {
+				home = get().shown;
+				set({ resizing: { id, edge }, layer: null });
+			},
+			resizeTo(id, to) {
+				set({ shown: share(get().shown, port.preview(id, to)) });
+			},
+			endResize(id, to) {
+				if (to) {
+					set({ shown: share(get().shown, port.preview(id, to)) });
+					write(port.move(id, to));
+				} else get().carryHome();
+				home = null;
+				set({ resizing: null });
+				get().release("resize");
+			},
 			setPlusAt(at) {
 				const was = get().plusAt;
 				if (was === at || (was && at && was.into === at.into && was.index === at.index)) return;
@@ -173,7 +230,7 @@ export function createScreenStore(port: ScreenPort): ScreenStore {
 			},
 			lift(id) {
 				home = get().shown;
-				set({ lifted: id, liftedDepth: null, layer: null });
+				set({ lifted: id, liftedDepth: null, layer: null, selected: null });
 			},
 			setLiftedDepth(liftedDepth) {
 				if (get().liftedDepth !== liftedDepth) set({ liftedDepth });
@@ -198,7 +255,7 @@ export function createScreenStore(port: ScreenPort): ScreenStore {
 				get().release("drag");
 			},
 			openMenu(id) {
-				set({ layer: { kind: "menu", id, items: port.menu(id) } });
+				set({ layer: { kind: "menu", id, items: port.menu(id) }, selected: null });
 			},
 			closeLayer() {
 				if (get().layer) set({ layer: null });
@@ -222,7 +279,9 @@ export function createScreenStore(port: ScreenPort): ScreenStore {
 					set({ entry: next && depth > 0 ? { ...entry, depth: depth - 1 } : null });
 					return;
 				}
-				set({ entry: next ? entry : null, entrySeq: get().entrySeq + 1 });
+				/** A field on the calendar takes one task: its minute is that task's. */
+				const again = next && entry.at === undefined;
+				set({ entry: again ? entry : null, entrySeq: get().entrySeq + 1 });
 				const added = port.add(text, entry);
 				write(added);
 				await added;
@@ -230,12 +289,13 @@ export function createScreenStore(port: ScreenPort): ScreenStore {
 			start() {
 				const off = port.subscribe(refresh);
 				let timer = 0;
+				/** Each minute the clock moves and the screen reads again: what rides the now line moves with it, what is over fades. */
 				const tick = () => {
 					set({ now: port.now() });
+					refresh();
 					timer = window.setTimeout(tick, MINUTE_MS - (Date.now() % MINUTE_MS));
 				};
 				tick();
-				refresh();
 				return () => {
 					off();
 					window.clearTimeout(timer);
