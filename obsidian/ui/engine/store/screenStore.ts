@@ -1,5 +1,5 @@
 import { createStore, type StoreApi } from "zustand/vanilla";
-import type { Destination, MenuItem, Now, ScreenData, ScreenPort } from "../port";
+import type { Destination, ListId, MenuItem, Now, ScreenData, ScreenPort } from "../port";
 import { share } from "./share";
 
 /** Where the ribbon stands: Inbox–Soon, Soon–the day, the day–its calendar. */
@@ -38,6 +38,8 @@ export interface ScreenState {
 	readonly layer: Layer | null;
 	/** The new task's field: where it stands (the slot a typed task is written to), open while not null. */
 	readonly entry: Destination | null;
+	/** Where the carried plus would open the field: a list and the index among its rows, where they part for it. */
+	readonly plusAt: { readonly into: ListId; readonly index: number } | null;
 	/** Counts the fields opened: each new one (after Enter) is a fresh, empty field. */
 	readonly entrySeq: number;
 	/** Tasks new in the last read: their rows come in; a row merely scrolled into sight does not. */
@@ -63,6 +65,7 @@ export interface ScreenActions {
 	openMenu(id: string): void;
 	closeLayer(): void;
 	act(id: string, item: string): void;
+	setPlusAt(at: { readonly into: ListId; readonly index: number } | null): void;
 	/** Opens the new task's field at `at`, or at the port's place for new tasks; null closes it. */
 	openEntry(at?: Destination | null): void;
 	/** The field one level deeper (1) or shallower (-1), as Tab and Shift+Tab do. */
@@ -133,6 +136,12 @@ export function createScreenStore(port: ScreenPort): ScreenStore {
 			layer: null,
 			entry: null,
 			entrySeq: 0,
+			plusAt: null,
+			setPlusAt(at) {
+				const was = get().plusAt;
+				if (was === at || (was && at && was.into === at.into && was.index === at.index)) return;
+				set({ plusAt: at });
+			},
 			fresh: new Set(),
 			reveal: null,
 

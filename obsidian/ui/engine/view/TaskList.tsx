@@ -1,6 +1,6 @@
 import { defaultRangeExtractor, type Range, useVirtualizer } from "@tanstack/react-virtual";
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
-import { SortableList, SortableRow } from "../drag/Drag";
+import { PLUS, SortableList, SortableRow } from "../drag/Drag";
 import { descendantsOf } from "../drag/tree";
 import { useAnchor } from "../layers/Layers";
 import type { Destination, ListId, Row } from "../port";
@@ -31,15 +31,24 @@ export const TaskList = memo(function TaskList({ list }: { readonly list: ListId
 		const under = descendantsOf(allRows, lifted);
 		return under.size === 0 ? allRows : allRows.filter((row) => !under.has(row.id));
 	}, [allRows, lifted]);
+	const plusAt = useScreen((s) => s.plusAt);
+	/** The rows with the carried plus among them, as a row of this list while it is over it. */
+	const withPlus = useMemo((): readonly Drawn[] => {
+		if (!plusAt) return rows;
+		const { into: where, index } = plusAt;
+		if (where !== list) return rows;
+		const slot: Drawn = { kind: "plus", id: PLUS };
+		return [...rows.slice(0, index), slot, ...rows.slice(index)];
+	}, [rows, plusAt, list]);
 	const entry = useScreen((s) => s.entry);
 	const entrySeq = useScreen((s) => s.entrySeq);
 	/** The rows drawn: the list's, with the new task's field standing in its slot when it is in this list. */
-	const drawn = useMemo(() => withEntry(rows, list, entry), [rows, list, entry]);
+	const drawn = useMemo(() => withEntry(withPlus, list, entry), [withPlus, list, entry]);
 	const fresh = useScreen((s) => s.fresh);
 	const reveal = useScreen((s) => s.reveal);
 	const order = useMemo(() => readRows.map((row) => row.id).join(" "), [readRows]);
 	/** Every row is in the sortable list: headers and plates move aside like cards, and a card goes after them into their section. */
-	const ids = useMemo(() => rows.map((row) => row.id), [rows]);
+	const ids = useMemo(() => withPlus.map((row) => row.id), [withPlus]);
 	const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
 	/**
 	 * While a card is carried, its own row stays mounted however far the list scrolls under it (TanStack Virtual's
@@ -91,6 +100,14 @@ export const TaskList = memo(function TaskList({ list }: { readonly list: ListId
 						<MovingRows>
 							{items.map((item) => {
 								const row = drawn[item.index];
+								if (row.kind === "plus")
+									return (
+										<MovingRow key={row.id} id={row.id} index={item.index} ref={virtualizer.measureElement} order={order} carried fresh={false} className="tc-list-item">
+											<SortableRow id={row.id} gap>
+												<div className="tc-card" />
+											</SortableRow>
+										</MovingRow>
+									);
 								if (row.kind === "entry")
 									return (
 										<MovingRow key={row.id} id={row.id} index={item.index} ref={virtualizer.measureElement} order={order} carried={false} fresh={false} className="tc-list-item">
@@ -143,13 +160,13 @@ const RowFace = memo(function RowFace({ row }: { readonly row: Row }) {
 });
 
 /** A row of the list as drawn: the list's own, or the new task's field. */
-type Drawn = Row | { readonly kind: "entry"; readonly id: string; readonly depth: number };
+type Drawn = Row | { readonly kind: "entry"; readonly id: string; readonly depth: number } | { readonly kind: "plus"; readonly id: string };
 
 /**
  * The list's rows with the new task's field put in its slot: before the task it goes before, else at the end of its
  * section (in place of an empty section's plate). Its level is no deeper than one under the task above it.
  */
-function withEntry(rows: readonly Row[], list: ListId, entry: Destination | null): readonly Drawn[] {
+function withEntry(rows: readonly Drawn[], list: ListId, entry: Destination | null): readonly Drawn[] {
 	if (!entry) return rows;
 	const { list: where, section, before } = entry;
 	if (where !== list) return rows;

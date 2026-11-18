@@ -1,4 +1,4 @@
-import { closestCenter, type CollisionDetection, DndContext, defaultDropAnimationSideEffects, getFirstCollision, pointerWithin, rectIntersection, type UniqueIdentifier, useDndContext, useDroppable, type DragEndEvent, type DragMoveEvent, type DragOverEvent, DragOverlay, type DragStartEvent, type DropAnimation, MouseSensor, TouchSensor, useSensor, useSensors } from "@dnd-kit/core";
+import { closestCenter, type CollisionDetection, DndContext, defaultDropAnimationSideEffects, getClientRect, getFirstCollision, type MeasuringConfiguration, pointerWithin, rectIntersection, type UniqueIdentifier, useDndContext, useDroppable, type DragEndEvent, type DragMoveEvent, type DragOverEvent, DragOverlay, type DragStartEvent, type DropAnimation, MouseSensor, TouchSensor, useDraggable, useSensor, useSensors } from "@dnd-kit/core";
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS, getEventCoordinates } from "@dnd-kit/utilities";
 import { type CSSProperties, memo, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
@@ -17,6 +17,26 @@ import { descendantsOf, projectDepth, type Slot, slotOf } from "./tree";
 
 /** The mouse lifts a card once it moved this far; the finger once it held still this long (the plugin's long press) within this tolerance. */
 const MOUSE_DISTANCE_PX = 4;
+
+/** The plus is carried by this id: on its button, and as a row of the list it is over. */
+export const PLUS = "plus";
+
+/** Whether a touch starts on the plus: it moves at once, a card only after the long press. */
+const onPlus = (event: Event): boolean => (event.target as Element | null)?.closest?.("[data-plus]") != null;
+
+/**
+ * Touch sensors as dnd-kit's custom sensors are made (a sensor's activators filter what may start it): the plus moves at
+ * once under the finger (the old plugin's F175), a card is lifted by the long press.
+ */
+type TouchActivator = (typeof TouchSensor.activators)[number];
+const touchOnly = (takes: (event: Event) => boolean): TouchActivator[] =>
+	TouchSensor.activators.map((activator) => ({ ...activator, handler: (event, options) => takes(event.nativeEvent) && activator.handler(event, options) }));
+class PlusTouchSensor extends TouchSensor {
+	static override activators = touchOnly(onPlus);
+}
+class CardTouchSensor extends TouchSensor {
+	static override activators = touchOnly((event) => !onPlus(event));
+}
 const LONG_PRESS_MS = 250;
 const LONG_PRESS_TOLERANCE_PX = 5;
 
@@ -48,14 +68,20 @@ export interface DragProps {
 	readonly doc: Document;
 	/** How the carried card is drawn, by its task's id and where the pointer took it from the card's left edge. */
 	readonly carried: (id: string, grab: number) => ReactNode;
+	/** How the carried plus is drawn. */
+	readonly plus: ReactNode;
 	/** A tick under the finger as a card lifts: the host's haptics. */
 	readonly onLift: () => void;
 	readonly children: ReactNode;
 }
 
-export function Drag({ doc, carried, onLift, children }: DragProps) {
+export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 	const api = useScreenApi();
-	const sensors = useSensors(useSensor(MouseSensor, { activationConstraint: { distance: MOUSE_DISTANCE_PX } }), useSensor(TouchSensor, { activationConstraint: { delay: LONG_PRESS_MS, tolerance: LONG_PRESS_TOLERANCE_PX } }));
+	const sensors = useSensors(
+		useSensor(MouseSensor, { activationConstraint: { distance: MOUSE_DISTANCE_PX } }),
+		useSensor(CardTouchSensor, { activationConstraint: { delay: LONG_PRESS_MS, tolerance: LONG_PRESS_TOLERANCE_PX } }),
+		useSensor(PlusTouchSensor, { activationConstraint: { distance: MOUSE_DISTANCE_PX } }),
+	);
 	const [active, setActive] = useState<string | null>(null);
 
 	/**
@@ -77,6 +103,8 @@ export function Drag({ doc, carried, onLift, children }: DragProps) {
 		const ofOwn = (hit: { readonly id: UniqueIdentifier; readonly data?: { readonly droppableContainer?: { readonly data: { readonly current?: { readonly sortable?: { readonly containerId: UniqueIdentifier } } } } } }) => hit.id === `${LIST_TARGET}${own}` || hit.data?.droppableContainer?.data.current?.sortable?.containerId === own;
 		const inOwn = underPointer.filter(ofOwn);
 		/** Between the lists, under no list at all, the card stays in its own: only the pointer inside another list moves it there. */
+		/** The plus over no list is no list's row: nothing is under it. */
+		if (args.active.id === PLUS && underPointer.length === 0) return [];
 		const hits = inOwn.length > 0 ? inOwn : underPointer.length > 0 ? underPointer : rectIntersection(args).filter(ofOwn);
 		let overId = getFirstCollision(hits, "id");
 		if (overId !== null) {
@@ -128,13 +156,55 @@ export function Drag({ doc, carried, onLift, children }: DragProps) {
 		const shallowest = below?.kind === "task" ? below.depth : 0;
 		return Math.max(shallowest, Math.min(deepest, liftedDepth.current + Math.round(offsetX / DESIGN.subtaskIndent)));
 	};
-	const move = ({ active: lifted, over, delta }: DragMoveEvent) => {
+	/**
+	 * The carried plus comes into a list the way a card crosses into another (dnd-kit's «multiple containers»): it becomes
+	 * that list's row at the place under the pointer, and from then on the rows part around it as they do for a card. Over
+	 * no list, it is no list's row.
+	 */
+	const plusOver = (event: { readonly activatorEvent: Event; readonly delta: { readonly y: number }; readonly active: Sortable }, over: (Sortable & { readonly rect: { readonly top: number; readonly height: number } }) | null) => {
+		if (!over) return api.getState().setPlusAt(null);
+		const overId = String(over.id);
+		const own = containerOf(event.active);
+		const list = overId.startsWith(LIST_TARGET) ? overId.slice(LIST_TARGET.length) : containerOf(over);
+		if (list === null || list === own) return;
+		if (overId.startsWith(LIST_TARGET)) return api.getState().setPlusAt({ into: list as ListId, index: rowsOf(list).length });
+		const order = itemsOf(over).filter((id) => id !== PLUS);
+		const pointerY = (getEventCoordinates(event.activatorEvent)?.y ?? 0) + event.delta.y;
+		const below = pointerY > over.rect.top + over.rect.height / 2;
+		justMoved.current = true;
+		api.getState().setPlusAt({ into: list as ListId, index: order.indexOf(overId) + (below ? 1 : 0) });
+	};
+	/** The plus let go in a list: the field opens where the rows parted for it, at the level its sideways place asks (the old plugin's F175). */
+	const dropPlus = (event: DragEndEvent) => {
+		const list = containerOf(event.active);
+		const order = orderAfter(event.active, event.over);
+		api.getState().setPlusAt(null);
+		api.getState().release("drag");
+		if (list === null) return;
+		const rows = rowsOf(list);
+		const index = order.indexOf(PLUS);
+		const x = (getEventCoordinates(event.activatorEvent)?.x ?? 0) + event.delta.x;
+		const box = event.over?.rect;
+		const middle = box ? box.left + box.width / 2 : x;
+		const wanted = x < middle ? 0 : 1 + Math.floor((x - middle) / DESIGN.subtaskIndent);
+		const above = rows.find((row) => row.id === order[index - 1]);
+		const depth = Math.min(wanted, above?.kind === "task" ? above.depth + 1 : 0);
+		api.getState().openEntry({ list: list as ListId, ...slotOf(rows, order, PLUS), dayOffset: api.getState().dayOffset, depth });
+	};
+	const move = (event: DragMoveEvent) => {
+		const { active: lifted, over, delta } = event;
+		if (lifted.id === PLUS) return plusOver(event, over);
 		api.getState().setLiftedDepth(projected(lifted, over, sideways(lifted, over, delta.x)));
 	};
 
 	const start = ({ active: lifted }: DragStartEvent) => {
 		const screen = api.getState();
 		if (!screen.claim("drag")) return;
+		if (lifted.id === PLUS) {
+			screen.openEntry(null);
+			setActive(PLUS);
+			return onLift();
+		}
 		screen.lift(String(lifted.id));
 		setActive(String(lifted.id));
 		liftedLeft.current = null;
@@ -149,7 +219,9 @@ export function Drag({ doc, carried, onLift, children }: DragProps) {
 	 * Over another list, the card moves into it at once, as dnd-kit's «multiple containers» example does: the screen draws
 	 * the port's preview of the card there, and that list's cards part around its place.
 	 */
-	const overList = ({ active: lifted, over, delta }: DragOverEvent) => {
+	const overList = (event: DragOverEvent) => {
+		const { active: lifted, over, delta } = event;
+		if (lifted.id === PLUS) return plusOver(event, over);
 		const into = crossing(lifted, over);
 		if (!into) return;
 		const rows = rowsOf(into.list);
@@ -159,8 +231,10 @@ export function Drag({ doc, carried, onLift, children }: DragProps) {
 		justMoved.current = true;
 		api.getState().carryInto(id, to);
 	};
-	const end = ({ active: lifted, over, delta }: DragEndEvent) => {
+	const end = (event: DragEndEvent) => {
+		const { active: lifted, over, delta } = event;
 		setActive(null);
+		if (lifted.id === PLUS) return dropPlus(event);
 		const id = String(lifted.id);
 		const container = containerOf(lifted);
 		if (container === null) return api.getState().drop(id, null);
@@ -170,16 +244,19 @@ export function Drag({ doc, carried, onLift, children }: DragProps) {
 		api.getState().drop(id, still ? null : { list: container as ListId, ...slot, dayOffset: api.getState().dayOffset, depth });
 	};
 	const cancel = () => {
-		if (active) api.getState().drop(active, null);
+		if (active === PLUS) {
+			api.getState().setPlusAt(null);
+			api.getState().release("drag");
+		} else if (active) api.getState().drop(active, null);
 		setActive(null);
 	};
 
 	return (
-		<DndContext sensors={sensors} collisionDetection={collision} onDragStart={start} onDragMove={move} onDragOver={overList} onDragEnd={end} onDragCancel={cancel} autoScroll={AUTO_SCROLL}>
+		<DndContext sensors={sensors} collisionDetection={collision} onDragStart={start} onDragMove={move} onDragOver={overList} onDragEnd={end} onDragCancel={cancel} autoScroll={AUTO_SCROLL} measuring={MEASURING}>
 			{children}
 			{createPortal(
 				<DragOverlay className="tc-overlay" dropAnimation={DROP_ANIMATION}>
-					{active ? <Carried id={active} carried={carried} /> : null}
+					{active === PLUS ? plus : active ? <Carried id={active} carried={carried} /> : null}
 				</DragOverlay>,
 				doc.body,
 			)}
@@ -213,6 +290,21 @@ function orderAfter(active: Sortable, over: Sortable | null): readonly string[] 
 	if (!over || over.id === active.id || own === null || containerOf(over) !== own) return items;
 	return arrayMove([...items], items.indexOf(String(active.id)), items.indexOf(String(over.id)));
 }
+
+/**
+ * Where a row stands for dnd-kit, as its measuring configuration lets an app say (`measuring.droppable.measure`): its
+ * place in the list's layout, never where a glide has it this frame. A row glides by Motion on its list item, so the item
+ * is measured without its transform, as dnd-kit measures a row without its own (`getClientRect`, `ignoreTransform`); the
+ * place the rows part at then holds still under the pointer while they glide.
+ */
+const MEASURING: MeasuringConfiguration = {
+	droppable: {
+		measure: (element) => {
+			const item = element.parentElement?.classList.contains("tc-list-item") ? element.parentElement : element;
+			return getClientRect(item, { ignoreTransform: true });
+		},
+	},
+};
 
 /**
  * A list scrolls under a card held near its top or bottom edge: dnd-kit's own auto-scroll, faster nearer the edge, up and
@@ -262,13 +354,29 @@ export function SortableList({ list, ids, children }: { readonly list: ListId; r
  * A section's header and an empty section's plate move aside like cards but are not carried (`onTap` absent): a card goes
  * after them into their section.
  */
-export const SortableRow = memo(function SortableRow({ id, onTap, children }: { readonly id: string; readonly onTap?: (target: Element) => void; readonly children: ReactNode }) {
+export const SortableRow = memo(function SortableRow({ id, onTap, gap = false, children }: { readonly id: string; readonly onTap?: (target: Element) => void; readonly gap?: boolean; readonly children: ReactNode }) {
 	const carried = onTap !== undefined;
 	const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({ id, disabled: { draggable: !carried, droppable: false } });
 	const style: CSSProperties = { transform: CSS.Translate.toString(transform), transition };
 	return (
-		<div ref={setNodeRef} className={`tc-drag-source${isDragging ? " is-lifted" : ""}`} style={style} {...(carried ? attributes : {})} {...(carried ? listeners : {})} onClick={carried ? (event) => onTap(event.currentTarget) : undefined}>
+		<div ref={setNodeRef} className={`tc-drag-source${isDragging || gap ? " is-lifted" : ""}`} style={style} {...(carried ? attributes : {})} {...(carried ? listeners : {})} onClick={carried ? (event) => onTap(event.currentTarget) : undefined}>
 			{children}
 		</div>
 	);
 });
+
+/**
+ * The plus as dnd-kit carries it: dragged it moves at once; tapped, it does what its `onTap` says. While it is carried, its
+ * own place shows as a dashed ring (the old plugin's F176), and let go back over it nothing opens.
+ */
+export function CarriedPlus({ onTap, children, ring }: { readonly onTap: () => void; readonly children: ReactNode; readonly ring: ReactNode }) {
+	const { setNodeRef, attributes, listeners, isDragging } = useDraggable({ id: PLUS });
+	return (
+		<>
+			{isDragging ? ring : null}
+			<button ref={setNodeRef} type="button" data-plus="" className={`tc-btn is-round is-accent tc-plus${isDragging ? " is-hidden" : ""}`} {...attributes} {...listeners} onClick={onTap}>
+				{children}
+			</button>
+		</>
+	);
+}

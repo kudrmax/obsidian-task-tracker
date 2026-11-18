@@ -77,6 +77,48 @@ export default {
 		await sleep(400);
 		inbox = await file();
 		t.expect(!inbox.some((x) => x.startsWith("Не сохранять")) && !(await field()), `Escape closes without writing: ${JSON.stringify(inbox.slice(-2))}`);
+
+		/** Carried (the old plugin's F175–F176): the plus moves at once; the rows part where it is; let go there, the field opens there. */
+		/** Aimed at a card in the middle of the list's room, away from the edges where a held card scrolls the list. */
+		const target = await t.cdp.eval(`(() => { const list = document.querySelector('[data-list="inbox"]').getBoundingClientRect(); const mid = list.top + list.height / 2; const cards = [...document.querySelectorAll('[data-list="inbox"] .tc-card[data-id]')]; const e = cards.find((c) => c.getBoundingClientRect().top >= mid); const r = e.getBoundingClientRect(); return { x: r.left + r.width * 0.3, y: r.top + 4, title: e.querySelector(".tc-card-title").textContent }; })()`);
+		const press = async (type, p) =>
+			t.platform === "phone"
+				? t.cdp.send("Input.dispatchTouchEvent", { type: { down: "touchStart", move: "touchMove", up: "touchEnd" }[type], touchPoints: type === "up" ? [] : [{ x: p.x, y: p.y, id: 0 }] })
+				: t.cdp.send("Input.dispatchMouseEvent", { type: { down: "mousePressed", move: "mouseMoved", up: "mouseReleased" }[type], x: p.x, y: p.y, button: "left", buttons: type === "up" ? 0 : 1, clickCount: 1 });
+		await press("down", plus);
+		let at = plus;
+		for (let i = 1; i <= 30; i++) {
+			at = { x: plus.x + ((target.x - plus.x) * i) / 30, y: plus.y + ((target.y - plus.y) * i) / 30 };
+			await press("move", at);
+			await sleep(16);
+		}
+		await sleep(400);
+		const held = await t.cdp.eval(`(() => ({ ring: !!document.querySelector(".tc-plus-ring"), gap: !!document.querySelector('[data-list="inbox"] .tc-drag-source.is-lifted') }))()`);
+		await press("up", at);
+		await sleep(500);
+		t.expect(held.ring && held.gap, `the plus carried: a ring at its place, the rows parted for it: ${JSON.stringify(held)}`);
+		t.expect(await field(), "let go among the rows, the field opens there");
+		await t.cdp.send("Input.insertText", { text: "Через плюс" });
+		await key("Enter", "Enter", 13);
+		await sleep(400);
+		await key("Escape", "Escape", 27);
+		await sleep(300);
+		inbox = await file();
+		t.expect(inbox.indexOf("Через плюс:0") === inbox.indexOf(`${target.title}:0`) - 1, `the task written where the plus was let go, before «${target.title}»: ${JSON.stringify(inbox)}`);
+
+		await press("down", plus);
+		for (let i = 1; i <= 8; i++) {
+			await press("move", { x: plus.x - i * 20, y: plus.y - i * 15 });
+			await sleep(16);
+		}
+		for (let i = 7; i >= 0; i--) {
+			await press("move", { x: plus.x - i * 20, y: plus.y - i * 15 });
+			await sleep(16);
+		}
+		await sleep(200);
+		await press("up", plus);
+		await sleep(400);
+		t.expect(!(await field()), "let go back on its ring, nothing opens");
 		await t.cdp.eval(`(async () => { app.commands.executeCommandById("task-calendar-stand:whole-screen"); await new Promise((r) => setTimeout(r, 600)); return 1; })()`);
 	},
 };

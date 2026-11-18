@@ -4,10 +4,18 @@ import { Layers } from "../layers/Layers";
 import { Layout, type Place } from "../layout/Layout";
 import { StoreContext, type ScreenStore } from "../store";
 import { Card } from "./Card";
+import { Icon } from "./Icon";
 import { HostContext, type ScreenHost } from "./host";
 
 /** Touches stay the screen's: Obsidian's drawers never take a swipe meant for it (stage 0, «Integration findings» 8). */
 const keepTouch = (event: TouchEvent) => event.stopPropagation();
+
+/** The carried plus: the round button itself, under the finger. */
+const CARRIED_PLUS = (
+	<div className="tc-btn is-round is-accent tc-plus is-carried">
+		<Icon name="plus" />
+	</div>
+);
 
 /** The carried card: a compact plate around the point the pointer took it by (`--tc-grab-x`), the title cut short. */
 const carried = (id: string, grab: number) => (
@@ -26,7 +34,7 @@ export function TaskScreen({ store, host, place }: { readonly store: ScreenStore
 		<StoreContext.Provider value={store}>
 			<HostContext.Provider value={host}>
 				<Layers>
-					<Drag doc={host.doc} carried={carried} onLift={() => host.haptics.tap()}>
+					<Drag doc={host.doc} carried={carried} plus={CARRIED_PLUS} onLift={() => host.haptics.tap()}>
 						<div className={`task-calendar is-engine is-${place}`} onTouchStart={keepTouch} onTouchMove={keepTouch} onTouchEnd={keepTouch}>
 							<Layout place={place} />
 						</div>

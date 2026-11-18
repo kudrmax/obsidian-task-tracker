@@ -1,19 +1,32 @@
 import { memo, type FocusEvent, type CSSProperties } from "react";
 import { PROPERTY } from "../../design";
+import { CarriedPlus } from "../drag/Drag";
 import { useScreen, useScreenApi } from "../store";
 import { Icon } from "./Icon";
 import { ObsidianEditor } from "./ObsidianEditor";
 
-/** The plus: a tap opens the new task's field at the port's place for new tasks; while the field is open, a tap closes it. */
+/**
+ * The plus: a tap opens the new task's field at the port's place for new tasks (while the field is open, a tap closes it);
+ * carried, it opens the field where it is let go (`CarriedPlus`, the drag owner's).
+ */
 export const PlusButton = memo(function PlusButton() {
 	const api = useScreenApi();
 	const open = useScreen((s) => s.entry !== null);
+	const inList = useScreen((s) => s.plusAt !== null);
+	if (inList) return RING;
 	return (
-		<button type="button" className="tc-btn is-round is-accent tc-plus" aria-label={open ? "Close" : "New task"} onClick={() => api.getState().openEntry(open ? null : undefined)}>
+		<CarriedPlus onTap={() => api.getState().openEntry(open ? null : undefined)} ring={RING}>
 			<Icon name={open ? "cross" : "plus"} />
-		</button>
+		</CarriedPlus>
 	);
 });
+
+/** The plus's place while it is carried: a dashed ring. */
+const RING = (
+	<div className="tc-btn is-round tc-plus-ring">
+		<Icon name="plus" />
+	</div>
+);
 
 /**
  * The new task's field, standing in its list where the task will be written, at its level (spec, «Text fields»: Obsidian's
