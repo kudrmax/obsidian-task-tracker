@@ -205,7 +205,7 @@ The reviews found reads the screens build in their own code. Each becomes a core
   (`normalize` → `write`): the port's `write` applies the change to the text in memory only, so later reads in the run
   see the file as the plugin would, and the disk stays. `create` throws; the settings port's `update` throws;
   `setShown` is never called. Nothing subscribes, so no ticker or timer keeps the process alive.
-- **Install**: `~/.local/bin/obsidian-task-calendar` is a symlink to the main clone's `agent/obsidian-task-calendar.mjs`
+- **Install** (changed 2026-11-18, after Max's agents in Cowork couldn't see a program outside the vault): `npm run release` copies `agent/obsidian-task-calendar.mjs` and the skill `skills/obsidian-task-calendar/SKILL.md` into `~/Obsidian/.claude/skills/obsidian-task-calendar/`; Sync carries them to every Mac. With no `--vault`, the program reads the vault it sits in (`vaultOf`), else `~/Obsidian`. Superseded: `~/.local/bin/obsidian-task-calendar` as a symlink to the main clone's `agent/obsidian-task-calendar.mjs`
   (`~/.local/bin` is on PATH). The main clone is on master, so a merge is the install; no plugin release is needed for
   it. The release script is not touched.
 - **For agents**: a skill `~/.claude/skills/obsidian-task-calendar/SKILL.md` (the home config repo; read
