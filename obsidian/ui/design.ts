@@ -31,6 +31,8 @@ export const DESIGN = {
 	groupHead: 26,
 	/** The gap between two lists of the rows, as between two sections. */
 	sectionGap: 10,
+	/** A subtask's indent under its task: one level of a carried card's depth. */
+	subtaskIndent: 20,
 } as const;
 
 export type DesignMeasure = keyof typeof DESIGN;
@@ -52,6 +54,7 @@ export const DESIGN_TOKENS: Readonly<Record<DesignMeasure, string>> = {
 	treeIndent: "--tc-tree-indent",
 	groupHead: "--tc-group-head-h",
 	sectionGap: "--tc-space-10",
+	subtaskIndent: "--tc-subtask-indent",
 };
 
 /** The custom properties the code sets on elements; styles.css does the arithmetic with them. */
@@ -89,6 +92,8 @@ export const PROPERTY = {
 	level: "--tc-level",
 	/** Where a ribbon's column stands, 0 its left half (its padding near the screen's edge) to 1 its right half. */
 	side: "--tc-side",
+	/** How wide the carried copy may grow to show its whole title: the view's width. */
+	carriedMax: "--tc-carried-max",
 	/** How many levels back from a subtask's card a line of a task further up passes it. */
 	pass: "--tc-pass",
 	/** How many icons' widths an icon of the wheel stands out of its window. */

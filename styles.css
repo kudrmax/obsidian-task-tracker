@@ -287,6 +287,8 @@ body {
 	/* The dragged card stands a little taller than the one it was lifted from. */
 	--tc-float-h: calc(var(--tc-card-h) + var(--tc-float-grow));
 	--tc-float-grow: 2px;
+	/* The dashed place a carried card left while the gap is elsewhere: fainter than the gap. */
+	--tc-home-place-opacity: 0.6;
 	/* Over the Projects screen's tree a carried card or project rides this far above the finger. */
 	--tc-float-above: var(--tc-space-16);
 	/* The number of tasks carried at once, on the top card's upper right corner, standing out of it by `out`. */
@@ -1021,7 +1023,7 @@ button.tc-btn.tc-select-menu.is-off { background: var(--tc-track-bg); color: var
 /* A section lifted: its tasks fold away with its header. A task lifted waits as a dashed place where it stood, its subtasks folded away under it; no other card moves, the drop line shows the place. */
 .tc-card.is-folded { height: 0; margin-bottom: calc(-1 * var(--tc-card-gap)); opacity: 0; }
 .tc-card.is-lifted { visibility: hidden; }
-.tc-list > .tc-card, .tc-list > .tc-quick-row, .tc-list-item > .tc-card { margin-left: calc(var(--tc-level) * var(--tc-subtask-indent)); overflow: visible; clip-path: inset(calc(-1 * var(--tc-branch-rise)) 0 0 calc(-1 * var(--tc-level) * var(--tc-subtask-indent))); }
+.tc-list > .tc-card, .tc-list > .tc-quick-row, .tc-list-item > .tc-card, .tc-drag-source > .tc-card { margin-left: calc(var(--tc-level) * var(--tc-subtask-indent)); overflow: visible; clip-path: inset(calc(-1 * var(--tc-branch-rise)) 0 0 calc(-1 * var(--tc-level) * var(--tc-subtask-indent))); }
 /* A subtask's branch from its task: on down past it to the next subtask, bending in at the last; the lines of the tasks further up that go on past it. */
 .tc-branch, .tc-branch-pass { position: absolute; top: calc(-1 * var(--tc-branch-rise)); height: calc(100% + var(--tc-branch-rise)); box-sizing: border-box; border-left: var(--tc-branch-w) solid var(--tc-branch); pointer-events: none; }
 .tc-branch { left: calc(-1 * (var(--tc-subtask-indent) + var(--tc-branch-w)) / 2); width: calc((var(--tc-subtask-indent) + var(--tc-branch-w)) / 2); }
@@ -1036,13 +1038,13 @@ button.tc-btn.tc-select-menu.is-off { background: var(--tc-track-bg); color: var
 .tc-meta.is-pair .tc-desc-mark { width: var(--tc-desc-mark-pair); height: var(--tc-desc-mark-pair); }
 .tc-count { flex-shrink: 0; font-size: var(--tc-font-count); line-height: var(--tc-leading-card); font-weight: var(--tc-weight-semibold); color: var(--tc-muted); font-variant-numeric: tabular-nums; }
 /* A list card's counter folds the subtasks away and shows them again: it takes the tap from the card's whole height and lights up under the pointer. */
-.tc-list > .tc-card .tc-count, .tc-list-item > .tc-card .tc-count { position: relative; }
-.tc-list > .tc-card .tc-count::after, .tc-list-item > .tc-card .tc-count::after { content: ""; position: absolute; left: calc(-1 * var(--tc-fold-hit-x)); right: calc(-1 * var(--tc-fold-hit-x)); top: calc((var(--tc-leading-card) - var(--tc-card-h)) / 2); bottom: calc((var(--tc-leading-card) - var(--tc-card-h)) / 2); }
+.tc-list > .tc-card .tc-count, :is(.tc-list-item, .tc-drag-source) > .tc-card .tc-count { position: relative; }
+.tc-list > .tc-card .tc-count::after, :is(.tc-list-item, .tc-drag-source) > .tc-card .tc-count::after { content: ""; position: absolute; left: calc(-1 * var(--tc-fold-hit-x)); right: calc(-1 * var(--tc-fold-hit-x)); top: calc((var(--tc-leading-card) - var(--tc-card-h)) / 2); bottom: calc((var(--tc-leading-card) - var(--tc-card-h)) / 2); }
 @media (hover: hover) {
-	body:not(.is-mobile) .tc-list > .tc-card .tc-count:hover, body:not(.is-mobile) .tc-list-item > .tc-card .tc-count:hover { color: var(--tc-text); }
+	body:not(.is-mobile) .tc-list > .tc-card .tc-count:hover, body:not(.is-mobile) :is(.tc-list-item, .tc-drag-source) > .tc-card .tc-count:hover { color: var(--tc-text); }
 }
 /* A task whose subtasks are folded away: a card peeks out under it, and the next card stands below that. */
-.tc-list > .tc-card.is-collapsed, .tc-list-item > .tc-card[data-collapsed="true"] { margin-bottom: var(--tc-stack-step-y); box-shadow: var(--tc-shadow-fold); clip-path: inset(calc(-1 * var(--tc-branch-rise)) 0 calc(-1 * var(--tc-stack-step-y)) calc(-1 * var(--tc-level) * var(--tc-subtask-indent))); }
+.tc-list > .tc-card.is-collapsed, :is(.tc-list-item, .tc-drag-source) > .tc-card[data-collapsed="true"] { margin-bottom: var(--tc-stack-step-y); box-shadow: var(--tc-shadow-fold); clip-path: inset(calc(-1 * var(--tc-branch-rise)) 0 calc(-1 * var(--tc-stack-step-y)) calc(-1 * var(--tc-level) * var(--tc-subtask-indent))); }
 /* Where a dragged task will land: the calendar's drop line between two cards, at the level it picks, inside the list so it scrolls with the cards. */
 .tc-list-drop { position: absolute; left: 0; top: calc(-1 * var(--tc-drop-dot) / 2); width: 0; height: var(--tc-drop-dot); z-index: var(--tc-layer-drop-gap); pointer-events: none; opacity: 0; transition: transform var(--tc-duration-snap) var(--tc-ease-out), opacity var(--tc-duration-snap) var(--tc-ease-out); }
 .tc-list-drop.is-shown { opacity: 1; }
@@ -1266,7 +1268,7 @@ body:has(> .tc-backdrop.is-shown) > .suggestion-container, body:has(> .tc-backdr
 .tc-pick { display: flex; width: 0; height: var(--tc-pick-size); flex-shrink: 0; box-sizing: border-box; margin-right: 0; border: 0 solid var(--tc-muted); border-radius: var(--tc-radius-circle); color: var(--tc-on-accent); align-items: center; justify-content: center; opacity: 0; overflow: hidden; transition: width var(--tc-duration-collapse) var(--tc-ease-out), margin var(--tc-duration-collapse) var(--tc-ease-out), border-width var(--tc-duration-collapse) var(--tc-ease-out), opacity var(--tc-duration-collapse) var(--tc-ease-out), background-color var(--tc-duration-collapse) var(--tc-ease-out); }
 .tc-pick svg { width: var(--tc-pick-check); height: var(--tc-pick-check); stroke: currentColor; stroke-width: var(--tc-stroke-pick); visibility: hidden; }
 .task-calendar.is-selecting .tc-card > .tc-pick, .tc-lifted > .tc-pick { width: var(--tc-pick-size); margin-right: var(--tc-pick-gap); border-width: var(--tc-pick-ring); opacity: 1; }
-.task-calendar .tc-list > .tc-card, .task-calendar .tc-list-item > .tc-card { transition: height var(--tc-duration-collapse) var(--tc-ease-out), margin var(--tc-duration-collapse) var(--tc-ease-out), opacity var(--tc-duration-collapse) var(--tc-ease-out), transform var(--tc-duration-collapse) var(--tc-ease-out), padding var(--tc-duration-collapse) var(--tc-ease-out), background-color var(--tc-duration-collapse) var(--tc-ease-out); }
+.task-calendar .tc-list > .tc-card, .task-calendar :is(.tc-list-item, .tc-drag-source) > .tc-card { transition: height var(--tc-duration-collapse) var(--tc-ease-out), margin var(--tc-duration-collapse) var(--tc-ease-out), opacity var(--tc-duration-collapse) var(--tc-ease-out), transform var(--tc-duration-collapse) var(--tc-ease-out), padding var(--tc-duration-collapse) var(--tc-ease-out), background-color var(--tc-duration-collapse) var(--tc-ease-out); }
 .task-calendar.is-selecting .tc-card, .tc-lifted:has(> .tc-pick) { padding-left: var(--tc-pick-pad-start); }
 .tc-progress-dot { transition: opacity var(--tc-duration-collapse) var(--tc-ease-out); }
 .task-calendar.is-selecting .tc-card > .tc-progress-dot, .tc-lifted:has(> .tc-pick) > .tc-progress-dot { opacity: 0; }
@@ -1800,3 +1802,23 @@ button.tc-btn.tc-folder-btn:disabled { opacity: var(--tc-tile-off-opacity); curs
 .tc-ribbon-track > :is(.tc-divider, .tc-stage-rule) { position: relative; left: auto; top: auto; bottom: auto; flex: none; margin-top: var(--tc-columns-head); }
 .tc-ribbon-track > .tc-stage-col > :is(.tc-stage-head, .tc-stage-body) { padding: 0 calc(var(--tc-space-2) + var(--tc-side) * (var(--tc-space-10) - var(--tc-space-2))) 0 calc(var(--tc-space-10) - var(--tc-side) * (var(--tc-space-10) - var(--tc-space-2))); }
 .tc-ribbon-track > .tc-stage-col.is-timeline > :is(.tc-stage-head, .tc-stage-body) { padding: 0; }
+/*
+ * Drag and drop (docs/superpowers/specs/2026-11-18-ui-engine.md, «Decided» 1): while a card is carried the cards part and the
+ * gap is where it lands, its place outline at the depth it will take. The carried copy rides the pointer in dnd-kit's overlay,
+ * outside the screen's styles: it carries the screen's type itself.
+ */
+.tc-drag-source { display: flow-root; touch-action: pan-y; }
+.tc-gap { height: var(--tc-card-h); box-sizing: border-box; margin-left: calc(var(--tc-level) * var(--tc-subtask-indent)); border: var(--tc-hairline) dashed var(--tc-dash); border-radius: var(--tc-radius-card); }
+.tc-overlay { font-family: var(--tc-font-ui); font-size: var(--tc-font-body); font-weight: var(--tc-weight-normal); line-height: var(--tc-leading-normal); color: var(--tc-text); z-index: var(--tc-layer-float); }
+.tc-carried { position: relative; width: max-content; min-width: 100%; max-width: var(--tc-carried-max); }
+.tc-carried > .tc-card { background: var(--tc-float-bg); box-shadow: var(--tc-shadow-lift); cursor: grabbing; }
+.tc-carried > .tc-card[data-priority] { background: var(--tc-priority-fill); }
+.tc-carried > .tc-card > .tc-card-title, .tc-carried .tc-card-lines > .tc-card-title { flex: none; -webkit-mask-image: none; mask-image: none; }
+.tc-carried-layer { position: absolute; left: 0; right: 0; top: 0; height: var(--tc-card-h); border-radius: var(--tc-radius-card); box-shadow: var(--tc-shadow-lift); }
+.tc-carried-layer.is-1 { transform: translate(var(--tc-stack-step-x), var(--tc-stack-step-y)); right: calc(2 * var(--tc-stack-step-x)); background: var(--tc-stack-1); }
+.tc-carried-layer.is-2 { transform: translate(calc(2 * var(--tc-stack-step-x)), calc(2 * var(--tc-stack-step-y))); right: calc(2 * var(--tc-stack-step-x) + 2 * var(--tc-stack-step-x)); background: var(--tc-stack-2); }
+/* Looks to choose on the stand (spec, «Not decided»): the place a carried card left, an outline round the card it would go under, the timeline's landing. */
+.tc-gap.is-home { border-color: var(--tc-dash); opacity: var(--tc-home-place-opacity); }
+.tc-card.is-drop-parent { box-shadow: 0 0 0 var(--tc-hairline) var(--tc-accent); }
+.tc-drop-at { position: absolute; left: 0; right: 0; top: calc(var(--tc-y) - var(--tc-now-h) / 2); height: var(--tc-now-h); display: flex; align-items: center; z-index: var(--tc-layer-drop); pointer-events: none; }
+.tc-block.tc-landing-place { box-sizing: border-box; border: var(--tc-hairline) dashed var(--tc-accent); border-radius: var(--tc-radius-card); background: var(--tc-drop-bg); pointer-events: none; }

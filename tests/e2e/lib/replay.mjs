@@ -6,6 +6,8 @@ import { FrameRecorder, frameFaults } from "./frames.mjs";
 const LONGEST_PAUSE_MS = 2000;
 /** The ribbon stands on a place when it is this close to it, in places. */
 const ON_PLACE = 0.01;
+/** A run of the screen's trace turns when it goes back by more than this share of a place. */
+const TURN = 0.15;
 /** Of a long session held to the pager's rule run offline, the share of settled places that may lie off its path. */
 const ASTRAY_SHARE = 0.03;
 /** Frames the ribbon may stand between places, not moving, before it counts as stalled. */
@@ -48,17 +50,30 @@ export async function replay(cdp, file, { startPlace = 1, strokes = [] } = {}) {
 	const shown = await frames.stop();
 	const places = shown.map((f) => f.place).filter((p) => p !== null);
 	/**
-	 * What a person saw settle, as a position on the row of screens: the place (0 Inbox–Soon, 1 Soon–Now, 2 Now–calendar)
-	 * and past it the days, read from the calendar's title (Today, Tomorrow, a date).
+	 * Where the screen went, as a position on the row of screens: the place (0 Inbox–Soon, 1 Soon–Now, 2 Now–calendar) and
+	 * past it the days, read from the calendar's title (Today, Tomorrow, a date). A stroke can be taken back by the next one
+	 * before the screen settles: so the screen's turning points are read, not only where it came to rest. The trace is cut
+	 * into runs one way; where a run turns by more than `TURN` of a place, its far end is a place the screen was sent to.
 	 */
-	const observed = [];
-	for (const f of shown) {
-		if (f.place === null) continue;
-		const near = Math.round(f.place);
-		if (Math.abs(f.place - near) > ON_PLACE) continue;
-		const at = near === 2 ? 2 + dayOffset(f.day) : near;
-		if (observed.at(-1) !== at) observed.push(at);
+	const trace = shown.filter((f) => f.place !== null).map((f) => f.place + (Math.round(f.place) === 2 ? dayOffset(f.day) : 0));
+	const turns = trace.length ? [trace[0]] : [];
+	let far = trace[0];
+	let way = 0;
+	for (const at of trace) {
+		const step = at - far;
+		if (way === 0) {
+			if (Math.abs(step) > TURN) way = Math.sign(step);
+			else continue;
+		}
+		if (Math.sign(step) === way) far = at;
+		else if (Math.abs(step) > TURN) {
+			turns.push(far);
+			way = -way;
+			far = at;
+		}
 	}
+	if (trace.length) turns.push(trace.at(-1));
+	const observed = dedupe(turns.map((at) => Math.round(at)));
 	/**
 	 * Where each stroke leads: one screen its way along the row; nothing before Inbox. Without an expectation file the strokes
 	 * are the recorded ones as the pager's rule finds them (`strokes`).

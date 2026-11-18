@@ -2,6 +2,22 @@ import { createContext, useContext } from "react";
 import { useStore } from "zustand";
 import type { ScreenActions, ScreenState, ScreenStore } from "./screenStore";
 
+/**
+ * The looks Max has not chosen yet (docs/superpowers/specs/2026-11-18-ui-engine.md, «Not decided»): the stand switches
+ * between them; the plugin draws the released ones. Once he chooses, the switch and the other look go.
+ */
+export interface ScreenLooks {
+	/** Over the timeline, where a carried card lands: the released accent line with its time, or the block at its landing (stage 0). */
+	readonly timelineDrop: "line" | "block";
+	/** A card carried away from its place: the released dashed outline stays there, or the place closes (stage 0). */
+	readonly homePlace: "outline" | "closed";
+	/** A card about to become a subtask: no mark (released), or an outline around its parent. */
+	readonly parentOutline: boolean;
+}
+
+/** The released screen's looks. */
+export const RELEASED_LOOKS: ScreenLooks = { timelineDrop: "line", homePlace: "outline", parentOutline: false };
+
 /** Where and how the screen is shown: every fact a component would otherwise read from the platform, from the host. */
 export interface ScreenHost {
 	readonly store: ScreenStore;
@@ -16,6 +32,9 @@ export interface ScreenHost {
 	readonly height: number;
 	/** The window the view lives in (a pop-out has its own): the gestures listen there. */
 	readonly win: Window;
+	/** A light tap of the phone's haptics (none on the desktop): a card lifted and let go. */
+	readonly haptics: { tap(): void };
+	readonly looks: ScreenLooks;
 }
 
 export const ScreenContext = createContext<ScreenHost | null>(null);

@@ -4,6 +4,7 @@ import { clearCardSize, showCardSize } from "../ui/cardSize";
 import { clearPriorityColors, showLabelPaint, showPriorityColors } from "../ui/priorityColors";
 import { addWindowDocument } from "../ui/windowDocuments";
 import { type MountedScreen, mountScreen } from "../ui/engine/mountScreen";
+import { RELEASED_LOOKS, type ScreenLooks } from "../ui/engine/ScreenContext";
 import { PROJECT_NOTE } from "./mockTasks";
 import { composeStand, type Stand, WRITE_DELAYS } from "./standServices";
 
@@ -18,6 +19,7 @@ class StandView extends ItemView {
 	constructor(
 		leaf: WorkspaceLeaf,
 		private readonly stand: Stand,
+		private readonly looks: () => ScreenLooks,
 	) {
 		super(leaf);
 	}
@@ -37,7 +39,7 @@ class StandView extends ItemView {
 	override async onOpen(): Promise<void> {
 		this.contentEl.empty();
 		this.contentEl.addClass("tc-view");
-		this.screen = mountScreen(this.contentEl, this.stand.services, { kind: "main" });
+		this.screen = mountScreen(this.contentEl, this.stand.services, { kind: "main" }, this.looks);
 	}
 
 	override async onClose(): Promise<void> {
@@ -46,6 +48,10 @@ class StandView extends ItemView {
 	}
 
 	override onResize(): void {
+		this.screen?.refit();
+	}
+
+	refit(): void {
 		this.screen?.refit();
 	}
 }
@@ -60,14 +66,19 @@ class StandBlock extends MarkdownRenderChild {
 		el: HTMLElement,
 		private readonly stand: Stand,
 		private readonly path: string,
+		private readonly looks: () => ScreenLooks,
 	) {
 		super(el);
+	}
+
+	refit(): void {
+		this.screen?.refit();
 	}
 
 	override onload(): void {
 		const block = this.containerEl;
 		block.addClass("tc-project-block");
-		this.screen = mountScreen(block, this.stand.services, { kind: "note", path: () => this.path });
+		this.screen = mountScreen(block, this.stand.services, { kind: "note", path: () => this.path }, this.looks);
 		const view = block.ownerDocument.defaultView ?? window;
 		/** The block grows with its tasks once the screen has drawn them. */
 		this.frame = view.requestAnimationFrame(() => {
@@ -90,8 +101,20 @@ class StandBlock extends MarkdownRenderChild {
  * The stand: the engine (`obsidian/ui/engine`) on the real core over made-up tasks in memory, for the test Obsidian only
  * (docs/superpowers/specs/2026-11-18-ui-engine.md, «The stand»). Its checks reach it through `window.__tcStand`.
  */
+/**
+ * The looks Max is to choose between (spec, «Not decided»), each a switch of the stand's: its commands flip them on every
+ * open screen. They start as the released screen draws them.
+ */
+const LOOK_SWITCHES: readonly { readonly id: string; readonly name: string; readonly flip: (looks: ScreenLooks) => ScreenLooks }[] = [
+	{ id: "look-timeline-drop", name: "Look: timeline landing, line or block", flip: (l) => ({ ...l, timelineDrop: l.timelineDrop === "line" ? "block" : "line" }) },
+	{ id: "look-home-place", name: "Look: the place a carried card left, outline or closed", flip: (l) => ({ ...l, homePlace: l.homePlace === "outline" ? "closed" : "outline" }) },
+	{ id: "look-parent-outline", name: "Look: outline around the parent, off or on", flip: (l) => ({ ...l, parentOutline: !l.parentOutline }) },
+];
+
 export default class TaskCalendarStand extends Plugin {
 	stand!: Stand;
+	private looks: ScreenLooks = RELEASED_LOOKS;
+	private readonly screens = new Set<{ refit(): void }>();
 
 	override async onload(): Promise<void> {
 		const stand = composeStand();
@@ -103,8 +126,11 @@ export default class TaskCalendarStand extends Plugin {
 		this.register(clearCardSize);
 		this.register(clearPriorityColors);
 		this.followWindows();
-		this.registerView(STAND_VIEW, (leaf) => new StandView(leaf, stand));
-		this.registerMarkdownCodeBlockProcessor(BLOCK_LANGUAGE, (_source, el, ctx) => ctx.addChild(new StandBlock(el, stand, ctx.sourcePath)));
+		const looks = () => this.looks;
+		this.registerView(STAND_VIEW, (leaf) => this.track(new StandView(leaf, stand, looks)));
+		this.registerMarkdownCodeBlockProcessor(BLOCK_LANGUAGE, (_source, el, ctx) => ctx.addChild(this.track(new StandBlock(el, stand, ctx.sourcePath, looks))));
+		for (const look of LOOK_SWITCHES) this.addCommand({ id: look.id, name: look.name, callback: () => this.setLooks(look.flip(this.looks)) });
+		(window as unknown as { __tcStandLooks: (looks: Partial<ScreenLooks>) => void }).__tcStandLooks = (patch) => this.setLooks({ ...this.looks, ...patch });
 		this.addRibbonIcon("flask-conical", "Task Calendar Stand", () => void this.open());
 		this.addCommand({ id: "open", name: "Open the screen", callback: () => void this.open() });
 		this.addCommand({ id: "open-window", name: "Open the screen in a new window", callback: () => void this.open(true) });
@@ -112,6 +138,18 @@ export default class TaskCalendarStand extends Plugin {
 		this.addCommand({ id: "new-tasks", name: "New made-up tasks", callback: () => stand.reset() });
 		this.addCommand({ id: "phone-view", name: "Phone view on or off", callback: () => (this.app as unknown as { emulateMobile(on: boolean): void; isMobile: boolean }).emulateMobile(!(this.app as unknown as { isMobile: boolean }).isMobile) });
 		for (const delay of WRITE_DELAYS) this.addCommand({ id: `delay-${delay}`, name: `Write delay ${delay} ms`, callback: () => stand.setDelay(delay) });
+	}
+
+	/** A screen the stand opened, refitted when a look switches. */
+	private track<T extends { refit(): void }>(screen: T): T {
+		this.screens.add(screen);
+		return screen;
+	}
+
+	/** The looks switched: every open screen draws them. */
+	private setLooks(looks: ScreenLooks): void {
+		this.looks = looks;
+		for (const screen of this.screens) screen.refit();
 	}
 
 	/** The card size and the levels' and labels' colours, as the plugin paints them on every window's document. */

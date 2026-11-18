@@ -1,6 +1,7 @@
 import { motion, useMotionValue } from "motion/react";
 import { type TouchEvent, useEffect } from "react";
 import { Capsule, Plus, useWheelStyle, ViewButton, Wheel } from "./BottomRow";
+import { DragLayer } from "./drag/DragLayer";
 import { RibbonStage } from "./Ribbon";
 import { ScreenContext, type ScreenHost, useHost, useScreen } from "./ScreenContext";
 import { StillStage } from "./StillStage";
@@ -42,16 +43,18 @@ function Screen() {
 	return (
 		<motion.div className={classes} style={wheelStyle} onTouchStart={keepFromObsidian} onTouchMove={keepFromObsidian} onTouchEnd={keepFromObsidian} onTouchCancel={keepFromObsidian}>
 			{phase === "missing" ? <MissingFile /> : null}
-			{phase === "ready" && view ? ribbon ? <RibbonStage position={position} /> : <StillStage layout={view.layout} /> : null}
-			<div className="tc-fade" />
-			{phase === "ready" ? (
-				<>
-					<Capsule />
-					{view?.wheel ? <Wheel position={position} /> : null}
-					<ViewButton />
-					<Plus />
-				</>
-			) : null}
+			<DragLayer>
+				{phase === "ready" && view ? ribbon ? <RibbonStage position={position} /> : <StillStage layout={view.layout} /> : null}
+				<div className="tc-fade" />
+				{phase === "ready" ? (
+					<>
+						<Capsule />
+						{view?.wheel ? <Wheel position={position} /> : null}
+						<ViewButton />
+						<Plus />
+					</>
+				) : null}
+			</DragLayer>
 		</motion.div>
 	);
 }

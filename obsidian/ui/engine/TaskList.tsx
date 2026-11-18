@@ -1,35 +1,26 @@
+import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { useVirtualizer, type Virtualizer } from "@tanstack/react-virtual";
+import { motion } from "motion/react";
 import { type CSSProperties, memo, type ReactNode, useCallback, useMemo, useRef, useState } from "react";
+import type { DropColumn } from "../../../core/application/contracts";
 import { PROPERTY } from "../design";
 import type { LocalDate } from "../types";
 import { Card } from "./Card";
-import type { ColumnModel, GroupModel, RowModel } from "./columnModel";
-import { useScreen } from "./ScreenContext";
+import type { DragSource } from "./drag/DragLayer";
+import { dragId, dropId } from "./drag/dragState";
+import { useListShape } from "./drag/geometry";
+import { type Entry, entriesOf } from "./drag/listDrag";
+import { useHost, useScreen } from "./ScreenContext";
 import type { ShownList } from "./screenStore";
-
-/** A row of a list as the virtualizer counts it: a section's header, its No tasks plate, a card, or the empty list's plate. */
-type Entry =
-	| { readonly key: string; readonly kind: "head"; readonly group: GroupModel; readonly top: boolean }
-	| { readonly key: string; readonly kind: "plate"; readonly group: GroupModel }
-	| { readonly key: string; readonly kind: "card"; readonly row: RowModel }
-	| { readonly key: string; readonly kind: "empty"; readonly words: string };
-
-function entriesOf(model: ColumnModel): Entry[] {
-	const entries: Entry[] = [];
-	for (const group of model.groups) {
-		if (group.header) entries.push({ key: `head:${group.id}`, kind: "head", group, top: entries.length === 0 });
-		if (group.empty) entries.push({ key: `plate:${group.id}`, kind: "plate", group });
-		for (const row of group.rows) entries.push({ key: `task:${row.id}`, kind: "card", row });
-	}
-	if (model.plate !== null) entries.push({ key: "empty", kind: "empty", words: model.plate });
-	return entries;
-}
 
 /** How far the list is scrolled from its top and how much of it lies below: the fades at its edges follow them. */
 interface Edges {
 	readonly above: number;
 	readonly below: number;
 }
+
+/** Every card that changes place glides there, the same way whatever moved it (spec, «How the stack solves…»). */
+const GLIDE = { type: "spring", stiffness: 520, damping: 42, mass: 0.9 } as const;
 
 export interface TaskListProps {
 	readonly column: ShownList;
@@ -38,6 +29,8 @@ export interface TaskListProps {
 	/** The list scrolls in its own room and mounts only the cards in sight (TanStack Virtual); false: every card, the list as tall as its cards. */
 	readonly scrolls: boolean;
 	readonly className?: string;
+	/** The room over its first row, px: the rows' lists keep a card gap there. */
+	readonly padTop?: number;
 	/** The list's content as drawn, for the rows' heights (`stackedLists`): its whole height and where each card ends. */
 	readonly onSize?: (size: ListSize) => void;
 }
@@ -47,19 +40,33 @@ export interface ListSize {
 	readonly stops: readonly number[];
 }
 
+const isDropColumn = (column: ShownList): column is DropColumn => column !== "projects";
+
 /**
  * A column's list: each task with its open subtasks under it and their branches, the sections' headers and the empty
  * sections' plates, as the core groups them. A list that scrolls mounts only what is in sight; its edges fade as it is
- * scrolled under them.
+ * scrolled under them. While a card is carried the cards part where the core places it (the gap) and glide back as it
+ * moves on; every card is a drag source, the list a drop target.
  */
-export const TaskList = memo(function TaskList({ column, day, scrolls, className = "", onSize }: TaskListProps) {
+export const TaskList = memo(function TaskList({ column, day, scrolls, className = "", padTop = 0, onSize }: TaskListProps) {
 	const model = useScreen((s) => s.columns[column]);
-	const entries = useMemo(() => entriesOf(model), [model]);
+	const drag = useScreen((s) => (s.drag && (s.drag.lifted.kind !== "task" || s.drag.lifted.home?.column === column || (s.drag.aim.kind === "gap" && s.drag.aim.column === column) || s.drag.phase === "dropping") ? s.drag : null));
+	const { looks } = useHost();
+	const entries = useMemo(() => entriesOf(model, column, drag, looks), [model, column, drag, looks]);
 	const settings = useScreen((s) => s.settings);
 	const ungrouped = settings.ungrouped;
 	const emptyLabel = useScreen((s) => s.funnel?.view.emptyLabel ?? "");
 	const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
 	const [edges, setEdges] = useState<Edges>({ above: 0, below: 0 });
+	const droppable = isDropColumn(column) ? column : null;
+	const { setNodeRef: dropRef } = useDroppable({ id: dropId.list(droppable ?? "day"), disabled: droppable === null || !scrolls });
+	const listRef = useCallback(
+		(el: HTMLDivElement | null) => {
+			setScroller(el);
+			dropRef(el);
+		},
+		[dropRef],
+	);
 	/** Every row is measured once drawn; until then it counts as a card. */
 	const estimate = useCallback(() => settings.cardHeight, [settings.cardHeight]);
 	const shape = useRef({ entries, onSize });
@@ -82,12 +89,16 @@ export const TaskList = memo(function TaskList({ column, day, scrolls, className
 		enabled: scrolls,
 		onChange: follow,
 	});
+	useListShape(scrolls ? droppable : null, () => ({ entries, measured: virtualizer.measurementsCache, scrollTop: virtualizer.scrollOffset ?? 0, padTop }));
+
 	const draw = (entry: Entry): ReactNode => {
-		if (entry.kind === "card") return <Card id={entry.row.id} day={day} level={entry.row.level} branch={entry.row.branch} stage={entry.row.stage} />;
+		if (entry.kind === "card") return droppable ? <DraggableCard column={droppable} entry={entry} day={day} /> : <Card id={entry.row.id} day={day} level={entry.row.level} branch={entry.row.branch} stage={entry.row.stage} />;
+		if (entry.kind === "gap") return <Gap id={entry.id} level={entry.level} />;
+		if (entry.kind === "home") return <div className="tc-gap is-home" style={{ [PROPERTY.level]: String(entry.level) } as CSSProperties} />;
 		if (entry.kind === "head")
 			return (
 				<div className={`tc-group-head${entry.group.name === null ? " is-ungrouped" : ""}`}>
-					<span className="tc-group-name">{entry.group.title !== undefined ? entry.group.title ?? "" : entry.group.name ?? ungrouped}</span>
+					<span className="tc-group-name">{entry.group.title !== undefined ? (entry.group.title ?? "") : (entry.group.name ?? ungrouped)}</span>
 				</div>
 			);
 		if (entry.kind === "plate") return <div className="tc-group-empty" data-group={entry.group.name ?? ""}>{emptyLabel}</div>;
@@ -108,17 +119,38 @@ export const TaskList = memo(function TaskList({ column, day, scrolls, className
 			</div>
 		);
 	return (
-		<div className={`tc-list ${className}${fades}`} style={style} ref={setScroller} data-list={column}>
+		<div className={`tc-list ${className}${fades}`} style={style} ref={listRef} data-list={column}>
 			<div className="tc-list-items" style={{ height: virtualizer.getTotalSize() }}>
 				{virtualizer.getVirtualItems().map((v) => {
 					const entry = entries[v.index];
 					return (
-						<div key={v.key} ref={virtualizer.measureElement} data-index={v.index} className={`tc-list-item${entry.kind === "head" && entry.top ? " is-top" : ""}`} style={{ transform: `translateY(${v.start}px)` }}>
+						<motion.div key={v.key} ref={virtualizer.measureElement} data-index={v.index} className={`tc-list-item${entry.kind === "head" && entry.top ? " is-top" : ""}`} initial={false} animate={{ y: v.start }} transition={GLIDE}>
 							{draw(entry)}
-						</div>
+						</motion.div>
 					);
 				})}
 			</div>
 		</div>
 	);
 });
+
+/** A card as a drag source: the thin wrapper dnd-kit re-renders, around the memoized card. */
+function DraggableCard({ column, entry, day }: { readonly column: DropColumn; readonly entry: Extract<Entry, { kind: "card" }>; readonly day: LocalDate | null }) {
+	const source: DragSource = useMemo(() => ({ kind: "card", column, id: entry.row.id }), [column, entry.row.id]);
+	const { setNodeRef, listeners, attributes } = useDraggable({ id: dragId.task(entry.row.id), data: source });
+	return (
+		<div ref={setNodeRef} className="tc-drag-source" {...listeners} {...attributes}>
+			<Card id={entry.row.id} day={day} level={entry.row.level} branch={entry.row.branch} stage={entry.row.stage} unseen={entry.landing} parent={entry.parent} />
+		</div>
+	);
+}
+
+/**
+ * The place a carried card will land: its outline at its depth. It is the carried task's own node for dnd-kit, so the
+ * copy let go flies into it.
+ */
+function Gap({ id, level }: { readonly id: string | null; readonly level: number }) {
+	const twoLine = useScreen((s) => (id ? s.items[id]?.card.over !== null : false));
+	const { setNodeRef } = useDraggable({ id: id ? dragId.task(id) : "gap", disabled: true });
+	return <div ref={setNodeRef} className={`tc-gap${twoLine ? " is-two-line" : ""}`} style={{ [PROPERTY.level]: String(level) } as CSSProperties} />;
+}

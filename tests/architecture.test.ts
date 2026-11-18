@@ -15,7 +15,7 @@ const OBSIDIAN_PACKAGES = ["obsidian", "@codemirror/state", "@codemirror/view"];
  * The view's libraries, the stack the UI is built on (docs/superpowers/specs/2026-11-16-ui-standard-stack.md, «The
  * stack»): drawing and gestures only, no layer of ours. Named one by one, by the exact entry the UI imports.
  */
-const UI_PACKAGES = ["react", "react/jsx-runtime", "react-dom", "react-dom/client", "zustand", "zustand/vanilla", "zustand/react/shallow", "motion/react", "@use-gesture/react", "@tanstack/react-virtual"];
+const UI_PACKAGES = ["react", "react/jsx-runtime", "react-dom", "react-dom/client", "zustand", "zustand/vanilla", "zustand/react/shallow", "motion/react", "@use-gesture/react", "@tanstack/react-virtual", "@dnd-kit/core", "@dnd-kit/utilities"];
 
 function layerOf(file: string): Layer | null {
 	if (["obsidian/main.ts", "obsidian/demo.ts", "obsidian/compose.ts", "obsidian/settingsFile.ts"].includes(file)) return "root";

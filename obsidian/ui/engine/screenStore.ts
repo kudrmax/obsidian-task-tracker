@@ -8,6 +8,10 @@ import {
 	dayTitle,
 	type DayService,
 	type DropColumn,
+	type DropTo,
+	placeOfDrop,
+	type ScreenView,
+	StaleTaskError,
 	type FunnelPlace,
 	type FunnelView,
 	NO_DAY_EVENTS,
@@ -17,9 +21,12 @@ import {
 	type TaskSpan,
 	type UndoService,
 } from "../../../core/application/contracts";
+import { LAYOUT } from "../design";
 import type { LocalDate } from "../types";
 import type { ShownSettings, ShownSettingsStore } from "../viewSettings";
 import { type ColumnModel, columnModel, EMPTY_COLUMN, projectsModel, shared } from "./columnModel";
+import type { Aim, Drag, Lifted } from "./drag/dragState";
+import { listCards } from "./drag/listDrag";
 
 /** What the screen reads and writes through: the core's services and the device's settings of the view. */
 export interface ScreenServices {
@@ -59,6 +66,10 @@ export interface ScreenState {
 	readonly canUndo: boolean;
 	/** The present minute from the shown day's start while it is today (the now line); null on another day. */
 	readonly now: number | null;
+	/** What a drop on each column's title means (`ScreenView.titleDrops`); none before the first read. */
+	readonly titleDrops: Readonly<Record<DropColumn, DropTo>> | null;
+	/** A drag under way, or the card just let go waiting for its copy to land; null otherwise. */
+	readonly drag: Drag | null;
 }
 
 export interface ScreenActions {
@@ -78,8 +89,25 @@ export interface ScreenActions {
 	saveShare(share: number): void;
 	undo(): Promise<void>;
 	createFile(): Promise<void>;
+	/** A finger lifts a card, the plus or a section: its place in its list stays the gap until the finger aims elsewhere. */
+	lift(lifted: Lifted): void;
+	/** Where the carried thing would land now. */
+	aim(aim: Aim): void;
+	/**
+	 * Let go: what the aim means is written (`TaskService.drop`); the screen the drop leaves (`dropPreview`) is drawn at once,
+	 * the card waiting unseen at its place until its copy lands (`landed`). Aiming home, nothing is written.
+	 */
+	release(): Promise<void>;
+	/** The drag ends with nothing written: the copy flies back to the card's place. */
+	cancel(): void;
+	/** The carried copy has landed: the card shows. */
+	landed(): void;
 	/** A minute may have passed: the now line follows. */
 	tickNow(): void;
+	/** A minute of the timeline snapped to its grid at this zoom (`TaskService.snap`). */
+	snap(minute: number, hourPx: number): number;
+	/** Where a task let go at `start` on the shown day's timeline lands (`TaskService.dropSpan`). */
+	landingSpan(start: number): { readonly start: number; readonly end: number | null } | null;
 	/** Reads of the core the timeline draws by, for the shown day. */
 	spanOf(item: TaskItem): TaskSpan;
 	eventSpan(event: CalendarEvent): { readonly start: number; readonly end: number };
@@ -89,6 +117,8 @@ export interface ScreenActions {
 	openAt(date: LocalDate): DayOpening;
 	/** Minutes since midnight by the clock: the now line's pill. */
 	clockMinute(): number;
+	/** The clock's minutes of `minute` after the shown day's start: a time's words. */
+	clockOf(minute: number): number;
 	/** Stops following the services. */
 	dispose(): void;
 }
@@ -115,6 +145,62 @@ export function createScreenStore(services: ScreenServices, where: ScreenPlace, 
 		const titleOf = (date: LocalDate) => dayTitleOf(days, date);
 		const readView = (): Promise<FunnelView | null> => (where.kind === "note" ? tasks.projectNoteView(where.path(), wide()) : tasks.funnelView(wide()));
 
+		/** A screen the core read (or a drop's preview of the one it leaves) drawn: what is the same as drawn keeps its objects. */
+		const take = (screen: ScreenView, funnel: FunnelView | null, projects: ProjectsView | null, extra: Partial<ScreenState> = {}) => {
+			const date = get().date;
+			const prev = get();
+			const lists: Record<DropColumn, readonly TaskItem[]> = { inbox: screen.inbox, backlog: screen.backlog, soon: screen.soon, day: screen.day.list };
+			const items: Record<string, TaskItem> = {};
+			const keep = (item: TaskItem) => {
+				items[item.id] = shared(prev.items[item.id], item);
+				item.subtasks.forEach(keep);
+			};
+			for (const list of [...Object.values(lists), screen.day.slotted, projects?.sections.flatMap((section) => section.rows.map((row) => row.item)) ?? []]) list.forEach(keep);
+			const plates = funnel?.view.plates;
+			const columns = Object.fromEntries(
+				FUNNEL_LISTS.map((column) => {
+					const sections = tasks.columnSections(column, date);
+					const model = columnModel(lists[column], sections ? screen.sections[sections.list] : null, plates?.[column] ?? null);
+					return [column, shared(prev.columns[column], model)];
+				}),
+			) as Record<ShownList, ColumnModel>;
+			columns.projects = shared(prev.columns.projects, projects ? projectsModel(projects) : EMPTY_COLUMN);
+			set({
+				phase: screen.missing ? "missing" : "ready",
+				funnel: shared(prev.funnel ?? undefined, funnel),
+				place: prev.phase === "loading" && funnel ? funnel.place : prev.place,
+				items,
+				columns,
+				slotted: shared(prev.slotted, screen.day.slotted.map((item) => item.id)),
+				projects: shared(prev.projects ?? undefined, projects),
+				listNames: shared(prev.listNames, listNames()),
+				dayTitle: titleOf(date),
+				titleDrops: shared(prev.titleDrops ?? undefined, screen.titleDrops),
+				...extra,
+			});
+		};
+
+		/** A drop's step done (its screen drawn, its copy landed): once both are, the drag is over and the card shows. */
+		const settle = (step: { drawn?: boolean; flown?: boolean }) => {
+			const drag = get().drag;
+			if (!drag) return;
+			const next = { ...drag, phase: "dropping" as const, drawn: drag.drawn || step.drawn === true, flown: drag.flown || step.flown === true };
+			set({ drag: next.drawn && next.flown ? null : next });
+		};
+
+		/** What letting go at the aim means for the file; null where it changes nothing (the card's own place). */
+		const dropOf = (drag: Drag): DropTo | null => {
+			const { lifted, aim } = drag;
+			if (lifted.kind !== "task") return null;
+			if (aim.kind === "time") return { kind: "time", start: aim.start };
+			if (aim.kind === "title") return get().titleDrops?.[aim.column] ?? null;
+			if (aim.kind !== "gap") return null;
+			const cards = listCards(get().columns[aim.column], get().items, new Set(lifted.ids));
+			const home = lifted.home?.column === aim.column ? lifted.home.gap : null;
+			const place = placeOfDrop(cards, aim.gap, home);
+			return place ? { kind: "place", column: aim.column, place } : null;
+		};
+
 		return {
 			phase: "loading",
 			date: today,
@@ -130,6 +216,8 @@ export function createScreenStore(services: ScreenServices, where: ScreenPlace, 
 			settings: settings.get(),
 			canUndo: undo.canUndo(),
 			now: nowOn(today),
+			titleDrops: null,
+			drag: null,
 
 			async refresh() {
 				const read = ++reads;
@@ -139,34 +227,7 @@ export function createScreenStore(services: ScreenServices, where: ScreenPlace, 
 				const byProject = funnel?.view.source === "projectsScreen";
 				const [screen, projects] = await Promise.all([tasks.screen(date, node), byProject ? tasks.projectsScreen(node ?? "all") : Promise.resolve(null)]);
 				if (read !== reads) return;
-				const prev = get();
-				const lists: Record<DropColumn, readonly TaskItem[]> = { inbox: screen.inbox, backlog: screen.backlog, soon: screen.soon, day: screen.day.list };
-				const items: Record<string, TaskItem> = {};
-				const keep = (item: TaskItem) => {
-					items[item.id] = shared(prev.items[item.id], item);
-					item.subtasks.forEach(keep);
-				};
-				for (const list of [...Object.values(lists), screen.day.slotted, projects?.sections.flatMap((section) => section.rows.map((row) => row.item)) ?? []]) list.forEach(keep);
-				const plates = funnel?.view.plates;
-				const columns = Object.fromEntries(
-					FUNNEL_LISTS.map((column) => {
-						const sections = tasks.columnSections(column, date);
-						const model = columnModel(lists[column], sections ? screen.sections[sections.list] : null, plates?.[column] ?? null);
-						return [column, shared(prev.columns[column], model)];
-					}),
-				) as Record<ShownList, ColumnModel>;
-				columns.projects = shared(prev.columns.projects, projects ? projectsModel(projects) : EMPTY_COLUMN);
-				set({
-					phase: screen.missing ? "missing" : "ready",
-					funnel: shared(prev.funnel ?? undefined, funnel),
-					place: prev.phase === "loading" && funnel ? funnel.place : prev.place,
-					items,
-					columns,
-					slotted: shared(prev.slotted, screen.day.slotted.map((item) => item.id)),
-					projects: shared(prev.projects ?? undefined, projects),
-					listNames: shared(prev.listNames, listNames()),
-					dayTitle: titleOf(date),
-				});
+				take(screen, funnel, projects);
 			},
 
 			async refreshEvents() {
@@ -219,16 +280,66 @@ export function createScreenStore(services: ScreenServices, where: ScreenPlace, 
 				await get().refresh();
 			},
 
+			lift(lifted) {
+				const home = lifted.kind === "task" && lifted.home ? { kind: "gap" as const, ...lifted.home } : { kind: "home" as const };
+				set({ drag: { lifted, aim: home, phase: "carry", drawn: false, flown: false } });
+			},
+
+			aim(aim) {
+				const drag = get().drag;
+				if (!drag || drag.phase !== "carry" || JSON.stringify(drag.aim) === JSON.stringify(aim)) return;
+				set({ drag: { ...drag, aim } });
+			},
+
+			async release() {
+				const drag = get().drag;
+				if (!drag || drag.phase !== "carry") return;
+				const to = dropOf(drag);
+				if (!to || drag.lifted.kind !== "task") {
+					settle({ drawn: true });
+					return;
+				}
+				set({ drag: { ...drag, phase: "dropping" } });
+				const dropped = [{ key: drag.lifted.key, from: drag.lifted.from }];
+				const date = get().date;
+				const filter = get().funnel?.filter?.node ?? null;
+				try {
+					const preview = await tasks.dropPreview(dropped, to, date, filter);
+					take(preview.screen, get().funnel, get().projects);
+					settle({ drawn: true });
+					await tasks.drop(dropped, to, date, filter);
+				} catch (error) {
+					if (!(error instanceof StaleTaskError)) throw error;
+					set({ drag: null });
+					await get().refresh();
+				}
+			},
+
+			cancel() {
+				if (get().drag?.phase === "carry") settle({ drawn: true });
+			},
+
+			landed() {
+				settle({ flown: true });
+			},
+
 			tickNow() {
 				const now = nowOn(get().date);
 				if (now !== get().now) set({ now });
 			},
 
 			spanOf: (item) => tasks.shownSpan(item, get().date),
+			snap: (minute, hourPx) => tasks.snap(minute, hourPx, LAYOUT.snapTolerance),
+			landingSpan(start) {
+				const lifted = get().drag?.lifted;
+				if (lifted?.kind !== "task") return null;
+				return tasks.dropSpan(get().items[lifted.id] ?? null, lifted.from, start);
+			},
 			eventSpan: (event) => days.boundary().clipToDay(get().date, event.start, event.end),
 			isPast: (event) => calendars.isPast(event),
 			hourAt: (index) => days.boundary().hourAt(index),
 			openAt: (date) => days.openAt(date),
+			clockOf: (minute) => (days.boundary().hourAt(0) * 60 + minute) % (24 * 60),
 			clockMinute: () => {
 				const at = clock.now();
 				return at.getHours() * 60 + at.getMinutes();

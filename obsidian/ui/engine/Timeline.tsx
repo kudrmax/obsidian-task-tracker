@@ -1,4 +1,9 @@
-import { type CSSProperties, memo, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useDraggable, useDroppable } from "@dnd-kit/core";
+import { type CSSProperties, memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
+import type { StackBox } from "../../../core/application/contracts";
+import type { DragSource } from "./drag/DragLayer";
+import { dragId, dropId } from "./drag/dragState";
+import { useTimelineShape } from "./drag/geometry";
 import { type CalendarEvent, gridMarks, labelHidesNearNow, stackCorner, type TaskSpan, zoomShown } from "../../../core/application/contracts";
 import { formatHour, formatTime } from "../dates";
 import { DESIGN, LAYOUT, PROPERTY } from "../design";
@@ -49,6 +54,17 @@ export const Timeline = memo(function Timeline() {
 	const now = useScreen((s) => s.now);
 	const hourPx = zoomShown(settings.zoom, null, settings.zoomLevels);
 	const scroller = useRef<HTMLDivElement | null>(null);
+	const { setNodeRef: dropRef } = useDroppable({ id: dropId.timeline });
+	const scrollerRef = useCallback(
+		(el: HTMLDivElement | null) => {
+			scroller.current = el;
+			dropRef(el);
+		},
+		[dropRef],
+	);
+	const { looks } = useHost();
+	const drag = useScreen((s) => s.drag);
+	const liftedId = drag?.lifted.kind === "task" && (drag.phase === "carry" || !drag.drawn) ? drag.lifted.id : null;
 	const [room, setRoom] = useState({ top: 0, bottom: 0 });
 	/** How far the timeline is scrolled from its top and how much lies below: the fades at its edges follow them, as a list's do. */
 	const [edges, setEdges] = useState({ above: 0, below: 0 });
@@ -77,6 +93,16 @@ export const Timeline = memo(function Timeline() {
 	}, [slotted, items, services, placedEvents, hourPx, settings.cardHeight, settings.cardGap]);
 	const stackEnd = blocks.reduce((end, { box }) => Math.max(end, box.top + box.height), 0);
 
+	/**
+	 * Where a card carried over the timeline would land (`dropSpan` of the snapped minute, the core's), and once let go the
+	 * block standing there at once until the drop's screen is drawn: no frame without the card.
+	 */
+	const aimedSpan = drag?.aim.kind === "time" ? services.landingSpan(drag.aim.start) : null;
+	const placeOf = (span: TaskSpan) => stackTasks([span], [], hourPx, { height: settings.cardHeight, gap: settings.cardGap })[0];
+	const aimed = aimedSpan && drag?.phase === "carry" ? { start: aimedSpan.start, box: placeOf(aimedSpan) } : null;
+	const landing = aimedSpan && drag?.phase === "dropping" && !drag.drawn && drag.lifted.kind === "task" ? { id: drag.lifted.id, span: aimedSpan, box: placeOf(aimedSpan) } : null;
+	useTimelineShape(() => ({ hourPx, minuteAt: (clientY, top) => ((clientY - top + edges.above - DESIGN.labelLift - room.top) / hourPx) * 60 }));
+
 	/** The day opens where the core says, held at its share of the height; room past the day lets an early or late minute stand there. */
 	useLayoutEffect(() => {
 		const el = scroller.current;
@@ -97,7 +123,7 @@ export const Timeline = memo(function Timeline() {
 	return (
 		<div className="tc-right" style={{ [PROPERTY.allDayExtraRows]: String(Math.max(0, allDay.length - 1)) } as CSSProperties}>
 			<AllDayRows events={allDay} theme={theme} />
-			<div className={`tc-timeline${edges.above > 0 ? " is-under-top" : ""}${edges.below > 0 ? " is-under-bottom" : ""}`} style={{ [PROPERTY.scrolled]: px(edges.above), [PROPERTY.scrolledBelow]: px(edges.below) } as CSSProperties} ref={scroller} onScroll={(e) => follow(e.currentTarget)} data-timeline="">
+			<div className={`tc-timeline${edges.above > 0 ? " is-under-top" : ""}${edges.below > 0 ? " is-under-bottom" : ""}`} style={{ [PROPERTY.scrolled]: px(edges.above), [PROPERTY.scrolledBelow]: px(edges.below) } as CSSProperties} ref={scrollerRef} onScroll={(e) => follow(e.currentTarget)} data-timeline="">
 				<div className="tc-canvas" style={canvasStyle}>
 					{hours.map(({ minute, label }) => (
 						<HourMark key={minute} minute={minute} label={label} style={y(minute)} hidden={hidden(minute, DESIGN.labelLift)} />
@@ -120,29 +146,18 @@ export const Timeline = memo(function Timeline() {
 								</div>
 							);
 						})}
-						{blocks.map(({ item, span, box }) => {
-							const corner = stackCorner(box, item.slot!.start, span);
-							const style = { [PROPERTY.y]: px(box.top), [PROPERTY.length]: px(box.height), [PROPERTY.x]: px(box.left) } as CSSProperties;
-							return (
-								<div key={item.id} className={`tc-block${box.overlay ? " is-over" : ""}`} style={style} data-block={item.id}>
-									<div className="tc-block-card" data-status={item.status} {...paintOf(item.colors)}>
-										<Title text={item.block.text} />
-										{item.project?.mark ? (
-											<span className="tc-project-mark" aria-label={item.project.name} title={item.project.name}>
-												<Icon name="project" />
-											</span>
-										) : null}
-										{corner ? (
-											<span className="tc-block-meta">
-												<span>{corner[0]}</span>
-												<span>{corner[1]}</span>
-											</span>
-										) : null}
-									</div>
-								</div>
-							);
-						})}
+						{blocks.map(({ item, span, box }) => (
+							<Block key={item.id} id={item.id} span={span} box={box} hidden={liftedId === item.id} />
+						))}
+						{landing ? <Block id={landing.id} span={landing.span} box={landing.box} hidden={false} landing /> : null}
 					</div>
+					{aimed !== null && looks.timelineDrop === "line" ? (
+						<div className="tc-drop-at" style={y(aimed.start)}>
+							<span className="tc-drop-pill">{formatTime(services.clockOf(aimed.start))}</span>
+							<div className="tc-drop-line" />
+						</div>
+					) : null}
+					{aimed !== null && looks.timelineDrop === "block" ? <div className="tc-block tc-landing-place" style={{ [PROPERTY.y]: px(aimed.box.top), [PROPERTY.length]: px(aimed.box.height), [PROPERTY.x]: px(aimed.box.left) } as CSSProperties} /> : null}
 					{now !== null ? (
 						<div className="tc-now" style={y(now)}>
 							<span className="tc-now-pill">{formatTime(services.clockMinute())}</span>
@@ -167,3 +182,34 @@ function HourMark({ minute, label, style, hidden, minor = false }: { readonly mi
 		</>
 	);
 }
+
+/**
+ * A timed task's block: the card of the list on the timeline, its small time or duration on the right; a drag source. While
+ * carried it waits unseen where it stood; once let go on the timeline it stands at once where it lands (`landing`).
+ */
+const Block = memo(function Block({ id, span, box, hidden, landing = false }: { readonly id: string; readonly span: TaskSpan; readonly box: StackBox; readonly hidden: boolean; readonly landing?: boolean }) {
+	const item = useScreen((s) => s.items[id]);
+	const source: DragSource = useMemo(() => ({ kind: "block", id }), [id]);
+	const { setNodeRef, listeners, attributes } = useDraggable({ id: dragId.block(id), data: source, disabled: landing });
+	if (!item) return null;
+	const corner = landing ? null : stackCorner(box, item.slot!.start, span);
+	const style = { [PROPERTY.y]: px(box.top), [PROPERTY.length]: px(box.height), [PROPERTY.x]: px(box.left) } as CSSProperties;
+	return (
+		<div ref={landing ? undefined : setNodeRef} className={`tc-block${box.overlay ? " is-over" : ""}${hidden ? " is-lifted" : ""}`} style={style} data-block={id} {...(landing ? {} : listeners)} {...(landing ? {} : attributes)}>
+			<div className="tc-block-card" data-status={item.status} {...paintOf(item.colors)}>
+				<Title text={item.block.text} />
+				{item.project?.mark ? (
+					<span className="tc-project-mark" aria-label={item.project.name} title={item.project.name}>
+						<Icon name="project" />
+					</span>
+				) : null}
+				{corner ? (
+					<span className="tc-block-meta">
+						<span>{corner[0]}</span>
+						<span>{corner[1]}</span>
+					</span>
+				) : null}
+			</div>
+		</div>
+	);
+});

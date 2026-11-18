@@ -24,8 +24,10 @@ export const Capsule = memo(function Capsule() {
 
 /** Bottom right: the plus. */
 export const Plus = memo(function Plus() {
+	/** While a card is carried the plus and the capsule beside it fade out, and fade back once it lands. */
+	const carrying = useScreen((s) => s.drag !== null);
 	return (
-		<button className="tc-btn is-round is-accent tc-plus" aria-label="New task">
+		<button className={`tc-btn is-round is-accent tc-plus${carrying ? " is-hidden" : ""}`} aria-label="New task">
 			<Icon name="plus" />
 		</button>
 	);

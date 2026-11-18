@@ -79,7 +79,8 @@ export const RibbonStage = memo(function RibbonStage({ position }: { /** Where t
 	const bind = useGesture(
 		{
 			onDrag: ({ offset: [ox], velocity: [vx], direction: [dx], xy: [px], initial: [ix], first, last, cancel, event, tap }) => {
-				if ((event as PointerEvent).pointerType === "mouse" || tap) return cancel();
+				/** A card carried, or a mouse (whose drag is a card's), never turns the ribbon. */
+				if ((event as PointerEvent).pointerType === "mouse" || tap || store.getState().drag) return cancel();
 				if (first) dragFrom.current = x.get();
 				if (!last) {
 					fingerSpeed.current = -vx * dx;
@@ -94,7 +95,7 @@ export const RibbonStage = memo(function RibbonStage({ position }: { /** Where t
 			},
 			onWheel: ({ event }) => {
 				const e = event as WheelEvent;
-				if (e.ctrlKey || e.metaKey || Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
+				if (e.ctrlKey || e.metaKey || store.getState().drag || Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
 				e.preventDefault();
 				const shift = strokes.feed({ dx: e.deltaX, dy: e.deltaY, t: e.timeStamp });
 				if (shift !== 0) store.getState().step(shift);

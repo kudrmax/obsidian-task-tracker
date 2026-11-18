@@ -99,7 +99,7 @@ function RowsStack({ lists, scrolls, titles }: { readonly lists: readonly DropCo
 				<div key={list} className="tc-row" data-column={list} style={heights ? ({ height: heights[i] } as CSSProperties) : undefined}>
 					<div className="tc-row-label">{titles.get(list) ?? dayTitle}</div>
 					<div className="tc-row-body">
-						<TaskList column={list} day={list === "day" ? date : null} scrolls={scrolls} className="tc-row-list" onSize={reporterOf(list)} />
+						<TaskList column={list} day={list === "day" ? date : null} scrolls={scrolls} className="tc-row-list" padTop={settings.cardGap} onSize={reporterOf(list)} />
 					</div>
 				</div>
 			))}

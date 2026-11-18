@@ -12,8 +12,8 @@ export default {
 		await t.sleep(500);
 		t.expect((await leaves()) === 1, "the command again reveals the open view, no second one");
 		if (t.platform === "desktop") {
-			const ribbon = await t.oracle.rect('.side-dock-ribbon-action[aria-label="Task Calendar"]');
-			t.expect(ribbon !== null, "the ribbon icon «Task Calendar»");
+			const ribbon = await t.oracle.rect(`.side-dock-ribbon-action[aria-label="${t.target.ribbonLabel}"]`);
+			t.expect(ribbon !== null, `the ribbon icon «${t.target.ribbonLabel}»`);
 		}
 
 		/** Two tabs side by side: the desktop's; the phone shows one tab at a time. */

@@ -113,15 +113,21 @@ export interface CardProps {
 	readonly branch?: Branch | null;
 	/** By project: the stage's corner (`RowModel.stage`); undefined: the card's own. */
 	readonly stage?: ProjectsStage | null;
+	/** A copy of the card (the one a finger carries): marked as the task's copy, not as its card. */
+	readonly copy?: boolean;
+	/** Drawn but unseen: a card just let go, waiting at its place for its copy to land there. */
+	readonly unseen?: boolean;
+	/** The card a carried one would go under, outlined (a look the stand switches on). */
+	readonly parent?: boolean;
 }
 
-export const Card = memo(function Card({ id, day, level = 0, branch = null, stage }: CardProps) {
+export const Card = memo(function Card({ id, day, level = 0, branch = null, stage, copy = false, unseen = false, parent = false }: CardProps) {
 	const item = useScreen((s) => s.items[id]);
 	if (!item) return null;
 	const face = item.card;
 	const twoLines = face.over !== null;
 	return (
-		<div className={`tc-card${twoLines ? " is-two-line" : ""}`} data-id={id} data-status={item.status} data-collapsed={item.collapsed} style={{ [PROPERTY.level]: String(level) } as CSSProperties} {...paintOf(item.colors)}>
+		<div className={`tc-card${twoLines ? " is-two-line" : ""}${unseen ? " tc-invisible" : ""}${parent ? " is-drop-parent" : ""}`} {...(copy ? { "data-copy": id } : { "data-id": id })} data-status={item.status} data-collapsed={item.collapsed} style={{ [PROPERTY.level]: String(level) } as CSSProperties} {...paintOf(item.colors)}>
 			<span className="tc-pick">
 				<Icon name="check" />
 			</span>
