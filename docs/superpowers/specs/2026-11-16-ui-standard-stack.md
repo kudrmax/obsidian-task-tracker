@@ -90,6 +90,8 @@ The features are listed in [`2026-11-16-ui-standard-stack-features.md`](2026-11-
 
 ## Stages
 
+Stages 1–4 are replaced by [`2026-11-18-ui-engine.md`](2026-11-18-ui-engine.md) (Max, 2026-11-18): the engine on a stand first, the connection to the plugin after. Stage 0 and stage 1's commits stay as its start.
+
 0. **Blockers first** (done: [`ui-standard-stack/stage0.md`](ui-standard-stack/stage0.md); its «Recommended configuration» and integration rules are how stages 1–3 use the libraries; Obsidian's phone view is checked again on that configuration in stage 2). A throwaway test frontend on the stack, with real data, proved every risk before a feature is built: drag together with card animation, selective re-render and the 16 ms budget with ~300 tasks, the timeline (snap, resize, pinch), the ribbon swipe, the divider, menus, the embedded editor, pop-out windows, Obsidian's phone view, long-press drag in iOS WebKit, bundle size. Results in `ui-standard-stack/stage0.md`. A library that fails is swapped for its standard alternative here, not worked around later.
 1. React, Zustand store over `TaskService`, `TaskScreen` with static columns and cards, mounted in the leaf and the note block.
 2. Motion for layout and enter/exit; dnd-kit for lists, sections, columns and the time grid.
