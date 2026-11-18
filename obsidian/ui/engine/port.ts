@@ -28,8 +28,7 @@ export interface CardFace {
  */
 export type Row =
 	| { readonly kind: "task"; readonly id: string; readonly depth: number }
-	| { readonly kind: "section"; readonly id: string; readonly title: string }
-	| { readonly kind: "empty"; readonly id: string; readonly section: string; readonly label: string };
+	| { readonly kind: "section"; readonly id: string; readonly title: string };
 
 export interface ListData {
 	readonly title: string;

@@ -5,7 +5,7 @@ import { type CSSProperties, memo, type ReactNode, useCallback, useEffect, useMe
 import { createPortal } from "react-dom";
 import type { Destination, ListId, Row } from "../port";
 import { useScreen, useScreenApi } from "../store";
-import { descendantsOf, finalOrder, levelAt, levelBetween, shiftOf, type Slot, slotOf, stickyShift } from "./tree";
+import { descendantsOf, finalOrder, levelAt, levelBetween, spotKey, shiftOf, type Slot, slotOf, SwipeLevel } from "./tree";
 
 /**
  * Drag and drop (spec, «The owners»): one `DndContext` per screen, one `DragOverlay`, one `onDragEnd` that makes one write
@@ -136,21 +136,9 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 	const [origin, setOrigin] = useState<(Slot & { readonly container: string; readonly depth: number }) | null>(null);
 
 	const rowsOf = (list: string) => api.getState().shown.lists[list as ListId]?.rows ?? [];
-	/**
-	 * The level the carried card asks for, from how far the pointer moved sideways since it was taken (`stickyShift`):
-	 * within the list it is over now, a column's width being no indent (the rows of a list all start at its left edge, so
-	 * a row's box is where its list starts). A card asks for its own level plus the shift; the plus, for the shift from
-	 * where it came into its list.
-	 */
-	const lift = useRef<{ x: number; listLeft: number | null; depth: number; shift: number; listShift: number }>({ x: 0, listLeft: null, depth: 0, shift: 0, listShift: 0 });
-	const wantedLevel = (event: { readonly activatorEvent: Event; readonly delta: { readonly x: number }; readonly active: Sortable & { readonly rect: { readonly current: { readonly initial: { readonly left: number } | null } } } }, over: { readonly rect: { readonly left: number } } | null): number => {
-		const at = lift.current;
-		const x = (getEventCoordinates(event.activatorEvent)?.x ?? 0) + event.delta.x;
-		at.listLeft ??= event.active.rect.current.initial?.left ?? null;
-		if (over && at.listLeft !== null && event.active.id !== PLUS) at.listShift = over.rect.left - at.listLeft;
-		at.shift = stickyShift(at.shift, x - at.x - at.listShift);
-		return at.depth + at.shift;
-	};
+	/** The carried card's (or plus's) level on the place it stands at, by its sideways swipes there (`SwipeLevel`). */
+	const swipe = useRef(new SwipeLevel(null, 0, 0, 0));
+	const sideLevel = (event: { readonly activatorEvent: Event; readonly delta: { readonly x: number } }, spot: string, allowed: (wanted: number) => number): number => swipe.current.at((getEventCoordinates(event.activatorEvent)?.x ?? 0) + event.delta.x, performance.now(), spot, allowed);
 	/** The level the carried plus's field would take where the plus stands now among its list's rows: drawn by its place. */
 	const plusLevel = (plus: Sortable, over: Sortable | null, wanted: number): number | null => {
 		const container = containerOf(plus);
@@ -181,8 +169,6 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 		const own = containerOf(event.active);
 		const list = overId.startsWith(LIST_TARGET) ? overId.slice(LIST_TARGET.length) : containerOf(over);
 		if (list === null || list === own) return;
-		lift.current.x = activatorX(event) + event.delta.x;
-		lift.current.shift = 0;
 		if (overId.startsWith(LIST_TARGET)) return api.getState().setPlusAt({ into: list as ListId, index: rowsOf(list).length });
 		const order = itemsOf(over).filter((id) => id !== PLUS);
 		const pointerY = (getEventCoordinates(event.activatorEvent)?.y ?? 0) + event.delta.y;
@@ -200,22 +186,24 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 		const rows = rowsOf(list);
 		const index = order.indexOf(PLUS);
 		const near = (id: string | undefined) => rows.find((row) => row.id === id);
-		const depth = levelBetween(near(order[index - 1]), near(order[index + 1]), wantedLevel(event, event.over));
+		const depth = sideLevel(event, spotKey(list, order, PLUS), (wanted) => levelBetween(near(order[index - 1]), near(order[index + 1]), wanted));
 		api.getState().openEntry({ list: list as ListId, ...slotOf(rows, order, PLUS), dayOffset: api.getState().dayOffset, depth });
 	};
 	const move = (event: DragMoveEvent) => {
 		const { active: lifted, over } = event;
 		if (lifted.id === PLUS) plusOver(event, over);
-		api.getState().setLiftedDepth(lifted.id === PLUS ? plusLevel(lifted, over, wantedLevel(event, over)) : projected(lifted, over, wantedLevel(event, over)));
 		const container = containerOf(lifted);
-		api.getState().setLanding(container === null ? null : { into: container as ListId, section: slotOf(rowsOf(container), orderAfter(lifted, over), String(lifted.id)).section });
+		if (container === null) return api.getState().setLiftedDepth(null);
+		const allowed = (wanted: number) => (lifted.id === PLUS ? plusLevel(lifted, over, wanted) : projected(lifted, over, wanted)) ?? 0;
+		api.getState().setLiftedDepth(sideLevel(event, spotKey(container, orderAfter(lifted, over), String(lifted.id)), allowed));
 	};
 
 	const start = (event: DragStartEvent) => {
 		const { active: lifted } = event;
 		const screen = api.getState();
 		if (!screen.claim("drag")) return;
-		lift.current = { x: activatorX(event), listLeft: null, depth: 0, shift: 0, listShift: 0 };
+		const liftX = getEventCoordinates(event.activatorEvent)?.x ?? 0;
+		swipe.current = new SwipeLevel(null, 0, liftX, performance.now());
 		if (lifted.id === PLUS) {
 			screen.openEntry(null);
 			setActive(PLUS);
@@ -226,8 +214,10 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 		const container = containerOf(lifted);
 		const rows = container === null ? [] : rowsOf(container);
 		const own = rows.find((row) => row.id === String(lifted.id));
-		lift.current.depth = own?.kind === "task" ? own.depth : 0;
-		setOrigin(container === null ? null : { container, ...slotOf(rows, itemsOf(lifted), String(lifted.id)), depth: lift.current.depth });
+		const depth = own?.kind === "task" ? own.depth : 0;
+		const under = descendantsOf(rows, String(lifted.id));
+		if (container !== null) swipe.current = new SwipeLevel(spotKey(container, itemsOf(lifted).filter((other) => !under.has(other)), String(lifted.id)), depth, liftX, performance.now());
+		setOrigin(container === null ? null : { container, ...slotOf(rows, itemsOf(lifted), String(lifted.id)), depth });
 		onLift();
 	};
 	/**
@@ -242,7 +232,7 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 		const rows = rowsOf(into.list);
 		const id = String(lifted.id);
 		const order = [...into.order.slice(0, into.index), id, ...into.order.slice(into.index)];
-		const to: Destination = { list: into.list as ListId, ...slotOf(rows, order, id), dayOffset: api.getState().dayOffset, depth: levelBetween(rows[into.index - 1], rows[into.index], wantedLevel(event, over)) };
+		const to: Destination = { list: into.list as ListId, ...slotOf(rows, order, id), dayOffset: api.getState().dayOffset, depth: sideLevel(event, spotKey(into.list, order, id), (wanted) => levelBetween(rows[into.index - 1], rows[into.index], wanted)) };
 		justMoved.current = true;
 		api.getState().carryInto(id, to);
 	};
@@ -253,7 +243,7 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 		const id = String(lifted.id);
 		const container = containerOf(lifted);
 		if (container === null) return api.getState().drop(id, null);
-		const depth = projected(lifted, over, wantedLevel(event, over)) ?? 0;
+		const depth = sideLevel(event, spotKey(container, orderAfter(lifted, over), id), (wanted) => projected(lifted, over, wanted) ?? 0);
 		const slot = slotOf(rowsOf(container), orderAfter(lifted, over), id);
 		const still = origin !== null && origin.container === container && origin.section === slot.section && origin.before === slot.before && origin.depth === depth;
 		api.getState().drop(id, still ? null : { list: container as ListId, ...slot, dayOffset: api.getState().dayOffset, depth });
@@ -354,7 +344,7 @@ function crossing(active: Sortable & { readonly rect: { readonly current: { read
 /** A list's sortable tasks: `ids` keeps its identity between draws, or dnd-kit stops gliding (stage 0, finding 4). */
 export function SortableList({ list, ids, rows, children }: { readonly list: ListId; readonly ids: readonly string[]; readonly rows: readonly Row[]; readonly children: ReactNode }) {
 	const { setNodeRef } = useDroppable({ id: `${LIST_TARGET}${list}`, data: { items: ids } });
-	const strategy = useMemo(() => finalOrderStrategy(rows, ids), [rows, ids]);
+	const strategy = useMemo(() => finalOrderStrategy(ids), [ids]);
 	return (
 		<SortableContext id={list} items={ids as string[]} strategy={strategy}>
 			<div ref={setNodeRef} className="tc-list-target">
@@ -396,21 +386,16 @@ export function CarriedPlus({ onTap, children, ring }: { readonly onTap: () => v
 		</>
 	);
 }
-/** Where the pointer pressed, across the screen. */
-function activatorX(event: { readonly activatorEvent: Event | null }): number {
-	return event.activatorEvent ? (getEventCoordinates(event.activatorEvent)?.x ?? 0) : 0;
-}
-
 /** A row counts as this tall while it is not mounted (a card and its gap at the default size). */
 const ROW_ESTIMATE_PX = 37;
 
 /**
  * dnd-kit's sorting strategy for a list, as its strategies are written (`SortingStrategy`): each row moves to where the
  * list's final order puts it once the carried card is let go where it stands (`finalOrder`), the rows in flow one under
- * another, so what the rows show while the card is held is what the list will be. In an empty section the card takes the
- * room of the «No tasks» plate, which then shows nothing; nothing else moves for it.
+ * another, so what the rows show while the card is held is what the list will be. Headers move aside like cards: under
+ * an empty section's header the card's place opens as it does anywhere.
  */
-function finalOrderStrategy(rows: readonly Row[], ids: readonly string[]): SortingStrategy {
+function finalOrderStrategy(ids: readonly string[]): SortingStrategy {
 	let key = "";
 	let final: readonly string[] = ids;
 	return ({ activeIndex, overIndex, index, rects, activeNodeRect }) => {
@@ -418,10 +403,9 @@ function finalOrderStrategy(rows: readonly Row[], ids: readonly string[]): Sorti
 		const nextKey = `${activeIndex}:${overIndex}`;
 		if (nextKey !== key) {
 			key = nextKey;
-			final = finalOrder(rows, ids, activeIndex, overIndex);
+			final = finalOrder(ids, activeIndex, overIndex);
 		}
 		const id = ids[index];
-		if (!final.includes(id)) return null;
 		const heightOf = (other: string) => {
 			const at = ids.indexOf(other);
 			return rects[at]?.height ?? (at === activeIndex ? activeNodeRect?.height : undefined) ?? ROW_ESTIMATE_PX;

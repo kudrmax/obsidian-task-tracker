@@ -1,11 +1,15 @@
-import { LayoutGroup, motion, useIsPresent } from "motion/react";
+import { motion, useIsPresent } from "motion/react";
 import { type CSSProperties, forwardRef, type ReactNode } from "react";
 
 /**
  * Rows that move (spec, «The owners»): a row glides to its new place whatever moved it, a drag, a command, Sync, a new
  * task. Motion's `layout="position"` keyed by the task's id, as stage 0 settled it («Integration findings» 2–3, «Drop
  * flicker» 3): the layout is measured only when the order *as read* changes (`order`), never on the drag's own reorder;
- * the carried row has no layout and no layout id; no crossfade; a row comes in only when its task is new.
+ * the carried row has no layout and no layout id; no crossfade; a row comes in only when its task is new. A row whose task
+ * left goes in the same frame; a task moved to another region glides there by its layout id. No `LayoutGroup`: a list's
+ * rows already measure together (one `order`), and a group would make a row going away (an empty section's plate at a
+ * drop) measure every other row in the middle of the drop, without the place dnd-kit has them at, so they would glide
+ * back from where they stood before the drag.
  */
 export const MovingRow = forwardRef<HTMLDivElement, MovingRowProps>(function MovingRow({ id, order, carried, fresh, className, style, index, children }, ref) {
 	/** In a region sliding out (the day turned away from) the row stands still and gives its layout id to the copy coming in. */
@@ -41,15 +45,6 @@ export interface MovingRowProps {
 	/** Its index for the list's virtualizer, which measures it. */
 	readonly index?: number;
 	readonly children: ReactNode;
-}
-
-/**
- * The rows of one region (a list, the timeline's blocks). A row whose task left goes in the same frame, never lingering
- * where it stood while its task is drawn elsewhere (stage 0, «Drop flicker» 3): the region holds no exit, and a task moved
- * to another region glides there by its layout id, as Motion's shared layout does without `AnimatePresence`.
- */
-export function MovingRows({ children }: { readonly children: ReactNode }) {
-	return <LayoutGroup>{children}</LayoutGroup>;
 }
 
 /** Every row that changes place glides there the same way (stage 0's spring). */

@@ -1,23 +1,71 @@
 import { arrayMove } from "@dnd-kit/sortable";
 import type { Row } from "../port";
 
-/**
- * Subtask level while a card is carried (Max, 2026-11-18): by how far the pointer moved sideways since the card was taken,
- * as dnd-kit's «Sortable tree» example projects it, with a coarser step and a sticky edge. Every `SHIFT_STEP` pixels to
- * the right is one level deeper, to the left one shallower; a level once taken holds until the hand comes back to within
- * `SHIFT_BACK` pixels of where the previous one held, so a hand resting near an edge never makes the level flicker.
- */
-export const SHIFT_STEP = 40;
-export const SHIFT_BACK = 15;
+/** How far a sideways swipe goes for one level deeper or shallower (Max, 2026-11-18: «try 20»). */
+export const SWIPE_STEP = 20;
+/** How long the hand rests on a new spot before its sideways moves count as swipes: the way there is no swipe. */
+export const SWIPE_REST_MS = 100;
 
-/** The levels moved, deeper positive, for a sideways move of `offset` pixels, given the levels moved a moment before. */
-export function stickyShift(previous: number, offset: number, step = SHIFT_STEP, back = SHIFT_BACK): number {
-	let shift = previous;
-	while (offset >= (shift + 1) * step) shift++;
-	while (offset <= (shift - 1) * step) shift--;
-	while (shift > 0 && offset < (shift - 1) * step + back) shift--;
-	while (shift < 0 && offset > (shift + 1) * step - back) shift++;
-	return shift;
+/**
+ * The carried card's level by sideways swipes, not by where the hand is (Max, 2026-11-18). On a new spot the card is a
+ * task of the row below it (its own level on its own spot). Once the hand has rested there a moment, each `SWIPE_STEP`
+ * swiped right is one level deeper, left one shallower, as far as the spot allows (`allowed`, the levels between the rows
+ * around it); the moves that brought the hand there count for nothing. A swipe past what the spot allows builds up
+ * nothing: from there one step back is one level back.
+ */
+export class SwipeLevel {
+	private spot: string | null;
+	private level: number;
+	private moved = 0;
+	private resting = false;
+
+	/**
+	 * `home`: the card's own spot, where it keeps its own `depth` (null for the plus); `from`, `lastMove`: where and when it
+	 * was lifted, so the moves on its own spot count from there.
+	 */
+	constructor(
+		private readonly home: string | null,
+		private readonly depth: number,
+		private from: number,
+		private lastMove: number,
+	) {
+		this.spot = home;
+		this.level = depth;
+	}
+
+	/** The level at the pointer's `x` at time `now` (ms) on `spot` (a key naming the place: a new key is a new place). */
+	at(x: number, now: number, spot: string, allowed: (wanted: number) => number): number {
+		if (spot !== this.spot) {
+			this.spot = spot;
+			this.moved = 0;
+			this.resting = false;
+			this.lastMove = now;
+			this.level = allowed(spot === this.home ? this.depth : 0);
+		}
+		const dx = x - this.from;
+		this.from = x;
+		if (!this.resting && now - this.lastMove >= SWIPE_REST_MS) this.resting = true;
+		if (dx !== 0) this.lastMove = now;
+		if (!this.resting) return this.level;
+		this.moved += dx;
+		while (Math.abs(this.moved) >= SWIPE_STEP) {
+			const way = Math.sign(this.moved);
+			const next = allowed(this.level + way);
+			if (next === this.level) {
+				this.moved = 0;
+				break;
+			}
+			this.level = next;
+			this.moved -= way * SWIPE_STEP;
+		}
+		return this.level;
+	}
+}
+
+/** The key of the spot `id` stands at in `order` of `list`: its neighbours. */
+export function spotKey(list: string, order: readonly string[], id: string): string {
+	const at = order.indexOf(id);
+	return `${list}|${order[at - 1] ?? ""}|${order[at + 1] ?? ""}`;
 }
 
 /** The depth a section header stands for: under it no card can be a subtask. */
@@ -33,7 +81,7 @@ export interface Slot {
 
 /**
  * The slot of `id` in `order` (a list's row ids, `id` among them), by the rows around it: the section of the header (or
- * the empty section's plate) above it, and the task right below it, if a task comes before the next header.
+ * nothing) above it, and the task right below it, if a task comes before the next header.
  */
 export function slotOf(rows: readonly Row[], order: readonly string[], id: string): Slot {
 	const kinds = new Map(rows.map((row) => [row.id, row]));
@@ -43,10 +91,6 @@ export function slotOf(rows: readonly Row[], order: readonly string[], id: strin
 		const row = kinds.get(order[i]);
 		if (row?.kind === "section") {
 			section = row.id;
-			break;
-		}
-		if (row?.kind === "empty") {
-			section = row.section;
 			break;
 		}
 	}
@@ -81,18 +125,19 @@ export function descendantsOf(rows: readonly Row[], id: string): ReadonlySet<str
 	return out;
 }
 
-/**
- * The list's order once the carried card (at `activeIndex` of `ids`) is let go where it stands now (`overIndex`), as
- * dnd-kit's sortable list puts it (`arrayMove`), and without the «No tasks» plate of the section it lands in: there the
- * card takes the plate's room, the plate being only the section's empty place.
- */
-export function finalOrder(rows: readonly Row[], ids: readonly string[], activeIndex: number, overIndex: number): readonly string[] {
-	const order = arrayMove([...ids], activeIndex, overIndex < 0 ? activeIndex : overIndex);
-	const active = ids[activeIndex];
-	const { section } = slotOf(rows, order, active);
-	if (section === null) return order;
-	const plate = rows.find((row) => row.kind === "empty" && row.section === section);
-	return plate ? order.filter((id) => id !== plate.id) : order;
+/** The list's order once the carried card (at `activeIndex` of `ids`) is let go where it stands now (`overIndex`), as dnd-kit's sortable list puts it. */
+export function finalOrder(ids: readonly string[], activeIndex: number, overIndex: number): readonly string[] {
+	return arrayMove([...ids], activeIndex, overIndex < 0 ? activeIndex : overIndex);
+}
+
+/** The room the rows before `id` take in `order`: where `id` stands, from the order's first row. */
+export function topIn(order: readonly string[], id: string, heightOf: (id: string) => number): number {
+	let sum = 0;
+	for (const other of order) {
+		if (other === id) return sum;
+		sum += heightOf(other);
+	}
+	return sum;
 }
 
 /**
@@ -100,13 +145,5 @@ export function finalOrder(rows: readonly Row[], ids: readonly string[], activeI
  * final order less the room they take now, the rows in flow one under another. `heightOf` gives a row's height.
  */
 export function shiftOf(id: string, ids: readonly string[], final: readonly string[], heightOf: (id: string) => number): number {
-	const before = (order: readonly string[]) => {
-		let sum = 0;
-		for (const other of order) {
-			if (other === id) return sum;
-			sum += heightOf(other);
-		}
-		return sum;
-	};
-	return before(final) - before(ids);
+	return topIn(final, id, heightOf) - topIn(ids, id, heightOf);
 }

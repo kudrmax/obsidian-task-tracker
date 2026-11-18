@@ -270,7 +270,7 @@ export class MockPort implements ScreenPort {
 		};
 	}
 
-	/** A list's rows: each open task with its open subtasks under it, a header over each named section (an empty one too). */
+	/** A list's rows: each open task with its open subtasks under it, a header over each named section; an empty one is its header alone. */
 	private listData(title: string, sections: readonly MockSection[], cards: Record<string, CardFace>, day: string | null, shows: (t: MockTask) => boolean): ListData {
 		const rows: Row[] = [];
 		const walk = (t: MockTask, depth: number) => {
@@ -281,9 +281,7 @@ export class MockPort implements ScreenPort {
 		};
 		for (const s of sections) {
 			if (s.name !== null) rows.push({ kind: "section", id: s.id, title: s.name });
-			const before = rows.length;
 			for (const t of s.tasks) if (shows(t)) walk(t, 0);
-			if (s.name !== null && rows.length === before) rows.push({ kind: "empty", id: `empty-${s.id}`, section: s.id, label: "No tasks" });
 		}
 		return { title, rows };
 	}

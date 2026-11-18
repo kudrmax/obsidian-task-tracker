@@ -2,7 +2,7 @@ import { type CSSProperties, memo, useCallback, useMemo } from "react";
 import { PROPERTY } from "../../design";
 import { BASE_SCALE, TimeScale } from "../layout/timeScale";
 import { useData, useScreen } from "../store";
-import { MovingRow, MovingRows } from "./MovingRow";
+import { MovingRow } from "./MovingRow";
 
 const px = (n: number) => `${n}px`;
 
@@ -32,13 +32,11 @@ export const Timeline = memo(function Timeline() {
 					</div>
 				))}
 				<div className="tc-items">
-					<MovingRows>
 						{day.blocks.map((block) => (
 							<MovingRow key={block.id} id={block.id} order={order} carried={false} fresh={false} className="tc-block" style={{ ...y(block.start), [PROPERTY.length]: px(scale.y(block.end) - scale.y(block.start)), [PROPERTY.x]: `${(100 * block.lane) / block.lanes}%`, [PROPERTY.xEnd]: `${(100 * (block.lanes - block.lane - 1)) / block.lanes}%` } as CSSProperties}>
 								<BlockFace id={block.id} />
 							</MovingRow>
 						))}
-					</MovingRows>
 				</div>
 				{day.isToday ? (
 					<div className="tc-now" style={y(now.minute)} ref={reveal}>

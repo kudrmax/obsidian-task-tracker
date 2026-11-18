@@ -252,9 +252,6 @@ body {
 	/* A section's header in a list: its label at the bottom, a gap over every header but the first. */
 	--tc-group-head-h: 26px;
 	--tc-section-gap: var(--tc-space-10);
-	/** How long the cards part under a carried card, and its curve: dnd-kit's sortable transition; an empty section's plate folds in the same. */
-	--tc-duration-part: 250ms;
-	--tc-ease-part: ease;
 	/* The project's folder on a card: as wide as its symbol, at the card's right edge; a tap takes as much as a date's width, over the title's faded end. */
 	--tc-stroke-project-mark: var(--tc-stroke-2);
 	--tc-project-mark-w: var(--tc-icon-s);
@@ -1802,18 +1799,10 @@ button.tc-btn.tc-folder-btn:disabled { opacity: var(--tc-tile-off-opacity); curs
 .tc-slide { position: absolute; inset: 0; display: flex; flex-direction: column; }
 .tc-slide > .tc-stage-body > .tc-timeline { top: 0; }
 /* A long list mounts only the rows in sight (TanStack Virtual): its whole height, the rows in flow in one block placed at the first one's start; a row holds its gap, so its measure is its step. */
-.tc-list-items { position: relative; flex: none; box-sizing: content-box; }
+.tc-list-items { position: relative; flex: none; }
 .tc-list-block { position: absolute; top: 0; left: 0; right: 0; }
 .tc-list-item { display: flow-root; padding-bottom: var(--tc-card-gap); }
 .tc-list-item > .tc-group-head, .tc-list-item > .tc-drag-source > .tc-group-head { margin-top: var(--tc-section-gap); }
-/* An empty section's plate while a carried card would land there: the card's place stands in its room, the plate shows nothing; it fades out and back in the time and curve the cards part in. */
-.tc-drag-source > .tc-group-empty { transition: opacity var(--tc-duration-part) var(--tc-ease-part); }
-.tc-drag-source > .tc-group-empty.is-taken { opacity: 0; }
-/* The room an empty section's plate gave up to a card stays under the list's rows and goes in the cards' time and curve: a list scrolled to its end glides instead of jumping (two names, so each new time starts again). */
-.tc-list-items.is-spare-0 { animation: tc-spare-a var(--tc-duration-part) var(--tc-ease-part); }
-.tc-list-items.is-spare-1 { animation: tc-spare-b var(--tc-duration-part) var(--tc-ease-part); }
-@keyframes tc-spare-a { from { padding-bottom: calc(var(--tc-card-h) + var(--tc-card-gap)); } to { padding-bottom: 0px; } }
-@keyframes tc-spare-b { from { padding-bottom: calc(var(--tc-card-h) + var(--tc-card-gap)); } to { padding-bottom: 0px; } }
 /* Blocks that overlap stand side by side, each its lane's share of the items' width; a short one is still a whole card (the released screen's stacked cards). */
 .task-calendar.is-engine .tc-items > .tc-block { right: calc(var(--tc-x-end) + var(--tc-item-inset)); min-height: var(--tc-card-h); }
 /* Drag and drop («Decided» 1): while a card is carried the cards part, and its own place stands where it will land, as an outline at its depth. */
