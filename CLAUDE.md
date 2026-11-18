@@ -7,6 +7,7 @@ This repository holds the whole product, one core and its frontends:
 - `core/` — the core, TypeScript: `domain`, `application`, `settings.ts`, and `phone/main.ts`, the door the Apple apps call. `core/build.mjs` builds it into `core/task-calendar-phone.js` (committed; `tests/phone/build.test.ts` keeps it the build of the current source).
 - `obsidian/` — the Obsidian frontend: `ui`, `infrastructure` (vault, Google, the work file), `main.ts`, `compose.ts`. esbuild bundles it with the core into `main.js`.
 - `apple/` — the Swift frontends: the iPhone app today, a Mac app later. They run `core/task-calendar-phone.js` in JavaScriptCore through `apple/Core`.
+- `agent/` — `obsidian-task-calendar`, the agents' read-only command line program (Node): argv in, the core's `core.agent` answers out as JSON, in product words. `agent/build.mjs` builds the committed `agent/obsidian-task-calendar.mjs`; `~/.local/bin/obsidian-task-calendar` links to the main clone's copy, so a merge to master is its install. It has no screen, so no visual check; its answers are checked against the plugin's screen (`tests/agent/`). Spec: `docs/superpowers/specs/2026-11-18-agent-cli-design.md`; skill for agents: `~/.claude/skills/obsidian-task-calendar`.
 - The root holds what Obsidian and BRAT take from a plugin's repository: `manifest.json`, `versions.json`, `styles.css`, the built `main.js`, `README.md`. `tests/` covers the core and the Obsidian frontend.
 
 The core is one code, never a copy or a port. A rule a Swift frontend needs is added to the core and asked for through the door (`docs/door.md`), never written again in Swift. The apps are installed from Xcode, never as GitHub releases of this repository: BRAT takes the highest release as the plugin's. `kudrmax/task-calendar-ios` is the apps' old repository: emptied, its README points here.
@@ -60,7 +61,7 @@ Delete only with `trash`, never `rm`.
 
 A feature that touches more than one layer is built by the project's agents in `.claude/agents/`, the session Max talks to leads them:
 
-- `backend`: `core/`, the contracts and the door.
+- `backend`: `core/`, the contracts and the door, and the `agent/` program.
 - `frontend-obsidian`: `obsidian/`, `styles.css`, `docs/plugin/`.
 - `frontend-swift`: `apple/`.
 - `reviewer`: reads all the diffs against the spec, changes nothing.
