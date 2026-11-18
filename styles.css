@@ -6,7 +6,7 @@
  * number, a colour or a radius written straight into a rule, and on a token no rule uses. To change how something
  * looks, change its token, or add one here with a name that says what it is for.
  *
- * Properties the code sets per element (--tc-list-width, --tc-grab-x, --tc-landing-level, --tc-hour, --tc-allday-extra-rows, --tc-y,
+ * Properties the code sets per element (--tc-list-width, --tc-grab-x, --tc-grab-y, --tc-landing-level, --tc-landing-w, --tc-landing-h, --tc-hour, --tc-allday-extra-rows, --tc-y,
  * --tc-len, --tc-x, --tc-level, --tc-pass, --tc-stack-end, --tc-room-top, --tc-room-bottom, --tc-scrolled, --tc-scrolled-below, --tc-event-bg, --tc-event-bar, --tc-event-text, and per priority colour --tc-priority-ink, --tc-priority-fill, --tc-priority-meta) carry a measure from the layout
  * into these rules; the rules do the arithmetic.
  */
@@ -1809,11 +1809,22 @@ button.tc-btn.tc-folder-btn:disabled { opacity: var(--tc-tile-off-opacity); curs
 .tc-drag-source { display: flow-root; touch-action: pan-y; }
 .tc-drag-source.is-lifted > .tc-card { background: none; box-shadow: none; outline: var(--tc-hairline) dashed var(--tc-dash); outline-offset: calc(-1 * var(--tc-hairline)); }
 .tc-drag-source.is-lifted > .tc-card > *, .tc-drag-source.is-lifted > .tc-card::before { visibility: hidden; }
+/* A block is carried by its whole box; its place while carried (or a card's place on the calendar) is the block it will be, as a dashed outline like a card's place. */
+.tc-block > .tc-drag-source { position: absolute; inset: 0; }
+/* A block glides to wherever the shown day puts it, its lane's width and its length too: a card's place appearing among the blocks, a block moved, a write read back. */
+.task-calendar.is-engine .tc-items > .tc-block { transition: top var(--tc-duration-slide) var(--tc-ease-out), height var(--tc-duration-slide) var(--tc-ease-out), left var(--tc-duration-slide) var(--tc-ease-out), right var(--tc-duration-slide) var(--tc-ease-out); }
+.tc-drag-source.is-lifted > .tc-block-card { background: none; box-shadow: none; outline: var(--tc-hairline) dashed var(--tc-dash); outline-offset: calc(-1 * var(--tc-hairline)); }
+.tc-drag-source.is-lifted > .tc-block-card > *, .tc-drag-source.is-lifted > .tc-block-card::before { visibility: hidden; }
 /* The carried copy rides the pointer in dnd-kit's overlay, outside the screen's styles: it carries the screen's type itself. */
 .tc-overlay { font-family: var(--tc-font-ui); font-size: var(--tc-font-body); font-weight: var(--tc-weight-normal); line-height: var(--tc-leading-normal); color: var(--tc-text); z-index: var(--tc-layer-float); }
-.tc-carried { position: relative; }
-.tc-carried > .tc-card { width: var(--tc-carried-w); max-width: 100%; margin-left: clamp(0px, calc(var(--tc-grab-x) - var(--tc-carried-w) / 2), calc(100% - var(--tc-carried-w))); background: var(--tc-float-bg); box-shadow: var(--tc-shadow-lift); cursor: grabbing; transition: width var(--tc-duration-fly) var(--tc-ease-fly), margin-left var(--tc-duration-fly) var(--tc-ease-fly), background-color var(--tc-duration-fly) var(--tc-ease-fly), box-shadow var(--tc-duration-fly) var(--tc-ease-fly); }
-.tc-overlay.is-dropping .tc-carried > .tc-card { width: calc(100% - var(--tc-landing-level) * var(--tc-subtask-indent)); margin-left: calc(var(--tc-landing-level) * var(--tc-subtask-indent)); background: var(--tc-card-bg); box-shadow: none; }
+.tc-carried { position: relative; height: 100%; }
+/* The plate: compact around the grab's x, at the top of the carried box, or lower on a tall block so the finger stays on it. */
+.tc-carried > .tc-card { width: var(--tc-carried-w); max-width: 100%; margin-left: clamp(0px, calc(var(--tc-grab-x) - var(--tc-carried-w) / 2), calc(100% - var(--tc-carried-w))); margin-top: max(0px, calc(var(--tc-grab-y) - var(--tc-card-h))); background: var(--tc-float-bg); box-shadow: var(--tc-shadow-lift); cursor: grabbing; transition: width var(--tc-duration-fly) var(--tc-ease-fly), height var(--tc-duration-fly) var(--tc-ease-fly), margin-left var(--tc-duration-fly) var(--tc-ease-fly), margin-top var(--tc-duration-fly) var(--tc-ease-fly), padding-top var(--tc-duration-fly) var(--tc-ease-fly), background-color var(--tc-duration-fly) var(--tc-ease-fly), box-shadow var(--tc-duration-fly) var(--tc-ease-fly); }
+/* Let go, it flies in as the task where it lands: the place's width at its level; onto the calendar, the block itself, its height and its title at the top. */
+.tc-overlay.is-dropping .tc-carried > .tc-card { width: calc(var(--tc-landing-w, 100%) - var(--tc-landing-level) * var(--tc-subtask-indent)); margin-left: calc(var(--tc-landing-level) * var(--tc-subtask-indent)); margin-top: 0px; background: var(--tc-card-bg); box-shadow: none; }
+.tc-overlay.is-dropping .tc-carried.is-block > .tc-card { height: var(--tc-landing-h); align-items: flex-start; padding-top: var(--tc-block-pad-top); }
+/* The carried task's place on the calendar steps from start to start: it never glides, so the copy lands where it stands. */
+.task-calendar.is-engine .tc-items > .tc-block:has(> .tc-drag-source.is-lifted) { transition: none; }
 .tc-carried > .tc-card[data-priority] { background: var(--tc-priority-fill); }
 .tc-overlay.is-dropping .tc-carried > .tc-card[data-priority] { background: var(--tc-priority-fill); }
 /* A layer placed by Floating UI: shown as it mounts, where Floating UI puts it. */

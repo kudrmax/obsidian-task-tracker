@@ -22,10 +22,7 @@ export interface CardFace {
 	readonly due: { readonly day: string; readonly month: string } | null;
 }
 
-/**
- * A row of a list, top to bottom: a task's card at its depth (0 a task, 1 its subtask…), a section's header, or the plate
- * under the header of a section with no tasks (`label`: its words).
- */
+/** A row of a list, top to bottom: a task's card at its depth (0 a task, 1 its subtask…), or a section's header. */
 export type Row =
 	| { readonly kind: "task"; readonly id: string; readonly depth: number }
 	| { readonly kind: "section"; readonly id: string; readonly title: string };
@@ -77,6 +74,8 @@ export interface Destination {
 	readonly depth?: number;
 	/** When given, the section it goes into: a section's id, or null for the list's tasks outside any section. */
 	readonly section?: string | null;
+	/** When given, the task goes onto the calendar of the day `dayOffset`, starting at this minute from the day's start (`list` is "day"). */
+	readonly at?: number;
 }
 
 /** A menu's item: the port names it and runs it. */
@@ -92,8 +91,13 @@ export interface ScreenPort {
 	subscribe(listener: () => void): () => void;
 	/** The present minute from today's start and the clock's time as the now line writes it: «14:20». */
 	now(): Now;
-	/** The screen as it will stand once `move(id, to)` is written: drawn at the drop, before the write's read-back. */
+	/**
+	 * The screen as it will stand once `move(id, to)` is written: drawn while the task is carried and at the drop, before
+	 * the write's read-back. Writes made and not yet read back are in it already.
+	 */
 	preview(id: string, to: Destination): ScreenData;
+	/** Whether `to` takes the task: a place that refuses opens no place for it, and the card's place stays where it was. */
+	takes(id: string, to: Destination): boolean;
 	/** Writes a task to `to`; resolves once written and read back. */
 	move(id: string, to: Destination): Promise<void>;
 	/** Where the plus puts a new task's field on the screen showing the day `dayOffset` days from today. */

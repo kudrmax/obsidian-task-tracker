@@ -9,6 +9,9 @@ const MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const LEVEL_COLORS = { p1: "red", p2: "orange" } as const;
 const pad = (n: number) => String(n).padStart(2, "0");
+/** A task put on the calendar without a time of its own takes this long. */
+const TIMED_LENGTH = 60;
+const DAY_MINUTES = 24 * 60;
 
 /** The lists a menu sends a task to, by the item's id. */
 const MENU: readonly MenuItem[] = [
@@ -24,6 +27,9 @@ const MENU: readonly MenuItem[] = [
  */
 export class MockPort implements ScreenPort {
 	private file: MockFile;
+	/** The file with the writes not yet read back already made: what a preview and a refusal are drawn from. Null when none is in flight. */
+	private ahead: MockFile | null = null;
+	private inFlight = 0;
 	private readonly listeners = new Set<() => void>();
 	private readonly cache = new Map<number, ScreenData>();
 	private added = 0;
@@ -42,6 +48,7 @@ export class MockPort implements ScreenPort {
 	/** New made-up tasks around now; `file` puts a given set instead (the first step's one column). */
 	reset(file: MockFile = mockFile(this.clock())): void {
 		this.file = file;
+		this.ahead = null;
 		this.changed();
 	}
 
@@ -85,13 +92,19 @@ export class MockPort implements ScreenPort {
 	}
 
 	preview(id: string, to: Destination): ScreenData {
-		const file = structuredClone(this.file);
+		const file = structuredClone(this.ahead ?? this.file);
 		this.apply(file, id, to);
 		return this.screenOf(file, to.dayOffset);
 	}
 
+	/** The stand's refusals: Soon takes no task with a time (F161's simplest); only today's calendar takes a time (the stand draws no other day's blocks). */
+	takes(id: string, to: Destination): boolean {
+		if (to.at !== undefined && to.dayOffset !== 0) return false;
+		return !(to.list === "soon" && this.findBy(this.ahead ?? this.file, (t) => t.id === id)?.task.slot);
+	}
+
 	async move(id: string, to: Destination): Promise<void> {
-		await this.write(() => this.apply(this.file, id, to));
+		await this.write((file) => this.apply(file, id, to));
 	}
 
 	/** The plus's place, the simplest: the end of Inbox's tasks outside any section. */
@@ -100,12 +113,13 @@ export class MockPort implements ScreenPort {
 	}
 
 	async add(text: string, at: Destination): Promise<string> {
-		const task = this.newTask(text.trim(), null);
-		await this.write(() => {
-			this.nest(this.file, task, { ...at, depth: at.depth ?? 0 }, at.section === undefined ? null : this.sectionFor(this.file, at));
+		const id = `x${++this.added}`;
+		await this.write((file) => {
+			const task = this.newTask(text.trim(), null, id);
+			this.nest(file, task, { ...at, depth: at.depth ?? 0 }, at.section === undefined ? null : this.sectionFor(file, at));
 			task.due = at.list === "day" ? dateOf(addDays(this.day(), at.dayOffset)) : null;
 		});
-		return task.id;
+		return id;
 	}
 
 	menu(id: string): readonly MenuItem[] {
@@ -122,9 +136,14 @@ export class MockPort implements ScreenPort {
 
 	// Writes.
 
-	private async write(change: () => void): Promise<void> {
+	/** A write made at once in `ahead` (previews see it), and in the file after `delay`, as a real write is read back. */
+	private async write(change: (file: MockFile) => void): Promise<void> {
+		this.ahead ??= structuredClone(this.file);
+		change(this.ahead);
+		this.inFlight++;
 		if (this.delay > 0) await new Promise((resolve) => window.setTimeout(resolve, this.delay));
-		change();
+		change(this.file);
+		if (--this.inFlight === 0) this.ahead = null;
 		this.changed();
 	}
 
@@ -136,15 +155,22 @@ export class MockPort implements ScreenPort {
 	/**
 	 * A move's rules, the simplest: before a task, into its section and under its parent; at a list's end, into its last
 	 * section. To Inbox or Soon a task loses its date and its time; to today's list it is due today without a time; to
-	 * another day's list it is due that day in Soon.
+	 * another day's list it is due that day in Soon. Onto today's calendar (`at`) it is due today at that minute, keeping
+	 * its length (a task without a time takes an hour), at the end of Now.
 	 */
 	private apply(file: MockFile, id: string, to: Destination): void {
 		const found = this.findBy(file, (t) => t.id === id);
 		if (!found || id === to.before) return;
 		const { task } = found;
 		this.take(file, id);
+		const length = task.slot ? task.slot.end - task.slot.start : TIMED_LENGTH;
 		task.slot = null;
 		task.due = to.list === "day" ? dateOf(addDays(this.day(), to.dayOffset)) : null;
+		if (to.at !== undefined) {
+			task.slot = { start: to.at, end: Math.min(DAY_MINUTES, to.at + length) };
+			file.now[file.now.length - 1].tasks.push(task);
+			return;
+		}
 		if (to.section !== undefined) return this.nest(file, task, to, this.sectionFor(file, to));
 		if (to.depth !== undefined) return this.nest(file, task, to);
 		const into = to.before ? this.containerOf(file, to.before) : null;
@@ -238,8 +264,8 @@ export class MockPort implements ScreenPort {
 		return null;
 	}
 
-	private newTask(title: string, due: string | null): MockTask {
-		return { id: `x${++this.added}`, title, level: null, status: " ", due, slot: null, description: null, children: [] };
+	private newTask(title: string, due: string | null, id = `x${++this.added}`): MockTask {
+		return { id, title, level: null, status: " ", due, slot: null, description: null, children: [] };
 	}
 
 	/** A screen list's sections in the file: today's list is Now, another day's is Soon (its tasks due that day). */

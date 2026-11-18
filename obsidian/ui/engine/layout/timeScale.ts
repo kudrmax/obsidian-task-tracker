@@ -19,6 +19,16 @@ export class TimeScale {
 	minute(y: number): number {
 		return (y / this.hourPx) * 60;
 	}
+
+	/** The start a carried task's top at `y` pixels takes: the nearest step of the grid, within the day. */
+	start(y: number): number {
+		const minute = Math.round(this.minute(y) / TimeScale.STEP) * TimeScale.STEP;
+		return Math.max(0, Math.min(TimeScale.DAY - TimeScale.STEP, minute));
+	}
+
+	/** The grid a carried task's start snaps to, in minutes. */
+	static readonly STEP = 15;
+	static readonly DAY = 24 * 60;
 }
 
 /** The scale at the base zoom (zoom comes with E3). */

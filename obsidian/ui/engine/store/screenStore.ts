@@ -29,7 +29,7 @@ export interface ScreenState {
 	readonly gesture: Gesture | null;
 	/** The task carried now. */
 	readonly lifted: string | null;
-	/** The level the carried task would take where it stands now (dnd-kit's sortable tree projection); null: its own. */
+	/** The level the carried task would take where it stands now (its swipes there, `SwipeLevel`); null: its own. */
 	readonly liftedDepth: number | null;
 	/** Data came while a drag or its write held the screen still: read once they end. */
 	readonly pending: boolean;
@@ -56,10 +56,14 @@ export interface ScreenActions {
 	claim(gesture: Gesture): boolean;
 	release(gesture: Gesture): void;
 	lift(id: string): void;
-	/** The carried task's level where it would land, as the pointer's sideways move projects it. */
+	/** The carried task's level where it would land, as its swipes there set it. */
 	setLiftedDepth(depth: number | null): void;
 	/** The carried task drawn in another list while carried: the port's preview of it there (dnd-kit's «multiple containers»). */
 	carryInto(id: string, to: Destination): void;
+	/** Whether `to` takes the carried task (the port's answer): a place that refuses opens no place. */
+	takes(id: string, to: Destination): boolean;
+	/** The carried task's place back where it was taken: the screen as read, as over a place that refuses it. */
+	carryHome(): void;
 	/** The carried task let go at `to` (null: cancelled, or let go where nothing takes it). */
 	drop(id: string, to: Destination | null): void;
 	openMenu(id: string): void;
@@ -90,6 +94,8 @@ const LEFT_KEPT = 4;
 export function createScreenStore(port: ScreenPort): ScreenStore {
 	/** Writes of the screen's own not yet read back: their reads come together once the last is in. */
 	let writing = 0;
+	/** The screen as it stood when the carried task was lifted: its place's home, a drop's in-flight write drawn in it. */
+	let home: ScreenData | null = null;
 	const first = port.read(0);
 	return createStore<Screen>()((set, get) => {
 		/** The port's data again; held while a drag or a drop's write keeps the screen still (spec, principle 5). */
@@ -166,10 +172,18 @@ export function createScreenStore(port: ScreenPort): ScreenStore {
 				if (get().pending) refresh();
 			},
 			lift(id) {
+				home = get().shown;
 				set({ lifted: id, liftedDepth: null, layer: null });
 			},
 			setLiftedDepth(liftedDepth) {
 				if (get().liftedDepth !== liftedDepth) set({ liftedDepth });
+			},
+			takes(id, to) {
+				return port.takes(id, to);
+			},
+			carryHome() {
+				const back = home ?? get().read;
+				if (get().shown !== back) set({ shown: back });
 			},
 			carryInto(id, to) {
 				set({ shown: share(get().shown, port.preview(id, to)) });
@@ -178,7 +192,8 @@ export function createScreenStore(port: ScreenPort): ScreenStore {
 				if (to) {
 					set({ shown: share(get().shown, port.preview(id, to)) });
 					write(port.move(id, to));
-				} else if (get().shown !== get().read) set({ shown: get().read });
+				} else get().carryHome();
+				home = null;
 				set({ lifted: null, liftedDepth: null });
 				get().release("drag");
 			},

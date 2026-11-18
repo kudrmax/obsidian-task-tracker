@@ -7,13 +7,13 @@ import { type CSSProperties, forwardRef, type ReactNode } from "react";
  * flicker» 3): the layout is measured only when the order *as read* changes (`order`), never on the drag's own reorder;
  * the carried row has no layout and no layout id; no crossfade; a row comes in only when its task is new. A row whose task
  * left goes in the same frame; a task moved to another region glides there by its layout id. No `LayoutGroup`: a list's
- * rows already measure together (one `order`), and a group would make a row going away (an empty section's plate at a
- * drop) measure every other row in the middle of the drop, without the place dnd-kit has them at, so they would glide
- * back from where they stood before the drag.
+ * rows already measure together (one `order`), and a group would make a row going away at a drop measure every other
+ * row in the middle of the drop, without the place dnd-kit has them at, so they would glide back from where they stood
+ * before the drag.
  */
-export const MovingRow = forwardRef<HTMLDivElement, MovingRowProps>(function MovingRow({ id, order, carried, fresh, className, style, index, children }, ref) {
+export const MovingRow = forwardRef<HTMLDivElement, MovingRowProps>(function MovingRow({ id, order, carried, fresh, placed = false, className, style, index, children }, ref) {
 	/** In a region sliding out (the day turned away from) the row stands still and gives its layout id to the copy coming in. */
-	const still = carried || !useIsPresent();
+	const still = carried || placed || !useIsPresent();
 	return (
 		<motion.div
 			ref={ref}
@@ -38,6 +38,11 @@ export interface MovingRowProps {
 	/** The order of its list as read: a change measures the rows and glides them. */
 	readonly order: string;
 	readonly carried: boolean;
+	/**
+	 * Placed by its own box in CSS (a calendar's block: its top, height and lane), so it glides by that box's CSS transition,
+	 * size and all, and Motion measures nothing.
+	 */
+	readonly placed?: boolean;
 	/** Its task is new in the last read: it comes in. */
 	readonly fresh: boolean;
 	readonly className?: string;

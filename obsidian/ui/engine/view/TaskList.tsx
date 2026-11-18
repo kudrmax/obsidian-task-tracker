@@ -51,7 +51,6 @@ export const TaskList = memo(function TaskList({ list }: { readonly list: ListId
 	const order = useMemo(() => readRows.map((row) => row.id).join(" "), [readRows]);
 	/** Every row is in the sortable list: headers move aside like cards; a card goes after a header into its section. */
 	const ids = useMemo(() => withPlus.map((row) => row.id), [withPlus]);
-	const sortableRows = useMemo(() => withPlus.filter((row): row is Row => row.kind !== "plus" && row.kind !== "entry"), [withPlus]);
 	const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
 	/**
 	 * While a card is carried, its own row stays mounted however far the list scrolls under it (TanStack Virtual's
@@ -99,7 +98,7 @@ export const TaskList = memo(function TaskList({ list }: { readonly list: ListId
 		<div className="tc-list" ref={setScroller} data-list={list}>
 			<div className="tc-list-items" style={{ height: virtualizer.getTotalSize() }}>
 				<div className="tc-list-block" style={{ transform: `translateY(${items[0]?.start ?? 0}px)` }}>
-					<SortableList list={list} ids={ids} rows={sortableRows}>
+					<SortableList list={list} ids={ids}>
 							{items.map((item) => {
 								const row = drawn[item.index];
 								if (row.kind === "plus")

@@ -1,6 +1,6 @@
 import { type CSSProperties, type TouchEvent, useEffect } from "react";
 import { PROPERTY } from "../../design";
-import { Drag } from "../drag/Drag";
+import { Drag, type Grab, type Landing } from "../drag/Drag";
 import { Layers } from "../layers/Layers";
 import { Layout, type Place } from "../layout/Layout";
 import { StoreContext, type ScreenStore } from "../store";
@@ -18,9 +18,15 @@ const CARRIED_PLUS = (
 	</div>
 );
 
-/** The carried card: a compact plate around the point the pointer took it by (`--tc-grab-x`), the title cut short. */
-const carried = (id: string, grab: number, landing: number) => (
-	<div className="tc-carried" style={{ [PROPERTY.grabX]: `${grab}px`, [PROPERTY.landingLevel]: String(landing) } as CSSProperties}>
+/**
+ * The carried task: a compact plate around the point the pointer took it by (`--tc-grab-x`, `--tc-grab-y`), the title cut
+ * short; let go, it takes the shape of its place (`--tc-landing-…`, a block's look on the calendar).
+ */
+const carried = (id: string, grab: Grab, landing: Landing) => (
+	<div
+		className={`tc-carried${landing.block ? " is-block" : ""}`}
+		style={{ [PROPERTY.grabX]: `${grab.x}px`, [PROPERTY.grabY]: `${grab.y}px`, [PROPERTY.landingLevel]: String(landing.level), ...(landing.width === null ? {} : { [PROPERTY.landingWidth]: `${landing.width}px` }), ...(landing.height === null ? {} : { [PROPERTY.landingHeight]: `${landing.height}px` }) } as CSSProperties}
+	>
 		<Card id={id} copy />
 	</div>
 );

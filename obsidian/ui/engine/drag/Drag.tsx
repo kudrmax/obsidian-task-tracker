@@ -11,7 +11,8 @@ import { descendantsOf, finalOrder, levelAt, levelBetween, spotKey, shiftOf, typ
  * Drag and drop (spec, «The owners»): one `DndContext` per screen, one `DragOverlay`, one `onDragEnd` that makes one write
  * through the port. Classic dnd-kit used as stage 0 settled it («Recommended configuration», «Integration findings»,
  * «Drop flicker»): the default measuring, the overlay in a portal to the view's own `document.body` with its card given
- * its id as a prop, sortable items keeping their identity, closest corners for the lists.
+ * its id as a prop, sortable items keeping their identity; the target is what is under the pointer, else the row nearest
+ * the carried card in its own list (`pointerWithin`, `closestCenter`).
  */
 
 /** The mouse lifts a card once it moved this far; the finger once it held still this long (the plugin's long press) within this tolerance. */
@@ -49,40 +50,53 @@ const DROP_ANIMATION: DropAnimation = {
 	sideEffects: defaultDropAnimationSideEffects({ className: { dragOverlay: "is-dropping" }, styles: { active: { opacity: "0" } } }),
 };
 
+/** Where the pointer took the carried task, from its box's top left corner. */
+export interface Grab {
+	readonly x: number;
+	readonly y: number;
+}
+
+/** What the carried task lands as: its level, whether it is a block of the calendar, and the box of its place (dnd-kit's measure); null before measured. */
+export interface Landing {
+	readonly level: number;
+	readonly block: boolean;
+	readonly width: number | null;
+	readonly height: number | null;
+}
+
 /**
- * The carried card, told where the pointer took it from the card's left edge, so the plate is drawn around that point:
- * the pressing event and the lifted card's measured box are dnd-kit's own (`useDndContext`, as its `snapCenterToCursor`
- * modifier reads them).
+ * The carried card, told where the pointer took it and what it lands as, so the plate is drawn around that point and,
+ * let go, flies in as the task where it lands: the pressing event, the lifted box and the place's box are dnd-kit's own
+ * (`useDndContext`, as its `snapCenterToCursor` modifier reads them).
  */
 function Carried({ id, carried }: { readonly id: string; readonly carried: DragProps["carried"] }) {
-	const { activatorEvent, activeNodeRect } = useDndContext();
+	const { activatorEvent, activeNodeRect, active } = useDndContext();
 	/**
-	 * The level the card lands at, as it stood when it was let go: the drop clears the carried level at once, while the copy
-	 * still flies into its place, and the copy keeps the level it flies to.
+	 * What it lands as, kept as it stood when it was let go: the drop clears the carried state at once, while the copy still
+	 * flies into its place, and the copy keeps the shape it flies to.
 	 */
 	const level = useScreen((s) => (s.lifted === null ? null : (s.liftedDepth ?? 0)));
-	const landingRef = useRef(0);
-	if (level !== null) landingRef.current = level;
-	const landing = landingRef.current;
+	const landing = useRef<Landing>({ level: 0, block: false, width: null, height: null });
+	if (level !== null) landing.current = { level, block: active?.data.current?.sortable?.containerId === CALENDAR, width: activeNodeRect?.width ?? null, height: activeNodeRect?.height ?? null };
 	/**
-	 * Where the pointer took the card is a fact of the lift: kept from the first measure of the lifted card. dnd-kit
-	 * measures the card again wherever it stands later (in another list it is another row), and that box no longer says
-	 * where it was taken.
+	 * Where the pointer took the task is a fact of the lift: kept from the first measure of the lifted box. dnd-kit measures
+	 * the task again wherever it stands later (in another list it is another row), and that box no longer says where it was
+	 * taken.
 	 */
-	const grab = useRef<number | null>(null);
+	const grab = useRef<Grab | null>(null);
 	const at = activatorEvent ? getEventCoordinates(activatorEvent) : null;
-	if (grab.current === null && at && activeNodeRect) grab.current = at.x - activeNodeRect.left;
-	return <>{carried(id, grab.current ?? 0, landing)}</>;
+	if (grab.current === null && at && activeNodeRect) grab.current = { x: at.x - activeNodeRect.left, y: at.y - activeNodeRect.top };
+	return <>{carried(id, grab.current ?? { x: 0, y: 0 }, landing.current)}</>;
 }
 
 export interface DragProps {
 	/** The view's own document: the overlay goes on its body (a pop-out window has its own). */
 	readonly doc: Document;
 	/**
-	 * How the carried card is drawn, by its task's id, where the pointer took it from the card's left edge, and the level
-	 * it would land at: let go, it flies into its place in the shape of the card there, indent and all.
+	 * How the carried task is drawn, by its id, where the pointer took it, and what it lands as: let go, it flies into its
+	 * place in the shape of the task there, indent, width and all, or as the block on the calendar.
 	 */
-	readonly carried: (id: string, grab: number, landing: number) => ReactNode;
+	readonly carried: (id: string, grab: Grab, landing: Landing) => ReactNode;
 	/** How the carried plus is drawn. */
 	readonly plus: ReactNode;
 	/** A tick under the finger as a card lifts: the host's haptics. */
@@ -108,11 +122,19 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 	const lastOver = useRef<UniqueIdentifier | null>(null);
 	const justMoved = useRef(false);
 	const lists = useScreen((s) => s.shown.lists);
+	const plusAt = useScreen((s) => s.plusAt);
+	/** The other list is drawn with the card (or the plus) in it: from now on the pointer decides again. */
 	useEffect(() => {
 		justMoved.current = false;
-	}, [lists]);
+	}, [lists, plusAt]);
 	const collision: CollisionDetection = useCallback((args) => {
 		const underPointer = pointerWithin(args);
+		/** Over the calendar the target is the calendar itself: the card's place there is at the minute under its top, among no rows. */
+		const onCalendar = underPointer.some((hit) => hit.id === CALENDAR_TARGET || hit.id === CALENDAR_ROOM);
+		if (onCalendar && args.active.id !== PLUS) {
+			lastOver.current = CALENDAR_TARGET;
+			return [{ id: CALENDAR_TARGET }];
+		}
 		/** Where two lists meet, the pointer is in both: the card stays in its own until the pointer has left it. */
 		const own = String(args.active.data.current?.sortable?.containerId ?? "");
 		const ofOwn = (hit: { readonly id: UniqueIdentifier; readonly data?: { readonly droppableContainer?: { readonly data: { readonly current?: { readonly sortable?: { readonly containerId: UniqueIdentifier } } } } } }) => hit.id === `${LIST_TARGET}${own}` || hit.data?.droppableContainer?.data.current?.sortable?.containerId === own;
@@ -120,6 +142,7 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 		/** Between the lists, under no list at all, the card stays in its own: only the pointer inside another list moves it there. */
 		/** The plus over no list is no list's row: nothing is under it. */
 		if (args.active.id === PLUS && underPointer.length === 0) return [];
+		if (args.active.id === PLUS && onCalendar) return [];
 		const hits = inOwn.length > 0 ? inOwn : underPointer.length > 0 ? underPointer : rectIntersection(args).filter(ofOwn);
 		let overId = getFirstCollision(hits, "id");
 		if (overId !== null) {
@@ -133,7 +156,11 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 	}, []);
 
 	/** Where the card was lifted, and at which level: let go there, nothing is written. */
-	const [origin, setOrigin] = useState<(Slot & { readonly container: string; readonly depth: number }) | null>(null);
+	const [origin, setOrigin] = useState<(Slot & { readonly container: string; readonly depth: number; readonly at: number | null }) | null>(null);
+	/** The minute the carried card's place stands at on the calendar, while it stands there. */
+	const carriedAt = useRef<number | null>(null);
+	/** The carried card is over a place that refuses it: its place is home, its level its own, and let go it flies back. */
+	const refusedNow = useRef(false);
 
 	const rowsOf = (list: string) => api.getState().shown.lists[list as ListId]?.rows ?? [];
 	/** The carried card's (or plus's) level on the place it stands at, by its sideways swipes there (`SwipeLevel`). */
@@ -176,7 +203,7 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 		justMoved.current = true;
 		api.getState().setPlusAt({ into: list as ListId, index: order.indexOf(overId) + (below ? 1 : 0) });
 	};
-	/** The plus let go in a list: the field opens where the rows parted for it, at the level of the zone the pointer is in. */
+	/** The plus let go in a list: the field opens where the rows parted for it, at the level its swipes there set. */
 	const dropPlus = (event: DragEndEvent) => {
 		const list = containerOf(event.active);
 		const order = orderAfter(event.active, event.over);
@@ -189,11 +216,48 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 		const depth = sideLevel(event, spotKey(list, order, PLUS), (wanted) => levelBetween(near(order[index - 1]), near(order[index + 1]), wanted));
 		api.getState().openEntry({ list: list as ListId, ...slotOf(rows, order, PLUS), dayOffset: api.getState().dayOffset, depth });
 	};
+	/**
+	 * Over a place that refuses the card, its place goes back where it was taken (the screen as read): let go there, it
+	 * flies back and nothing is written.
+	 */
+	const refused = () => {
+		refusedNow.current = true;
+		carriedAt.current = origin?.at ?? null;
+		const before = api.getState().shown;
+		api.getState().carryHome();
+		if (api.getState().shown !== before) justMoved.current = true;
+		api.getState().setLiftedDepth(origin?.depth ?? null);
+	};
+	/**
+	 * Over the calendar the card's place is its block, at the minute the calendar reads under the carried plate's top (its
+	 * time scale and scroll are its own): the screen draws the port's preview of the task there, as it does in a list.
+	 */
+	const overCalendar = (event: { readonly active: Sortable & { readonly rect: { readonly current: { readonly translated: { readonly top: number } | null } } } }, over: { readonly rect: { readonly top: number }; readonly data: { readonly current?: unknown } }) => {
+		const id = String(event.active.id);
+		const minuteAt = (over.data.current as CalendarData | undefined)?.minuteAt;
+		const top = event.active.rect.current.translated?.top;
+		if (!minuteAt || top === undefined) return;
+		const at = minuteAt(top);
+		if (at === null) return;
+		if (at === carriedAt.current && containerOf(event.active) === CALENDAR) {
+			refusedNow.current = false;
+			return;
+		}
+		const to: Destination = { list: "day", before: null, dayOffset: api.getState().dayOffset, at };
+		if (!api.getState().takes(id, to)) return refused();
+		refusedNow.current = false;
+		if (containerOf(event.active) !== CALENDAR) justMoved.current = true;
+		carriedAt.current = at;
+		api.getState().carryInto(id, to);
+	};
 	const move = (event: DragMoveEvent) => {
 		const { active: lifted, over } = event;
 		if (lifted.id === PLUS) plusOver(event, over);
+		else if (over?.id === CALENDAR_TARGET) overCalendar(event, over);
+		if (refusedNow.current) return;
 		const container = containerOf(lifted);
 		if (container === null) return api.getState().setLiftedDepth(null);
+		if (container === CALENDAR) return api.getState().setLiftedDepth(0);
 		const allowed = (wanted: number) => (lifted.id === PLUS ? plusLevel(lifted, over, wanted) : projected(lifted, over, wanted)) ?? 0;
 		api.getState().setLiftedDepth(sideLevel(event, spotKey(container, orderAfter(lifted, over), String(lifted.id)), allowed));
 	};
@@ -202,6 +266,9 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 		const { active: lifted } = event;
 		const screen = api.getState();
 		if (!screen.claim("drag")) return;
+		justMoved.current = false;
+		lastOver.current = null;
+		refusedNow.current = false;
 		const liftX = getEventCoordinates(event.activatorEvent)?.x ?? 0;
 		swipe.current = new SwipeLevel(null, 0, liftX, performance.now());
 		if (lifted.id === PLUS) {
@@ -217,7 +284,9 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 		const depth = own?.kind === "task" ? own.depth : 0;
 		const under = descendantsOf(rows, String(lifted.id));
 		if (container !== null) swipe.current = new SwipeLevel(spotKey(container, itemsOf(lifted).filter((other) => !under.has(other)), String(lifted.id)), depth, liftX, performance.now());
-		setOrigin(container === null ? null : { container, ...slotOf(rows, itemsOf(lifted), String(lifted.id)), depth });
+		const block = container === CALENDAR ? (screen.shown.day.blocks.find((b) => b.id === String(lifted.id)) ?? null) : null;
+		carriedAt.current = block?.start ?? null;
+		setOrigin(container === null ? null : { container, ...slotOf(rows, itemsOf(lifted), String(lifted.id)), depth, at: block?.start ?? null });
 		onLift();
 	};
 	/**
@@ -227,12 +296,20 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 	const overList = (event: DragOverEvent) => {
 		const { active: lifted, over } = event;
 		if (lifted.id === PLUS) return plusOver(event, over);
+		if (over?.id === CALENDAR_TARGET) return overCalendar(event, over);
 		const into = crossing(lifted, over);
-		if (!into) return;
+		if (!into) {
+			/** Back over its own list the card is no longer refused: its place goes where the pointer is, as in any list. */
+			if (over && (containerOf(over) === containerOf(lifted) || String(over.id) === `${LIST_TARGET}${containerOf(lifted)}`)) refusedNow.current = false;
+			return;
+		}
 		const rows = rowsOf(into.list);
 		const id = String(lifted.id);
 		const order = [...into.order.slice(0, into.index), id, ...into.order.slice(into.index)];
 		const to: Destination = { list: into.list as ListId, ...slotOf(rows, order, id), dayOffset: api.getState().dayOffset, depth: sideLevel(event, spotKey(into.list, order, id), (wanted) => levelBetween(rows[into.index - 1], rows[into.index], wanted)) };
+		if (!api.getState().takes(id, to)) return refused();
+		refusedNow.current = false;
+		carriedAt.current = null;
 		justMoved.current = true;
 		api.getState().carryInto(id, to);
 	};
@@ -242,11 +319,18 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 		if (lifted.id === PLUS) return dropPlus(event);
 		const id = String(lifted.id);
 		const container = containerOf(lifted);
-		if (container === null) return api.getState().drop(id, null);
+		if (container === null || refusedNow.current) return api.getState().drop(id, null);
+		if (container === CALENDAR) {
+			const at = carriedAt.current;
+			const to: Destination | null = at === null ? null : { list: "day", before: null, dayOffset: api.getState().dayOffset, at };
+			const still = to === null || (origin !== null && origin.container === CALENDAR && origin.at === at) || !api.getState().takes(id, to);
+			return api.getState().drop(id, still ? null : to);
+		}
 		const depth = sideLevel(event, spotKey(container, orderAfter(lifted, over), id), (wanted) => projected(lifted, over, wanted) ?? 0);
 		const slot = slotOf(rowsOf(container), orderAfter(lifted, over), id);
 		const still = origin !== null && origin.container === container && origin.section === slot.section && origin.before === slot.before && origin.depth === depth;
-		api.getState().drop(id, still ? null : { list: container as ListId, ...slot, dayOffset: api.getState().dayOffset, depth });
+		const to: Destination = { list: container as ListId, ...slot, dayOffset: api.getState().dayOffset, depth };
+		api.getState().drop(id, still || !api.getState().takes(id, to) ? null : to);
 	};
 	const cancel = () => {
 		if (active === PLUS) {
@@ -317,6 +401,44 @@ const MEASURING: MeasuringConfiguration = {
  */
 const AUTO_SCROLL = { threshold: { x: 0, y: 0.15 } };
 
+/** The calendar's blocks as dnd-kit's container: a carried block stands among them, and a card carried onto it joins them. */
+export const CALENDAR = "calendar";
+/** The calendar's drop target: its canvas of hours, inside the room it scrolls in, so dnd-kit's auto-scroll scrolls that room. */
+const CALENDAR_TARGET = "calendar:";
+/** The room the calendar scrolls in, a droppable only for dnd-kit to measure it: it stands still on the screen while its hours scroll. */
+const CALENDAR_ROOM = "calendar-room:";
+
+/** What the calendar tells the drag: the start a carried task's top at `top` on the screen takes; null before the room is measured. */
+interface CalendarData {
+	readonly minuteAt: (top: number) => number | null;
+}
+
+/**
+ * The calendar as a drop target: `room` goes on the element it scrolls in, `canvas` on its hours inside it. `minuteAt`
+ * turns a height from the room's top (measured by dnd-kit) into a start, by the calendar's own time scale and scroll.
+ */
+export function useCalendarDrop(minuteAt: (y: number) => number): { readonly room: (element: HTMLElement | null) => void; readonly canvas: (element: HTMLElement | null) => void } {
+	const room = useDroppable({ id: CALENDAR_ROOM });
+	const roomRect = room.rect;
+	const canvas = useDroppable({ id: CALENDAR_TARGET, data: { minuteAt: (top: number) => (roomRect.current ? minuteAt(top - roomRect.current.top) : null) } satisfies CalendarData });
+	return { room: room.setNodeRef, canvas: canvas.setNodeRef };
+}
+
+/** The calendar's blocks as dnd-kit's «multiple containers» container: its items stand still, each block placed by its minute. */
+export function CalendarBlocks({ ids, children }: { readonly ids: readonly string[]; readonly children: ReactNode }) {
+	return (
+		<SortableContext id={CALENDAR} items={ids as string[]} strategy={STAND_STILL}>
+			{children}
+		</SortableContext>
+	);
+}
+
+/** A placed row never animates a change of its index: its own box glides. */
+const STAY = () => false;
+
+/** The calendar's blocks never part: each stands at its minute. */
+const STAND_STILL: SortingStrategy = () => null;
+
 /** A list's own drop target, for when no row of it is under the pointer: an empty list, or past its last row. */
 const LIST_TARGET = "list:";
 
@@ -342,7 +464,7 @@ function crossing(active: Sortable & { readonly rect: { readonly current: { read
 }
 
 /** A list's sortable tasks: `ids` keeps its identity between draws, or dnd-kit stops gliding (stage 0, finding 4). */
-export function SortableList({ list, ids, rows, children }: { readonly list: ListId; readonly ids: readonly string[]; readonly rows: readonly Row[]; readonly children: ReactNode }) {
+export function SortableList({ list, ids, children }: { readonly list: ListId; readonly ids: readonly string[]; readonly children: ReactNode }) {
 	const { setNodeRef } = useDroppable({ id: `${LIST_TARGET}${list}`, data: { items: ids } });
 	const strategy = useMemo(() => finalOrderStrategy(ids), [ids]);
 	return (
@@ -357,13 +479,13 @@ export function SortableList({ list, ids, rows, children }: { readonly list: Lis
 /**
  * A row of a list in dnd-kit's sortable list: the thin wrapper dnd-kit draws again around the memoized card (stage 0,
  * second round). A task's card is carried by it; lifted, it stays where the card will land, as the gap (spec, «Decided»).
- * A section's header and an empty section's plate move aside like cards but are not carried (`onTap` absent): a card goes
- * after them into their section.
+ * A section's header moves aside like cards but is not carried (`onTap` absent): a card goes after it into its section.
+ * A calendar's block is `placed`: its box says where it stands, so dnd-kit never moves it (its box glides by CSS).
  */
-export const SortableRow = memo(function SortableRow({ id, onTap, gap = false, children }: { readonly id: string; readonly onTap?: (target: Element) => void; readonly gap?: boolean; readonly children: ReactNode }) {
+export const SortableRow = memo(function SortableRow({ id, onTap, gap = false, placed = false, children }: { readonly id: string; readonly onTap?: (target: Element) => void; readonly gap?: boolean; readonly placed?: boolean; readonly children: ReactNode }) {
 	const carried = onTap !== undefined;
-	const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({ id, disabled: { draggable: !carried, droppable: false } });
-	const style: CSSProperties = { transform: CSS.Translate.toString(transform), transition };
+	const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({ id, disabled: { draggable: !carried, droppable: false }, animateLayoutChanges: placed ? STAY : undefined });
+	const style: CSSProperties = placed ? {} : { transform: CSS.Translate.toString(transform), transition };
 	return (
 		<div ref={setNodeRef} className={`tc-drag-source${isDragging || gap ? " is-lifted" : ""}`} style={style} {...(carried ? attributes : {})} {...(carried ? listeners : {})} onClick={carried ? (event) => onTap(event.currentTarget) : undefined}>
 			{children}

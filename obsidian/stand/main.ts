@@ -6,7 +6,7 @@ import type { Stop } from "../ui/engine/store";
 import { detectHaptics, type HapticsHost } from "../ui/haptics";
 import { clearPriorityColors, showPriorityColors } from "../ui/priorityColors";
 import { addWindowDocument } from "../ui/windowDocuments";
-import { type ListKey, longListsFile, type MockFile, oneColumnFile, sectionsFile, subtasksFile, twoColumnsFile } from "./mockData";
+import { calendarFile, type ListKey, longListsFile, type MockFile, oneColumnFile, sectionsFile, subtasksFile, twoColumnsFile } from "./mockData";
 import { MockPort, WRITE_DELAYS, type WriteDelay } from "./MockPort";
 
 /** The stand's own view type and code block language: never the plugin's. */
@@ -163,6 +163,7 @@ export default class TaskCalendarStand extends Plugin {
 		this.addCommand({ id: "step-subtasks", name: "Step 3: subtasks", callback: () => void this.showStep("twoColumns", subtasksFile()) });
 		this.addCommand({ id: "step-sections", name: "Step 4: sections", callback: () => void this.showStep("twoColumns", sectionsFile()) });
 		this.addCommand({ id: "step-long-lists", name: "Step 5: long lists", callback: () => void this.showStep("twoColumns", longListsFile()) });
+		this.addCommand({ id: "step-calendar", name: "Step 6: onto and off the calendar", callback: () => void this.showStep("calendar", calendarFile(new Date())) });
 		this.addCommand({ id: "whole-screen", name: "The whole screen", callback: () => void this.showStep("leaf") });
 		for (const delay of WRITE_DELAYS) this.addCommand({ id: `delay-${delay}`, name: `Write delay ${delay} ms`, callback: () => (port.delay = delay) });
 	}

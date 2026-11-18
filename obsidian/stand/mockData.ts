@@ -166,6 +166,32 @@ export function sectionsFile(): MockFile {
 	return file;
 }
 
+/**
+ * The stand's calendar step: Soon, today's list and today's calendar, a dozen plain tasks in Soon and in today's list,
+ * and five blocks today from the hour after the present one (two of them overlapping), all within the day.
+ */
+export function calendarFile(clock: Date): MockFile {
+	const file = oneColumnFile();
+	const today = dateOf(dayOf(clock));
+	const plain = (id: string, title: string, due: string | null, slot: MockTask["slot"] = null): MockTask => ({ id, title, level: null, status: " ", due, slot, description: null, children: [] });
+	file.soon[0].tasks = ["Купить подарок", "Сдать отчёт", "Написать письмо", "Забрать посылку", "Обновить резюме", "Сходить в зал"].map((title, i) => plain(`g${i + 1}`, title, null));
+	file.inbox[0].tasks = [];
+	/** The blocks start an hour after the present hour, never so late that the last would leave the day. */
+	const hour = Math.min(Math.max(0, Math.floor(minuteOf(clock) / 60) * 60), 24 * 60 - 9 * 60);
+	const blocks: [string, number, number][] = [
+		["Созвон с командой", hour + 60, 30],
+		["Обед", hour + 120, 60],
+		["Ревью дизайна", hour + 240, 60],
+		["Звонок врачу", hour + 270, 30],
+		["Тренировка", hour + 360, 90],
+	];
+	file.now[0].tasks = [
+		...["Разобрать почту", "Полить цветы", "Ответить Косте", "Оплатить свет", "Купить молоко", "Позвонить маме"].map((title, i) => plain(`h${i + 1}`, title, today)),
+		...blocks.map(([title, start, length], i) => plain(`k${i + 1}`, title, today, { start, end: start + length })),
+	];
+	return file;
+}
+
 /** The stand's long lists step: the two columns with a hundred plain tasks in Inbox and sixty in Soon, so lists scroll under a carried card. */
 export function longListsFile(): MockFile {
 	const file = oneColumnFile();

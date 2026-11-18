@@ -12,9 +12,10 @@ import { COLUMN_SHARE, STRIP_WIDTH } from "./columns";
 
 /**
  * Where a screen is mounted: Obsidian's leaf (the main screen, a pop-out), a note's block, or the stand's steps alone:
- * one column (a list and drag, nothing else on screen), then two columns side by side (drag between them).
+ * one column (a list and drag, nothing else on screen), then two columns side by side (drag between them), then Soon,
+ * the day's list and the day's calendar side by side (drag onto and off the calendar).
  */
-export type Place = "leaf" | "note" | "column" | "twoColumns";
+export type Place = "leaf" | "note" | "column" | "twoColumns" | "calendar";
 
 /**
  * Where things stand (spec, «The owners»): the place's columns. The only module that reads the place. A leaf shows the
@@ -23,11 +24,12 @@ export type Place = "leaf" | "note" | "column" | "twoColumns";
  * «Behaviours Max had to ask for twice»); at the day's calendar too until the divider comes (E2).
  */
 export const Layout = memo(function Layout({ place }: { readonly place: Place }) {
-	if (place === "column" || place === "twoColumns")
+	if (place === "column" || place === "twoColumns" || place === "calendar")
 		return (
 			<>
-				{place === "column" ? <NoteColumn /> : <TwoColumns />}
+				{place === "column" ? <NoteColumn /> : place === "twoColumns" ? <TwoColumns /> : <CalendarColumns />}
 				<PlusButton />
+				<TaskMenu />
 			</>
 		);
 	return (
@@ -87,12 +89,29 @@ function NoteColumn() {
 const WHOLE = 100;
 /** Two columns standing still side by side split the room in half. */
 const HALF = 50;
+/** Three columns standing still share the room in three. */
+const THIRD = 100 / 3;
 
 function TwoColumns() {
 	return (
 		<div className="tc-note-column">
 			<ListColumn list="inbox" share={HALF} />
 			<ListColumn list="soon" share={HALF} />
+		</div>
+	);
+}
+
+function CalendarColumns() {
+	return (
+		<div className="tc-note-column">
+			<ListColumn list="soon" share={THIRD} />
+			<ListColumn list="day" share={THIRD} />
+			<ColumnBox className="is-timeline" share={THIRD}>
+				<ColumnHead title={null} />
+				<div className="tc-stage-body">
+					<Timeline />
+				</div>
+			</ColumnBox>
 		</div>
 	);
 }
