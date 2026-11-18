@@ -1,4 +1,4 @@
-import { closestCorners, DndContext, type DragEndEvent, DragOverlay, type DragStartEvent, type DropAnimation, MouseSensor, TouchSensor, useSensor, useSensors } from "@dnd-kit/core";
+import { closestCorners, DndContext, defaultDropAnimationSideEffects, type DragEndEvent, DragOverlay, type DragStartEvent, type DropAnimation, MouseSensor, TouchSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { type CSSProperties, memo, type ReactNode, useState } from "react";
@@ -18,14 +18,28 @@ const MOUSE_DISTANCE_PX = 4;
 const LONG_PRESS_MS = 250;
 const LONG_PRESS_TOLERANCE_PX = 5;
 
-/** The copy let go flies into the card's place: short, translation only (stage 0, round four). */
-const DROP_ANIMATION: DropAnimation = { duration: 180, easing: "cubic-bezier(0.2, 0, 0, 1)" };
+/**
+ * The copy let go flies into the card's place: short, translation only (stage 0, round four). While it flies it takes the
+ * resting card's look and width (`is-dropping`, CSS over `--tc-duration-fly` and `--tc-ease-fly`), so it lands as the card
+ * itself and nothing changes when it goes: dnd-kit's documented drop side effects; the card under it stays hidden meanwhile.
+ */
+const DROP_ANIMATION: DropAnimation = {
+	duration: 180,
+	easing: "cubic-bezier(0.2, 0, 0, 1)",
+	sideEffects: defaultDropAnimationSideEffects({ className: { dragOverlay: "is-dropping" }, styles: { active: { opacity: "0" } } }),
+};
+
+/** Where the pointer took the card, from the card's left edge: the carried plate is drawn around it. */
+function grabOffset(event: Event, left: number): number {
+	const x = "touches" in event ? ((event as TouchEvent).touches[0]?.clientX ?? left) : (event as MouseEvent).clientX;
+	return x - left;
+}
 
 export interface DragProps {
 	/** The view's own document: the overlay goes on its body (a pop-out window has its own). */
 	readonly doc: Document;
-	/** How the carried card is drawn, by its task's id. */
-	readonly carried: (id: string) => ReactNode;
+	/** How the carried card is drawn, by its task's id and where the pointer took it from the card's left edge. */
+	readonly carried: (id: string, grab: number) => ReactNode;
 	/** A tick under the finger as a card lifts: the host's haptics. */
 	readonly onLift: () => void;
 	readonly children: ReactNode;
@@ -35,10 +49,12 @@ export function Drag({ doc, carried, onLift, children }: DragProps) {
 	const api = useScreenApi();
 	const sensors = useSensors(useSensor(MouseSensor, { activationConstraint: { distance: MOUSE_DISTANCE_PX } }), useSensor(TouchSensor, { activationConstraint: { delay: LONG_PRESS_MS, tolerance: LONG_PRESS_TOLERANCE_PX } }));
 	const [active, setActive] = useState<string | null>(null);
+	const [grab, setGrab] = useState(0);
 
-	const start = ({ active: lifted }: DragStartEvent) => {
+	const start = ({ active: lifted, activatorEvent }: DragStartEvent) => {
 		const screen = api.getState();
 		if (!screen.claim("drag")) return;
+		setGrab(grabOffset(activatorEvent, lifted.rect.current.initial?.left ?? 0));
 		screen.lift(String(lifted.id));
 		setActive(String(lifted.id));
 		onLift();
@@ -57,7 +73,7 @@ export function Drag({ doc, carried, onLift, children }: DragProps) {
 			{children}
 			{createPortal(
 				<DragOverlay className="tc-overlay" dropAnimation={DROP_ANIMATION}>
-					{active ? carried(active) : null}
+					{active ? carried(active, grab) : null}
 				</DragOverlay>,
 				doc.body,
 			)}

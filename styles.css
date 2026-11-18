@@ -6,7 +6,7 @@
  * number, a colour or a radius written straight into a rule, and on a token no rule uses. To change how something
  * looks, change its token, or add one here with a name that says what it is for.
  *
- * Properties the code sets per element (--tc-list-width, --tc-hour, --tc-allday-extra-rows, --tc-y,
+ * Properties the code sets per element (--tc-list-width, --tc-grab-x, --tc-hour, --tc-allday-extra-rows, --tc-y,
  * --tc-len, --tc-x, --tc-level, --tc-pass, --tc-stack-end, --tc-room-top, --tc-room-bottom, --tc-scrolled, --tc-scrolled-below, --tc-event-bg, --tc-event-bar, --tc-event-text, and per priority colour --tc-priority-ink, --tc-priority-fill, --tc-priority-meta) carry a measure from the layout
  * into these rules; the rules do the arithmetic.
  */
@@ -724,6 +724,8 @@ body {
 	--tc-duration-collapse: 150ms;
 	--tc-duration-menu: 200ms;
 	--tc-duration-fly: 180ms;
+	--tc-ease-fly: cubic-bezier(0.2, 0, 0, 1);
+	--tc-carried-w: 240px;
 	--tc-duration-snap: 120ms;
 	--tc-duration-fade: 160ms;
 	/* The phone keyboard slides in and out as Obsidian moves its toolbar with it: the quick bar and the field typed in ride it. */
@@ -1810,8 +1812,10 @@ button.tc-btn.tc-folder-btn:disabled { opacity: var(--tc-tile-off-opacity); curs
 /* The carried copy rides the pointer in dnd-kit's overlay, outside the screen's styles: it carries the screen's type itself. */
 .tc-overlay { font-family: var(--tc-font-ui); font-size: var(--tc-font-body); font-weight: var(--tc-weight-normal); line-height: var(--tc-leading-normal); color: var(--tc-text); z-index: var(--tc-layer-float); }
 .tc-carried { position: relative; }
-.tc-carried > .tc-card { background: var(--tc-float-bg); box-shadow: var(--tc-shadow-lift); cursor: grabbing; }
+.tc-carried > .tc-card { width: var(--tc-carried-w); max-width: 100%; margin-left: clamp(0px, calc(var(--tc-grab-x) - var(--tc-carried-w) / 2), calc(100% - var(--tc-carried-w))); background: var(--tc-float-bg); box-shadow: var(--tc-shadow-lift); cursor: grabbing; transition: width var(--tc-duration-fly) var(--tc-ease-fly), margin-left var(--tc-duration-fly) var(--tc-ease-fly), background-color var(--tc-duration-fly) var(--tc-ease-fly), box-shadow var(--tc-duration-fly) var(--tc-ease-fly); }
+.tc-overlay.is-dropping .tc-carried > .tc-card { width: 100%; margin-left: 0px; background: var(--tc-card-bg); box-shadow: none; }
 .tc-carried > .tc-card[data-priority] { background: var(--tc-priority-fill); }
+.tc-overlay.is-dropping .tc-carried > .tc-card[data-priority] { background: var(--tc-priority-fill); }
 /* A layer placed by Floating UI: shown as it mounts, where Floating UI puts it. */
 .tc-panel.tc-floating-menu { width: var(--tc-menu-w); opacity: 1; transform: none; }
 /* The field the plus opens, over the screen's foot, left of the plus. */

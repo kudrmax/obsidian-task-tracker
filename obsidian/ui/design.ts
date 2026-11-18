@@ -60,6 +60,8 @@ export const DESIGN_TOKENS: Readonly<Record<DesignMeasure, string>> = {
 /** The custom properties the code sets on elements; styles.css does the arithmetic with them. */
 export const PROPERTY = {
 	listWidth: "--tc-list-width",
+	/** Where the pointer took a carried card, from its left edge: the compact carried plate is drawn around it. */
+	grabX: "--tc-grab-x",
 	/** Where the screen's foot fade starts: past the rows' column, which ends on its own (rows). */
 	fadeLeft: "--tc-fade-left",
 	/** The Projects screen's tree, as wide as its divider was let go at on this device. */

@@ -1,4 +1,4 @@
-import { type TouchEvent, useEffect } from "react";
+import { type CSSProperties, type TouchEvent, useEffect } from "react";
 import { Drag } from "../drag/Drag";
 import { Layers } from "../layers/Layers";
 import { Layout, type Place } from "../layout/Layout";
@@ -9,8 +9,9 @@ import { HostContext, type ScreenHost } from "./host";
 /** Touches stay the screen's: Obsidian's drawers never take a swipe meant for it (stage 0, «Integration findings» 8). */
 const keepTouch = (event: TouchEvent) => event.stopPropagation();
 
-const carried = (id: string) => (
-	<div className="tc-carried">
+/** The carried card: a compact plate around the point the pointer took it by (`--tc-grab-x`), the title cut short. */
+const carried = (id: string, grab: number) => (
+	<div className="tc-carried" style={{ "--tc-grab-x": `${grab}px` } as CSSProperties}>
 		<Card id={id} copy />
 	</div>
 );
