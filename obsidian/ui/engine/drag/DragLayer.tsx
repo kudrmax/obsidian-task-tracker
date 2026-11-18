@@ -17,7 +17,7 @@ import {
 import { getEventCoordinates } from "@dnd-kit/utilities";
 import { type ReactNode, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
-import { acceptsDrop, carriedMiddle, type DropColumn, levelAt, placeAt } from "../../../../core/application/contracts";
+import { acceptsDrop, carriedMiddle, type DropColumn, levelAt, placeAt, placesInGap } from "../../../../core/application/contracts";
 import { DESIGN, LAYOUT } from "../../design";
 import { useHost, useScreen } from "../ScreenContext";
 import { Carried } from "./Carried";
@@ -89,6 +89,8 @@ export function DragLayer({ children }: { readonly children: ReactNode }) {
 		const column = id.slice("list:".length) as DropColumn;
 		const shape = geometry.list(column);
 		if (!shape || !acceptsDrop(column, [from])) return { kind: "home" };
+		/** A list that shows no sections takes a task from elsewhere at its end (`placesInGap`): the gap stands there. */
+		if (!placesInGap(column, from, store.getState().grouped[column])) return { kind: "gap", column, gap: { kind: "gap", index: placedOf(shape.entries, shape.measured, 0).cards.length, level: 0, group: null } };
 		const pointer = start.current ? { x: start.current.x + delta.x, y: start.current.y + delta.y } : { x: carried.left, y: carried.top };
 		return { kind: "gap", column, gap: gapIn(shape, column, over.rect, carried, pointer) };
 	};
@@ -100,7 +102,7 @@ export function DragLayer({ children }: { readonly children: ReactNode }) {
 		const { cards, heads, shift } = placedOf(shape.entries, shape.measured, store.getState().settings.cardGap);
 		const grab = pointer.y - carried.top;
 		const middle = carriedMiddle(pointer.y - list.top + shape.scrollTop - shape.padTop, grab, carried.height);
-		const level = levelAt(carried.left, { left: list.left, width: list.width }, DESIGN.subtaskIndent);
+		const level = levelAt(pointer.x, { left: list.left, width: list.width }, DESIGN.subtaskIndent);
 		return placeAt(cards, middle, level, shift, room, heads, room, LAYOUT.dropHysteresis);
 	};
 
@@ -134,6 +136,7 @@ export function DragLayer({ children }: { readonly children: ReactNode }) {
 				autoScroll={{ threshold: { x: 0, y: 0.15 }, acceleration: 8 }}
 				onDragStart={lift}
 				onDragMove={(event) => store.getState().aim(aimAt(event))}
+				onDragOver={(event) => store.getState().aim(aimAt(event as DragMoveEvent))}
 				onDragEnd={() => {
 					const drop = store.getState().drag?.aim.kind;
 					void store.getState().release();

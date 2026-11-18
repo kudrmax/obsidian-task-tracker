@@ -66,6 +66,8 @@ export interface ScreenState {
 	readonly canUndo: boolean;
 	/** The present minute from the shown day's start while it is today (the now line); null on another day. */
 	readonly now: number | null;
+	/** Whether each list shows its sections on the shown day (`columnSections`): a list that does places a task from anywhere. */
+	readonly grouped: Readonly<Record<DropColumn, boolean>>;
 	/** What a drop on each column's title means (`ScreenView.titleDrops`); none before the first read. */
 	readonly titleDrops: Readonly<Record<DropColumn, DropTo>> | null;
 	/** A drag under way, or the card just let go waiting for its copy to land; null otherwise. */
@@ -176,6 +178,7 @@ export function createScreenStore(services: ScreenServices, where: ScreenPlace, 
 				listNames: shared(prev.listNames, listNames()),
 				dayTitle: titleOf(date),
 				titleDrops: shared(prev.titleDrops ?? undefined, screen.titleDrops),
+				grouped: shared(prev.grouped, Object.fromEntries(FUNNEL_LISTS.map((column) => [column, tasks.columnSections(column, date) !== null])) as Record<DropColumn, boolean>),
 				...extra,
 			});
 		};
@@ -217,6 +220,7 @@ export function createScreenStore(services: ScreenServices, where: ScreenPlace, 
 			canUndo: undo.canUndo(),
 			now: nowOn(today),
 			titleDrops: null,
+			grouped: { inbox: false, backlog: false, soon: false, day: false },
 			drag: null,
 
 			async refresh() {

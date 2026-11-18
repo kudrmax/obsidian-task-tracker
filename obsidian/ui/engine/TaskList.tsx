@@ -93,7 +93,7 @@ export const TaskList = memo(function TaskList({ column, day, scrolls, className
 
 	const draw = (entry: Entry): ReactNode => {
 		if (entry.kind === "card") return droppable ? <DraggableCard column={droppable} entry={entry} day={day} /> : <Card id={entry.row.id} day={day} level={entry.row.level} branch={entry.row.branch} stage={entry.row.stage} />;
-		if (entry.kind === "gap") return <Gap id={entry.id} level={entry.level} />;
+		if (entry.kind === "gap") return <Gap id={entry.id} level={entry.level} day={day} />;
 		if (entry.kind === "home") return <div className="tc-gap is-home" style={{ [PROPERTY.level]: String(entry.level) } as CSSProperties} />;
 		if (entry.kind === "head")
 			return (
@@ -140,7 +140,7 @@ function DraggableCard({ column, entry, day }: { readonly column: DropColumn; re
 	const { setNodeRef, listeners, attributes } = useDraggable({ id: dragId.task(entry.row.id), data: source });
 	return (
 		<div ref={setNodeRef} className="tc-drag-source" {...listeners} {...attributes}>
-			<Card id={entry.row.id} day={day} level={entry.row.level} branch={entry.row.branch} stage={entry.row.stage} unseen={entry.landing} parent={entry.parent} />
+			<Card id={entry.row.id} day={day} level={entry.row.level} branch={entry.row.branch} stage={entry.row.stage} parent={entry.parent} />
 		</div>
 	);
 }
@@ -149,8 +149,13 @@ function DraggableCard({ column, entry, day }: { readonly column: DropColumn; re
  * The place a carried card will land: its outline at its depth. It is the carried task's own node for dnd-kit, so the
  * copy let go flies into it.
  */
-function Gap({ id, level }: { readonly id: string | null; readonly level: number }) {
+function Gap({ id, level, day }: { readonly id: string | null; readonly level: number; readonly day: LocalDate | null }) {
 	const twoLine = useScreen((s) => (id ? s.items[id]?.card.over !== null : false));
-	const { setNodeRef } = useDraggable({ id: id ? dragId.task(id) : "gap", disabled: true });
+	/** The copy has landed and the drop's screen is still coming: the card stands in its gap, never a frame without it. */
+	const landed = useScreen((s) => s.drag?.phase === "dropping" && s.drag.flown);
+	/** The carried thing's own id for dnd-kit (a card's or a block's), so the copy let go flies into the gap. */
+	const carriedId = useScreen((s) => (s.drag?.lifted.kind === "task" ? (s.drag.lifted.home ? dragId.task(s.drag.lifted.id) : dragId.block(s.drag.lifted.id)) : "gap"));
+	const { setNodeRef } = useDraggable({ id: id ? carriedId : "gap", disabled: true });
+	if (landed && id) return <Card id={id} day={day} level={level} />;
 	return <div ref={setNodeRef} className={`tc-gap${twoLine ? " is-two-line" : ""}`} style={{ [PROPERTY.level]: String(level) } as CSSProperties} />;
 }

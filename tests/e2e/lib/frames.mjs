@@ -21,7 +21,7 @@ const SAMPLER = String.raw`(() => {
 	const tick = () => {
 		if (!state.run) return;
 		const items = [];
-		for (const el of doc.querySelectorAll(".task-calendar [data-id], .task-calendar [data-block]")) {
+		for (const el of doc.querySelectorAll(".task-calendar [data-id], .task-calendar [data-block], [data-copy]")) {
 			const r = el.getBoundingClientRect();
 			const clip = clipOf(el);
 			const shown = { l: Math.max(r.left, clip.l), t: Math.max(r.top, clip.t), r: Math.min(r.right, clip.r), b: Math.min(r.bottom, clip.b) };
@@ -29,11 +29,12 @@ const SAMPLER = String.raw`(() => {
 			const title = el.querySelector(".tc-card-title");
 			const tr = title ? title.getBoundingClientRect() : null;
 			items.push({
-				id: el.dataset.id ?? el.dataset.block,
-				kind: el.dataset.id ? "card" : "block",
+				id: el.dataset.id ?? el.dataset.block ?? el.dataset.copy,
+				kind: el.dataset.id ? "card" : el.dataset.block ? "block" : "copy",
 				x: +r.left.toFixed(1), y: +r.top.toFixed(1), w: +r.width.toFixed(1), h: +r.height.toFixed(1),
 				whole: shown.l <= r.left + 1 && shown.r >= r.right - 1 && shown.t <= r.top + 1 && shown.b >= r.bottom - 1,
-				o: opacityOf(el),
+				/** What a person sees of it: its title's visibility (a lifted block hides its insides, not itself). */
+				o: opacityOf(title ?? el),
 				text: title ? title.textContent.length : 0,
 				cut: !!title && title.scrollHeight > title.clientHeight + 1,
 				above: tr ? +(tr.top - r.top).toFixed(1) : 0,
@@ -70,7 +71,7 @@ export class FrameRecorder {
  * way it came while `monotonic` holds, no text is selected, a card's title is never cut mid-line nor blank, and the
  * thing under the finger follows it (`follow`).
  */
-export function frameFaults(frames, { maxStep = Infinity, monotonic = null, follow = null, ignoreBlankBelow = 0 } = {}) {
+export function frameFaults(frames, { maxStep = Infinity, monotonic = null, follow = null, ignoreBlankBelow = 0, carried = null } = {}) {
 	const faults = [];
 	const fault = (frame, kind, detail) => faults.push({ t: frame.t, kind, ...detail });
 	const byId = (frame) => {
@@ -84,8 +85,14 @@ export function frameFaults(frames, { maxStep = Infinity, monotonic = null, foll
 	const maps = frames.map(byId);
 	frames.forEach((frame, i) => {
 		if (frame.selection > 0) fault(frame, "selection", { chars: frame.selection });
+		/** The carried task is seen every frame, as its card or its copy, from the lift until it has landed. */
+		if (carried && frame.t >= carried.from && frame.t <= carried.until && !maps[i].has(carried.id)) fault(frame, "carried task unseen", { id: carried.id });
 		for (const [id, copies] of maps[i]) {
-			if (copies.length > 1 && copies.filter((c) => c.kind === "card").length > 1) fault(frame, "double", { id, copies: copies.length });
+			if (copies.filter((c) => c.kind === "card").length > 1) fault(frame, "double", { id, copies: copies.length });
+			/** Its card and its copy in one frame are one card only where they lie on each other: the frame the copy lands. */
+			const copy = copies.find((c) => c.kind === "copy");
+			const card = copies.find((c) => c.kind === "card" || c.kind === "block");
+			if (copy && card && Math.hypot(copy.x - card.x, copy.y - card.y) > 2) fault(frame, "card and its copy apart", { id, dx: +(copy.x - card.x).toFixed(1), dy: +(copy.y - card.y).toFixed(1) });
 			for (const item of copies) {
 				if (item.whole && item.cut) fault(frame, "text cut", { id });
 				if (item.whole && item.text === 0 && item.h > ignoreBlankBelow) fault(frame, "blank card", { id });
@@ -104,7 +111,9 @@ export function frameFaults(frames, { maxStep = Infinity, monotonic = null, foll
 	const tracks = new Map();
 	frames.forEach((frame, i) => {
 		for (const [id, copies] of maps[i]) {
-			const at = copies[0];
+			/** A card or a block is followed frame to frame; a carried copy moves with the finger, which its own check holds. */
+			const at = copies.find((c) => c.kind !== "copy");
+			if (!at) continue;
 			const last = tracks.get(id);
 			if (last && last.i === i - 1) {
 				const dx = at.x - last.x;

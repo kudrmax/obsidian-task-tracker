@@ -7,23 +7,26 @@ import type { Drag } from "./dragState";
 export type Entry =
 	| { readonly key: string; readonly kind: "head"; readonly group: GroupModel; readonly top: boolean }
 	| { readonly kind: "plate"; readonly key: string; readonly group: GroupModel }
-	| { readonly kind: "card"; readonly key: string; readonly row: RowModel; readonly group: GroupModel; readonly landing: boolean; readonly parent: boolean }
+	| { readonly kind: "card"; readonly key: string; readonly row: RowModel; readonly group: GroupModel; readonly parent: boolean }
 	| { readonly kind: "home"; readonly key: string; readonly level: number }
 	| { readonly kind: "empty"; readonly key: string; readonly words: string }
 	| { readonly kind: "gap"; readonly key: string; readonly level: number; readonly id: string | null };
 
-/** The key the gap is drawn under: the carried task's own, so dnd-kit finds its node there and its drop flies into it. */
+/** The key of a gap for no task (the plus): a carried task's gap is keyed as its card, so the card takes its row after the drop. */
 export const GAP_KEY = "gap";
 
 /**
  * The rows a list draws, from its model and the drag under way: the carried task and its subtasks leave it; the gap
- * opens where the core placed the carried card (`placeAt`), at its depth, in place of an empty section's plate. A card
- * just let go waits unseen at its place (`landing`) until its copy has flown there.
+ * opens where the core placed the carried card (`placeAt`), at its depth, in place of an empty section's plate.
  */
 export function entriesOf(model: ColumnModel, column: string, drag: Drag | null, looks: Pick<ScreenLooks, "homePlace" | "parentOutline">): Entry[] {
 	const lifted = drag?.lifted.kind === "task" ? new Set(drag.lifted.ids) : null;
-	/** Until the drop's screen is drawn the list stands as during the carry: the gap open, the carried task out of it. */
-	const carrying = drag !== null && (drag.phase === "carry" || !drag.drawn);
+	/**
+	 * Until the drop is over (its screen drawn, its copy landed) the list stands as during the carry: the gap open where the
+	 * copy flies, the carried task out of it. Then the card takes the gap's row (the same row, keyed by the task) and glides
+	 * to where it stands, with every card the drop moved.
+	 */
+	const carrying = drag !== null;
 	const aim = carrying ? drag.aim : null;
 	const home = drag?.lifted.kind === "task" ? drag.lifted.home : null;
 	/** Where the gap stands in this list: the aim's, else (aiming nowhere new, or refused) the card's own place. */
@@ -43,7 +46,7 @@ export function entriesOf(model: ColumnModel, column: string, drag: Drag | null,
 	const openGap = () => {
 		if (placed || !gap) return;
 		placed = true;
-		entries.push({ key: GAP_KEY, kind: "gap", level: gap.level, id: gapId });
+		entries.push({ key: gapId ? `task:${gapId}` : GAP_KEY, kind: "gap", level: gap.level, id: gapId });
 	};
 	model.groups.forEach((group, at) => {
 		if (group.header) entries.push({ key: `head:${group.id}`, kind: "head", group, top: entries.length === 0 });
@@ -57,7 +60,7 @@ export function entriesOf(model: ColumnModel, column: string, drag: Drag | null,
 				if (looks.parentOutline && gap.level > 0) parentAt = parentOf(entries, gap.level);
 				openGap();
 			}
-			entries.push({ key: `task:${row.id}`, kind: "card", row, group, landing: drag?.phase === "dropping" && drag.drawn && lifted?.has(row.id) === true, parent: false });
+			entries.push({ key: `task:${row.id}`, kind: "card", row, group, parent: false });
 			cards++;
 		}
 		if (homeHere && cards === homeGap.index && !entries.some((entry) => entry.kind === "home")) entries.push({ key: "home", kind: "home", level: homeGap.level });

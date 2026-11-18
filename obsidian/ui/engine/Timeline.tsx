@@ -45,7 +45,8 @@ const AllDayRows = memo(function AllDayRows({ events, theme }: { readonly events
  */
 export const Timeline = memo(function Timeline() {
 	const { store, theme } = useHost();
-	const services = store.getState();
+	/** The store's reads of the core (`spanOf`, `openAt`, …): its actions keep their identity, so nothing redraws for them. */
+	const services = useMemo(() => store.getState(), [store]);
 	const date = useScreen((s) => s.date);
 	const slotted = useScreen((s) => s.slotted);
 	const items = useScreen((s) => s.items);
@@ -146,10 +147,11 @@ export const Timeline = memo(function Timeline() {
 								</div>
 							);
 						})}
-						{blocks.map(({ item, span, box }) => (
-							<Block key={item.id} id={item.id} span={span} box={box} hidden={liftedId === item.id} />
-						))}
-						{landing ? <Block id={landing.id} span={landing.span} box={landing.box} hidden={false} landing /> : null}
+						{blocks.map(({ item, span, box }) =>
+							/** Carried to a list, its gap there is its node for dnd-kit; the block waits unseen as a face only (one node per id). */
+							liftedId === item.id && drag?.aim.kind === "gap" ? <BlockFace key={item.id} id={item.id} span={span} box={box} hidden /> : <Block key={item.id} id={item.id} span={span} box={box} hidden={liftedId === item.id} />,
+						)}
+						{landing ? <LandingBlock id={landing.id} span={landing.span} box={landing.box} /> : null}
 					</div>
 					{aimed !== null && looks.timelineDrop === "line" ? (
 						<div className="tc-drop-at" style={y(aimed.start)}>
@@ -185,17 +187,29 @@ function HourMark({ minute, label, style, hidden, minor = false }: { readonly mi
 
 /**
  * A timed task's block: the card of the list on the timeline, its small time or duration on the right; a drag source. While
- * carried it waits unseen where it stood; once let go on the timeline it stands at once where it lands (`landing`).
+ * carried it waits unseen where it stood.
  */
-const Block = memo(function Block({ id, span, box, hidden, landing = false }: { readonly id: string; readonly span: TaskSpan; readonly box: StackBox; readonly hidden: boolean; readonly landing?: boolean }) {
-	const item = useScreen((s) => s.items[id]);
+const Block = memo(function Block({ id, span, box, hidden }: { readonly id: string; readonly span: TaskSpan; readonly box: StackBox; readonly hidden: boolean }) {
 	const source: DragSource = useMemo(() => ({ kind: "block", id }), [id]);
-	const { setNodeRef, listeners, attributes } = useDraggable({ id: dragId.block(id), data: source, disabled: landing });
+	const { setNodeRef, listeners, attributes } = useDraggable({ id: dragId.block(id), data: source });
+	return <BlockFace id={id} span={span} box={box} hidden={hidden} nodeRef={setNodeRef} handlers={{ ...listeners, ...attributes }} />;
+});
+
+/**
+ * A block just let go on the timeline, standing at once where it lands until the drop's screen is drawn: no frame without
+ * the card. Not a drag source: the task's own block is (one node per id for dnd-kit).
+ */
+function LandingBlock({ id, span, box }: { readonly id: string; readonly span: TaskSpan; readonly box: StackBox }) {
+	return <BlockFace id={id} span={span} box={box} hidden={false} landing />;
+}
+
+function BlockFace({ id, span, box, hidden, landing = false, nodeRef, handlers }: { readonly id: string; readonly span: TaskSpan; readonly box: StackBox; readonly hidden: boolean; readonly landing?: boolean; readonly nodeRef?: (el: HTMLElement | null) => void; readonly handlers?: object }) {
+	const item = useScreen((s) => s.items[id]);
 	if (!item) return null;
 	const corner = landing ? null : stackCorner(box, item.slot!.start, span);
 	const style = { [PROPERTY.y]: px(box.top), [PROPERTY.length]: px(box.height), [PROPERTY.x]: px(box.left) } as CSSProperties;
 	return (
-		<div ref={landing ? undefined : setNodeRef} className={`tc-block${box.overlay ? " is-over" : ""}${hidden ? " is-lifted" : ""}`} style={style} data-block={id} {...(landing ? {} : listeners)} {...(landing ? {} : attributes)}>
+		<div ref={nodeRef} className={`tc-block${box.overlay ? " is-over" : ""}${hidden ? " is-lifted" : ""}`} style={style} data-block={id} {...handlers}>
 			<div className="tc-block-card" data-status={item.status} {...paintOf(item.colors)}>
 				<Title text={item.block.text} />
 				{item.project?.mark ? (
@@ -212,4 +226,4 @@ const Block = memo(function Block({ id, span, box, hidden, landing = false }: { 
 			</div>
 		</div>
 	);
-});
+}

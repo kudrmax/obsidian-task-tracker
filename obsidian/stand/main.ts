@@ -40,6 +40,8 @@ class StandView extends ItemView {
 		this.contentEl.empty();
 		this.contentEl.addClass("tc-view");
 		this.screen = mountScreen(this.contentEl, this.stand.services, { kind: "main" }, this.looks);
+		/** For a person debugging on the stand: the open screen's store (the checks never read it). */
+		(window as unknown as { __tcStandScreen?: MountedScreen }).__tcStandScreen = this.screen;
 	}
 
 	override async onClose(): Promise<void> {
