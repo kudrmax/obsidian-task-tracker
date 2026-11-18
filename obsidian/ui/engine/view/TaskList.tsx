@@ -1,7 +1,7 @@
 import { defaultRangeExtractor, type Range, useVirtualizer } from "@tanstack/react-virtual";
 import { type CSSProperties, memo, useCallback, useEffect, useMemo, useState } from "react";
 import { PROPERTY } from "../../design";
-import { EmptyPlate, PLUS, SortableList, SortableRow } from "../drag/Drag";
+import { PLUS, SortableList, SortableRow } from "../drag/Drag";
 import { descendantsOf } from "../drag/tree";
 import { useAnchor } from "../layers/Layers";
 import type { Destination, ListId, Row } from "../port";
@@ -27,12 +27,23 @@ export const TaskList = memo(function TaskList({ list }: { readonly list: ListId
 	const lifted = useScreen((s) => s.lifted);
 	const liftedDepth = useScreen((s) => s.liftedDepth);
 	/** A carried task's subtasks fold away under it while it is carried (dnd-kit's «Sortable tree»): they travel with it. */
-	const rows = useMemo(() => {
+	const listed = useMemo(() => {
 		if (lifted === null) return allRows;
 		const under = descendantsOf(allRows, lifted);
 		return under.size === 0 ? allRows : allRows.filter((row) => !under.has(row.id));
 	}, [allRows, lifted]);
 	const plusAt = useScreen((s) => s.plusAt);
+	/**
+	 * An empty section's plate is no row a card stands among: it says the section is empty, so while the carried card would
+	 * land in that section the plate is gone and the card's own place stands there instead.
+	 */
+	const landing = useScreen((s) => s.landing);
+	const rows = useMemo(() => {
+		if (!landing) return listed;
+		const { into, section } = landing;
+		if (into !== list) return listed;
+		return listed.filter((row) => !(row.kind === "empty" && row.section === section));
+	}, [listed, landing, list]);
 	/** The rows with the carried plus among them, as a row of this list while it is over it. */
 	const withPlus = useMemo((): readonly Drawn[] => {
 		if (!plusAt) return rows;
@@ -141,12 +152,7 @@ const RowFace = memo(function RowFace({ row, list }: { readonly row: Row; readon
 				</div>
 			</SortableRow>
 		);
-	if (row.kind === "empty")
-		return (
-			<EmptyPlate id={row.id} list={list} section={row.section}>
-				{row.label}
-			</EmptyPlate>
-		);
+	if (row.kind === "empty") return <div className="tc-group-empty">{row.label}</div>;
 	return (
 		<SortableRow
 			id={row.id}

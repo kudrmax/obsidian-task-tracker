@@ -38,6 +38,8 @@ export interface ScreenState {
 	readonly layer: Layer | null;
 	/** The new task's field: where it stands (the slot a typed task is written to), open while not null. */
 	readonly entry: Destination | null;
+	/** The list and section the carried card (or plus) would land in now: an empty section there gives its plate's room to the card. */
+	readonly landing: { readonly into: ListId; readonly section: string | null } | null;
 	/** Where the carried plus would open the field: a list and the index among its rows, where they part for it. */
 	readonly plusAt: { readonly into: ListId; readonly index: number } | null;
 	/** Counts the fields opened: each new one (after Enter) is a fresh, empty field. */
@@ -66,6 +68,7 @@ export interface ScreenActions {
 	closeLayer(): void;
 	act(id: string, item: string): void;
 	setPlusAt(at: { readonly into: ListId; readonly index: number } | null): void;
+	setLanding(landing: { readonly into: ListId; readonly section: string | null } | null): void;
 	/** Opens the new task's field at `at`, or at the port's place for new tasks; null closes it. */
 	openEntry(at?: Destination | null): void;
 	/** The field one level deeper (1) or shallower (-1), as Tab and Shift+Tab do. */
@@ -137,6 +140,12 @@ export function createScreenStore(port: ScreenPort): ScreenStore {
 			entry: null,
 			entrySeq: 0,
 			plusAt: null,
+			landing: null,
+			setLanding(landing) {
+				const was = get().landing;
+				if (was === landing || (was && landing && was.into === landing.into && was.section === landing.section)) return;
+				set({ landing });
+			},
 			setPlusAt(at) {
 				const was = get().plusAt;
 				if (was === at || (was && at && was.into === at.into && was.index === at.index)) return;
@@ -179,7 +188,7 @@ export function createScreenStore(port: ScreenPort): ScreenStore {
 					set({ shown: share(get().shown, port.preview(id, to)) });
 					write(port.move(id, to));
 				} else if (get().shown !== get().read) set({ shown: get().read });
-				set({ lifted: null, liftedDepth: null });
+				set({ lifted: null, liftedDepth: null, landing: null });
 				get().release("drag");
 			},
 			openMenu(id) {

@@ -2,19 +2,22 @@ import { arrayMove } from "@dnd-kit/sortable";
 import type { Row } from "../port";
 
 /**
- * Subtask level while a card is carried (Max, 2026-11-18): where the pointer stands across the list decides it. In the
- * right third of the list the card is a subtask, one level under the task above its place; in the left two thirds it is
- * as shallow as its place allows (a task, or a sibling of the subtasks below it).
+ * Subtask level while a card is carried (Max, 2026-11-18): by how far the pointer moved sideways since the card was taken,
+ * as dnd-kit's «Sortable tree» example projects it, with a coarser step and a sticky edge. Every `SHIFT_STEP` pixels to
+ * the right is one level deeper, to the left one shallower; a level once taken holds until the hand comes back to within
+ * `SHIFT_BACK` pixels of where the previous one held, so a hand resting near an edge never makes the level flicker.
  */
+export const SHIFT_STEP = 40;
+export const SHIFT_BACK = 15;
 
-/** From this share of the list's width on, the card is a subtask. */
-export const SUBTASK_FROM = 2 / 3;
-
-export type Zone = "task" | "subtask";
-
-/** Which zone of a list (left edge `left`, `width` wide) the pointer at `x` is in. */
-export function zoneOf(x: number, left: number, width: number): Zone {
-	return x >= left + width * SUBTASK_FROM ? "subtask" : "task";
+/** The levels moved, deeper positive, for a sideways move of `offset` pixels, given the levels moved a moment before. */
+export function stickyShift(previous: number, offset: number, step = SHIFT_STEP, back = SHIFT_BACK): number {
+	let shift = previous;
+	while (offset >= (shift + 1) * step) shift++;
+	while (offset <= (shift - 1) * step) shift--;
+	while (shift > 0 && offset < (shift - 1) * step + back) shift--;
+	while (shift < 0 && offset > (shift + 1) * step - back) shift++;
+	return shift;
 }
 
 /** The depth a section header stands for: under it no card can be a subtask. */
@@ -51,21 +54,21 @@ export function slotOf(rows: readonly Row[], order: readonly string[], id: strin
 	return { section, before: next?.kind === "task" ? next.id : null };
 }
 
-/** The level a card takes in `zone` between the row `above` and the row `below` its place. */
-export function levelBetween(above: Row | undefined, below: Row | undefined, zone: Zone): number {
+/** The level a card asking for `wanted` takes between the row `above` and the row `below` its place. */
+export function levelBetween(above: Row | undefined, below: Row | undefined, wanted: number): number {
 	const deepest = above ? Math.max(0, depthOf(above) + 1) : 0;
 	const shallowest = below ? Math.max(0, depthOf(below)) : 0;
-	return zone === "subtask" ? Math.max(shallowest, deepest) : Math.min(shallowest, deepest);
+	return Math.max(shallowest, Math.min(deepest, Math.max(0, wanted)));
 }
 
-/** The level the carried card `activeId` takes when it stands where `overId` is now, the pointer in `zone`. */
-export function levelAt(rows: readonly Row[], activeId: string, overId: string, zone: Zone): number {
+/** The level the carried card `activeId` takes when it stands where `overId` is now, asking for `wanted`. */
+export function levelAt(rows: readonly Row[], activeId: string, overId: string, wanted: number): number {
 	const from = rows.findIndex((row) => row.id === activeId);
 	if (from < 0) return 0;
 	const found = rows.findIndex((row) => row.id === overId);
 	const to = found < 0 ? from : found;
 	const moved = arrayMove([...rows], from, to);
-	return levelBetween(moved[to - 1], moved[to + 1], zone);
+	return levelBetween(moved[to - 1], moved[to + 1], wanted);
 }
 
 /** The rows under `id` (its subtasks, theirs…): they fold away while it is carried and travel with it. */

@@ -48,10 +48,16 @@ export default {
 		await t.cdp.eval(`(() => { const l = document.querySelector('[data-list="inbox"]'); l.scrollTop = l.scrollHeight; return 1; })()`);
 		await t.sleep(400);
 		const flowers = await rowBy(t, "Полить цветы");
+		let over = null;
 		await carry(t, flowers, once(async () => {
 			const plate = await rowBy(t, "No tasks");
 			return { x: plate.x, y: plate.y };
-		}));
+		}), {
+			during: async () =>
+				(over = await t.cdp.eval(`(() => { const head = [...document.querySelectorAll(".tc-group-head")].find((h) => h.textContent === "Пустая секция").getBoundingClientRect(); const place = document.querySelector('[data-list="inbox"] .tc-drag-source.is-lifted .tc-card').getBoundingClientRect(); return { plate: !!document.querySelector(".tc-group-empty"), placeUnderHeader: place.top >= head.bottom - 1 && place.top - head.bottom < 30 }; })()`)),
+		});
+		/** Max, 2026-11-18: the plate and the card's place both showed, and the plate took the card like a second target. */
+		t.expect(over && over.plate === false && over.placeUnderHeader, `over an empty section only the card's place shows, right under its header, the plate gone: ${JSON.stringify(over)}`);
 		await t.sleep(500);
 		inbox = await listOf(t, "Inbox");
 		t.expect(inbox.at(-1) === "Полить цветы" && inbox.at(-2) === "### Пустая секция", `onto an empty section's plate: into it: ${JSON.stringify(inbox.slice(-4))}`);

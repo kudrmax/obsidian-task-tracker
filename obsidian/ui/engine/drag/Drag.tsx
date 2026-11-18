@@ -5,7 +5,7 @@ import { type CSSProperties, memo, type ReactNode, useCallback, useEffect, useRe
 import { createPortal } from "react-dom";
 import type { Destination, ListId, Row } from "../port";
 import { useScreen, useScreenApi } from "../store";
-import { descendantsOf, levelAt, levelBetween, type Slot, slotOf, type Zone, zoneOf } from "./tree";
+import { descendantsOf, levelAt, levelBetween, type Slot, slotOf, stickyShift } from "./tree";
 
 /**
  * Drag and drop (spec, «The owners»): one `DndContext` per screen, one `DragOverlay`, one `onDragEnd` that makes one write
@@ -118,9 +118,6 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 		const ofOwn = (hit: { readonly id: UniqueIdentifier; readonly data?: { readonly droppableContainer?: { readonly data: { readonly current?: { readonly sortable?: { readonly containerId: UniqueIdentifier } } } } } }) => hit.id === `${LIST_TARGET}${own}` || hit.data?.droppableContainer?.data.current?.sortable?.containerId === own;
 		const inOwn = underPointer.filter(ofOwn);
 		/** Between the lists, under no list at all, the card stays in its own: only the pointer inside another list moves it there. */
-		/** An empty section's plate under the pointer is the target: the card goes into that section. */
-		const plateHit = underPointer.find((hit) => hit.data?.droppableContainer?.data.current?.plate);
-		if (plateHit) return [plateHit];
 		/** The plus over no list is no list's row: nothing is under it. */
 		if (args.active.id === PLUS && underPointer.length === 0) return [];
 		const hits = inOwn.length > 0 ? inOwn : underPointer.length > 0 ? underPointer : rectIntersection(args).filter(ofOwn);
@@ -139,42 +136,53 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 	const [origin, setOrigin] = useState<(Slot & { readonly container: string; readonly depth: number }) | null>(null);
 
 	const rowsOf = (list: string) => api.getState().shown.lists[list as ListId]?.rows ?? [];
-	/** The zone of its list the pointer is in, by the row (or list) under it: rows stand across their list's whole width. */
-	const zoneUnder = (event: { readonly activatorEvent: Event; readonly delta: { readonly x: number } }, over: { readonly rect: { readonly left: number; readonly width: number } } | null): Zone => {
+	/**
+	 * The level the carried card asks for, from how far the pointer moved sideways since it was taken (`stickyShift`):
+	 * within the list it is over now, a column's width being no indent (the rows of a list all start at its left edge, so
+	 * a row's box is where its list starts). A card asks for its own level plus the shift; the plus, for the shift from
+	 * where it came into its list.
+	 */
+	const lift = useRef<{ x: number; listLeft: number | null; depth: number; shift: number; listShift: number }>({ x: 0, listLeft: null, depth: 0, shift: 0, listShift: 0 });
+	const wantedLevel = (event: { readonly activatorEvent: Event; readonly delta: { readonly x: number }; readonly active: Sortable & { readonly rect: { readonly current: { readonly initial: { readonly left: number } | null } } } }, over: { readonly rect: { readonly left: number } } | null): number => {
+		const at = lift.current;
 		const x = (getEventCoordinates(event.activatorEvent)?.x ?? 0) + event.delta.x;
-		return over ? zoneOf(x, over.rect.left, over.rect.width) : "task";
+		at.listLeft ??= event.active.rect.current.initial?.left ?? null;
+		if (over && at.listLeft !== null && event.active.id !== PLUS) at.listShift = over.rect.left - at.listLeft;
+		at.shift = stickyShift(at.shift, x - at.x - at.listShift);
+		return at.depth + at.shift;
 	};
 	/** The level the carried plus's field would take where the plus stands now among its list's rows: drawn by its place. */
-	const plusLevel = (plus: Sortable, over: Sortable | null, zone: Zone): number | null => {
+	const plusLevel = (plus: Sortable, over: Sortable | null, wanted: number): number | null => {
 		const container = containerOf(plus);
 		if (container === null) return null;
 		const rows = rowsOf(container);
 		const byId = new Map(rows.map((row) => [row.id, row]));
 		const order = itemsOf(plus).map((id): Row => byId.get(id) ?? { kind: "task", id, depth: 0 });
-		return levelAt(order, PLUS, over ? String(over.id) : PLUS, zone);
+		return levelAt(order, PLUS, over ? String(over.id) : PLUS, wanted);
 	};
 	/** The level the carried card takes where it stands now, among the rows of its list, its own subtasks folded away. */
-	const projected = (lifted: Sortable, over: Sortable | null, zone: Zone): number | null => {
+	const projected = (lifted: Sortable, over: Sortable | null, wanted: number): number | null => {
 		const container = containerOf(lifted);
 		if (container === null) return null;
 		const id = String(lifted.id);
 		const rows = rowsOf(container);
 		const under = descendantsOf(rows, id);
 		const visible = under.size === 0 ? rows : rows.filter((row) => !under.has(row.id));
-		return levelAt(visible, id, over ? String(over.id) : id, zone);
+		return levelAt(visible, id, over ? String(over.id) : id, wanted);
 	};
 	/**
 	 * The carried plus comes into a list the way a card crosses into another (dnd-kit's «multiple containers»): it becomes
 	 * that list's row at the place under the pointer, and from then on the rows part around it as they do for a card. Over
 	 * no list, it is no list's row.
 	 */
-	const plusOver = (event: { readonly activatorEvent: Event; readonly delta: { readonly y: number }; readonly active: Sortable }, over: (Sortable & { readonly rect: { readonly top: number; readonly height: number } }) | null) => {
+	const plusOver = (event: { readonly activatorEvent: Event; readonly delta: { readonly x: number; readonly y: number }; readonly active: Sortable }, over: (Sortable & { readonly rect: { readonly top: number; readonly height: number } }) | null) => {
 		if (!over) return api.getState().setPlusAt(null);
-		if (plateOf(over)) return;
 		const overId = String(over.id);
 		const own = containerOf(event.active);
 		const list = overId.startsWith(LIST_TARGET) ? overId.slice(LIST_TARGET.length) : containerOf(over);
 		if (list === null || list === own) return;
+		lift.current.x = activatorX(event) + event.delta.x;
+		lift.current.shift = 0;
 		if (overId.startsWith(LIST_TARGET)) return api.getState().setPlusAt({ into: list as ListId, index: rowsOf(list).length });
 		const order = itemsOf(over).filter((id) => id !== PLUS);
 		const pointerY = (getEventCoordinates(event.activatorEvent)?.y ?? 0) + event.delta.y;
@@ -184,12 +192,6 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 	};
 	/** The plus let go in a list: the field opens where the rows parted for it, at the level of the zone the pointer is in. */
 	const dropPlus = (event: DragEndEvent) => {
-		const plate = plateOf(event.over);
-		if (plate) {
-			api.getState().setPlusAt(null);
-			api.getState().release("drag");
-			return api.getState().openEntry({ list: plate.list, section: plate.section, before: null, dayOffset: api.getState().dayOffset, depth: 0 });
-		}
 		const list = containerOf(event.active);
 		const order = orderAfter(event.active, event.over);
 		api.getState().setPlusAt(null);
@@ -198,21 +200,22 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 		const rows = rowsOf(list);
 		const index = order.indexOf(PLUS);
 		const near = (id: string | undefined) => rows.find((row) => row.id === id);
-		const depth = levelBetween(near(order[index - 1]), near(order[index + 1]), zoneUnder(event, event.over));
+		const depth = levelBetween(near(order[index - 1]), near(order[index + 1]), wantedLevel(event, event.over));
 		api.getState().openEntry({ list: list as ListId, ...slotOf(rows, order, PLUS), dayOffset: api.getState().dayOffset, depth });
 	};
 	const move = (event: DragMoveEvent) => {
 		const { active: lifted, over } = event;
-		if (lifted.id === PLUS) {
-			plusOver(event, over);
-			return api.getState().setLiftedDepth(plusLevel(lifted, over, zoneUnder(event, over)));
-		}
-		api.getState().setLiftedDepth(projected(lifted, over, zoneUnder(event, over)));
+		if (lifted.id === PLUS) plusOver(event, over);
+		api.getState().setLiftedDepth(lifted.id === PLUS ? plusLevel(lifted, over, wantedLevel(event, over)) : projected(lifted, over, wantedLevel(event, over)));
+		const container = containerOf(lifted);
+		api.getState().setLanding(container === null ? null : { into: container as ListId, section: slotOf(rowsOf(container), orderAfter(lifted, over), String(lifted.id)).section });
 	};
 
-	const start = ({ active: lifted }: DragStartEvent) => {
+	const start = (event: DragStartEvent) => {
+		const { active: lifted } = event;
 		const screen = api.getState();
 		if (!screen.claim("drag")) return;
+		lift.current = { x: activatorX(event), listLeft: null, depth: 0, shift: 0, listShift: 0 };
 		if (lifted.id === PLUS) {
 			screen.openEntry(null);
 			setActive(PLUS);
@@ -223,7 +226,8 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 		const container = containerOf(lifted);
 		const rows = container === null ? [] : rowsOf(container);
 		const own = rows.find((row) => row.id === String(lifted.id));
-		setOrigin(container === null ? null : { container, ...slotOf(rows, itemsOf(lifted), String(lifted.id)), depth: own?.kind === "task" ? own.depth : 0 });
+		lift.current.depth = own?.kind === "task" ? own.depth : 0;
+		setOrigin(container === null ? null : { container, ...slotOf(rows, itemsOf(lifted), String(lifted.id)), depth: lift.current.depth });
 		onLift();
 	};
 	/**
@@ -238,7 +242,7 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 		const rows = rowsOf(into.list);
 		const id = String(lifted.id);
 		const order = [...into.order.slice(0, into.index), id, ...into.order.slice(into.index)];
-		const to: Destination = { list: into.list as ListId, ...slotOf(rows, order, id), dayOffset: api.getState().dayOffset, depth: levelBetween(rows[into.index - 1], rows[into.index], zoneUnder(event, over)) };
+		const to: Destination = { list: into.list as ListId, ...slotOf(rows, order, id), dayOffset: api.getState().dayOffset, depth: levelBetween(rows[into.index - 1], rows[into.index], wantedLevel(event, over)) };
 		justMoved.current = true;
 		api.getState().carryInto(id, to);
 	};
@@ -247,11 +251,9 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 		setActive(null);
 		if (lifted.id === PLUS) return dropPlus(event);
 		const id = String(lifted.id);
-		const plate = plateOf(over);
-		if (plate) return api.getState().drop(id, { list: plate.list, section: plate.section, before: null, dayOffset: api.getState().dayOffset, depth: 0 });
 		const container = containerOf(lifted);
 		if (container === null) return api.getState().drop(id, null);
-		const depth = projected(lifted, over, zoneUnder(event, over)) ?? 0;
+		const depth = projected(lifted, over, wantedLevel(event, over)) ?? 0;
 		const slot = slotOf(rowsOf(container), orderAfter(lifted, over), id);
 		const still = origin !== null && origin.container === container && origin.section === slot.section && origin.before === slot.before && origin.depth === depth;
 		api.getState().drop(id, still ? null : { list: container as ListId, ...slot, dayOffset: api.getState().dayOffset, depth });
@@ -335,7 +337,7 @@ const LIST_TARGET = "list:";
  */
 function crossing(active: Sortable & { readonly rect: { readonly current: { readonly translated: { readonly top: number } | null } } }, over: (Sortable & { readonly rect: { readonly top: number; readonly height: number } }) | null): { readonly list: string; readonly order: readonly string[]; readonly index: number } | null {
 	const own = containerOf(active);
-	if (!over || own === null || plateOf(over)) return null;
+	if (!over || own === null) return null;
 	const overId = String(over.id);
 	if (overId.startsWith(LIST_TARGET)) {
 		const list = overId.slice(LIST_TARGET.length);
@@ -393,26 +395,7 @@ export function CarriedPlus({ onTap, children, ring }: { readonly onTap: () => v
 		</>
 	);
 }
-
-/** An empty section's plate a card is over: its list and section. */
-interface Plate {
-	readonly list: ListId;
-	readonly section: string;
-}
-
-function plateOf(over: { readonly data: { readonly current?: unknown } } | null): Plate | null {
-	return (over?.data.current as { readonly plate?: Plate } | undefined)?.plate ?? null;
-}
-
-/**
- * An empty section's «No tasks» plate: it stands still while cards part (it is no task, only the section's place) and is a
- * drop target of its own; it lights while a carried card is over it, and a card let go there goes into that section.
- */
-export function EmptyPlate({ id, list, section, children }: { readonly id: string; readonly list: ListId; readonly section: string; readonly children: ReactNode }) {
-	const { setNodeRef, isOver } = useDroppable({ id, data: { plate: { list, section } } });
-	return (
-		<div ref={setNodeRef} className={`tc-group-empty${isOver ? " is-hot" : ""}`}>
-			{children}
-		</div>
-	);
+/** Where the pointer pressed, across the screen. */
+function activatorX(event: { readonly activatorEvent: Event | null }): number {
+	return event.activatorEvent ? (getEventCoordinates(event.activatorEvent)?.x ?? 0) : 0;
 }

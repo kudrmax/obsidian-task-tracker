@@ -20,9 +20,9 @@ const levels = (text, list) => {
 };
 
 /**
- * Subtasks (spec 2026-11-18, «The depth of a subtask»: dnd-kit's sortable tree projection): a card carried an indent to
- * the right under a task becomes its subtask; a last subtask carried an indent to the left becomes a task; a task with
- * subtasks carried into the other column takes them along and stays a task there — the column's width is no indent.
+ * Subtasks (Max, 2026-11-18: a coarser sideways step, a sticky edge): a card moved a step (40 px) right under a task
+ * becomes its subtask; a last subtask moved a step left becomes a task; a task with subtasks carried into the other column
+ * takes them along and stays a task there.
  */
 export default {
 	name: "e3-subtasks",
@@ -34,14 +34,14 @@ export default {
 		const milk = await cardBy(t, "Купить молоко", "inbox");
 		await carry(t, milk, once(async () => {
 			const mom = await cardBy(t, "Позвонить маме", "inbox");
-			return { x: milk.x + INDENT * 2, y: mom.y + mom.height * 0.2 };
+			return { x: milk.x + 50, y: mom.y + mom.height * 0.2 };
 		}));
 		await t.sleep(500);
 		let inbox = levels(await file(), "Inbox");
 		t.expect(inbox[0] === "Позвонить маме:0" && inbox[1] === "Купить молоко:1", `an indent right under a task: its subtask: ${JSON.stringify(inbox.slice(0, 3))}`);
 
 		const hotel = await cardBy(t, "Забронировать отель", "inbox");
-		await carry(t, hotel, once(async () => ({ x: hotel.x - INDENT * 2, y: hotel.y + 2 })));
+		await carry(t, hotel, once(async () => ({ x: hotel.x - 50, y: hotel.y + 2 })));
 		await t.sleep(500);
 		inbox = levels(await file(), "Inbox");
 		t.expect(inbox.includes("Забронировать отель:0"), `the last subtask an indent left: a task: ${JSON.stringify(inbox.slice(2, 9))}`);

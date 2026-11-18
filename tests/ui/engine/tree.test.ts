@@ -1,40 +1,54 @@
 import { describe, expect, it } from "vitest";
-import { descendantsOf, levelAt, levelBetween, zoneOf } from "../../../obsidian/ui/engine/drag/tree";
+import { descendantsOf, levelAt, levelBetween, SHIFT_BACK, SHIFT_STEP, slotOf, stickyShift } from "../../../obsidian/ui/engine/drag/tree";
 import type { Row } from "../../../obsidian/ui/engine/port";
 
 const task = (id: string, depth = 0): Row => ({ kind: "task", id, depth });
 
-describe("the zone across a list (Max, 2026-11-18: the right third makes a subtask)", () => {
-	it("the left two thirds are a task's, the right third a subtask's", () => {
-		expect(zoneOf(10, 0, 300)).toBe("task");
-		expect(zoneOf(199, 0, 300)).toBe("task");
-		expect(zoneOf(200, 0, 300)).toBe("subtask");
-		expect(zoneOf(299, 0, 300)).toBe("subtask");
+describe("the sideways shift (Max, 2026-11-18: a coarser step, a sticky edge)", () => {
+	it("a step to the right is one level deeper, two steps two", () => {
+		expect(stickyShift(0, SHIFT_STEP - 1)).toBe(0);
+		expect(stickyShift(0, SHIFT_STEP)).toBe(1);
+		expect(stickyShift(0, SHIFT_STEP * 2)).toBe(2);
+	});
+	it("a level taken holds until the hand comes back near where the one before held", () => {
+		expect(stickyShift(1, SHIFT_STEP - 5)).toBe(1);
+		expect(stickyShift(1, SHIFT_BACK)).toBe(1);
+		expect(stickyShift(1, SHIFT_BACK - 1)).toBe(0);
+	});
+	it("to the left the same way, shallower", () => {
+		expect(stickyShift(0, -SHIFT_STEP)).toBe(-1);
+		expect(stickyShift(-1, -SHIFT_BACK)).toBe(-1);
+		expect(stickyShift(-1, -SHIFT_BACK + 1)).toBe(0);
 	});
 });
 
-describe("a carried card's level by the zone", () => {
+describe("a carried card's level where it stands", () => {
 	const rows = [task("a"), task("b"), task("b1", 1), task("b2", 1), task("c")];
 
-	it("in the subtask zone it goes one level under the task above its place", () => {
-		expect(levelAt(rows, "c", "c", "subtask")).toBe(2);
-		expect(levelAt(rows, "b", "b", "subtask")).toBe(1);
+	it("no deeper than one under the row above its place", () => {
+		expect(levelAt(rows, "c", "c", 5)).toBe(2);
+		expect(levelAt(rows, "b", "b", 5)).toBe(1);
 	});
-	it("in the task zone it is as shallow as its place allows", () => {
-		expect(levelAt(rows, "c", "c", "task")).toBe(0);
-		expect(levelAt(rows, "b2", "b2", "task")).toBe(0);
+	it("no shallower than the subtask below its place", () => {
+		expect(levelBetween(task("b"), task("b1", 1), 0)).toBe(1);
 	});
-	it("between a task and its subtask it can only be a sibling subtask", () => {
-		expect(levelBetween(task("b"), task("b1", 1), "task")).toBe(1);
-		expect(levelBetween(task("b"), task("b1", 1), "subtask")).toBe(1);
+	it("at the top of a list, or right under a section's header, a task", () => {
+		expect(levelAt(rows, "c", "a", 3)).toBe(0);
+		expect(levelBetween({ kind: "section", id: "s", title: "Идеи" }, task("x"), 3)).toBe(0);
 	});
-	it("at the top of a list, or right under a section's header, it is a task", () => {
-		expect(levelAt(rows, "c", "a", "subtask")).toBe(0);
-		expect(levelBetween({ kind: "section", id: "s", title: "Идеи" }, task("x"), "subtask")).toBe(0);
+	it("takes the level asked for where it now stands", () => {
+		expect(levelAt(rows, "a", "b2", 2)).toBe(2);
+		expect(levelAt(rows, "a", "b2", 0)).toBe(0);
 	});
-	it("takes the level where it now stands among the rows", () => {
-		expect(levelAt(rows, "a", "b2", "subtask")).toBe(2);
-		expect(levelAt(rows, "a", "b2", "task")).toBe(0);
+});
+
+describe("where a card stands among a list's rows", () => {
+	const rows: Row[] = [task("a"), { kind: "section", id: "s1", title: "Идеи" }, task("x"), { kind: "section", id: "s2", title: "Пустая" }, { kind: "empty", id: "e", section: "s2", label: "No tasks" }];
+	it("right after an empty section's header: in that section, at its end", () => {
+		expect(slotOf(rows, ["a", "s1", "x", "s2", "c"], "c")).toEqual({ section: "s2", before: null });
+	});
+	it("before a header: at the end of the section above", () => {
+		expect(slotOf(rows, ["a", "s1", "x", "c", "s2"], "c")).toEqual({ section: "s1", before: null });
 	});
 });
 
