@@ -6,7 +6,7 @@ import type { Stop } from "../ui/engine/store";
 import { detectHaptics, type HapticsHost } from "../ui/haptics";
 import { clearPriorityColors, showPriorityColors } from "../ui/priorityColors";
 import { addWindowDocument } from "../ui/windowDocuments";
-import { type ListKey, type MockFile, oneColumnFile, sectionsFile, subtasksFile, twoColumnsFile } from "./mockData";
+import { type ListKey, longListsFile, type MockFile, oneColumnFile, sectionsFile, subtasksFile, twoColumnsFile } from "./mockData";
 import { MockPort, WRITE_DELAYS, type WriteDelay } from "./MockPort";
 
 /** The stand's own view type and code block language: never the plugin's. */
@@ -52,13 +52,23 @@ class StandView extends ItemView {
 	}
 
 	override async onOpen(): Promise<void> {
+		this.remount();
+	}
+
+	override async onClose(): Promise<void> {
+		this.unmount();
+	}
+
+	/** The screen drawn again for the stand's step now: the view's own screen, Obsidian's lifecycle left alone. */
+	remount(): void {
+		this.unmount();
 		this.contentEl.empty();
 		this.contentEl.addClass("tc-view");
 		this.screen = mountScreen(this.contentEl, { port: this.stand.port, place: this.stand.leafPlace, app: this.app, sourcePath: "", haptics: haptics() });
 		this.stand.screens.add(this.screen);
 	}
 
-	override async onClose(): Promise<void> {
+	private unmount(): void {
 		if (this.screen) this.stand.screens.delete(this.screen);
 		this.screen?.unmount();
 		this.screen = null;
@@ -117,13 +127,7 @@ export default class TaskCalendarStand extends Plugin {
 	private async showStep(place: Place, file: MockFile | undefined = place === "column" ? oneColumnFile() : place === "twoColumns" ? twoColumnsFile() : undefined): Promise<void> {
 		this.leafPlace = place;
 		this.port.reset(file);
-		for (const leaf of this.app.workspace.getLeavesOfType(STAND_VIEW)) {
-			const view = leaf.view;
-			if (view instanceof StandView) {
-				await view.onClose();
-				await view.onOpen();
-			}
-		}
+		for (const leaf of this.app.workspace.getLeavesOfType(STAND_VIEW)) if (leaf.view instanceof StandView) leaf.view.remount();
 	}
 
 	override async onload(): Promise<void> {
@@ -158,6 +162,7 @@ export default class TaskCalendarStand extends Plugin {
 		this.addCommand({ id: "step-two-columns", name: "Step 2: two columns and drag between them", callback: () => void this.showStep("twoColumns") });
 		this.addCommand({ id: "step-subtasks", name: "Step 3: subtasks", callback: () => void this.showStep("twoColumns", subtasksFile()) });
 		this.addCommand({ id: "step-sections", name: "Step 4: sections", callback: () => void this.showStep("twoColumns", sectionsFile()) });
+		this.addCommand({ id: "step-long-lists", name: "Step 5: long lists", callback: () => void this.showStep("twoColumns", longListsFile()) });
 		this.addCommand({ id: "whole-screen", name: "The whole screen", callback: () => void this.showStep("leaf") });
 		for (const delay of WRITE_DELAYS) this.addCommand({ id: `delay-${delay}`, name: `Write delay ${delay} ms`, callback: () => (port.delay = delay) });
 	}

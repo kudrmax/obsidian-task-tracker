@@ -165,3 +165,12 @@ export function sectionsFile(): MockFile {
 	file.soon.push({ id: "s-trip", name: "Поездка", tasks: take(file.soon[0].tasks, 3) });
 	return file;
 }
+
+/** The stand's long lists step: the two columns with a hundred plain tasks in Inbox and sixty in Soon, so lists scroll under a carried card. */
+export function longListsFile(): MockFile {
+	const file = oneColumnFile();
+	const plain = (id: string, title: string): MockTask => ({ id, title, level: null, status: " ", due: null, slot: null, description: null, children: [] });
+	file.inbox[0].tasks = Array.from({ length: 100 }, (_, i) => plain(`l${i + 1}`, `Задача ${i + 1}`));
+	file.soon[0].tasks = Array.from({ length: 60 }, (_, i) => plain(`m${i + 1}`, `Скоро ${i + 1}`));
+	return file;
+}

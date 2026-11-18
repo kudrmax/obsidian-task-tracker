@@ -1,4 +1,4 @@
-import { useVirtualizer } from "@tanstack/react-virtual";
+import { defaultRangeExtractor, type Range, useVirtualizer } from "@tanstack/react-virtual";
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { SortableList, SortableRow } from "../drag/Drag";
 import { descendantsOf } from "../drag/tree";
@@ -16,7 +16,7 @@ const OVERSCAN = 6;
 /**
  * The one list component (spec, «Long lists»): a list scrolls natively in its own room and mounts only the rows in sight,
  * as TanStack Virtual's dynamic list draws them (the rows in flow inside one block translated to the first one's start,
- * each measured). Every task's id stays in the list's `SortableContext`, mounted or not (stage 0, second round); every row
+ * each measured; a carried card's row kept mounted). Every task's id stays in the list's `SortableContext`, mounted or not (stage 0, second round); every row
  * is a `MovingRow`. A task the store asks to reveal is scrolled into sight by the virtualizer's `scrollToIndex`.
  */
 export const TaskList = memo(function TaskList({ list }: { readonly list: ListId }) {
@@ -36,7 +36,24 @@ export const TaskList = memo(function TaskList({ list }: { readonly list: ListId
 	/** Every row is in the sortable list: headers and plates move aside like cards, and a card goes after them into their section. */
 	const ids = useMemo(() => rows.map((row) => row.id), [rows]);
 	const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
+	/**
+	 * While a card is carried, its own row stays mounted however far the list scrolls under it (TanStack Virtual's
+	 * `rangeExtractor`): dnd-kit carries it by that row. The rows from it to those in sight are mounted with it, so the rows
+	 * still stand in one flow.
+	 */
+	const liftedAt = useMemo(() => (lifted === null ? -1 : rows.findIndex((row) => row.id === lifted)), [rows, lifted]);
+	const rangeExtractor = useCallback(
+		(range: Range) => {
+			const inSight = defaultRangeExtractor(range);
+			if (liftedAt < 0 || inSight.length === 0 || inSight.includes(liftedAt)) return inSight;
+			const from = Math.min(liftedAt, inSight[0]);
+			const to = Math.max(liftedAt, inSight[inSight.length - 1]);
+			return Array.from({ length: to - from + 1 }, (_, i) => from + i);
+		},
+		[liftedAt],
+	);
 	const virtualizer = useVirtualizer({
+		rangeExtractor,
 		count: rows.length,
 		getScrollElement: () => scroller,
 		estimateSize: useCallback(() => ESTIMATE_PX, []),

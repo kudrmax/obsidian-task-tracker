@@ -175,7 +175,7 @@ export function Drag({ doc, carried, onLift, children }: DragProps) {
 	};
 
 	return (
-		<DndContext sensors={sensors} collisionDetection={collision} onDragStart={start} onDragMove={move} onDragOver={overList} onDragEnd={end} onDragCancel={cancel}>
+		<DndContext sensors={sensors} collisionDetection={collision} onDragStart={start} onDragMove={move} onDragOver={overList} onDragEnd={end} onDragCancel={cancel} autoScroll={AUTO_SCROLL}>
 			{children}
 			{createPortal(
 				<DragOverlay className="tc-overlay" dropAnimation={DROP_ANIMATION}>
@@ -213,6 +213,12 @@ function orderAfter(active: Sortable, over: Sortable | null): readonly string[] 
 	if (!over || over.id === active.id || own === null || containerOf(over) !== own) return items;
 	return arrayMove([...items], items.indexOf(String(active.id)), items.indexOf(String(over.id)));
 }
+
+/**
+ * A list scrolls under a card held near its top or bottom edge: dnd-kit's own auto-scroll, faster nearer the edge, up and
+ * down only (the columns never slide under a carried card).
+ */
+const AUTO_SCROLL = { threshold: { x: 0, y: 0.15 } };
 
 /** A list's own drop target, for when no row of it is under the pointer: an empty list, or past its last row. */
 const LIST_TARGET = "list:";
