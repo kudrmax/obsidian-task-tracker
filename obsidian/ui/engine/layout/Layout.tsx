@@ -11,10 +11,10 @@ import { Timeline } from "../view/Timeline";
 import { COLUMN_SHARE, STRIP_WIDTH } from "./columns";
 
 /**
- * Where a screen is mounted: Obsidian's leaf (the main screen, a pop-out), a note's block, or one column alone (the
- * stand's first step: a list and drag, nothing else on screen).
+ * Where a screen is mounted: Obsidian's leaf (the main screen, a pop-out), a note's block, or the stand's steps alone:
+ * one column (a list and drag, nothing else on screen), then two columns side by side (drag between them).
  */
-export type Place = "leaf" | "note" | "column";
+export type Place = "leaf" | "note" | "column" | "twoColumns";
 
 /**
  * Where things stand (spec, «The owners»): the place's columns. The only module that reads the place. A leaf shows the
@@ -24,6 +24,7 @@ export type Place = "leaf" | "note" | "column";
  */
 export const Layout = memo(function Layout({ place }: { readonly place: Place }) {
 	if (place === "column") return <NoteColumn />;
+	if (place === "twoColumns") return <TwoColumns />;
 	return (
 		<>
 			{place === "leaf" ? <RibbonColumns /> : <NoteColumn />}
@@ -79,6 +80,17 @@ function NoteColumn() {
 
 /** A note's one column takes the whole block. */
 const WHOLE = 100;
+/** Two columns standing still side by side split the room in half. */
+const HALF = 50;
+
+function TwoColumns() {
+	return (
+		<div className="tc-note-column">
+			<ListColumn list="inbox" share={HALF} />
+			<ListColumn list="soon" share={HALF} />
+		</div>
+	);
+}
 
 const ListColumn = memo(function ListColumn({ list, share = COLUMN_SHARE }: { readonly list: ListId; readonly share?: number }) {
 	const title = useData((d) => d.lists[list].title);

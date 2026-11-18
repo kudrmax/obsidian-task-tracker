@@ -1,10 +1,10 @@
-import { closestCorners, DndContext, defaultDropAnimationSideEffects, useDndContext, type DragEndEvent, DragOverlay, type DragStartEvent, type DropAnimation, MouseSensor, TouchSensor, useSensor, useSensors } from "@dnd-kit/core";
+import { closestCenter, type CollisionDetection, DndContext, defaultDropAnimationSideEffects, getFirstCollision, pointerWithin, rectIntersection, type UniqueIdentifier, useDndContext, useDroppable, type DragEndEvent, type DragOverEvent, DragOverlay, type DragStartEvent, type DropAnimation, MouseSensor, TouchSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS, getEventCoordinates } from "@dnd-kit/utilities";
-import { type CSSProperties, memo, type ReactNode, useState } from "react";
+import { type CSSProperties, memo, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Destination, ListId } from "../port";
-import { useScreenApi } from "../store";
+import { useScreen, useScreenApi } from "../store";
 
 /**
  * Drag and drop (spec, «The owners»): one `DndContext` per screen, one `DragOverlay`, one `onDragEnd` that makes one write
@@ -56,16 +56,64 @@ export function Drag({ doc, carried, onLift, children }: DragProps) {
 	const sensors = useSensors(useSensor(MouseSensor, { activationConstraint: { distance: MOUSE_DISTANCE_PX } }), useSensor(TouchSensor, { activationConstraint: { delay: LONG_PRESS_MS, tolerance: LONG_PRESS_TOLERANCE_PX } }));
 	const [active, setActive] = useState<string | null>(null);
 
+	/**
+	 * Which target the pointer is over, as dnd-kit's «multiple containers» example decides it: what is under the pointer,
+	 * else what the card overlaps in its own list; over a list itself, its card nearest the carried one; in the card's own list first. Right after the card moved into
+	 * another list, the target stays as it was until that list is drawn, so the card never swings back and forth between
+	 * two lists at their border.
+	 */
+	const lastOver = useRef<UniqueIdentifier | null>(null);
+	const justMoved = useRef(false);
+	const lists = useScreen((s) => s.shown.lists);
+	useEffect(() => {
+		justMoved.current = false;
+	}, [lists]);
+	const collision: CollisionDetection = useCallback((args) => {
+		const underPointer = pointerWithin(args);
+		/** Where two lists meet, the pointer is in both: the card stays in its own until the pointer has left it. */
+		const own = String(args.active.data.current?.sortable?.containerId ?? "");
+		const ofOwn = (hit: { readonly id: UniqueIdentifier; readonly data?: { readonly droppableContainer?: { readonly data: { readonly current?: { readonly sortable?: { readonly containerId: UniqueIdentifier } } } } } }) => hit.id === `${LIST_TARGET}${own}` || hit.data?.droppableContainer?.data.current?.sortable?.containerId === own;
+		const inOwn = underPointer.filter(ofOwn);
+		/** Between the lists, under no list at all, the card stays in its own: only the pointer inside another list moves it there. */
+		const hits = inOwn.length > 0 ? inOwn : underPointer.length > 0 ? underPointer : rectIntersection(args).filter(ofOwn);
+		let overId = getFirstCollision(hits, "id");
+		if (overId !== null) {
+			const items = args.droppableContainers.find((c) => c.id === overId)?.data.current?.items as readonly string[] | undefined;
+			if (items && items.length > 0) overId = closestCenter({ ...args, droppableContainers: args.droppableContainers.filter((c) => c.id !== overId && items.includes(String(c.id))) })[0]?.id ?? overId;
+			lastOver.current = overId;
+			return [{ id: overId }];
+		}
+		if (justMoved.current) lastOver.current = args.active.id;
+		return lastOver.current !== null ? [{ id: lastOver.current }] : [];
+	}, []);
+
+	/** Where the card was lifted: let go there, nothing is written. */
+	const [origin, setOrigin] = useState<SortablePlace | null>(null);
+
 	const start = ({ active: lifted }: DragStartEvent) => {
 		const screen = api.getState();
 		if (!screen.claim("drag")) return;
 		screen.lift(String(lifted.id));
 		setActive(String(lifted.id));
+		setOrigin(placeOf(lifted));
 		onLift();
+	};
+	/**
+	 * Over another list, the card moves into it at once, as dnd-kit's «multiple containers» example does: the screen draws
+	 * the port's preview of the card there, and that list's cards part around its place.
+	 */
+	const overList = ({ active: lifted, over }: DragOverEvent) => {
+		const to = crossing(lifted, over, api.getState().dayOffset);
+		if (!to) return;
+		justMoved.current = true;
+		api.getState().carryInto(String(lifted.id), to);
 	};
 	const end = ({ active: lifted, over }: DragEndEvent) => {
 		setActive(null);
-		api.getState().drop(String(lifted.id), destinationOf(lifted, over, api.getState().dayOffset));
+		const to = destinationOf(lifted, over, api.getState().dayOffset);
+		const here = placeOf(lifted);
+		const still = to === null && here !== null && origin !== null && here.container === origin.container && here.before === origin.before;
+		api.getState().drop(String(lifted.id), to ?? (still || here === null ? null : { list: here.container as ListId, before: here.before, dayOffset: api.getState().dayOffset }));
 	};
 	const cancel = () => {
 		if (active) api.getState().drop(active, null);
@@ -73,7 +121,7 @@ export function Drag({ doc, carried, onLift, children }: DragProps) {
 	};
 
 	return (
-		<DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={start} onDragEnd={end} onDragCancel={cancel}>
+		<DndContext sensors={sensors} collisionDetection={collision} onDragStart={start} onDragOver={overList} onDragEnd={end} onDragCancel={cancel}>
 			{children}
 			{createPortal(
 				<DragOverlay className="tc-overlay" dropAnimation={DROP_ANIMATION}>
@@ -88,6 +136,43 @@ export function Drag({ doc, carried, onLift, children }: DragProps) {
 interface Sortable {
 	readonly id: string | number;
 	readonly data: { readonly current?: { readonly sortable?: { readonly containerId: string | number; readonly items: readonly (string | number)[] } } | undefined };
+}
+
+/** Where a card stands among a sortable container's items: the container (a list), and the item after it (null: its end). */
+interface SortablePlace {
+	readonly container: string;
+	readonly before: string | null;
+}
+
+function placeOf(card: Sortable): SortablePlace | null {
+	const at = card.data.current?.sortable;
+	if (!at) return null;
+	const items = at.items.map(String);
+	return { container: String(at.containerId), before: items[items.indexOf(String(card.id)) + 1] ?? null };
+}
+
+/** A list's own drop target, for when no card of it is under the pointer: an empty list, or past its last card. */
+const LIST_TARGET = "list:";
+
+/**
+ * The carried card is over another list: where it goes there, as dnd-kit's «multiple containers» example puts it — before
+ * the card under the pointer, or after it once the carried card's top is past that card's middle; over the list itself,
+ * at its end. Null while it stays over its own list.
+ */
+function crossing(active: Sortable & { readonly rect: { readonly current: { readonly translated: { readonly top: number } | null } } }, over: (Sortable & { readonly rect: { readonly top: number; readonly height: number } }) | null, dayOffset: number): Destination | null {
+	const from = active.data.current?.sortable;
+	if (!over || !from) return null;
+	const overId = String(over.id);
+	if (overId.startsWith(LIST_TARGET)) {
+		const list = overId.slice(LIST_TARGET.length);
+		return list === String(from.containerId) ? null : { list: list as ListId, before: null, dayOffset };
+	}
+	const to = over.data.current?.sortable;
+	if (!to || to.containerId === from.containerId) return null;
+	const items = to.items.map(String);
+	const below = (active.rect.current.translated?.top ?? 0) > over.rect.top + over.rect.height / 2;
+	const at = items.indexOf(overId) + (below ? 1 : 0);
+	return { list: String(to.containerId) as ListId, before: items[at] ?? null, dayOffset };
 }
 
 /**
@@ -107,9 +192,12 @@ function destinationOf(active: Sortable, over: Sortable | null, dayOffset: numbe
 
 /** A list's sortable tasks: `ids` keeps its identity between draws, or dnd-kit stops gliding (stage 0, finding 4). */
 export function SortableList({ list, ids, children }: { readonly list: ListId; readonly ids: readonly string[]; readonly children: ReactNode }) {
+	const { setNodeRef } = useDroppable({ id: `${LIST_TARGET}${list}`, data: { items: ids } });
 	return (
 		<SortableContext id={list} items={ids as string[]} strategy={verticalListSortingStrategy}>
-			{children}
+			<div ref={setNodeRef} className="tc-list-target">
+				{children}
+			</div>
 		</SortableContext>
 	);
 }

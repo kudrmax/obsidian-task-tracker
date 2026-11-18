@@ -139,3 +139,11 @@ export function oneColumnFile(): MockFile {
 	const tasks: MockTask[] = names.map((title, i) => ({ id: `c${i + 1}`, title, level: null, status: " ", due: null, slot: null, description: null, children: [] }));
 	return { inbox: [{ id: "c-s1", name: null, tasks }], now: [{ id: "c-s2", name: null, tasks: [] }], soon: [{ id: "c-s3", name: null, tasks: [] }], backlog: [{ id: "c-s4", name: null, tasks: [] }], done: [{ id: "c-s5", name: null, tasks: [] }] };
 }
+
+/** The stand's second step: two columns, Inbox and Soon, of plain tasks, to carry tasks between them. */
+export function twoColumnsFile(): MockFile {
+	const file = oneColumnFile();
+	const names = ["Купить подарок", "Сдать отчёт", "Написать письмо", "Забрать посылку", "Обновить резюме", "Сходить в зал", "Убрать балкон", "Записать идеи"];
+	file.soon[0].tasks = names.map((title, i) => ({ id: `d${i + 1}`, title, level: null, status: " ", due: null, slot: null, description: null, children: [] }));
+	return file;
+}

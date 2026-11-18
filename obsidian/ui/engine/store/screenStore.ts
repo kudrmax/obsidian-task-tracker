@@ -49,6 +49,8 @@ export interface ScreenActions {
 	claim(gesture: Gesture): boolean;
 	release(gesture: Gesture): void;
 	lift(id: string): void;
+	/** The carried task drawn in another list while carried: the port's preview of it there (dnd-kit's «multiple containers»). */
+	carryInto(id: string, to: Destination): void;
 	/** The carried task let go at `to` (null: cancelled, or let go where nothing takes it). */
 	drop(id: string, to: Destination | null): void;
 	openMenu(id: string): void;
@@ -141,11 +143,14 @@ export function createScreenStore(port: ScreenPort): ScreenStore {
 			lift(id) {
 				set({ lifted: id, layer: null });
 			},
+			carryInto(id, to) {
+				set({ shown: share(get().shown, port.preview(id, to)) });
+			},
 			drop(id, to) {
 				if (to) {
 					set({ shown: share(get().shown, port.preview(id, to)) });
 					write(port.move(id, to));
-				}
+				} else if (get().shown !== get().read) set({ shown: get().read });
 				set({ lifted: null });
 				get().release("drag");
 			},
