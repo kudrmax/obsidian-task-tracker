@@ -140,7 +140,11 @@ export interface WireSearch {
 /** One task whole, and where it is stored: `stored` is for editing the file by the recipes, never what to tell Max. */
 export interface WireTaskAnswer {
 	readonly task: WireTask;
-	readonly stored: { readonly section: string; readonly line: string };
+	/**
+	 * The section and the line as the file on disk has them now. `pending`: the task is not on disk yet (the tidy Obsidian
+	 * makes when it opens the file today writes it, a repeat's next copy), `note` says so.
+	 */
+	readonly stored: { readonly section: string; readonly line: string; readonly pending?: true; readonly note?: string };
 }
 
 export interface WireHelp {

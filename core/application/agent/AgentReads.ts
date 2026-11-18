@@ -56,6 +56,8 @@ export interface AgentServices {
 	readonly assistant: AssistantService;
 	readonly screenSettings: ScreenSettingsStore;
 	readonly clock: Clock;
+	/** The tasks file as it stands, before the tidy the reads make in memory (null: none). */
+	readonly storedTasks: () => Promise<string | null>;
 }
 
 /** The screen's project filter as the program is asked for it: a project by name (`--project`), or No project (`--no-project`). */
@@ -75,6 +77,8 @@ const REMINDER: Readonly<Record<ReminderKind, WireReminder>> = { live: "lockScre
 const SEARCH_LIST: Readonly<Record<SectionKey, "inbox" | "backlog" | "soon" | "today" | "done">> = { inbox: "inbox", backlog: "backlog", soon: "soon", now: "today", done: "done" };
 const DAYS_IN_WEEK = 7;
 const MOST_DAYS = 62;
+
+const PENDING_NOTE = "This line is not in the file yet: Obsidian writes it when it opens the file today (the day's tidy). Read again after that before editing.";
 
 const PAST_NOTE = "A past day keeps no tasks: what wasn't done moved to today, and the file keeps no date of completion. Its meetings stay.";
 
@@ -110,9 +114,11 @@ export class AgentReads {
 	async week(ask: WeekAsk = {}, filter: AgentFilter = {}): Promise<WireWeek> {
 		await this.needFile();
 		const node = await this.nodeOf(filter);
+		const whole = ask.which === "this" || ask.which === "next";
+		if (whole && ask.count !== undefined) throw new AgentError("badArgument", "--days goes with a day, not with this or next: a week is Monday to Sunday");
 		const count = ask.count ?? DAYS_IN_WEEK;
 		if (!Number.isInteger(count) || count < 1 || count > MOST_DAYS) throw new AgentError("badArgument", `--days takes a whole number from 1 to ${MOST_DAYS}`);
-		const dates = ask.which === "this" || ask.which === "next" ? this.s.days.week(ask.which) : this.s.days.days(ask.which === undefined ? this.s.days.today() : this.dayNamed(ask.which), count);
+		const dates = whole ? this.s.days.week(ask.which as "this" | "next") : this.s.days.days(ask.which === undefined ? this.s.days.today() : this.dayNamed(ask.which), count);
 		const days: WireDay[] = [];
 		for (const date of dates) days.push(await this.dayOf(date, node));
 		return { days };
@@ -178,7 +184,15 @@ export class AgentReads {
 		if (item === null) throw new AgentError("staleTask", "the task is no longer where the ref says: the file or the day changed, read again");
 		const place = await this.s.tasks.placeOf(item);
 		const whole = { ...this.wire(item, place), subtasks: this.subtask(item, item.card.step, true, "date" in place ? place.date : undefined).subtasks };
-		return { task: present(whole), stored: { section: this.s.tasks.listName(item.key.section), line: item.key.raw } };
+		return { task: present(whole), stored: await this.stored(item) };
+	}
+
+	/** Where the task is on disk now: its line before the tidy the reads make in memory. */
+	private async stored(item: TaskItem): Promise<WireTaskAnswer["stored"]> {
+		const disk = await this.s.storedTasks();
+		const line = disk === null ? null : this.s.tasks.storedLine(item, disk);
+		if (line !== null) return { section: this.s.tasks.listName(line.section), line: line.raw };
+		return { section: this.s.tasks.listName(item.key.section), line: item.key.raw, pending: true, note: PENDING_NOTE };
 	}
 
 	/** The commands, the words, and Max's priority levels and labels in their order. */
@@ -217,10 +231,10 @@ export class AgentReads {
 			now: side === "today" ? localMoment(this.s.clock.now()) : undefined,
 		};
 		const meetings = { events: this.events(events), calendars: this.calendars(events) };
-		if (side === "past") return defined({ ...head, past: true as const, note: PAST_NOTE, ...meetings });
+		const past = side === "past" ? { past: true as const, note: PAST_NOTE } : {};
 		const screen = await this.s.tasks.screen(date, node);
 		const list = this.s.tasks.columnView(screen, "day");
-		return defined({ ...head, list: { sections: await this.sections(list.groups) }, timeline: await this.placed(screen.day.slotted, date), ...meetings });
+		return defined({ ...head, ...past, list: { sections: await this.sections(list.groups) }, timeline: await this.placed(screen.day.slotted, date), ...meetings });
 	}
 
 	private async list(list: "soon" | "inbox" | "backlog", filter: AgentFilter): Promise<WireList> {
@@ -374,13 +388,13 @@ function pathTo(subtasks: readonly TaskItem[], id: string): string[] {
 const HELP_COMMANDS: WireHelp["commands"] = [
 	{ command: "today", answers: "the day as Max sees it at Now–calendar: the day's list in its sections, the timeline, the day's meetings" },
 	{ command: "day <date>", answers: "the same for one day; <date>: YYYY-MM-DD, today, tomorrow, yesterday, +N, -N" },
-	{ command: "week [this | next | <date>] [--days N]", answers: "day for each day: this / next = Monday to Sunday of this / next week; a date = N days from it (7 by default); nothing = 7 days from today" },
+	{ command: "week [this | next | <date>] [--days N]", answers: "day for each day: this / next = Monday to Sunday of this / next week (no --days); a date = N days from it (7 by default); nothing = 7 days from today" },
 	{ command: "soon", answers: "the Soon column in its sections" },
 	{ command: "inbox", answers: "Inbox in its sections" },
 	{ command: "backlog", answers: "Backlog in its sections" },
 	{ command: "all", answers: "every open task exactly once, flat, in funnel order: Inbox, Backlog, Soon, today, then later days by date" },
 	{ command: "projects", answers: "the whole tree: every project with its path, folder or not, status, attached note" },
-	{ command: "project <name> [--no-subprojects] [--done]", answers: "the project By project: its own tasks, then a part per subproject, each task with its place; --done: also its history, the closed tasks" },
+	{ command: "project <name> [--no-subprojects] [--done]", answers: "the project By project, exactly as the Projects screen orders it: its own tasks, then a part per subproject; in a part Inbox, Backlog, Soon (dated ones among them), Now, file order inside; each task with its place; --done: also its history, the closed tasks" },
 	{ command: "search <text>", answers: "the plugin's search, Done included, best first" },
 	{ command: "task <ref>", answers: "one task whole: description, every subtask at every depth (closed ones too), where it is stored" },
 	{ command: "help", answers: "this" },
@@ -411,7 +425,8 @@ const HELP_STATUSES: WireHelp["statuses"] = [
 ];
 
 const HELP_NOTES: readonly string[] = [
-	"date is the day Max sees the task on; due is its due date, only when it differs. A date is a plan, not a deadline: nothing is overdue.",
+	"date is the day the task stands on: its slot's day, else today for Now, else its due date; due is its due date, only when it differs. A date is a plan, not a deadline: nothing is overdue.",
+	"A task with a due date and a slot on another day shows on both days, as the screen shows it: in the due day's list and on the slot day's timeline (date is the slot's day in both), so week lists it twice.",
 	"time.startsAt is the full moment: a day runs from dayStart to dayStart next morning, so a slot after midnight belongs to the night before. time.passed: the task rides the now line (an open task of today whose start has passed).",
 	"A folded task (collapsed) shows its nextStep on its card and its timeline block, the task's own title small above it; Done closes the step. subtasks lists the open subtasks, the step marked next.",
 	"A ref names a task for task <ref>; refs go stale when the file or the day changes: read again.",

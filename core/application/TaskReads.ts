@@ -12,6 +12,7 @@ import { descriptionMarkdown } from "../domain/description";
 import { flatten, type TaskDocument, type TaskEntry } from "../domain/TaskDocument";
 import { type LabelLevel, type PriorityLevel, usableLabels, usableLevels } from "../settings";
 import type {
+	StoredLine,
 	ColumnList,
 	ColumnSource,
 	PlacedTask,
@@ -102,7 +103,7 @@ function sectionsOf(doc: TaskDocument, list: GroupedList): readonly ListSection[
 }
 
 /** The lists of open tasks, in the order the funnel walks them before it sorts them by place. */
-const OPEN_ORDER: readonly SectionKey[] = ["inbox", "backlog", "soon", "now"];
+const OPEN_ORDER: readonly SectionKey[] = ["inbox", "backlog", "now", "soon"];
 
 /** The most names an unknown project's answer offers instead. */
 const MOST_CANDIDATES = 5;
@@ -274,10 +275,7 @@ export class TaskReads {
 	/** The screen of `date`, only the tasks `filter` lets through (`TaskService.screen`). */
 	screen(s: Snapshot, date: LocalDate, filter?: ProjectsNodeId | null): ScreenView {
 		const { doc, today, boundary } = s;
-		const tree = projectTreeOf(doc);
-		const node = filterNode(filter, tree);
-		const shows = node === null ? () => true : filterTest(node, tree, doc, this.subprojects());
-		const item = this.itemOf(today, doc, node === null || projectOfNode(node) === null);
+		const { shows, item } = this.filtered(s, filter);
 		const shown = (entries: readonly TaskEntry[]) => entries.filter(shows).map(item);
 		const day = { date, list: shown(dayList(doc, date, today, boundary)), slotted: shown(slottedOn(doc, date, boundary)) };
 		const sections = this.listSections(s);
@@ -468,6 +466,13 @@ export class TaskReads {
 		return { reads: true, tidies: true, answer: (s) => this.lineOf(s!.text, key) };
 	}
 
+	/** Where the task stands in `text` as it is, untidied: the line its id has there (`TaskService.storedLine`). */
+	storedLine(item: TaskItem, text: string): StoredLine | null {
+		const doc = this.rules.parse(text);
+		const entry = flatten(doc.allTasks()).find((e) => e.id === item.id);
+		return entry ? { section: entry.section, line: doc.lineOf(entry), raw: entry.raw } : null;
+	}
+
 	/** The task's line in the file as it stands, unnormalized, from 0. */
 	lineOf(text: string, key: TaskKey): number {
 		const doc = this.rules.parse(text);
@@ -541,10 +546,7 @@ export class TaskReads {
 
 	openTasks(s: Snapshot, filter?: ProjectsNodeId | null): readonly PlacedTask[] {
 		const { doc, today, boundary } = s;
-		const tree = projectTreeOf(doc);
-		const node = filterNode(filter, tree);
-		const shows = node === null ? () => true : filterTest(node, tree, doc, this.subprojects());
-		const item = this.itemOf(today, doc, node === null || projectOfNode(node) === null);
+		const { shows, item } = this.filtered(s, filter);
 		const open = OPEN_ORDER.flatMap((list) => doc.tasks(list)).filter((entry) => isOpen(entry.task.status) && shows(entry));
 		const placed = open.map((entry) => ({ item: item(entry), place: placeOfTask(entry.section, entry.task, true, today, boundary) }));
 		return placed.map((p, i) => ({ p, i, rank: funnelRank(p.place) })).sort((a, b) => (a.rank < b.rank ? -1 : a.rank > b.rank ? 1 : a.i - b.i)).map(({ p }) => p);
@@ -614,6 +616,17 @@ export class TaskReads {
 	/** The timeline's rules by the clock and the day's boundary now. */
 	timeline(): TimelineSpans {
 		return new TimelineSpans(this.rules.moment().boundary, this.clock.now());
+	}
+
+	/**
+	 * What a read under `filter` shows (`TaskService.screen`'s filter): which tasks the node lets through, a subtask with its
+	 * task, and how each is drawn, without the folder mark under a project.
+	 */
+	private filtered({ doc, today }: Snapshot, filter?: ProjectsNodeId | null): { readonly shows: (entry: TaskEntry) => boolean; readonly item: (entry: TaskEntry) => TaskItem } {
+		const tree = projectTreeOf(doc);
+		const node = filterNode(filter, tree);
+		const shows = node === null ? () => true : filterTest(node, tree, doc, this.subprojects());
+		return { shows, item: this.itemOf(today, doc, node === null || projectOfNode(node) === null) };
 	}
 
 	/** The item of a task of `doc`, its subtasks below it, its projects as `doc`'s tree has them; `mark`, the card shows the folder mark. */

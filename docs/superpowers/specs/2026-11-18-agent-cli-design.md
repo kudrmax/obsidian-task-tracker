@@ -107,8 +107,10 @@ Status: `open`, `inProgress`, `done`, `wontDo` (the core's `todo`, `inProgress`,
 - `ref`: an opaque token (the task's key, encoded) for `task <ref>`; never contains a list's name. Resolved by the core's
   `find`: a task that moved is still found while its line is unique; not found: `staleTask`; not a token: `unknownTask`.
   Refs go stale when the file or the day changes: read again.
-- `date`: **the day Max sees the task on** (always for `today` and `day`). `due`: the due date, only when it differs.
-  A date is a plan, not a deadline; nothing is overdue.
+- `date`: **the day the task stands on**: its slot's day, else today for Now, else its due date (always for `today` and
+  `day`). `due`: the due date, only when it differs. A task with a due date and a slot on another day shows on both days,
+  as the screen shows it: in the due day's list and on the slot day's timeline, `date` the slot's day in both; so `week`
+  lists it twice. A date is a plan, not a deadline; nothing is overdue.
 - `time`: the slot. `startsAt` is the full moment, so a slot past midnight (the day runs from the start hour, 5:00, to
   5:00 next morning) is never put on the wrong night. `passed`: the task rides the now line, as the core judges it
   (an open task of today whose start has passed).
@@ -141,18 +143,21 @@ Status: `open`, `inProgress`, `done`, `wontDo` (the core's `todo`, `inProgress`,
   core's order (by start). `now` only for today. `calendars` as the sources window gives it, unfiltered; the program
   never calls Google, so `google` may read old where the running plugin would have refreshed it. A source that doesn't
   reach the day means «unknown», not «free».
-  A **past day** has `"past": true`, no `list` and no `timeline`, and a `note`: what wasn't done moved to today, and the
-  file keeps no date of completion. Its events stay.
+  A **past day** has `"past": true` and a `note`: what wasn't done moved to today, and the file keeps no date of
+  completion. Its `list` and `timeline` are read as the screen reads them, so they are empty after the tidy. Its events stay.
 - **`week`**: `{ "days": [ day, ... ] }`.
 - **`all`**: `{ "tasks": [ ... ] }`, every open task once.
 - **`projects`**: `{ "projects": [ { "name", "path", "depth", "folder", "status": "active | waiting | done", "note"? } ], "noProject": { "openTasks": bool } }`
   in the tree's order, done projects last, nothing folded away.
 - **`project`**: `{ "project": { "name", "folder", "status" }, "parts": [ { "kind": "own | subproject | done", "title"?, "path", "tasks": [...] } ] }`;
-  in a part the tasks in By project's order (Inbox, Backlog, Soon, today, later days; file order inside). A done project:
-  its closed tasks. A folder with `--no-subprojects` is empty by design; `folder: true` says why.
+  in a part the tasks in By project's order, exactly as the screen orders them: Inbox, Backlog, Soon (dated ones among
+  them), Now; file order inside. A done project: its closed tasks. A folder keeps its branch with `--no-subprojects`, as
+  the screen does (Decision 9).
 - **`search`**: `{ "query", "groups": [ { "list": "inbox | backlog | soon | today | done", "tasks": [...] } ] }`. A group is
   the list the task is stored in; each task's `place` says where Max sees it.
-- **`task`**: `{ "task": task, "stored": { "section": "Soon", "line": "- [ ] … 📅 …" } }`. `stored` is for editing the
+- **`task`**: `{ "task": task, "stored": { "section": "Soon", "line": "- [ ] … 📅 …", "pending"?: true, "note"? } }`:
+  the section and line as the file on disk has them now, before the tidy the reads make in memory; `pending` for a line
+  the tidy makes (Obsidian writes it when it opens the file today). `stored` is for editing the
   file by `docs/plugin/agents.md`'s recipes only, never what to tell Max.
 
 An empty tasks file is no error: every list is empty.
@@ -263,7 +268,7 @@ Backend (2026-11-18):
 16. An empty tasks file answers `sections: []` for a list (the column draws nothing), `tasks: []` for `all`.
 17. Every command but `help` answers `tasksFileMissing` without the tasks file; an error the program doesn't expect is code `failed`.
 18. `projects[].depth` is the tree's depth (`path.length - 1`): a done project at the tree's top is 0, where the panel draws it one step under the Done tile.
-19. Options: `--project` / `--no-project` only on today, day, week, soon, inbox, backlog, all; `--no-subprojects` with `--project` or on `project`; `--days` (1 to 62) only on `week`; `--done` only on `project`; anything else is `badArgument`. `project` and `search` take every word that follows as the name or the query. No command is `help`.
+19. Options: `--project` / `--no-project` only on today, day, week, soon, inbox, backlog, all; `--no-subprojects` with `--project` or on `project`; `--days` (1 to 62) only on `week`, and never with `this` / `next` (a week is Monday to Sunday); `--done` only on `project`; anything else is `badArgument`. `project` and `search` take every word that follows as the name or the query. No command is `help`.
 20. `time.passed` of a task in `all`, `search`, `project` is judged on its place's day; on a day's timeline, on that day.
 21. `help`'s labels for the assistant come from the Assistant page's option rows (Best task's Label and Skip label), each with the label chosen and what it means.
 
@@ -271,3 +276,6 @@ Obsidian frontend (2026-11-18):
 
 22. Every list the plugin draws in sections takes the core's `columnView` whole: `TaskList` draws one `ListView` (`list()`), never items plus `grouped`/`sections`; a list that shows no sections (Done, a task's subtasks on the whole screen) draws `listView(items, false)`. A column reads its sections from the screen it draws (that screen's day), not from the day selected while the next one loads, so the headers always belong to the cards under them. Before the first read the column draws the selected day's empty list. `tests/uiDecides.test.ts` trips on `columnSections(` or a `listView(` with sections in the frontends.
 23. The card waiting for its section's name (a new section being named) is left out of the screen handed to `columnView`, as it was left out of the items before.
+22. Two orders, on purpose. `project` is By project exactly as the Projects screen orders it (`STAGE_ORDER`, by the file's section: Inbox, Backlog, Soon with its dated tasks among them, Now; file order inside), because the program must equal the screen. `all` is a list the screen doesn't have; it keeps `funnelRank` by place: Inbox, Backlog, Soon, today (Now's, then Soon's, each in file order), then the later days by date.
+23. `task <ref>`'s `stored` is the line on disk, not the tidied copy: `TaskService.storedLine(item, text)` finds the task by its id in the file as it stands (the identity tracks lines through the tidy) and gives its section and line; the program hands it the disk's text (`CorePorts.storedTasks`). A line only the tidy makes (a repeat's next copy) answers `pending: true` with a note.
+24. A past day is read like any day (`screen` + `columnView` + the timeline: empty after the tidy); the program only adds `past: true` and the note.

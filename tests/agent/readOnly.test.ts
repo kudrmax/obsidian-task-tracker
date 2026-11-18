@@ -65,6 +65,27 @@ describe("every command", () => {
 	});
 });
 
+describe("task <ref>'s stored line", () => {
+	it("is the section and the line as the disk has them, not the copy tidied in memory", async () => {
+		const file = ["## Now", "", "- [ ] Today's own", "", "## Soon", "", "- [ ] Old thing 📅 2026-11-10", "\t- [ ] Its step", "", "## Done", ""].join("\n");
+		const vault = makeVault({ tasks: file });
+		const today = (await run(vault, ["today"])).answer;
+		const old = today.list.sections.flatMap((s: { tasks: { title: string; ref: string; subtasks?: { ref: string }[] }[] }) => s.tasks).find((t: { title: string }) => t.title === "Old thing");
+		expect(old).toMatchObject({ place: "today", date: "2026-11-18" });
+		expect((await run(vault, ["task", old.ref])).answer.stored).toEqual({ section: "Soon", line: "- [ ] Old thing 📅 2026-11-10" });
+		expect((await run(vault, ["task", old.subtasks[0].ref])).answer.stored).toEqual({ section: "Soon", line: "\t- [ ] Its step" });
+		expect(readFileSync(join(vault, "TODOs Tasks.md"), "utf8")).toBe(file);
+	});
+
+	it("of a line the tidy makes, not on disk yet, says it is pending", async () => {
+		const file = ["## Now", "", "- [x] Water 📅 2026-11-17 🔁 every day", "", "## Done", ""].join("\n");
+		const vault = makeVault({ tasks: file });
+		const next = (await run(vault, ["all"])).answer.tasks.find((t: { title: string }) => t.title === "Water");
+		const stored = (await run(vault, ["task", next.ref])).answer.stored;
+		expect(stored).toMatchObject({ pending: true, note: expect.stringMatching(/not in the file yet/) });
+	});
+});
+
 describe("the ports", () => {
 	it("the tasks file keeps a tidy in memory and never creates a file", async () => {
 		const vault = makeVault({ tasks: "## Now\n\n- [ ] A\n" });

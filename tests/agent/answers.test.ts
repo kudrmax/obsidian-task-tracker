@@ -139,8 +139,8 @@ describe("day and week", () => {
 		const { answer } = await run(makeVault(), ["day", "yesterday"]);
 		expect(answer).toMatchObject({ date: "2026-11-17", relation: "yesterday", past: true });
 		expect(answer.note).toMatch(/moved to today/);
-		expect(answer.list).toBeUndefined();
-		expect(answer.timeline).toBeUndefined();
+		expect(answer.list).toEqual({ sections: [{ name: null, tasks: [] }] });
+		expect(answer.timeline).toEqual([]);
 		expect(answer.events).toEqual({ allDay: [], timed: [] });
 		expect((await run(makeVault(), ["day", "2026-11-10"])).answer.relation).toBe("past");
 	});
@@ -153,6 +153,8 @@ describe("day and week", () => {
 		expect(await dates("2026-11-30", "--days", "2")).toEqual(["2026-11-30", "2026-12-01"]);
 		expect(await dates()).toEqual(["2026-11-18", "2026-11-19", "2026-11-20", "2026-11-21", "2026-11-22", "2026-11-23", "2026-11-24"]);
 		const week = (await run(vault, ["week", "this"])).answer.days;
+		const sunday = (d: { list: { sections: { tasks: { title: string; date?: string }[] }[] }; timeline: { title: string; date?: string }[] }) => [...d.list.sections.flatMap((s) => s.tasks), ...d.timeline].filter((t) => t.title === "Slotted sunday").map((t) => t.date);
+		expect(week.map(sunday)).toEqual([[], [], [], [], ["2026-11-22"], [], ["2026-11-22"]]);
 		expect(week[0]).toMatchObject({ past: true });
 		expect(week[2]).toMatchObject({ relation: "today" });
 		expect(week[3]).toMatchObject({ relation: "tomorrow" });
@@ -352,6 +354,8 @@ describe("help and failures", () => {
 		expect(await code("today", "--frobnicate")).toBe("badArgument");
 		expect(await code("search", "x", "--project", "Отчёты")).toBe("badArgument");
 		expect(await code("week", "--days", "0")).toBe("badArgument");
+		expect(await code("week", "this", "--days", "3")).toBe("badArgument");
+		expect(await code("week", "next", "--days", "7")).toBe("badArgument");
 		expect(await code("today", "--project", "Отчёты", "--no-project")).toBe("badArgument");
 	});
 

@@ -31,6 +31,8 @@ export interface CorePorts {
 	readonly projects?: Projects;
 	/** What this device keeps of the Projects screen; kept in memory when left out. */
 	readonly projectsScreen?: ProjectsScreenStore;
+	/** The tasks file as it stands, before the reads tidy it: what the agents' program edits by; left out, the file as read. */
+	readonly storedTasks?: () => Promise<string | null>;
 	/** The models this host serves and how it asks them; none when left out (the door, the phone plugin). */
 	readonly models?: HostModels;
 }
@@ -55,6 +57,6 @@ export function composeCore(ports: CorePorts): Core {
 	const days = new DayServiceImpl(ports.clock, ports.settings, tasks, ports.ticker);
 	const calendars = new CalendarServiceImpl(files, ports.feeds, ports.clock, ports.settings, ports.timers, ports.work, { canMigrate: ports.isPhone });
 	const assistant = new AssistantServiceImpl({ tasks, steps: undo, settings: ports.settings, timers: ports.timers, models: ports.models });
-	const agent = new AgentReads({ tasks, days, calendars, assistant, screenSettings: new ScreenSettingsImpl(ports.settings), clock: ports.clock });
+	const agent = new AgentReads({ tasks, days, calendars, assistant, screenSettings: new ScreenSettingsImpl(ports.settings), clock: ports.clock, storedTasks: ports.storedTasks ?? (() => ports.tasksFile.read()) });
 	return { tasks, days, undo, calendars, assistant, agent };
 }

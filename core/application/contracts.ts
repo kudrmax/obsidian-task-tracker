@@ -424,6 +424,13 @@ export type ColumnSource = Pick<ScreenView, "day" | "soon" | "inbox" | "backlog"
 export type { TaskPlace } from "./taskPlaces";
 import type { TaskPlace } from "./taskPlaces";
 
+/** A task's line in the file as it stands, untidied: its section, its line from 0, and the line. */
+export interface StoredLine {
+	readonly section: SectionKey;
+	readonly line: number;
+	readonly raw: string;
+}
+
 /** An open task and where Max sees it. */
 export interface PlacedTask {
 	readonly item: TaskItem;
@@ -1412,7 +1419,7 @@ export interface TaskService {
 	projectNodeNamed(name: string): Promise<ProjectNodeMatch>;
 	/**
 	 * Every open task once (a task of two projects too), the file tidied first, under `filter` as `screen` filters: Inbox,
-	 * Backlog, Soon, today (Now's then Soon's in file order), then the later days by date, each with where Max sees it.
+	 * Backlog, Soon, today (Now's, then Soon's, each in file order), then the later days by date, each with where Max sees it.
 	 */
 	openTasks(filter?: ProjectsNodeId | null): Promise<readonly PlacedTask[]>;
 	/**
@@ -1643,6 +1650,12 @@ export interface TaskService {
 	remove(key: TaskKey): Promise<void>;
 	/** The task's line in the file, from 0, once the file is normalized: where Open in Obsidian puts the cursor. */
 	lineOf(key: TaskKey): Promise<number>;
+	/**
+	 * Where the task stands in `text`, the file as it is before today's tidy (on the disk, when no plugin has opened it
+	 * today): its section, its line from 0 and the line itself, found by who it is (`TaskItem.id`), wherever the tidy moved
+	 * or rewrote it. Null for a task the tidy made (a repeat's next copy) or one `text` lacks.
+	 */
+	storedLine(item: TaskItem, text: string): StoredLine | null;
 	/**
 	 * The task `key` names as the file now has it: its line at its place; moved, the one line like it anywhere; else the
 	 * task at its place whose text is `text`, its other fields changed there. Null when none of these is found.

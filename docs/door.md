@@ -540,11 +540,14 @@ core, never building them themselves:
   (`"отчёты"` → `"project:Отчёты"`), `candidates` empty; a name the tree lacks: `node` null, `candidates` up to five
   project names the search's match finds closest, best first. No tasks file: `{ node: null, candidates: [] }`.
 - `tasks.openTasks(filter?)`: every open task once (a task of two projects once), each `{ item, place }`, the file tidied
-  first, under `filter` as `tasks.screen` filters: Inbox, Backlog, Soon, today (Now's and Soon's in file order), then the
+  first, under `filter` as `tasks.screen` filters: Inbox, Backlog, Soon, today (Now's, then Soon's, each in file order), then the
   later days by date. No tasks file: `[]`.
 - `tasks.projectHistory(node)`: a live project's closed tasks By project (`ProjectsSection`s: its own, then each
   subproject's with Subprojects on), as a done project's `tasks.projectsScreen(node)` draws them; `[]` for a done project
   (its screen shows them already), a name the tree lacks, or no tasks file.
+- `tasks.storedLine(item, text)`: where the task stands in `text`, the file as it is before today's tidy (on disk, when
+  no plugin has opened it today): `{ section, line, raw }`, found by `TaskItem.id` wherever the tidy moved or rewrote it;
+  `null` for a line only the tidy makes (a repeat's next copy) or a task `text` lacks.
 - A slot after midnight stands on the night it belongs to everywhere: `TaskItem.day`, `tasks.screenOf`, `tasks.reveal`,
   `tasks.placeOf` and the menus' Today/Tomorrow read a slot's day by the day's start, as the timeline does (00:30 on the
   19th, the day starting at 5, is the 18th's). Before, they took the slot's calendar date and opened the next day.

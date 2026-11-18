@@ -1,4 +1,4 @@
-import { type ColumnList, type ColumnSource, listView, type PlacedTask, type ProjectNodeMatch, type ProjectsSection, type TaskPlace, type ColumnSections, DESCRIPTION_TEMPLATE, type DropColumn, type DaySpan, type DayView, type DraftMarks, type ResizeEdge, type StretchSpan, type CreatedTask, type DroppedTask, type DropFrom, type DropLanding, type DropOrigin, type DropPreview, type DropTo, type EndList, type FullTree, type GroupedList, type ListSection, type NewTaskPlace, type Placement, type RepeatRule, type ScreenView, type SearchGroup, type SectionKey, type SectionOffer, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type TaskMenuModel, type TaskService, type MenuFrom, type MenuScreen, type MenuStatusId, type PickedTask, type ProjectsView, type ProjectsDropPreview, type FunnelView, type ViewChoice } from "../../core/application/contracts";
+import { type StoredLine, type ColumnList, type ColumnSource, listView, type PlacedTask, type ProjectNodeMatch, type ProjectsSection, type TaskPlace, type ColumnSections, DESCRIPTION_TEMPLATE, type DropColumn, type DaySpan, type DayView, type DraftMarks, type ResizeEdge, type StretchSpan, type CreatedTask, type DroppedTask, type DropFrom, type DropLanding, type DropOrigin, type DropPreview, type DropTo, type EndList, type FullTree, type GroupedList, type ListSection, type NewTaskPlace, type Placement, type RepeatRule, type ScreenView, type SearchGroup, type SectionKey, type SectionOffer, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type TaskMenuModel, type TaskService, type MenuFrom, type MenuScreen, type MenuStatusId, type PickedTask, type ProjectsView, type ProjectsDropPreview, type FunnelView, type ViewChoice } from "../../core/application/contracts";
 import { carriedWith, menuOffer, taskMenu, tileStatus, toggledPriority } from "../../core/application/menus";
 import type { Clock } from "../../core/application/ports";
 import { dropMoves, readDrop } from "../../core/application/drops";
@@ -297,6 +297,11 @@ export class DemoTaskService implements TaskService {
 
 	async placeOf(item: TaskItem): Promise<TaskPlace> {
 		return item.open ? placeOfScreen(await this.screenOf(item), this.today()) : { kind: "done" };
+	}
+
+	/** The board's file is never untidy: a task stands where it is read. */
+	storedLine(item: TaskItem): StoredLine | null {
+		return { section: item.key.section, line: item.key.index, raw: item.key.raw };
 	}
 
 	ridesNow(item: TaskItem, day: LocalDate): boolean {

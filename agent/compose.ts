@@ -22,8 +22,10 @@ export const DEFAULT_VAULT = join(homedir(), "Obsidian");
 export async function composeAgent(host: AgentHost): Promise<AgentReads> {
 	const settings = await settingsAt(join(host.vault, SETTINGS_FILE));
 	const tasksPath = tasksFilePath(settings.get());
+	const tasksFile = new ReadOnlyTaskFile(tasksPath === null ? null : join(host.vault, tasksPath));
 	const core = composeCore({
-		tasksFile: new ReadOnlyTaskFile(tasksPath === null ? null : join(host.vault, tasksPath)),
+		tasksFile,
+		storedTasks: () => tasksFile.stored(),
 		settings,
 		clock: host.clock ?? systemClock,
 		ticker: NO_TICKS,

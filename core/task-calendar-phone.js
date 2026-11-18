@@ -6596,7 +6596,7 @@ ${key.title}`.toLowerCase();
   function sectionsOf2(doc, list) {
     return doc.groups(list).filter((g) => g.heading || g.entries.length > 0).map((g) => ({ id: g.name === null || g.id === null ? NO_SECTION_ID : g.id, name: g.name, empty: g.name !== null && g.entries.length === 0 }));
   }
-  var OPEN_ORDER = ["inbox", "backlog", "soon", "now"];
+  var OPEN_ORDER = ["inbox", "backlog", "now", "soon"];
   var MOST_CANDIDATES = 5;
   var MOST_TYPOS = 2;
   var TYPO_SHARE = 4;
@@ -6730,10 +6730,7 @@ ${key.title}`.toLowerCase();
     /** The screen of `date`, only the tasks `filter` lets through (`TaskService.screen`). */
     screen(s, date, filter) {
       const { doc, today, boundary } = s;
-      const tree = projectTreeOf(doc);
-      const node = filterNode(filter, tree);
-      const shows = node === null ? () => true : filterTest(node, tree, doc, this.subprojects());
-      const item = this.itemOf(today, doc, node === null || projectOfNode(node) === null);
+      const { shows, item } = this.filtered(s, filter);
       const shown2 = (entries) => entries.filter(shows).map(item);
       const day = { date, list: shown2(dayList(doc, date, today, boundary)), slotted: shown2(slottedOn(doc, date, boundary)) };
       const sections = this.listSections(s);
@@ -6904,6 +6901,12 @@ ${key.title}`.toLowerCase();
     lineOfRead(key) {
       return { reads: true, tidies: true, answer: (s) => this.lineOf(s.text, key) };
     }
+    /** Where the task stands in `text` as it is, untidied: the line its id has there (`TaskService.storedLine`). */
+    storedLine(item, text) {
+      const doc = this.rules.parse(text);
+      const entry = flatten(doc.allTasks()).find((e) => e.id === item.id);
+      return entry ? { section: entry.section, line: doc.lineOf(entry), raw: entry.raw } : null;
+    }
     /** The task's line in the file as it stands, unnormalized, from 0. */
     lineOf(text, key) {
       const doc = this.rules.parse(text);
@@ -6963,10 +6966,7 @@ ${key.title}`.toLowerCase();
     }
     openTasks(s, filter) {
       const { doc, today, boundary } = s;
-      const tree = projectTreeOf(doc);
-      const node = filterNode(filter, tree);
-      const shows = node === null ? () => true : filterTest(node, tree, doc, this.subprojects());
-      const item = this.itemOf(today, doc, node === null || projectOfNode(node) === null);
+      const { shows, item } = this.filtered(s, filter);
       const open = OPEN_ORDER.flatMap((list) => doc.tasks(list)).filter((entry) => isOpen(entry.task.status) && shows(entry));
       const placed = open.map((entry) => ({ item: item(entry), place: placeOfTask(entry.section, entry.task, true, today, boundary) }));
       return placed.map((p, i) => ({ p, i, rank: funnelRank(p.place) })).sort((a, b) => a.rank < b.rank ? -1 : a.rank > b.rank ? 1 : a.i - b.i).map(({ p }) => p);
@@ -7019,6 +7019,16 @@ ${key.title}`.toLowerCase();
     /** The timeline's rules by the clock and the day's boundary now. */
     timeline() {
       return new TimelineSpans(this.rules.moment().boundary, this.clock.now());
+    }
+    /**
+     * What a read under `filter` shows (`TaskService.screen`'s filter): which tasks the node lets through, a subtask with its
+     * task, and how each is drawn, without the folder mark under a project.
+     */
+    filtered({ doc, today }, filter) {
+      const tree = projectTreeOf(doc);
+      const node = filterNode(filter, tree);
+      const shows = node === null ? () => true : filterTest(node, tree, doc, this.subprojects());
+      return { shows, item: this.itemOf(today, doc, node === null || projectOfNode(node) === null) };
     }
     /** The item of a task of `doc`, its subtasks below it, its projects as `doc`'s tree has them; `mark`, the card shows the folder mark. */
     itemOf(today, doc, mark = true) {
@@ -8536,6 +8546,7 @@ ${key.title}`.toLowerCase();
     columnView: (c, [screen, column]) => c.reads.columnView(screen, column),
     placeOf: (c, [item]) => c.reads.placeOf(KEPT(c), item),
     ridesNow: (c, [item, day]) => c.reads.ridesNow(item, day),
+    storedLine: (c, [item, text]) => c.reads.storedLine(item, text),
     projectNodeNamed: (c, [name]) => c.hasTasks() ? c.reads.projectNodeNamed(KEPT(c), name) : { node: null, candidates: [] },
     openTasks: (c, [filter]) => c.ask(c.reads.openTasksRead(filter)),
     projectHistory: (c, [node]) => c.ask(c.reads.projectHistoryRead(node)),

@@ -415,6 +415,7 @@ const TASKS: Readonly<Record<string, Handler>> = {
 	columnView: (c, [screen, column]) => c.reads.columnView(screen as A, column as A),
 	placeOf: (c, [item]) => c.reads.placeOf(KEPT(c), item as A),
 	ridesNow: (c, [item, day]) => c.reads.ridesNow(item as A, day as string),
+	storedLine: (c, [item, text]) => c.reads.storedLine(item as A, text as string),
 	projectNodeNamed: (c, [name]) => (c.hasTasks() ? c.reads.projectNodeNamed(KEPT(c), name as string) : { node: null, candidates: [] }),
 	openTasks: (c, [filter]) => c.ask(c.reads.openTasksRead(filter as A)),
 	projectHistory: (c, [node]) => c.ask(c.reads.projectHistoryRead(node as string)),

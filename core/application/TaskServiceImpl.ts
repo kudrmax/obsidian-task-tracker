@@ -7,6 +7,7 @@ import {
 	TasksFileMissingError,
 	type ColumnSections,
 	type ColumnList,
+	type StoredLine,
 	type ColumnSource,
 	type PlacedTask,
 	type ProjectNodeMatch,
@@ -444,6 +445,10 @@ export class TaskServiceImpl implements TaskService {
 
 	async placeOf(item: TaskItem): Promise<TaskPlace> {
 		return this.reads.placeOf(await this.snapshot(), item);
+	}
+
+	storedLine(item: TaskItem, text: string): StoredLine | null {
+		return this.reads.storedLine(item, text);
 	}
 
 	ridesNow(item: TaskItem, day: LocalDate): boolean {

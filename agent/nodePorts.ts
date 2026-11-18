@@ -30,11 +30,17 @@ async function textOf(path: string): Promise<string | null> {
  */
 export class ReadOnlyTaskFile implements TaskFileStore {
 	private text: Promise<string | null> | null = null;
+	private disk: Promise<string | null> | null = null;
 
 	constructor(private readonly path: string | null) {}
 
 	read(): Promise<string | null> {
-		return (this.text ??= this.path === null ? Promise.resolve(null) : textOf(this.path));
+		return (this.text ??= this.stored());
+	}
+
+	/** The file as the disk has it, whatever the tidy made of it in memory. */
+	stored(): Promise<string | null> {
+		return (this.disk ??= this.path === null ? Promise.resolve(null) : textOf(this.path));
 	}
 
 	async write(fn: (text: string) => string): Promise<void> {
