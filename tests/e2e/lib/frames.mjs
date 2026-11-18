@@ -5,7 +5,8 @@ import { sleep } from "./cdp.mjs";
 /**
  * What every frame showed, sampled in the page on each animation frame: each card and timeline block in sight (where,
  * how visible, its text and whether the text is cut), the pointer or finger, and any selected text. Read from the DOM as
- * it is painted, never from the code under test's own numbers.
+ * it is painted, never from the code under test's own numbers. While the day slides, the day is the one more in sight of
+ * its column (two copies stand there: the day going out and the day coming in).
  */
 const SAMPLER = String.raw`(() => {
 	const doc = document;
@@ -42,7 +43,7 @@ const SAMPLER = String.raw`(() => {
 			});
 		}
 		const sel = doc.getSelection();
-		state.frames.push({ t: Math.round(performance.now() - state.t0), day: doc.querySelector(".task-calendar .tc-day-title")?.textContent ?? null, items, pointer: state.pointer, selection: sel ? sel.toString().length : 0, track: (() => { const t = doc.querySelector(".tc-ribbon-track"); return t ? +t.getBoundingClientRect().left.toFixed(1) : null; })(), place: (() => { const t = doc.querySelector(".tc-ribbon-track"); const r = doc.querySelector(".tc-ribbon"); const cols = t ? t.querySelectorAll(":scope > .tc-stage-col") : []; if (!t || !r || cols.length < 2) return null; const step = cols[1].getBoundingClientRect().left - cols[0].getBoundingClientRect().left; return +((r.getBoundingClientRect().left - t.getBoundingClientRect().left) / step).toFixed(3); })() });
+		state.frames.push({ t: Math.round(performance.now() - state.t0), day: (() => { const titles = [...doc.querySelectorAll(".task-calendar .tc-day-title")]; if (titles.length < 2) return titles[0]?.textContent ?? null; const off = (el) => { const slide = el.closest(".tc-slide"); const col = el.closest(".tc-stage-col"); return slide && col ? Math.abs(slide.getBoundingClientRect().left - col.getBoundingClientRect().left) : 0; }; return titles.sort((a, b) => off(a) - off(b))[0].textContent; })(), items, pointer: state.pointer, selection: sel ? sel.toString().length : 0, track: (() => { const t = doc.querySelector(".tc-ribbon-track"); return t ? +t.getBoundingClientRect().left.toFixed(1) : null; })(), place: (() => { const t = doc.querySelector(".tc-ribbon-track"); const r = doc.querySelector(".tc-ribbon"); const cols = t ? t.querySelectorAll(":scope > .tc-stage-col") : []; if (!t || !r || cols.length < 2) return null; const step = cols[1].getBoundingClientRect().left - cols[0].getBoundingClientRect().left; return +((r.getBoundingClientRect().left - t.getBoundingClientRect().left) / step).toFixed(3); })() });
 		requestAnimationFrame(tick);
 	};
 	requestAnimationFrame(tick);

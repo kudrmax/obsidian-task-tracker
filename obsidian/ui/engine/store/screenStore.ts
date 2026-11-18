@@ -17,8 +17,11 @@ export interface ScreenState {
 	readonly shown: ScreenData;
 	/** The last read: the order the rows glide by (Motion's `layoutDependency`, stage 0 «Integration findings» 3). */
 	readonly read: ScreenData;
-	/** The day the screen turned away from, as it stood: drawn by the region sliding out while the new day slides in. */
-	readonly left: { readonly dayOffset: number; readonly shown: ScreenData; readonly read: ScreenData } | null;
+	/**
+	 * The days the screen turned away from, as they stood, by their offset: each region still sliding out draws its own
+	 * day, however fast the strokes came. The last few only: a region is gone within one slide.
+	 */
+	readonly left: Readonly<Record<number, { readonly shown: ScreenData; readonly read: ScreenData }>>;
 	/** The shown day, in days from today, and the way it last turned (the day's slide). */
 	readonly dayOffset: number;
 	readonly dayWay: -1 | 0 | 1;
@@ -61,6 +64,8 @@ export type Screen = ScreenState & ScreenActions;
 export type ScreenStore = StoreApi<Screen>;
 
 const MINUTE_MS = 60_000;
+/** Days kept for regions sliding out: as many as fast strokes can leave sliding at once. */
+const LEFT_KEPT = 4;
 
 /** One store per mounted screen, over its port (spec, «Screen state»). */
 export function createScreenStore(port: ScreenPort): ScreenStore {
@@ -93,13 +98,14 @@ export function createScreenStore(port: ScreenPort): ScreenStore {
 			const { dayOffset: from, shown, read } = get();
 			const dayOffset = from + shift;
 			const next = port.read(dayOffset);
-			set({ left: { dayOffset: from, shown, read }, dayOffset, dayWay: shift, read: next, shown: next, fresh: new Set() });
+			const kept = Object.entries(get().left).filter(([day]) => Math.abs(Number(day) - dayOffset) <= LEFT_KEPT);
+			set({ left: { ...Object.fromEntries(kept), [from]: { shown, read } }, dayOffset, dayWay: shift, read: next, shown: next, fresh: new Set() });
 		};
 
 		return {
 			shown: first,
 			read: first,
-			left: null,
+			left: {},
 			dayOffset: 0,
 			dayWay: 0,
 			stop: "calendar",

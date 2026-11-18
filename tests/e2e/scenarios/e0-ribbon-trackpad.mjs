@@ -35,19 +35,21 @@ export default {
 		await strokes(1, 1);
 		await is(["Today"], "on to the day's calendar");
 
-		let mid = null;
-		const day = await t.frames(async () => {
-			const stroke = t.input.stroke(at.x, at.y, 1);
-			await t.sleep(90);
-			mid = await t.cdp.eval(`[...document.querySelectorAll(".tc-day-title")].map((e) => e.textContent)`);
-			await stroke;
-			await t.sleep(750);
-		}, { cast: "day-slide", maxStep: 400, monotonic: "x" });
-		t.expect(JSON.stringify(mid) === JSON.stringify(["Today", "Tomorrow"]), `mid-slide the day going out still shows its own title beside the day coming in: ${JSON.stringify(mid)}`);
+		const day = await t.frames(() => strokes(1, 1), { cast: "day-slide", maxStep: 400, monotonic: "x" });
 		await is(["Tomorrow"], "a stroke on at the calendar turns to tomorrow");
 		t.expect(day.length === 0, `frames of the day sliding: ${JSON.stringify(day.slice(0, 5))}`);
 		await strokes(-1, 1);
 		await is(["Today"], "and back to today");
+
+		/** Mid-slide (turned by the key, so no probe runs inside a stroke's stream) the day going out still shows its own day. */
+		await t.cdp.send("Input.dispatchKeyEvent", { type: "keyDown", key: "ArrowRight", code: "ArrowRight", windowsVirtualKeyCode: 39 });
+		await t.cdp.send("Input.dispatchKeyEvent", { type: "keyUp", key: "ArrowRight", code: "ArrowRight", windowsVirtualKeyCode: 39 });
+		await t.sleep(60);
+		const mid = await t.cdp.eval(`[...document.querySelectorAll(".tc-day-title")].map((e) => e.textContent)`);
+		t.expect(JSON.stringify(mid) === JSON.stringify(["Today", "Tomorrow"]), `mid-slide the day going out still shows its own title beside the day coming in: ${JSON.stringify(mid)}`);
+		await t.sleep(700);
+		await strokes(-1, 1);
+		await is(["Today"], "back to today again");
 
 		const vertical = await t.frames(async () => {
 			for (let i = 0; i < 20; i++) {

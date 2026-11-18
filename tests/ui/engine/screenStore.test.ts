@@ -123,6 +123,20 @@ describe("the screen's store", () => {
 	});
 });
 
+describe("the day's slide", () => {
+	it("keeps every day still sliding out, however fast the strokes came", () => {
+		const { store } = screen();
+		store.getState().step(1);
+		store.getState().step(1);
+		store.getState().step(-1);
+		const { left, dayOffset } = store.getState();
+		expect(dayOffset).toBe(1);
+		expect(left[0].shown.day.title).toBe("Today");
+		expect(left[2].shown.day.title).not.toBe("Tomorrow");
+		expect(left[1].shown.day.title).toBe("Tomorrow");
+	});
+});
+
 describe("structural sharing", () => {
 	it("keeps every equal part's identity and replaces only what changed", () => {
 		const prev = { a: { x: 1 }, b: [{ y: 2 }, { y: 3 }], c: "z" };

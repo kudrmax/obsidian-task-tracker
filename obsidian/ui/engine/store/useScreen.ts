@@ -32,7 +32,7 @@ export const DayContext = createContext<number | null>(null);
 export function useData<T>(select: (data: ScreenData) => T, read = false): T {
 	const day = useContext(DayContext);
 	return useScreen((s) => {
-		const left = day !== null && day !== s.dayOffset && s.left?.dayOffset === day ? s.left : null;
+		const left = day !== null && day !== s.dayOffset ? (s.left[day] ?? null) : null;
 		return select(left ? (read ? left.read : left.shown) : read ? s.read : s.shown);
 	});
 }
