@@ -1,6 +1,6 @@
-import { closestCorners, DndContext, defaultDropAnimationSideEffects, type DragEndEvent, DragOverlay, type DragStartEvent, type DropAnimation, MouseSensor, TouchSensor, useSensor, useSensors } from "@dnd-kit/core";
+import { closestCorners, DndContext, defaultDropAnimationSideEffects, useDndContext, type DragEndEvent, DragOverlay, type DragStartEvent, type DropAnimation, MouseSensor, TouchSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
+import { CSS, getEventCoordinates } from "@dnd-kit/utilities";
 import { type CSSProperties, memo, type ReactNode, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Destination, ListId } from "../port";
@@ -29,10 +29,16 @@ const DROP_ANIMATION: DropAnimation = {
 	sideEffects: defaultDropAnimationSideEffects({ className: { dragOverlay: "is-dropping" }, styles: { active: { opacity: "0" } } }),
 };
 
-/** Where the pointer took the card, from the card's left edge: the carried plate is drawn around it. */
-function grabOffset(event: Event, left: number): number {
-	const x = "touches" in event ? ((event as TouchEvent).touches[0]?.clientX ?? left) : (event as MouseEvent).clientX;
-	return x - left;
+/**
+ * The carried card, told where the pointer took it from the card's left edge, so the plate is drawn around that point:
+ * the pressing event and the lifted card's measured box are dnd-kit's own (`useDndContext`, as its `snapCenterToCursor`
+ * modifier reads them).
+ */
+function Carried({ id, carried }: { readonly id: string; readonly carried: DragProps["carried"] }) {
+	const { activatorEvent, activeNodeRect } = useDndContext();
+	const at = activatorEvent ? getEventCoordinates(activatorEvent) : null;
+	const grab = at && activeNodeRect ? at.x - activeNodeRect.left : 0;
+	return <>{carried(id, grab)}</>;
 }
 
 export interface DragProps {
@@ -49,12 +55,10 @@ export function Drag({ doc, carried, onLift, children }: DragProps) {
 	const api = useScreenApi();
 	const sensors = useSensors(useSensor(MouseSensor, { activationConstraint: { distance: MOUSE_DISTANCE_PX } }), useSensor(TouchSensor, { activationConstraint: { delay: LONG_PRESS_MS, tolerance: LONG_PRESS_TOLERANCE_PX } }));
 	const [active, setActive] = useState<string | null>(null);
-	const [grab, setGrab] = useState(0);
 
-	const start = ({ active: lifted, activatorEvent }: DragStartEvent) => {
+	const start = ({ active: lifted }: DragStartEvent) => {
 		const screen = api.getState();
 		if (!screen.claim("drag")) return;
-		setGrab(grabOffset(activatorEvent, lifted.rect.current.initial?.left ?? 0));
 		screen.lift(String(lifted.id));
 		setActive(String(lifted.id));
 		onLift();
@@ -73,7 +77,7 @@ export function Drag({ doc, carried, onLift, children }: DragProps) {
 			{children}
 			{createPortal(
 				<DragOverlay className="tc-overlay" dropAnimation={DROP_ANIMATION}>
-					{active ? carried(active, grab) : null}
+					{active ? <Carried id={active} carried={carried} /> : null}
 				</DragOverlay>,
 				doc.body,
 			)}
