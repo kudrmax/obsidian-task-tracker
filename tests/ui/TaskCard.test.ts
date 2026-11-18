@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
 import type { TaskItem } from "../../core/application/contracts";
+import { listView } from "../../core/application/contracts";
 import { RenamedTexts } from "../../obsidian/ui/RenamedTexts";
 import { markColours, renderTaskCard } from "../../obsidian/ui/TaskCard";
 import { TaskList } from "../../obsidian/ui/TaskList";
@@ -162,7 +163,7 @@ describe("a task with subtasks", () => {
 		const tree = [item({ text: "A", subtasks: [sub("A1", [sub("A11")]), sub("A2")] }), item({ text: "B" })];
 		const subtrees = new Map<string, string[]>();
 		const list = new TaskList(document.createElement("div"), {
-			items: () => tree,
+			list: () => listView(tree, false),
 			day: () => null,
 			onCard: (_card, task, subtree) => subtrees.set(task.text, subtree.map((c) => c.textContent ?? "")),
 		});
@@ -182,7 +183,7 @@ describe("a task with subtasks", () => {
 	it("runs a branch from each task to its subtasks, bending in at the last, and the task's line on past its subtasks' own", () => {
 		const sub = (text: string, subtasks: TaskItem[] = []) => item({ text, subtasks, parentText: "p" });
 		const tree = [item({ text: "A", subtasks: [sub("A1", [sub("A11"), sub("A12")]), sub("A2", [sub("A21")])] }), item({ text: "B" })];
-		const list = new TaskList(document.createElement("div"), { items: () => tree, day: () => null });
+		const list = new TaskList(document.createElement("div"), { list: () => listView(tree, false), day: () => null });
 		list.render();
 		const lines = (card: HTMLElement) => [
 			card.querySelector(".tc-branch")?.className ?? null,

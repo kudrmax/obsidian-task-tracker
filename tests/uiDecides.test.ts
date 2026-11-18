@@ -40,6 +40,7 @@ const DECISIONS: readonly { readonly name: string; readonly pattern: RegExp }[] 
 	{ name: "a task's section compared", pattern: /\.group\s*[!=]==|[!=]==\s*(?:\w+\.)*group\b(?!\s*\.)/g },
 	{ name: "whether a task's subtasks are folded", pattern: tested("collapsed") },
 	{ name: "whether a task has a due date", pattern: tested("dueDate", false) },
+	{ name: "a column's sections chained by hand (`TaskService.columnView` gives the list in them)", pattern: /\.columnSections\s*\(|\blistView\s*\((?![^;]*,\s*false\s*\))/g },
 	{ name: "a task's fields taken apart to decide", pattern: /\{[^}]*\b(?:list|status|priority|dueDate|isSubtask|open)\b[^}]*\}\s*=\s*(?:\w+\.)*(?:item|task)\b/g },
 ];
 
@@ -118,6 +119,9 @@ describe("the UI decides nothing", () => {
 		expect(hitsIn("if (date === this.today()) a(); if (this.deps.today() !== day) b();")).toEqual(["1: a day compared with today", "1: a day compared with today"]);
 		expect(hitsIn("this.select(this.today());")).toEqual([]);
 		expect(hitsIn("switch (item.status) {")).toEqual(["1: a task's status switched on"]);
+		expect(hitsIn('const shown = tasks.columnSections("day", date);')).toHaveLength(1);
+		expect(hitsIn("listView(items, this.deps.grouped?.() ?? false, this.deps.sections?.() ?? []);")).toHaveLength(1);
+		expect(hitsIn("list: () => listView(host.ribbon.done(), false),")).toEqual([]);
 		expect(hitsIn("if (LISTS.includes(item.list)) go();")).toEqual(["1: whether a task's list is one of these"]);
 		expect(hitsIn("if (!item.open) go(); if (!this.panel.open) stay();")).toEqual(["1: whether a task is closed"]);
 		expect(hitsIn("const { list, status } = item;")).toEqual(["1: a task's fields taken apart to decide"]);

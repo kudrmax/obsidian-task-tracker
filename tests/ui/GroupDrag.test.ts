@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { GroupName, TaskItem } from "../../core/application/contracts";
+import { listView } from "../../core/application/contracts";
 import { GroupDrag, nearestSlot } from "../../obsidian/ui/drag/GroupDrag";
 import { GestureArbiter } from "../../obsidian/ui/gestures";
 import { TaskList } from "../../obsidian/ui/TaskList";
@@ -44,7 +45,7 @@ describe("a section carried (block 3)", () => {
 	it("moves the mark only when the slot changes", () => {
 		vi.useFakeTimers();
 		const items = [item(0, "A"), item(1, "B"), item(2, "C")];
-		const list = new TaskList(document.createElement("div"), { items: () => items, day: () => null, grouped: () => true, ungroupedName: () => "No section" });
+		const list = new TaskList(document.createElement("div"), { list: () => listView(items, true), day: () => null, ungroupedName: () => "No section" });
 		document.body.appendChild(list.el);
 		list.render();
 		list.elements.forEach((node, i) => (node.getBoundingClientRect = () => new DOMRect(10, 100 + i * 40, 175, 35)));

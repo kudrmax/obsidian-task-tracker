@@ -1,4 +1,4 @@
-import { DescriptionDraft, type EntryState, type FullTree, QuickEntrySession, SHOWN_LISTS, samePlace, type TaskItem, type TaskKey, type TaskService, type UndoService } from "../../../core/application/contracts";
+import { DescriptionDraft, type EntryState, type FullTree, listView, QuickEntrySession, SHOWN_LISTS, samePlace, type TaskItem, type TaskKey, type TaskService, type UndoService } from "../../../core/application/contracts";
 import { BottomCapsule } from "../BottomCapsule";
 import { DURATION, tokenMs } from "../design";
 import { clear, el } from "../dom";
@@ -119,7 +119,7 @@ export class FullScreen {
 		this.projectText = el(this.projectButton, "span", "tc-full-project-text");
 		this.projectButton.addEventListener("click", () => this.openProject());
 		this.list = new TaskList(el(column, "div", "tc-full-list"), {
-			items: () => this.tree?.subtasks ?? [],
+			list: () => listView(this.tree?.subtasks ?? [], false),
 			day: () => this.deps.day(),
 			entry: () => this.listEntry(),
 			renaming: () => this.renamedCard()?.key ?? null,
