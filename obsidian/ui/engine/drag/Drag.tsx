@@ -56,7 +56,14 @@ const DROP_ANIMATION: DropAnimation = {
  */
 function Carried({ id, carried }: { readonly id: string; readonly carried: DragProps["carried"] }) {
 	const { activatorEvent, activeNodeRect } = useDndContext();
-	const landing = useScreen((s) => s.liftedDepth ?? 0);
+	/**
+	 * The level the card lands at, as it stood when it was let go: the drop clears the carried level at once, while the copy
+	 * still flies into its place, and the copy keeps the level it flies to.
+	 */
+	const level = useScreen((s) => (s.lifted === null ? null : (s.liftedDepth ?? 0)));
+	const landingRef = useRef(0);
+	if (level !== null) landingRef.current = level;
+	const landing = landingRef.current;
 	/**
 	 * Where the pointer took the card is a fact of the lift: kept from the first measure of the lifted card. dnd-kit
 	 * measures the card again wherever it stands later (in another list it is another row), and that box no longer says
