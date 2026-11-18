@@ -1,4 +1,4 @@
-import { type ColumnSections, DESCRIPTION_TEMPLATE, type DropColumn, type DaySpan, type DayView, type DraftMarks, type ResizeEdge, type StretchSpan, type CreatedTask, type DroppedTask, type DropFrom, type DropLanding, type DropOrigin, type DropPreview, type DropTo, type EndList, type FullTree, type GroupedList, type ListSection, type NewTaskPlace, type Placement, type RepeatRule, type ScreenView, type SearchGroup, type SectionKey, type SectionOffer, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type TaskMenuModel, type TaskService, type MenuFrom, type MenuScreen, type MenuStatusId, type PickedTask, type ProjectsView, type ProjectsDropPreview, type FunnelView, type ViewChoice } from "../../core/application/contracts";
+import { type ColumnList, type ColumnSource, listView, type PlacedTask, type ProjectNodeMatch, type ProjectsSection, type TaskPlace, type ColumnSections, DESCRIPTION_TEMPLATE, type DropColumn, type DaySpan, type DayView, type DraftMarks, type ResizeEdge, type StretchSpan, type CreatedTask, type DroppedTask, type DropFrom, type DropLanding, type DropOrigin, type DropPreview, type DropTo, type EndList, type FullTree, type GroupedList, type ListSection, type NewTaskPlace, type Placement, type RepeatRule, type ScreenView, type SearchGroup, type SectionKey, type SectionOffer, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type TaskMenuModel, type TaskService, type MenuFrom, type MenuScreen, type MenuStatusId, type PickedTask, type ProjectsView, type ProjectsDropPreview, type FunnelView, type ViewChoice } from "../../core/application/contracts";
 import { carriedWith, menuOffer, taskMenu, tileStatus, toggledPriority } from "../../core/application/menus";
 import type { Clock } from "../../core/application/ports";
 import { dropMoves, readDrop } from "../../core/application/drops";
@@ -7,6 +7,7 @@ import { dayMonth } from "../../core/application/dayLabels";
 import { keyId } from "../../core/application/taskKeys";
 import { NO_SECTION_ID } from "../../core/application/sections";
 import { fullTree } from "../../core/application/fullTree";
+import { placeOfScreen } from "../../core/application/taskPlaces";
 import { droppedSpan, TimelineSpans } from "../../core/application/TimelineSpans";
 import { DayBoundary } from "../../core/domain/DayBoundary";
 import { ProjectTree } from "../../core/domain/ProjectTree";
@@ -183,7 +184,7 @@ export class DemoTaskService implements TaskService {
 			projects: [],
 			list: section,
 			isSubtask: false,
-			day: dayOfTask(section, t, this.today()),
+			day: dayOfTask(section, t, this.today(), this.boundary()),
 			repeatDay: t.dueDate ?? t.slot?.date ?? this.today(),
 			can: { postpone: canPostpone(section), removeDue: canRemoveDue(t.dueDate, this.today()), remind: canRemind(t.slot), setPriority: true, setLabels: t.priority == null, stop: (t.repeat ?? null) !== null && section !== "done" && (t.status === "todo" || t.status === "inProgress"), addDescription: (t.description ?? null) === null, fold: false, resize: t.slot != null, setProject: true, firstStep: t.status === "todo" || t.status === "inProgress" },
 			drawnOn: null,
@@ -286,6 +287,33 @@ export class DemoTaskService implements TaskService {
 		if (column !== "day") return { list: column, date: null };
 		const { list, date: day, sections } = this.dayColumn(date);
 		return sections ? { list, date: day } : null;
+	}
+
+	columnView(screen: ColumnSource, column: DropColumn): ColumnList {
+		const sections = this.columnSections(column, screen.day.date);
+		const items = column === "day" ? screen.day.list : screen[column];
+		return { sections, ...listView(items, sections !== null, sections ? screen.sections[sections.list] : []) };
+	}
+
+	async placeOf(item: TaskItem): Promise<TaskPlace> {
+		return item.open ? placeOfScreen(await this.screenOf(item), this.today()) : { kind: "done" };
+	}
+
+	ridesNow(item: TaskItem, day: LocalDate): boolean {
+		return this.timeline().ridesNow({ slot: item.slot!, open: item.open }, day);
+	}
+
+	/** The board has no projects. */
+	async projectNodeNamed(): Promise<ProjectNodeMatch> {
+		return { node: null, candidates: [] };
+	}
+
+	async openTasks(): Promise<readonly PlacedTask[]> {
+		return [];
+	}
+
+	async projectHistory(): Promise<readonly ProjectsSection[]> {
+		return [];
 	}
 
 	/** The board's tasks have no subtasks, and the pixel comparison makes none. */

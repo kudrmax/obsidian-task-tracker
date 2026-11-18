@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { DayBoundary } from "../../core/domain/DayBoundary";
 import { canPostpone, canRemoveDue, dayColumn, dayOfPlacement, dayOfTask, dayRelation, placementOfDay, taskScreen } from "../../core/domain/Days";
 
 const TODAY = "2026-11-01";
@@ -35,10 +36,19 @@ describe("dayOfPlacement", () => {
 
 describe("dayOfTask", () => {
 	it("a slot's day first, then today for Now, then the due date", () => {
-		expect(dayOfTask("soon", { slot: { date: "2026-11-04", start: 600, end: 660 }, dueDate: "2026-11-09" }, TODAY)).toBe("2026-11-04");
-		expect(dayOfTask("now", { slot: null, dueDate: null }, TODAY)).toBe(TODAY);
-		expect(dayOfTask("soon", { slot: null, dueDate: "2026-11-09" }, TODAY)).toBe("2026-11-09");
-		expect(dayOfTask("soon", { slot: null, dueDate: null }, TODAY)).toBeNull();
+		const midnight = DayBoundary.MIDNIGHT;
+		expect(dayOfTask("soon", { slot: { date: "2026-11-04", start: 600, end: 660 }, dueDate: "2026-11-09" }, TODAY, midnight)).toBe("2026-11-04");
+		expect(dayOfTask("now", { slot: null, dueDate: null }, TODAY, midnight)).toBe(TODAY);
+		expect(dayOfTask("soon", { slot: null, dueDate: "2026-11-09" }, TODAY, midnight)).toBe("2026-11-09");
+		expect(dayOfTask("soon", { slot: null, dueDate: null }, TODAY, midnight)).toBeNull();
+	});
+
+	it("puts a slot after midnight on the night of the day before, as the timeline does: 00:30 on the 5th, the day starting at 5, is the 4th's", () => {
+		const five = new DayBoundary(5);
+		const slot = { date: "2026-11-05", start: 30, end: 90 };
+		expect(dayOfTask("soon", { slot, dueDate: null }, TODAY, five)).toBe("2026-11-04");
+		expect(dayOfTask("soon", { slot, dueDate: null }, TODAY, five)).toBe(five.dayOfSlot(slot));
+		expect(dayOfTask("soon", { slot: { ...slot, start: 5 * 60 }, dueDate: null }, TODAY, five)).toBe("2026-11-05");
 	});
 });
 

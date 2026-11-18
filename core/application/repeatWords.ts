@@ -22,6 +22,12 @@ export function repeatValue(rule: RepeatRule): string | null {
 	return capital(every);
 }
 
+/** A rule in a sentence, where no row draws the week's letters: `repeatValue`, and weeks on a schedule `Every week on Mon, Wed`. */
+export function repeatSentence(rule: RepeatRule): string {
+	const { every, on } = repeatParts(rule);
+	return repeatValue(rule) ?? `${capital(every)} ${on}`;
+}
+
 /** The words of the repeat page: its kinds, its units after Every, and the weekdays, short and whole, Monday first. */
 export const REPEAT_WORDS: {
 	readonly kinds: Readonly<Record<RepeatKind, string>>;

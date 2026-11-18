@@ -1,6 +1,7 @@
 import type { TaskItem } from "../../core/application/contracts";
 import { markColors } from "../../core/application/marks";
 import { keyId } from "../../core/application/taskKeys";
+import { DayBoundary } from "../../core/domain/DayBoundary";
 import { canPostpone, canRemoveDue, dayOfTask } from "../../core/domain/Days";
 import { canRemind, type LocalDate } from "../../core/domain/Task";
 import { plainText } from "../../core/domain/TaskText";
@@ -24,7 +25,7 @@ export function onDay(item: Omit<TaskItem, "day" | "repeatDay" | "can" | "title"
 		allSubtasks: item.subtasks,
 		title: plainText(item.text),
 		durationMin: item.slot && item.slot.end !== null ? item.slot.end - item.slot.start : null,
-		day: dayOfTask(item.list, item, today),
+		day: dayOfTask(item.list, item, today, DayBoundary.MIDNIGHT),
 		repeatDay: item.dueDate ?? item.slot?.date ?? today,
 		can: { postpone: canPostpone(item.list), removeDue: canRemoveDue(item.dueDate, today), remind: canRemind(item.slot), setPriority: (item.labels ?? []).length === 0, setLabels: item.priority === null, stop: item.repeat !== null && item.repeatable, addDescription: item.description === null, fold: item.subtasks.length > 0, resize: item.slot !== null, setProject: !item.isSubtask, firstStep: item.open },
 		...item,

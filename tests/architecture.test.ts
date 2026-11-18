@@ -322,6 +322,7 @@ const CONTRACT_RUNTIME: Readonly<Record<string, string>> = {
 	allColumnsWidthAt: "./listWidth",
 	DIVIDER_SNAP: "./listWidth",
 	repeatValue: "./repeatWords",
+	repeatSentence: "./repeatWords",
 	onTheDay: "./repeatWords",
 	REPEAT_WORDS: "./repeatWords",
 	dayMonth: "./dayLabels",
