@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
-import { type DropColumn, viewLayout, type ViewMode } from "../../core/application/contracts";
+import { type DropColumn, listView, viewLayout, type ViewMode } from "../../core/application/contracts";
 import { DemoTaskService } from "../fakes/DemoTaskService";
 import { GestureArbiter } from "../../obsidian/ui/gestures";
 import type { FunnelListDeps } from "../../obsidian/ui/layouts/FunnelLists";
@@ -11,10 +11,8 @@ import { ProjectTasks } from "../../obsidian/ui/projects/ProjectTasks";
 import { EdgeTrack } from "../../obsidian/ui/ScreenTracks";
 
 const lists: FunnelListDeps = {
-	items: () => [],
+	column: () => ({ sections: null, ...listView([], false) }),
 	day: () => "2026-11-12",
-	sectionsOf: () => null,
-	listSections: () => [],
 	naming: () => null,
 	entry: () => null,
 	plate: () => "No tasks",

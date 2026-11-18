@@ -37,6 +37,11 @@ export class TimelineSpans {
 		return { start: now, end: own.end === null ? null : now + own.end - own.start };
 	}
 
+	/** On today, an open task whose start has passed: its card rides the now line, off its own start (`shown`). */
+	ridesNow(task: SlottedTask, day: LocalDate): boolean {
+		return this.shown(task, day).start !== this.boundary.spanOf(task.slot, day).start;
+	}
+
 	/**
 	 * The card while a dot is held at `minute`: the end no earlier than the start nor past the day; the start no earlier
 	 * than the day nor past the end, and on a task without a duration no later than its start, which becomes the end.

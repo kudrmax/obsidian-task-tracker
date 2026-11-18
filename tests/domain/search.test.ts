@@ -1,9 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { FuzzyQuery, matchParts, plainDescription, snippetParts } from "../../core/domain/search";
+import { FuzzyQuery, lettersApart, matchParts, plainDescription, snippetParts } from "../../core/domain/search";
 
 function query(text: string): FuzzyQuery {
 	return FuzzyQuery.of(text)!;
 }
+
+describe("lettersApart", () => {
+	it("counts the letters a typo changes, case and accents aside", () => {
+		expect(lettersApart("Окружение в Сербб", "Окружение в Сербии")).toBe(2);
+		expect(lettersApart("отчеты", "Отчёты")).toBe(0);
+		expect(lettersApart("Дом", "Отчёты")).toBe(6);
+		expect(lettersApart("", "abc")).toBe(3);
+	});
+});
 
 describe("FuzzyQuery", () => {
 	it("finds the query's words in their order, each a part of a word", () => {

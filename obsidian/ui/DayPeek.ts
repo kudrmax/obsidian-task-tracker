@@ -1,4 +1,4 @@
-import type { CalendarService, DayBoundary, DayEvents, DayRelation, DayView, ListSection, ProjectsNodeId, TaskService } from "../../core/application/contracts";
+import type { CalendarService, ColumnList, DayBoundary, DayEvents, DayRelation, DayView, ProjectsNodeId, TaskService } from "../../core/application/contracts";
 import { renderAllDayRows } from "./AllDayRow";
 import { PROPERTY } from "./design";
 import { el } from "./dom";
@@ -16,8 +16,8 @@ export interface DayPeekDeps {
 	boundary(): DayBoundary;
 	hourPx(): number;
 	now(): Date;
-	/** The groups of the list whose sections the day's column shows, where its empty sections stand; null when it shows none. */
-	sections(date: LocalDate): readonly ListSection[] | null;
+	/** The day's list as its column draws it (`TaskService.columnView`); `day` null: the day not read yet, its list empty. */
+	column(date: LocalDate, day: DayView | null): ColumnList;
 	ungroupedName(): string;
 	/** How far the shown day's list is scrolled: the next day's opens there too. */
 	listScroll(): number;
@@ -78,10 +78,8 @@ export class DayPeek {
 		this.left = el(this.el, "div", "tc-left");
 		const frames = deps.frames?.() ?? null;
 		this.list = new TaskList(el(this.left, "div"), {
-			items: () => this.day?.list ?? [],
+			list: () => deps.column(date, this.day),
 			day: () => date,
-			grouped: () => deps.sections(date) !== null,
-			sections: () => deps.sections(date) ?? [],
 			ungroupedName: () => deps.ungroupedName(),
 			emptyLabel: () => deps.emptyLabel?.() ?? "",
 		});

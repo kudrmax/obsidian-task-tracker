@@ -39,6 +39,22 @@ export function foldedText(text: string): string {
 	return folded(text);
 }
 
+/**
+ * How many letters set one text apart from another (Levenshtein's distance), case and accents aside: a typo in a name is
+ * one or two («Сербб» for «Сербии» is two).
+ */
+export function lettersApart(a: string, b: string): number {
+	const x = [...folded(a.trim())];
+	const y = [...folded(b.trim())];
+	let row = Array.from({ length: y.length + 1 }, (_, j) => j);
+	for (let i = 1; i <= x.length; i++) {
+		const next = [i];
+		for (let j = 1; j <= y.length; j++) next.push(Math.min(row[j] + 1, next[j - 1] + 1, row[j - 1] + (x[i - 1] === y[j - 1] ? 0 : 1)));
+		row = next;
+	}
+	return row[y.length];
+}
+
 function folded(text: string): string {
 	let out = "";
 	for (let i = 0; i < text.length; i++) out += foldedChar(text.charAt(i));

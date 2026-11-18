@@ -90,7 +90,7 @@ are numbers, every moment is epoch milliseconds (`…Ms`).
 
 Every method of `TaskService` but `onChange`, by its name and with its arguments: `tasks.screen(date)`,
 `tasks.search(query)`, `tasks.menu(item, from, screen)` (its `groups`: the order the menu is drawn in, the plugin's), `tasks.drop(tasks, to, day)`, `tasks.createInPlace(text,
-priority, place, repeat?, labels?)`, … (87 methods; `methods()` lists them). The answers are those of the plugin's
+priority, place, repeat?, labels?)`, … (every one `methods()` lists). The answers are those of the plugin's
 TaskServiceImpl over the same text, as `tests/application/PhoneCalls.test.ts` checks method by method.
 
 - Reads take a `TaskItem`, a `TaskKey` and the like as the door gave them; a key names a task as read. Every key the door
@@ -518,6 +518,42 @@ Project tag and Result mark settings, and the notes «New project…» once wrot
   `projectsScreen` over to the new name.
 - Twins (two identical lines) are two tasks with two ids: the door knows which line a write made of which.
 
+#### The reads every frontend draws from (agent CLI spec, 2026-11-18)
+
+The Obsidian screen, the iPhone app and the agents' program (`agent/obsidian-task-calendar.mjs`) take these from the
+core, never building them themselves:
+
+- `tasks.columnView(screen, column)`: the list a column draws (`ColumnList`): `{ sections, showsHeaders, groups }`,
+  `sections` whose sections it shows (`tasks.columnSections`'s answer on the screen's day; `null` for a past day) and
+  `groups` as `rules.listView` groups the column's tasks of `screen` (its `day.list`, `soon`, `inbox` or `backlog`, as
+  read, with the screen's filter) with those sections, the list's empty sections in. `screen` is a `tasks.screen` answer
+  (or a `tasks.firstStepScreen` one); only its `day`, `soon`, `inbox`, `backlog` and `sections` are read. A frontend draws
+  a list column from this and never chains `tasks.columnSections` and `rules.listView` itself:
+  `tasks.columnView(screen, "soon")` → `{ sections: { list: "soon", date: null }, showsHeaders: true, groups: [{ name: null, items: [...] }, { name: "Morning", items: [], empty: true, ... }] }`.
+- `tasks.placeOf(item)`: where Max sees the task (`TaskPlace`): `{ kind: "inbox" | "backlog" | "soon" | "done" }`, or
+  `{ kind: "today" | "day", date }`; a subtask is where its task is, a closed task is `done`. A task dated ahead in the
+  file's Soon is `{ kind: "day", date }`: seen on that day, never in Soon. By project's stage mark (`ProjectsCard.stage`)
+  says the same (`{ kind: "date" }` for `day`).
+- `tasks.ridesNow(item, day)`: the block of `day`'s timeline rides the now line (`tasks.shownSpan` puts it there): an
+  open task of today whose own start has passed. `tasks.landing`'s `ridesNow` is this rule.
+- `tasks.projectNodeNamed(name)`: `{ node, candidates }`: the project's node as every project call matches names
+  (`"отчёты"` → `"project:Отчёты"`), `candidates` empty; a name the tree lacks: `node` null, `candidates` up to five
+  project names the search's match finds closest, best first. No tasks file: `{ node: null, candidates: [] }`.
+- `tasks.openTasks(filter?)`: every open task once (a task of two projects once), each `{ item, place }`, the file tidied
+  first, under `filter` as `tasks.screen` filters: Inbox, Backlog, Soon, today (Now's, then Soon's, each in file order), then the
+  later days by date. No tasks file: `[]`.
+- `tasks.projectHistory(node)`: a live project's closed tasks By project (`ProjectsSection`s: its own, then each
+  subproject's with Subprojects on), as a done project's `tasks.projectsScreen(node)` draws them; `[]` for a done project
+  (its screen shows them already), a name the tree lacks, or no tasks file.
+- `tasks.storedLine(item, text)`: where the task stands in `text`, the file as it is before today's tidy (on disk, when
+  no plugin has opened it today): `{ section, line, raw }`, found by `TaskItem.id` wherever the tidy moved or rewrote it;
+  `null` for a line only the tidy makes (a repeat's next copy) or a task `text` lacks.
+- A slot after midnight stands on the night it belongs to everywhere: `TaskItem.day`, `tasks.screenOf`, `tasks.reveal`,
+  `tasks.placeOf` and the menus' Today/Tomorrow read a slot's day by the day's start, as the timeline does (00:30 on the
+  19th, the day starting at 5, is the 18th's). Before, they took the slot's calendar date and opened the next day.
+- `rules.repeatSentence(rule)`: a rule in a sentence where no row draws the week's letters: `repeatValue`'s words, and
+  for weeks on a schedule `"Every week on Mon, Wed"`.
+
 ### `days.*`: `DayService`
 
 `today()`, `relation(date)`, `step(date, days)`, `stepFunnel({mode, date}, shift)` (the funnel's walk, see «Projects as one view») (where a swipe or a day arrow leads: `{mode, date}` or null past the row's ends;
@@ -527,6 +563,12 @@ timeline opens, minutes from the day's start: `{ kind: "now", minute }` for toda
 at half the height), `{ kind: "hour", minute }` for another day (the settings' `scrollToHour`, at the top). `onDayChange` and `catchUp` are the
 host's: it checks the clock (once a minute while a screen is open), and when `days.today` answers another day it calls
 `tasks.normalize` and draws the day anew.
+
+`week("this" | "next")`: the week's days, Monday to Sunday, by today (`days.week("next")` on Wed 18 Nov →
+`["2026-11-23", …, "2026-11-29"]`). `days(from, count)`: `count` days from `from` on. `dayNamed(text)`: the day words name,
+`YYYY-MM-DD`, `today`, `tomorrow`, `yesterday`, `+N`, `-N`, by today; `null` for anything else (`"+2"` →
+`"2026-11-20"`). `weekday(date)`: the weekday's whole name, `"Wednesday"`. `side(date)`: `"past"`, `"today"` or
+`"future"`.
 
 ### `boundary.*`: where a day begins
 

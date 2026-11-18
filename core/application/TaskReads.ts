@@ -5,13 +5,19 @@ import { dayColumn, dayOfPlacement, dayOfTask, placementOfDay, type TaskScreen, 
 import { typedMarks } from "../domain/Marks";
 import { priorityOfTitle, withPriority } from "../domain/Priority";
 import { backlogList, dayList, inboxList, slottedOn, soonWithoutDate } from "../domain/queries";
-import { FuzzyQuery, matchParts, plainDescription, snippetParts, type TextMatch } from "../domain/search";
+import { FuzzyQuery, lettersApart, matchParts, plainDescription, snippetParts, type TextMatch } from "../domain/search";
 import { plainText } from "../domain/TaskText";
 import { isOpen, type LocalDate, type SectionKey, type Slot } from "../domain/Task";
 import { descriptionMarkdown } from "../domain/description";
 import { flatten, type TaskDocument, type TaskEntry } from "../domain/TaskDocument";
 import { type LabelLevel, type PriorityLevel, usableLabels, usableLevels } from "../settings";
 import type {
+	StoredLine,
+	ColumnList,
+	ColumnSource,
+	PlacedTask,
+	ProjectNodeMatch,
+	ProjectsSection,
 	ColumnSections,
 	DayColumn,
 	DaySpan,
@@ -35,7 +41,8 @@ import type {
 } from "./contracts";
 import { draftMarksOf } from "./marks";
 import { carriedWith, menuOffer, taskMenu } from "./menus";
-import { NO_SECTION_ID, offeredNames, type SectionOffer, shownSections } from "./sections";
+import { listView, NO_SECTION_ID, offeredNames, type SectionOffer, shownSections } from "./sections";
+import { funnelRank, placeOfTask, type TaskPlace } from "./taskPlaces";
 import { samePlace } from "./taskKeys";
 import { fullTree } from "./fullTree";
 import { type ItemLevels, itemLevels, ownCard, toItem } from "./taskItems";
@@ -45,7 +52,7 @@ import type { Clock, SettingsStore } from "./ports";
 import { ProjectIndex, projectTreeOf } from "./projects";
 import type { DropTo, FunnelView, ProjectFilter, ProjectNote, ProjectRef, ProjectsNodeId, ProjectsScreenState, ProjectsView } from "./contracts";
 import { ProjectTree } from "../domain/ProjectTree";
-import { chosenNode, filterNode, nodeHeader, panelRows, PROJECTS_WORDS, projectNodeOf, projectOfNode, projectsView, subprojectsOn } from "./projectsScreen";
+import { chosenNode, filterNode, nodeHeader, panelRows, projectHistory, PROJECTS_WORDS, projectNodeOf, projectOfNode, projectsView, subprojectsOn } from "./projectsScreen";
 import { filterTest, hasSubprojects, noteProject } from "./projectFilter";
 import { firstViewOf, viewChoice } from "./viewModes";
 import { panelReason } from "./projectsCarry";
@@ -94,6 +101,15 @@ function sectionsOf(doc: TaskDocument, list: GroupedList): readonly ListSection[
 		.filter((g) => g.heading || g.entries.length > 0)
 		.map((g) => ({ id: g.name === null || g.id === null ? NO_SECTION_ID : g.id, name: g.name, empty: g.name !== null && g.entries.length === 0 }));
 }
+
+/** The lists of open tasks, in the order the funnel walks them before it sorts them by place. */
+const OPEN_ORDER: readonly SectionKey[] = ["inbox", "backlog", "now", "soon"];
+
+/** The most names an unknown project's answer offers instead. */
+const MOST_CANDIDATES = 5;
+/** A name is a typo of a project's while this many letters apart, or one in four of a long name's. */
+const MOST_TYPOS = 2;
+const TYPO_SHARE = 4;
 
 /** The sections a search walks, in the order its results stand. */
 const SEARCH_ORDER: readonly SectionKey[] = ["inbox", "backlog", "soon", "now", "done"];
@@ -259,10 +275,7 @@ export class TaskReads {
 	/** The screen of `date`, only the tasks `filter` lets through (`TaskService.screen`). */
 	screen(s: Snapshot, date: LocalDate, filter?: ProjectsNodeId | null): ScreenView {
 		const { doc, today, boundary } = s;
-		const tree = projectTreeOf(doc);
-		const node = filterNode(filter, tree);
-		const shows = node === null ? () => true : filterTest(node, tree, doc, this.subprojects());
-		const item = this.itemOf(today, doc, node === null || projectOfNode(node) === null);
+		const { shows, item } = this.filtered(s, filter);
 		const shown = (entries: readonly TaskEntry[]) => entries.filter(shows).map(item);
 		const day = { date, list: shown(dayList(doc, date, today, boundary)), slotted: shown(slottedOn(doc, date, boundary)) };
 		const sections = this.listSections(s);
@@ -407,9 +420,9 @@ export class TaskReads {
 		return groups;
 	}
 
-	screenOf({ doc, today }: Snapshot, item: TaskItem): TaskScreen {
+	screenOf({ doc, today, boundary }: Snapshot, item: TaskItem): TaskScreen {
 		const top = item.isSubtask ? doc.find(item.key.section, item.key.index, []) : undefined;
-		return top ? taskScreen(top.section, dayOfTask(top.section, top.task, today)) : taskScreen(item.list, item.day);
+		return top ? taskScreen(top.section, dayOfTask(top.section, top.task, today, boundary)) : taskScreen(item.list, item.day);
 	}
 
 	findIn(items: readonly TaskItem[], key: TaskKey): TaskItem | null {
@@ -431,12 +444,12 @@ export class TaskReads {
 	}
 
 	/** The tasks the keys name as the file has them, in their order; throws StaleTaskError when one is gone. */
-	itemsAt({ doc, today }: Snapshot, keys: readonly TaskKey[]): readonly TaskItem[] {
+	itemsAt({ doc, today, boundary }: Snapshot, keys: readonly TaskKey[]): readonly TaskItem[] {
 		const levels = this.itemLevels(new ProjectIndex(projectTreeOf(doc)));
 		return keys.map((key) => {
 			const entry = this.rules.entryOf(doc, key);
 			const parent = key.path.length > 0 ? (doc.find(key.section, key.index, key.path.slice(0, -1)) ?? null) : null;
-			return toItem(entry, today, levels, parent);
+			return toItem(entry, today, levels, parent, boundary);
 		});
 	}
 
@@ -451,6 +464,13 @@ export class TaskReads {
 	/** The task's line in the file once tidied for today, from 0. */
 	lineOfRead(key: TaskKey): Read<number> {
 		return { reads: true, tidies: true, answer: (s) => this.lineOf(s!.text, key) };
+	}
+
+	/** Where the task stands in `text` as it is, untidied: the line its id has there (`TaskService.storedLine`). */
+	storedLine(item: TaskItem, text: string): StoredLine | null {
+		const doc = this.rules.parse(text);
+		const entry = flatten(doc.allTasks()).find((e) => e.id === item.id);
+		return entry ? { section: entry.section, line: doc.lineOf(entry), raw: entry.raw } : null;
 	}
 
 	/** The task's line in the file as it stands, unnormalized, from 0. */
@@ -478,6 +498,70 @@ export class TaskReads {
 
 	placementOfDay(date: LocalDate): Placement {
 		return placementOfDay(date, this.today());
+	}
+
+	/** The list `column` of `screen` draws: its tasks as the screen read them, in the sections it shows on the screen's day. */
+	columnView(screen: ColumnSource, column: DropColumn): ColumnList {
+		const sections = this.columnSections(column, screen.day.date);
+		const items = column === "day" ? screen.day.list : screen[column];
+		return { sections, ...listView(items, sections !== null, sections ? screen.sections[sections.list] : []) };
+	}
+
+	/** Where Max sees the task, a subtask's its task's (`placeOfTask`), as the screens and By project's stage mark say it. */
+	placeOf({ doc, today, boundary }: Snapshot, item: TaskItem): TaskPlace {
+		const top = item.isSubtask ? doc.find(item.key.section, item.key.index, []) : undefined;
+		if (top) return placeOfTask(top.section, top.task, isOpen(top.task.status), today, boundary);
+		return placeOfTask(item.list, item, item.open, today, boundary);
+	}
+
+	/** A block of `day`'s timeline rides the now line. */
+	ridesNow(item: TaskItem, day: LocalDate): boolean {
+		return this.timeline().ridesNow(slotted(item), day);
+	}
+
+	/**
+	 * The node of the project `name` names; none with the closest names: those the search's match finds, best first, then
+	 * those a typo or two apart (`lettersApart`), nearest first.
+	 */
+	projectNodeNamed({ doc }: Snapshot, name: string): ProjectNodeMatch {
+		const tree = projectTreeOf(doc);
+		const found = tree.find(name);
+		if (found) return { node: projectNodeOf(found.node.name), candidates: [] };
+		const query = FuzzyQuery.of(name);
+		const names = tree.all().map((p) => p.node.name);
+		const matched = query === null ? [] : names.map((n) => ({ name: n, match: query.match(n) })).filter((s) => s.match !== null);
+		const fuzzy = matched.sort((a, b) => b.match!.score - a.match!.score).map((s) => s.name);
+		const typos = names
+			.map((n) => ({ name: n, apart: lettersApart(name, n) }))
+			.filter((t) => t.apart <= Math.max(MOST_TYPOS, Math.floor(name.length / TYPO_SHARE)) && !fuzzy.includes(t.name))
+			.sort((a, b) => a.apart - b.apart)
+			.map((t) => t.name);
+		return { node: null, candidates: [...fuzzy, ...typos].slice(0, MOST_CANDIDATES) };
+	}
+
+	/** Every open task once, under `filter`, in the funnel's order, each with its place. */
+	openTasksRead(filter?: ProjectsNodeId | null): Read<readonly PlacedTask[]> {
+		return { reads: true, tidies: true, missing: () => [], answer: (s) => this.openTasks(s!, filter) };
+	}
+
+	openTasks(s: Snapshot, filter?: ProjectsNodeId | null): readonly PlacedTask[] {
+		const { doc, today, boundary } = s;
+		const { shows, item } = this.filtered(s, filter);
+		const open = OPEN_ORDER.flatMap((list) => doc.tasks(list)).filter((entry) => isOpen(entry.task.status) && shows(entry));
+		const placed = open.map((entry) => ({ item: item(entry), place: placeOfTask(entry.section, entry.task, true, today, boundary) }));
+		return placed.map((p, i) => ({ p, i, rank: funnelRank(p.place) })).sort((a, b) => (a.rank < b.rank ? -1 : a.rank > b.rank ? 1 : a.i - b.i)).map(({ p }) => p);
+	}
+
+	/** A live project's closed tasks By project; none for a done project or a name the tree lacks. */
+	projectHistoryRead(node: ProjectsNodeId): Read<readonly ProjectsSection[]> {
+		return { reads: true, tidies: true, missing: () => [], answer: (s) => this.projectHistory(s!, node) };
+	}
+
+	projectHistory(s: Snapshot, node: ProjectsNodeId): readonly ProjectsSection[] {
+		const { doc, today, boundary } = s;
+		const tree = projectTreeOf(doc);
+		const levels = this.itemLevels(new ProjectIndex(tree), false);
+		return projectHistory({ doc, tree, today, boundary, state: this.source.screen(), item: (entry) => toItem(entry, today, levels, null, boundary), listName: (list) => this.listName(list), node }, node);
 	}
 
 	/** A funnel list's column title: its name; the day's list draws the day's own. */
@@ -532,6 +616,17 @@ export class TaskReads {
 	/** The timeline's rules by the clock and the day's boundary now. */
 	timeline(): TimelineSpans {
 		return new TimelineSpans(this.rules.moment().boundary, this.clock.now());
+	}
+
+	/**
+	 * What a read under `filter` shows (`TaskService.screen`'s filter): which tasks the node lets through, a subtask with its
+	 * task, and how each is drawn, without the folder mark under a project.
+	 */
+	private filtered({ doc, today }: Snapshot, filter?: ProjectsNodeId | null): { readonly shows: (entry: TaskEntry) => boolean; readonly item: (entry: TaskEntry) => TaskItem } {
+		const tree = projectTreeOf(doc);
+		const node = filterNode(filter, tree);
+		const shows = node === null ? () => true : filterTest(node, tree, doc, this.subprojects());
+		return { shows, item: this.itemOf(today, doc, node === null || projectOfNode(node) === null) };
 	}
 
 	/** The item of a task of `doc`, its subtasks below it, its projects as `doc`'s tree has them; `mark`, the card shows the folder mark. */

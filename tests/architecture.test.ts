@@ -6,13 +6,18 @@ import { doorMethods } from "../core/application/PhoneCalls";
 
 const ROOT = resolve(__dirname, "..");
 
-type Layer = "domain" | "application" | "infrastructure" | "ui" | "phone" | "settings" | "root";
+type Layer = "domain" | "application" | "infrastructure" | "ui" | "phone" | "settings" | "root" | "agentReads" | "agentMain";
 
 /** Obsidian's own packages: the app provides them at run time (`external` in esbuild.config.mjs). */
 const OBSIDIAN_PACKAGES = ["obsidian", "@codemirror/state", "@codemirror/view"];
 
+/** The agents' program (`agent/`): its composition over Node's files, as `obsidian/compose.ts` is the plugin's. */
+const AGENT_ROOT = ["agent/compose.ts", "agent/nodePorts.ts"];
+
 function layerOf(file: string): Layer | null {
-	if (["obsidian/main.ts", "obsidian/demo.ts", "obsidian/compose.ts", "obsidian/settingsFile.ts"].includes(file)) return "root";
+	if (["obsidian/main.ts", "obsidian/demo.ts", "obsidian/compose.ts", "obsidian/settingsFile.ts", ...AGENT_ROOT].includes(file)) return "root";
+	if (file === "agent/main.ts") return "agentMain";
+	if (file.startsWith("core/application/agent/")) return "agentReads";
 	if (file === "core/settings.ts") return "settings";
 	const m = /^(?:core|obsidian)\/(domain|application|infrastructure|ui|phone)\//.exec(file);
 	return m ? (m[1] as Layer) : null;
@@ -33,6 +38,10 @@ const MAY_IMPORT: Readonly<Record<Layer, (target: string) => boolean>> = {
 	infrastructure: (t) => !under(t, "ui") && !under(t, "phone") && layerOf(t) !== "root",
 	ui: (t) => under(t, "ui") || t === "core/application/contracts.ts" || OBSIDIAN_PACKAGES.includes(t),
 	phone: (t) => under(t, "phone") || t === "core/application/contracts.ts" || t === PHONE_DOOR,
+	/** The program's answers map the screens' reads into its words: the contract only, and their own wire. */
+	agentReads: (t) => t === "core/application/contracts.ts" || t.startsWith("core/application/agent/"),
+	/** argv in, the answer out: the contract only, as a frontend talks to the core. */
+	agentMain: (t) => t === "core/application/contracts.ts",
 	settings: (t) => under(t, "domain"),
 	root: () => true,
 };
@@ -76,7 +85,10 @@ function importsOf(file: string): string[] {
 
 /** The sources: the core but its build (`core/build.mjs`, `core/task-calendar-phone.js`), and the Obsidian frontend. */
 const SOURCE_DIRS = ["core/domain", "core/application", "core/phone", "obsidian"];
-const FILES = [...SOURCE_DIRS.flatMap(files), "core/settings.ts"].filter(isSource);
+/** The program's sources: everything in `agent/` but its build script and its build. */
+const AGENT_BUILD = ["agent/build.mjs", "agent/obsidian-task-calendar.mjs"];
+const AGENT_FILES = files("agent").filter((file) => !AGENT_BUILD.includes(file));
+const FILES = [...SOURCE_DIRS.flatMap(files), ...AGENT_FILES, "core/settings.ts"].filter(isSource);
 
 function violations(): string[] {
 	return FILES.flatMap((file) => {
@@ -105,7 +117,19 @@ describe("the layers", () => {
 
 describe("the guard itself", () => {
 	it("scans every file of the sources: a source of a known layer, or a declaration", () => {
-		expect([...SOURCE_DIRS.flatMap(files), "core/settings.ts"].filter((file) => !isSource(file) && !DECLARATION.test(file))).toEqual([]);
+		expect([...SOURCE_DIRS.flatMap(files), ...AGENT_FILES, "core/settings.ts"].filter((file) => !isSource(file) && !DECLARATION.test(file))).toEqual([]);
+		expect(AGENT_FILES.sort()).toEqual(["agent/compose.ts", "agent/main.ts", "agent/nodePorts.ts"]);
+	});
+
+	it("keeps the agents' program a frontend: its answers and its argv read the contract alone", () => {
+		expect(MAY_IMPORT.agentMain("core/application/composeCore.ts")).toBe(false);
+		expect(MAY_IMPORT.agentMain("core/application/agent/AgentReads.ts")).toBe(false);
+		expect(MAY_IMPORT.agentReads("core/application/TaskReads.ts")).toBe(false);
+		expect(MAY_IMPORT.agentReads("core/domain/Days.ts")).toBe(false);
+		expect(MAY_IMPORT.agentReads("core/application/agent/agentWire.ts")).toBe(true);
+		expect(MAY_IMPORT.application("core/application/agent/AgentReads.ts")).toBe(true);
+		expect(layerOf("core/application/agent/AgentReads.ts")).toBe("agentReads");
+		expect(layerOf("agent/main.ts")).toBe("agentMain");
 	});
 
 	it("keeps the doors narrow", () => {
@@ -322,6 +346,7 @@ const CONTRACT_RUNTIME: Readonly<Record<string, string>> = {
 	allColumnsWidthAt: "./listWidth",
 	DIVIDER_SNAP: "./listWidth",
 	repeatValue: "./repeatWords",
+	repeatSentence: "./repeatWords",
 	onTheDay: "./repeatWords",
 	REPEAT_WORDS: "./repeatWords",
 	dayMonth: "./dayLabels",

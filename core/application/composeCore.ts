@@ -4,6 +4,8 @@ import { AssistantServiceImpl } from "./assistant/AssistantServiceImpl";
 import type { HostModels } from "./assistant/model";
 import type { AssistantService, CalendarService, CalendarSource, DayService, TaskService, UndoService, WorkCalendarSetup } from "./contracts";
 import { DayServiceImpl } from "./DayServiceImpl";
+import { AgentReads } from "./agent/AgentReads";
+import { ScreenSettingsImpl } from "./ScreenSettingsImpl";
 import type { EventFeed, EventFile } from "./EventSource";
 import type { Clock, Projects, ProjectsScreenStore, SettingsStore, TaskFileStore, Ticker, Timers } from "./ports";
 import { TaskServiceImpl } from "./TaskServiceImpl";
@@ -29,6 +31,8 @@ export interface CorePorts {
 	readonly projects?: Projects;
 	/** What this device keeps of the Projects screen; kept in memory when left out. */
 	readonly projectsScreen?: ProjectsScreenStore;
+	/** The tasks file as it stands, before the reads tidy it: what the agents' program edits by; left out, the file as read. */
+	readonly storedTasks?: () => Promise<string | null>;
 	/** The models this host serves and how it asks them; none when left out (the door, the phone plugin). */
 	readonly models?: HostModels;
 }
@@ -40,6 +44,8 @@ export interface Core {
 	readonly undo: UndoService;
 	readonly calendars: CalendarService;
 	readonly assistant: AssistantService;
+	/** The agents' program's answers, over these very services. */
+	readonly agent: AgentReads;
 }
 
 /** The services over a host's ports: the one place they are put together, the calendars in the order they are read. */
@@ -48,11 +54,9 @@ export function composeCore(ports: CorePorts): Core {
 	const undo = new UndoHistory(ports.tasksFile, identity);
 	const tasks = new TaskServiceImpl(ports.tasksFile, ports.settings, ports.clock, undo, ports.projects, ports.projectsScreen, identity);
 	const files = CALENDAR_SOURCES.map((source) => ports.calendarFiles[source]);
-	return {
-		tasks,
-		days: new DayServiceImpl(ports.clock, ports.settings, tasks, ports.ticker),
-		undo,
-		calendars: new CalendarServiceImpl(files, ports.feeds, ports.clock, ports.settings, ports.timers, ports.work, { canMigrate: ports.isPhone }),
-		assistant: new AssistantServiceImpl({ tasks, steps: undo, settings: ports.settings, timers: ports.timers, models: ports.models }),
-	};
+	const days = new DayServiceImpl(ports.clock, ports.settings, tasks, ports.ticker);
+	const calendars = new CalendarServiceImpl(files, ports.feeds, ports.clock, ports.settings, ports.timers, ports.work, { canMigrate: ports.isPhone });
+	const assistant = new AssistantServiceImpl({ tasks, steps: undo, settings: ports.settings, timers: ports.timers, models: ports.models });
+	const agent = new AgentReads({ tasks, days, calendars, assistant, screenSettings: new ScreenSettingsImpl(ports.settings), clock: ports.clock, storedTasks: ports.storedTasks ?? (() => ports.tasksFile.read()) });
+	return { tasks, days, undo, calendars, assistant, agent };
 }
