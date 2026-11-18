@@ -1,11 +1,11 @@
 import { closestCenter, type CollisionDetection, DndContext, defaultDropAnimationSideEffects, getClientRect, getFirstCollision, type MeasuringConfiguration, pointerWithin, rectIntersection, type UniqueIdentifier, useDndContext, useDroppable, type DragEndEvent, type DragMoveEvent, type DragOverEvent, DragOverlay, type DragStartEvent, type DropAnimation, MouseSensor, PointerSensor, TouchSensor, useDraggable, useSensor, useSensors } from "@dnd-kit/core";
-import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { arrayMove, SortableContext, type SortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS, getEventCoordinates } from "@dnd-kit/utilities";
-import { type CSSProperties, memo, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { type CSSProperties, memo, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Destination, ListId, Row } from "../port";
 import { useScreen, useScreenApi } from "../store";
-import { descendantsOf, levelAt, levelBetween, type Slot, slotOf, stickyShift } from "./tree";
+import { descendantsOf, finalOrder, levelAt, levelBetween, shiftOf, type Slot, slotOf, stickyShift } from "./tree";
 
 /**
  * Drag and drop (spec, «The owners»): one `DndContext` per screen, one `DragOverlay`, one `onDragEnd` that makes one write
@@ -352,10 +352,11 @@ function crossing(active: Sortable & { readonly rect: { readonly current: { read
 }
 
 /** A list's sortable tasks: `ids` keeps its identity between draws, or dnd-kit stops gliding (stage 0, finding 4). */
-export function SortableList({ list, ids, children }: { readonly list: ListId; readonly ids: readonly string[]; readonly children: ReactNode }) {
+export function SortableList({ list, ids, rows, children }: { readonly list: ListId; readonly ids: readonly string[]; readonly rows: readonly Row[]; readonly children: ReactNode }) {
 	const { setNodeRef } = useDroppable({ id: `${LIST_TARGET}${list}`, data: { items: ids } });
+	const strategy = useMemo(() => finalOrderStrategy(rows, ids), [rows, ids]);
 	return (
-		<SortableContext id={list} items={ids as string[]} strategy={verticalListSortingStrategy}>
+		<SortableContext id={list} items={ids as string[]} strategy={strategy}>
 			<div ref={setNodeRef} className="tc-list-target">
 				{children}
 			</div>
@@ -398,4 +399,34 @@ export function CarriedPlus({ onTap, children, ring }: { readonly onTap: () => v
 /** Where the pointer pressed, across the screen. */
 function activatorX(event: { readonly activatorEvent: Event | null }): number {
 	return event.activatorEvent ? (getEventCoordinates(event.activatorEvent)?.x ?? 0) : 0;
+}
+
+/** A row counts as this tall while it is not mounted (a card and its gap at the default size). */
+const ROW_ESTIMATE_PX = 37;
+
+/**
+ * dnd-kit's sorting strategy for a list, as its strategies are written (`SortingStrategy`): each row moves to where the
+ * list's final order puts it once the carried card is let go where it stands (`finalOrder`), the rows in flow one under
+ * another, so what the rows show while the card is held is what the list will be. In an empty section the card takes the
+ * room of the «No tasks» plate, which then shows nothing; nothing else moves for it.
+ */
+function finalOrderStrategy(rows: readonly Row[], ids: readonly string[]): SortingStrategy {
+	let key = "";
+	let final: readonly string[] = ids;
+	return ({ activeIndex, overIndex, index, rects, activeNodeRect }) => {
+		if (activeIndex < 0) return null;
+		const nextKey = `${activeIndex}:${overIndex}`;
+		if (nextKey !== key) {
+			key = nextKey;
+			final = finalOrder(rows, ids, activeIndex, overIndex);
+		}
+		const id = ids[index];
+		if (!final.includes(id)) return null;
+		const heightOf = (other: string) => {
+			const at = ids.indexOf(other);
+			return rects[at]?.height ?? (at === activeIndex ? activeNodeRect?.height : undefined) ?? ROW_ESTIMATE_PX;
+		};
+		const y = shiftOf(id, ids, final, heightOf);
+		return y === 0 ? null : { x: 0, y, scaleX: 1, scaleY: 1 };
+	};
 }

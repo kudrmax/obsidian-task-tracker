@@ -80,3 +80,33 @@ export function descendantsOf(rows: readonly Row[], id: string): ReadonlySet<str
 	for (let i = at + 1; i < rows.length && depthOf(rows[i]) > top; i++) out.add(rows[i].id);
 	return out;
 }
+
+/**
+ * The list's order once the carried card (at `activeIndex` of `ids`) is let go where it stands now (`overIndex`), as
+ * dnd-kit's sortable list puts it (`arrayMove`), and without the «No tasks» plate of the section it lands in: there the
+ * card takes the plate's room, the plate being only the section's empty place.
+ */
+export function finalOrder(rows: readonly Row[], ids: readonly string[], activeIndex: number, overIndex: number): readonly string[] {
+	const order = arrayMove([...ids], activeIndex, overIndex < 0 ? activeIndex : overIndex);
+	const active = ids[activeIndex];
+	const { section } = slotOf(rows, order, active);
+	if (section === null) return order;
+	const plate = rows.find((row) => row.kind === "empty" && row.section === section);
+	return plate ? order.filter((id) => id !== plate.id) : order;
+}
+
+/**
+ * How far each row moves for the carried card to stand where `final` puts it: the room the rows before it take in the
+ * final order less the room they take now, the rows in flow one under another. `heightOf` gives a row's height.
+ */
+export function shiftOf(id: string, ids: readonly string[], final: readonly string[], heightOf: (id: string) => number): number {
+	const before = (order: readonly string[]) => {
+		let sum = 0;
+		for (const other of order) {
+			if (other === id) return sum;
+			sum += heightOf(other);
+		}
+		return sum;
+	};
+	return before(final) - before(ids);
+}

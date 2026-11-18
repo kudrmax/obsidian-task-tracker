@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { descendantsOf, levelAt, levelBetween, SHIFT_BACK, SHIFT_STEP, slotOf, stickyShift } from "../../../obsidian/ui/engine/drag/tree";
+import { descendantsOf, finalOrder, levelAt, levelBetween, SHIFT_BACK, SHIFT_STEP, shiftOf, slotOf, stickyShift } from "../../../obsidian/ui/engine/drag/tree";
 import type { Row } from "../../../obsidian/ui/engine/port";
 
 const task = (id: string, depth = 0): Row => ({ kind: "task", id, depth });
@@ -58,5 +58,27 @@ describe("a carried card's subtasks", () => {
 		expect([...descendantsOf(rows, "a")]).toEqual(["a1", "a2", "a3"]);
 		expect([...descendantsOf(rows, "a1")]).toEqual(["a2"]);
 		expect([...descendantsOf(rows, "b")]).toEqual([]);
+	});
+});
+
+describe("the list's final order while a card is held (the sorting strategy)", () => {
+	const rows: Row[] = [task("a"), task("b"), { kind: "section", id: "s", title: "Пустая" }, { kind: "empty", id: "e", section: "s", label: "No tasks" }, { kind: "section", id: "t", title: "Дальше" }, task("x")];
+	const ids = rows.map((row) => row.id);
+	it("a card let go in an empty section takes its plate's room, the plate gone from the order", () => {
+		expect(finalOrder(rows, ids, 0, 2)).toEqual(["b", "s", "a", "t", "x"]);
+		expect(finalOrder(rows, ids, 0, 3)).toEqual(["b", "s", "a", "t", "x"]);
+	});
+	it("anywhere else the plate stays", () => {
+		expect(finalOrder(rows, ids, 0, 1)).toEqual(["b", "a", "s", "e", "t", "x"]);
+	});
+	it("while held, the rows stand where the list will be: the card right under the empty section's header, the next section right under the card", () => {
+		const final = finalOrder(rows, ids, 0, 2);
+		const height = (id: string) => (id === "s" || id === "t" ? 26 : 37);
+		const top = (id: string) => ids.slice(0, ids.indexOf(id)).reduce((sum, other) => sum + height(other), 0) + shiftOf(id, ids, final, height);
+		expect(top("b")).toBe(0);
+		expect(top("s")).toBe(37);
+		expect(top("a")).toBe(37 + 26);
+		expect(top("t")).toBe(37 + 26 + 37);
+		expect(top("x")).toBe(37 + 26 + 37 + 26);
 	});
 });

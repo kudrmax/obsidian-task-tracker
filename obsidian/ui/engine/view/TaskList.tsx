@@ -1,5 +1,5 @@
 import { defaultRangeExtractor, type Range, useVirtualizer } from "@tanstack/react-virtual";
-import { type CSSProperties, memo, useCallback, useEffect, useMemo, useState } from "react";
+import { type CSSProperties, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PROPERTY } from "../../design";
 import { PLUS, SortableList, SortableRow } from "../drag/Drag";
 import { descendantsOf } from "../drag/tree";
@@ -35,15 +35,22 @@ export const TaskList = memo(function TaskList({ list }: { readonly list: ListId
 	const plusAt = useScreen((s) => s.plusAt);
 	/**
 	 * An empty section's plate is no row a card stands among: it says the section is empty, so while the carried card would
-	 * land in that section the plate is gone and the card's own place stands there instead.
+	 * land in that section the card's place stands in the plate's room (the list's sorting strategy) and the plate shows nothing.
 	 */
 	const landing = useScreen((s) => s.landing);
-	const rows = useMemo(() => {
-		if (!landing) return listed;
-		const { into, section } = landing;
-		if (into !== list) return listed;
-		return listed.filter((row) => !(row.kind === "empty" && row.section === section));
-	}, [listed, landing, list]);
+	const rows = listed;
+	/**
+	 * A list never gets shorter in one step when an empty section takes a card: if it is scrolled to its end, the browser
+	 * would pull it down at once. The room the plate gave up stays under the rows and goes in the time and curve the cards
+	 * part in, so the list glides instead.
+	 */
+	const plates = useMemo(() => allRows.filter((row) => row.kind === "empty").length, [allRows]);
+	const spare = useRef({ plates, seq: 0 });
+	if (plates < spare.current.plates) spare.current.seq++;
+	spare.current.plates = plates;
+	const spareClass = spare.current.seq === 0 ? "" : ` is-spare-${spare.current.seq % 2}`;
+	/** The empty section the carried card would land in, in this list: the card stands in its plate's room, and the plate shows nothing. */
+	const takenSection = landing && landing.into === list ? landing.section : null;
 	/** The rows with the carried plus among them, as a row of this list while it is over it. */
 	const withPlus = useMemo((): readonly Drawn[] => {
 		if (!plusAt) return rows;
@@ -59,8 +66,9 @@ export const TaskList = memo(function TaskList({ list }: { readonly list: ListId
 	const fresh = useScreen((s) => s.fresh);
 	const reveal = useScreen((s) => s.reveal);
 	const order = useMemo(() => readRows.map((row) => row.id).join(" "), [readRows]);
-	/** Cards and headers are in the sortable list (headers move aside like cards, a card goes after one into its section); an empty section's plate stands still. */
-	const ids = useMemo(() => withPlus.filter((row) => row.kind !== "empty").map((row) => row.id), [withPlus]);
+	/** Every row is in the sortable list: headers and plates move aside like cards; a card goes after a header into its section, taking an empty section's plate's room. */
+	const ids = useMemo(() => withPlus.map((row) => row.id), [withPlus]);
+	const sortableRows = useMemo(() => withPlus.filter((row): row is Row => row.kind !== "plus" && row.kind !== "entry"), [withPlus]);
 	const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
 	/**
 	 * While a card is carried, its own row stays mounted however far the list scrolls under it (TanStack Virtual's
@@ -106,9 +114,9 @@ export const TaskList = memo(function TaskList({ list }: { readonly list: ListId
 	const items = virtualizer.getVirtualItems();
 	return (
 		<div className="tc-list" ref={setScroller} data-list={list}>
-			<div className="tc-list-items" style={{ height: virtualizer.getTotalSize() }}>
+			<div className={`tc-list-items${spareClass}`} style={{ height: virtualizer.getTotalSize() }}>
 				<div className="tc-list-block" style={{ transform: `translateY(${items[0]?.start ?? 0}px)` }}>
-					<SortableList list={list} ids={ids}>
+					<SortableList list={list} ids={ids} rows={sortableRows}>
 						<MovingRows>
 							{items.map((item) => {
 								const row = drawn[item.index];
@@ -128,7 +136,7 @@ export const TaskList = memo(function TaskList({ list }: { readonly list: ListId
 									);
 								return (
 									<MovingRow key={row.id} id={row.id} index={item.index} ref={virtualizer.measureElement} order={order} carried={lifted === row.id} fresh={fresh.has(row.id)} className="tc-list-item">
-										<RowFace row={row.kind === "task" && row.id === lifted && liftedDepth !== null ? { ...row, depth: liftedDepth } : row} list={list} />
+										<RowFace row={row.kind === "task" && row.id === lifted && liftedDepth !== null ? { ...row, depth: liftedDepth } : row} taken={row.kind === "empty" && row.section === takenSection} />
 									</MovingRow>
 								);
 							})}
@@ -141,7 +149,7 @@ export const TaskList = memo(function TaskList({ list }: { readonly list: ListId
 });
 
 /** A row's face: a section's header, or a task's card as a drag source that opens its menu when tapped. */
-const RowFace = memo(function RowFace({ row, list }: { readonly row: Row; readonly list: ListId }) {
+const RowFace = memo(function RowFace({ row, taken = false }: { readonly row: Row; readonly taken?: boolean }) {
 	const api = useScreenApi();
 	const anchor = useAnchor();
 	if (row.kind === "section")
@@ -152,7 +160,12 @@ const RowFace = memo(function RowFace({ row, list }: { readonly row: Row; readon
 				</div>
 			</SortableRow>
 		);
-	if (row.kind === "empty") return <div className="tc-group-empty">{row.label}</div>;
+	if (row.kind === "empty")
+		return (
+			<SortableRow id={row.id}>
+				<div className={`tc-group-empty${taken ? " is-taken" : ""}`}>{row.label}</div>
+			</SortableRow>
+		);
 	return (
 		<SortableRow
 			id={row.id}
