@@ -188,6 +188,7 @@ export default class TaskCalendarStand extends Plugin {
 		this.addCommand({ id: "step-calendar", name: "Step 6: onto and off the calendar", callback: () => void this.showStep("calendar", calendarFile(new Date())) });
 		this.addCommand({ id: "step-swipe", name: "Step 7: swipe the columns", callback: () => void this.showStep("follow") });
 		this.addCommand({ id: "step-menu", name: "Step 8: the task menu", callback: () => void this.showStep("calendar", calendarFile(new Date())) });
+		this.addCommand({ id: "step-quick-add", name: "Step 9: quick add", callback: () => void this.showStep("leaf") });
 		this.addCommand({ id: "whole-screen", name: "The whole screen", callback: () => void this.showStep("leaf") });
 		for (const delay of WRITE_DELAYS) this.addCommand({ id: `delay-${delay}`, name: `Write delay ${delay} ms`, callback: () => (port.delay = delay) });
 	}

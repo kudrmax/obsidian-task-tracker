@@ -24,6 +24,7 @@ const STEPS: Readonly<Record<string, { place: Place; file?: () => MockFile }>> =
 	"step-calendar": { place: "calendar", file: () => calendarFile(new Date()) },
 	"step-swipe": { place: "follow" },
 	"step-menu": { place: "calendar", file: () => calendarFile(new Date()) },
+	"step-quick-add": { place: "leaf" },
 	"whole-screen": { place: "leaf" },
 };
 
