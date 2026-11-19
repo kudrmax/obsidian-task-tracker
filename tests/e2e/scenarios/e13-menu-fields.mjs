@@ -1,5 +1,5 @@
 import { cardBy } from "../lib/carry.mjs";
-import { menuButton, menuNow } from "../lib/menu.mjs";
+import { closingFaults, menuButton, menuFrames, menuNow } from "../lib/menu.mjs";
 
 /**
  * E4, typing from the task menu (F107, F108, F117, F124, F298): Rename turns a list's card into the field holding its
@@ -34,7 +34,11 @@ export default {
 			const card = await cardBy(t, title, "day");
 			await tap(card);
 			await t.sleep(400);
-			await press("Rename");
+			/** The verifier's find (2026-11-20): the menu's copy jumped to the window's corner as the card became the field. */
+			const renameAt = await menuButton(t, "Rename");
+			const closing = await menuFrames(t, () => tap(renameAt), 400);
+			const faults = closingFaults(closing).filter((f) => !f.startsWith("still there"));
+			t.expect(faults.length === 0, `the menu fades out where it stood as the card becomes the field: ${JSON.stringify(faults.slice(0, 4))}`);
 			const f = await field();
 			t.expect(f && f.text === title && f.renaming === card.id, `the card itself is the field, its title in it, the focus in it: ${JSON.stringify(f)}`);
 			t.expect(f && Math.abs(f.top - card.top) <= 1 && Math.abs(f.left - card.left) <= 1, `the field stands where the card stood: ${JSON.stringify(f)} card ${JSON.stringify(card)}`);

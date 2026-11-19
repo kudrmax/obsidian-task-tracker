@@ -110,6 +110,14 @@ export function closingFaults(frames) {
 			if (first.panels[i] && p.o > 0.005 && Math.abs(p.left - first.panels[i].left) > 1) faults.push(`t=${f.t} panel ${i} moved sideways while closing: ${p.left} vs ${first.panels[i].left}`);
 			if (prev?.panels[i] && p.o > prev.panels[i].o + 0.02) faults.push(`t=${f.t} panel ${i} came back while closing`);
 		});
+		if (first.copy && f.copy && f.copy.o > 0.005 && (Math.abs(f.copy.left - first.copy.left) > 1 || Math.abs(f.copy.top - first.copy.top) > 1)) faults.push(`t=${f.t} the copy moved while closing: ${f.copy.left},${f.copy.top} vs ${first.copy.left},${first.copy.top}`);
+		if (prev?.copy && f.copy && f.copy.o > prev.copy.o + 0.02) faults.push(`t=${f.t} the copy came back while closing`);
+		f.panels.forEach((p, i) => {
+			/** Its edge by the copy stays within the design's rise as it shrinks towards it. */
+			const was = first.panels[i];
+			const off = was && (was.above ? Math.abs(p.top + p.height - (was.top + was.height)) : Math.abs(p.top - was.top));
+			if (was && p.o > 0.005 && off > 9) faults.push(`t=${f.t} panel ${i} moved while closing: its edge by the copy ${off.toFixed(1)} px off`);
+		});
 		const os = [f.backdrop ?? 0, f.copy?.o ?? 0, ...f.panels.map((p) => p.o)];
 		if (f.panels.length && Math.max(...os) - Math.min(...os) > 0.35) faults.push(`t=${f.t} parts not going together: ${os.join(" ")}`);
 		prev = f;

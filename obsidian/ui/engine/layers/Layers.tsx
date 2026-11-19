@@ -86,6 +86,7 @@ const motionClass = (status: string, ready: boolean) => (status === "open" && re
  */
 export function MenuLayer({ open, onClose, root, reference, panelBy = null, label, over, groups, panelClass, page, peek, keepWidth = false }: MenuLayerProps) {
 	const [above, setAbove] = useState(0);
+
 	const [overEl, setOverEl] = useState<HTMLElement | null>(null);
 	const parts = useRef<{ upper: HTMLElement | null; lower: HTMLElement | null }>({ upper: null, lower: null });
 	/** The window less the phone's safe areas (`env(safe-area-inset-*)`, the plugin's `menuRoom`): every part stays inside it. */
@@ -150,6 +151,15 @@ export function MenuLayer({ open, onClose, root, reference, panelBy = null, labe
 		if (wanted !== undefined && wanted !== above) setAbove(wanted);
 	}, [wanted, above]);
 	const { isMounted, status } = useTransitionStatus(lower.context, { duration: { open: LAYER_MS.open, close: LAYER_MS.close } });
+	/**
+	 * Each part follows what it stands by while the menu is open; closing, it stays where it last stood as it fades out,
+	 * though the card under it is gone meanwhile (Rename turns the card into the field in the same tap, F132).
+	 */
+	const stood = useRef<Record<string, CSSProperties>>({});
+	const at = (part: string, styles: CSSProperties, placed: boolean): CSSProperties => {
+		if (open && placed) stood.current[part] = styles;
+		return open ? styles : (stood.current[part] ?? styles);
+	};
 	/** Closed by the click, not the press: the finger's tap ends on the backdrop, never on a card under the fading menu. */
 	const dismiss = useDismiss(lower.context, { outsidePressEvent: "click", outsidePress: (event) => !(event.target instanceof Node && [overEl, parts.current.upper, parts.current.lower].some((part) => part?.contains(event.target as Node))) });
 	const { getFloatingProps } = useInteractions([dismiss, useRole(lower.context, { role: "menu" })]);
@@ -166,7 +176,7 @@ export function MenuLayer({ open, onClose, root, reference, panelBy = null, labe
 				<div ref={(el) => {
 					copy.refs.setFloating(el);
 					setOverEl(el);
-				}} style={copy.floatingStyles} className="tc-menu-over">
+				}} style={at("copy", copy.floatingStyles, copy.isPositioned)} className="tc-menu-over">
 					{over}
 				</div>
 				<FloatingFocusManager context={lower.context} modal={false} initialFocus={-1}>
@@ -175,7 +185,7 @@ export function MenuLayer({ open, onClose, root, reference, panelBy = null, labe
 							<div ref={(el) => {
 								upper.refs.setFloating(el);
 								parts.current.upper = el;
-							}} style={upper.floatingStyles} className={`${panel} is-above${motion}`} aria-label={label} role="menu">
+							}} style={at("upper", upper.floatingStyles, upper.isPositioned)} className={`${panel} is-above${motion}`} aria-label={label} role="menu">
 								{groups.slice(0, count)}
 							</div>
 						) : null}
@@ -183,7 +193,7 @@ export function MenuLayer({ open, onClose, root, reference, panelBy = null, labe
 							<div ref={(el) => {
 								lower.refs.setFloating(el);
 								parts.current.lower = el;
-							}} style={lower.floatingStyles} className={`${panel}${motion}`} aria-label={label} {...getFloatingProps()}>
+							}} style={at("lower", lower.floatingStyles, lower.isPositioned)} className={`${panel}${motion}`} aria-label={label} {...getFloatingProps()}>
 								{groups.slice(count)}
 							</div>
 						) : (
@@ -195,7 +205,7 @@ export function MenuLayer({ open, onClose, root, reference, panelBy = null, labe
 					</div>
 				</FloatingFocusManager>
 				{peek ? (
-					<div ref={peeking.refs.setFloating} style={peeking.floatingStyles} className={`tc-desc-peek${peekSide?.under ? " is-under" : ""}${peekSide?.away ? " is-away" : ""}${motion}`} onClick={peek.onPress}>
+					<div ref={peeking.refs.setFloating} style={at("peek", peeking.floatingStyles, peeking.isPositioned)} className={`tc-desc-peek${peekSide?.under ? " is-under" : ""}${peekSide?.away ? " is-away" : ""}${motion}`} onClick={peek.onPress}>
 						{peek.content}
 					</div>
 				) : null}
