@@ -8,6 +8,7 @@ import { LAYER_MS } from "../../../obsidian/ui/engine/layers/motion";
 import { groupsAbove } from "../../../obsidian/ui/engine/layers/split";
 import { monthGrid, monthOf, monthTitle } from "../../../obsidian/ui/engine/layout/month";
 import type { TaskMenuModel } from "../../../obsidian/ui/engine/port";
+import { createScreenStore } from "../../../obsidian/ui/engine/store";
 import { tileRows } from "../../../obsidian/ui/engine/view/TaskMenu";
 
 const NOW = new Date(2026, 10, 18, 14, 20);
@@ -126,5 +127,73 @@ describe("the menu's layout", () => {
 		const css = readFileSync(join(process.cwd(), "styles.css"), "utf8");
 		expect(css).toContain(`--tc-duration-menu: ${LAYER_MS.open}ms;`);
 		expect(css).toContain(`--tc-duration-collapse: ${LAYER_MS.close}ms;`);
+	});
+});
+
+describe("the menu's fields and the plus, in the store", () => {
+	const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+	const screen = () => {
+		const p = port();
+		const store = createScreenStore(p);
+		store.getState().start();
+		return { p, store };
+	};
+	const firstInbox = (store: ReturnType<typeof createScreenStore>) => store.getState().shown.lists.inbox.rows.find((r) => r.kind === "task")!.id;
+
+	it("the plus opens the field at the end of the day's list while it shows, else of Inbox's last section (F174)", () => {
+		const { store } = screen();
+		store.getState().plusTap(["soon", "day"]);
+		expect(store.getState().entry).toMatchObject({ list: "day", before: null, depth: 0 });
+		store.getState().plusTap(["inbox", "soon"]);
+		const entry = store.getState().entry!;
+		expect(entry.list).toBe("inbox");
+		expect(store.getState().shown.lists.inbox.rows.find((r) => r.kind === "section" && r.id === entry.section)).toMatchObject({ title: "Идеи" });
+	});
+
+	it("Rename closes the menu and makes the card the field; the new name shows at once, then is written (F117, F298)", async () => {
+		const { p, store } = screen();
+		const id = firstInbox(store);
+		store.getState().openMenu(id);
+		store.getState().startRename();
+		expect(store.getState().layer).toBeNull();
+		expect(store.getState().renaming).toBe(id);
+		store.getState().endRename("Новое имя");
+		expect(store.getState().renaming).toBeNull();
+		expect(store.getState().shown.cards[id].title).toBe("Новое имя");
+		await settle();
+		await settle();
+		expect(p.fileText()).toContain("Новое имя");
+		store.getState().openMenu(id);
+		store.getState().startRename();
+		store.getState().endRename(null);
+		expect(store.getState().shown.cards[id].title).toBe("Новое имя");
+	});
+
+	it("Add subtask in a list opens the field under the task's last subtask, written as its last subtask (F124)", async () => {
+		const p = port(calendarFile(NOW));
+		const store = createScreenStore(p);
+		store.getState().start();
+		store.getState().openMenu("g1");
+		store.getState().startSubtask();
+		expect(store.getState().entry).toMatchObject({ list: "soon", depth: 1, under: "g1" });
+		await store.getState().commitEntry("Шаг", true);
+		await settle();
+		expect(p.fileText()).toMatch(/Купить подарок\n\t- \[ \] Шаг/);
+	});
+
+	it("Add subtask on the calendar types into the menu's stack, a subtask each Enter, the menu showing it (F108)", async () => {
+		const p = port(calendarFile(NOW));
+		const store = createScreenStore(p);
+		store.getState().start();
+		store.getState().openMenu("k8", "calendar");
+		store.getState().startSubtask();
+		expect(store.getState().layer?.field).toBe("subtask");
+		store.getState().commitStackSubtask("Отключить интернет");
+		await settle();
+		await settle();
+		const model = store.getState().layer?.model;
+		expect(model?.kind === "task" && model.subtasks.length).toBe(3);
+		store.getState().commitStackSubtask("");
+		expect(store.getState().layer).toBeNull();
 	});
 });

@@ -4,19 +4,21 @@ import { CarriedPlus } from "../drag/Drag";
 import { useScreen, useScreenApi } from "../store";
 import { Icon } from "./Icon";
 import { ObsidianEditor } from "./ObsidianEditor";
+import type { ListId } from "../port";
 
 /**
- * The plus: a tap opens the new task's field at the port's place for new tasks (while the field is open, a tap closes it);
- * carried, it opens the field where it is let go (`CarriedPlus`, the drag owner's).
+ * The plus (F174, the design's «Плюс»): a tap opens the new task's field at the port's place for new tasks, for the lists
+ * `shown` on the screen; carried, it opens the field where it is let go (`CarriedPlus`, the drag owner's). While a field
+ * is open it fades away, as the plugin's does.
  */
-export const PlusButton = memo(function PlusButton() {
+export const PlusButton = memo(function PlusButton({ shown }: { readonly shown: readonly ListId[] }) {
 	const api = useScreenApi();
-	const open = useScreen((s) => s.entry !== null);
+	const open = useScreen((s) => s.entry !== null || s.renaming !== null);
 	const inList = useScreen((s) => s.plusAt !== null);
 	if (inList) return RING;
 	return (
-		<CarriedPlus onTap={() => api.getState().openEntry(open ? null : undefined)} ring={RING}>
-			<Icon name={open ? "cross" : "plus"} />
+		<CarriedPlus onTap={() => api.getState().plusTap(shown)} ring={RING} hidden={open}>
+			<Icon name="plus" />
 		</CarriedPlus>
 	);
 });
@@ -45,6 +47,7 @@ export const EntryField = memo(function EntryField({ depth }: { readonly depth: 
 			<ObsidianEditor
 				text=""
 				className="tc-quick-field tc-title-field"
+				placeholder="New task"
 				onEnter={(text) => void api.getState().commitEntry(text, true)}
 				onEscape={() => api.getState().openEntry(null)}
 				onTab={(shift) => api.getState().indentEntry(shift ? -1 : 1)}

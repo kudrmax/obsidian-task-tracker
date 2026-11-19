@@ -232,8 +232,8 @@ export interface ScreenPort {
 	move(id: string, to: Destination): Promise<void>;
 	/** A minute from the day's start as the clock writes it: «14:15» (the day starts at the port's hour). */
 	clockAt(minute: number): string;
-	/** Where the plus puts a new task's field on the screen showing the day `dayOffset` days from today. */
-	newTaskPlace(dayOffset: number): Destination;
+	/** Where a tap on the plus puts a new task's field, on the screen showing the day `dayOffset` days from today and the lists `shown` (F174). */
+	newTaskPlace(dayOffset: number, shown: readonly ListId[]): Destination;
 	/** Where Add subtask opens the field of a new last subtask of `id` in its list (F124): under its last subtask, a level deeper. */
 	subtaskPlace(id: string, dayOffset: number): Destination;
 	/** A new task from its typed text at `at`; resolves with its id once read back. */

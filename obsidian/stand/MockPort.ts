@@ -182,9 +182,12 @@ export class MockPort implements ScreenPort {
 		return clockOf(minute);
 	}
 
-	/** The plus's place, the simplest: the end of Inbox's tasks outside any section. */
-	newTaskPlace(dayOffset: number): Destination {
-		return { list: "inbox", section: null, before: null, dayOffset, depth: 0 };
+	/** The plus's place (F174, the core's `QuickEntry.plusSpot`): the end of the day's list while it shows, else of Inbox; in its last section, at the top level. */
+	newTaskPlace(dayOffset: number, shown: readonly ListId[]): Destination {
+		const list: ListId = shown.includes("day") ? "day" : "inbox";
+		const sections = this.listOf(this.file, list, dayOffset);
+		const last = sections[sections.length - 1];
+		return { list, section: last?.name === null || !last ? null : last.id, before: null, dayOffset, depth: 0 };
 	}
 
 	/** Under its last subtask, at any depth, in the list the task's card stands in. */
@@ -207,7 +210,10 @@ export class MockPort implements ScreenPort {
 	async add(text: string, at: Destination): Promise<string> {
 		const id = `x${++this.added}`;
 		await this.write((file) => {
-			const task = this.newTask(text.trim(), null, id);
+			/** A level's prefix typed first sets it (F182): «p1 Купить молоко». */
+			const prefixed = /^(p1|p2) +(.*)$/.exec(text.trim());
+			const task = this.newTask(prefixed ? prefixed[2] : text.trim(), null, id);
+			if (prefixed) task.level = prefixed[1] as MockTask["level"];
 			if (at.under !== undefined) {
 				this.findBy(file, (t) => t.id === at.under)?.task.children.push(task);
 				return;

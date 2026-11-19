@@ -156,8 +156,10 @@ export interface ScreenActions {
 	 * `least`, the minutes of the shortest length kept. Whether anything was written.
 	 */
 	endResize(id: string, edge: Edge, minute: number | null, least: number): boolean;
-	/** Opens the new task's field at `at`, or at the port's place for new tasks; null closes it. */
-	openEntry(at?: Destination | null): void;
+	/** Opens the new task's field at `at`; null closes it. */
+	openEntry(at: Destination | null): void;
+	/** The plus tapped while the lists `shown` are on the screen: the field opens at the port's place for new tasks (F174). */
+	plusTap(shown: readonly ListId[]): void;
 	/** The field one level deeper (1) or shallower (-1), as Tab and Shift+Tab do. */
 	indentEntry(by: -1 | 1): void;
 	/**
@@ -414,7 +416,10 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 				if (get().layer) set({ layer: null });
 			},
 			openEntry(at) {
-				set({ entry: at === null ? null : (at ?? port.newTaskPlace(get().dayOffset)), entrySeq: get().entrySeq + 1, layer: null });
+				set({ entry: at, entrySeq: get().entrySeq + 1, layer: null });
+			},
+			plusTap(shown) {
+				get().openEntry(port.newTaskPlace(get().dayOffset, shown));
 			},
 			indentEntry(by) {
 				const entry = get().entry;

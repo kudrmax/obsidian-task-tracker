@@ -704,12 +704,12 @@ export const SortableRow = memo(function SortableRow({ id, onTap, gap = false, p
  * The plus as dnd-kit carries it: dragged it moves at once; tapped, it does what its `onTap` says. While it is carried, its
  * own place shows as a dashed ring (the old plugin's F176), and let go back over it nothing opens.
  */
-export function CarriedPlus({ onTap, children, ring }: { readonly onTap: () => void; readonly children: ReactNode; readonly ring: ReactNode }) {
+export function CarriedPlus({ onTap, children, ring, hidden = false }: { readonly onTap: () => void; readonly children: ReactNode; readonly ring: ReactNode; readonly hidden?: boolean }) {
 	const { setNodeRef, attributes, listeners, isDragging } = useDraggable({ id: PLUS });
 	return (
 		<>
 			{isDragging ? ring : null}
-			<button ref={setNodeRef} type="button" data-plus="" className={`tc-btn is-round is-accent tc-plus${isDragging ? " is-hidden" : ""}`} {...attributes} {...listeners} onClick={onTap}>
+			<button ref={setNodeRef} type="button" data-plus="" className={`tc-btn is-round is-accent tc-plus${isDragging || hidden ? " is-hidden" : ""}`} {...attributes} {...listeners} onClick={onTap}>
 				{children}
 			</button>
 		</>

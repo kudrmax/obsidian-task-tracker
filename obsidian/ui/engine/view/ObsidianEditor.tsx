@@ -1,6 +1,18 @@
+import { EditorState, type Transaction, type TransactionSpec } from "@codemirror/state";
+import { placeholder as hint } from "@codemirror/view";
 import { type FocusEvent, useEffect, useRef } from "react";
 import { type EditorHost, EmbeddedEditor } from "../../markdown/EmbeddedEditor";
 import { useHost } from "./host";
+
+/** A line break typed or pasted in a title (the plugin's `LINE_BREAK`): the title stays one line, which wraps. */
+const LINE_BREAK = /\r\n|\r|\n/g;
+
+/** Each line break that lands in the text, pasted or dropped, becomes a space in the same change (the plugin's `oneLineFilter`). */
+function oneLine(tr: Transaction): TransactionSpec | readonly TransactionSpec[] {
+	if (!tr.docChanged) return tr;
+	const breaks = [...tr.newDoc.toString().matchAll(LINE_BREAK)].map((m) => ({ from: m.index ?? 0, to: (m.index ?? 0) + m[0].length, insert: " " }));
+	return breaks.length === 0 ? tr : [tr, { changes: breaks, sequential: true }];
+}
 
 /** The view whose active editor a field becomes while it has the focus, so Obsidian's commands act on it. */
 const EDITOR_HOST: EditorHost = { activeEditor: null };
@@ -8,6 +20,8 @@ const EDITOR_HOST: EditorHost = { activeEditor: null };
 export interface ObsidianEditorProps {
 	readonly text: string;
 	readonly className: string;
+	/** What shows while the field is empty («New task»). */
+	readonly placeholder?: string;
 	/** The colour its task's level paints the field in (`data-priority`). */
 	readonly priority?: string | null;
 	/** Enter: the text as typed. */
@@ -24,7 +38,7 @@ export interface ObsidianEditorProps {
  * (`EmbeddedEditor`, stage 0 blocker 8): `[[` opens the note search, the look is Obsidian's. Made once as it mounts, given
  * the focus, destroyed as it goes.
  */
-export function ObsidianEditor({ text, className, priority = null, onEnter, onEscape, onTab, onLeave }: ObsidianEditorProps) {
+export function ObsidianEditor({ text, className, placeholder, priority = null, onEnter, onEscape, onTab, onLeave }: ObsidianEditorProps) {
 	const { app, sourcePath } = useHost();
 	const container = useRef<HTMLDivElement>(null);
 	const handlers = useRef({ onEnter, onEscape, onTab });
@@ -32,7 +46,8 @@ export function ObsidianEditor({ text, className, priority = null, onEnter, onEs
 	const editorRef = useRef<EmbeddedEditor | null>(null);
 	useEffect(() => {
 		if (!container.current) return;
-		const editor: EmbeddedEditor = new EmbeddedEditor(app, EDITOR_HOST, sourcePath, container.current, text, {
+		const editor: EmbeddedEditor = new EmbeddedEditor(app, EDITOR_HOST, sourcePath, container.current, text.replace(LINE_BREAK, " "), {
+			extensions: [EditorState.transactionFilter.of(oneLine), ...(placeholder ? [hint(placeholder)] : [])],
 			keys: [
 				{ key: "Enter", run: () => handlers.current.onEnter(editor.value) },
 				{ key: "Escape", run: () => handlers.current.onEscape() },
@@ -40,6 +55,8 @@ export function ObsidianEditor({ text, className, priority = null, onEnter, onEs
 			],
 		});
 		editorRef.current = editor;
+		/** The phone's keyboard offers «next»: Enter opens the next field (the plugin's `enterkeyhint`). */
+		editor.contentDOM.setAttribute("enterkeyhint", "next");
 		editor.focusEnd();
 		return () => {
 			editorRef.current = null;
