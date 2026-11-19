@@ -296,6 +296,8 @@ function useOpenMenu(): (id: string, event: MouseEvent<HTMLElement>) => void {
 	return (id, event) => {
 		pressed.current = null;
 		anchor.current = event.currentTarget.querySelector(".tc-event-block") ?? event.currentTarget;
+		/** Partly out of the calendar's sight, it is scrolled into it first (the design's «Полная карточка»). */
+		anchor.current.scrollIntoView({ block: "nearest" });
 		api.getState().openMenu(id, "calendar");
 	};
 }
@@ -358,6 +360,7 @@ const BlockItem = memo(function BlockItem({ block, box, shades, order, z, top, s
 				placed
 				onTap={(target) => {
 					anchor.current = target.querySelector("[data-block]") ?? target;
+					anchor.current.scrollIntoView({ block: "nearest" });
 					pressed.current = look;
 					api.getState().openMenu(block.id, "calendar");
 					api.getState().select(block.id);

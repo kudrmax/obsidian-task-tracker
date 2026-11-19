@@ -1,5 +1,5 @@
 import { defaultRangeExtractor, type Range, useVirtualizer } from "@tanstack/react-virtual";
-import { type CSSProperties, memo, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { type CSSProperties, memo, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { PROPERTY } from "../../design";
 import { PLUS, SortableList, SortableRow, useListTarget } from "../drag/Drag";
 import { descendantsOf } from "../drag/tree";
@@ -96,7 +96,8 @@ export const TaskList = memo(function TaskList({ list }: { readonly list: ListId
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [entrySeq]);
 
-	useEffect(() => {
+	/** Before the screen is painted, so a menu opening over the card finds it where it is shown. */
+	useLayoutEffect(() => {
 		if (!reveal) return;
 		const at = rows.findIndex((row) => row.id === reveal.id);
 		if (at >= 0) virtualizer.scrollToIndex(at, { align: "auto" });
@@ -161,7 +162,7 @@ const RowFace = memo(function RowFace({ row }: { readonly row: Row }) {
 			onTap={(target) => {
 				anchor.current = target.querySelector("[data-id]") ?? target;
 				pressed.current = null;
-				api.getState().openMenu(row.id);
+				api.getState().openMenu(row.id, "list", true);
 			}}
 		>
 			<Card id={row.id} depth={row.depth} />

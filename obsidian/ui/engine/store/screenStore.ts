@@ -123,8 +123,11 @@ export interface ScreenActions {
 	carryHome(): void;
 	/** The carried task let go at `to` (null: cancelled, or let go where nothing takes it). */
 	drop(id: string, to: Destination | null): void;
-	/** Opens the menu of the task or event `id`, opened `from` there (a list's card unless said). */
-	openMenu(id: string, from?: MenuFrom): void;
+	/**
+	 * Opens the menu of the task or event `id`, opened `from` there (a list's card unless said). `reveal`: a tap, not a finger
+	 * still held: a card partly out of its list's sight is scrolled into it first (the design's «Полная карточка»).
+	 */
+	openMenu(id: string, from?: MenuFrom, reveal?: boolean): void;
 	closeLayer(): void;
 	/** The open menu shows another page. */
 	menuPage(page: MenuPage): void;
@@ -381,7 +384,8 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 				set({ lifted: null, liftedDepth: null });
 				get().release("drag");
 			},
-			openMenu(id, from = "list") {
+			openMenu(id, from = "list", reveal = false) {
+				if (reveal) set({ reveal: { id, seq: (get().reveal?.seq ?? 0) + 1 } });
 				const over = get().layer;
 				const stack = from !== "stack" || !over ? null : (over.stack ?? (over.model.kind === "task" ? { of: over.id, ids: over.model.subtasks } : null));
 				set({ layer: { kind: "menu", id, from, model: port.menu(id, from), page: "menu", asking: null, field: null, stack }, ...(from === "list" ? { selected: null } : {}) });

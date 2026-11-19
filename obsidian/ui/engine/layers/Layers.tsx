@@ -1,4 +1,4 @@
-import { autoUpdate, flip, FloatingFocusManager, FloatingOverlay, FloatingPortal, hide, type Middleware, offset, type Placement, shift, size, useDismiss, useFloating, useInteractions, useRole, useTransitionStatus } from "@floating-ui/react";
+import { autoUpdate, flip, FloatingFocusManager, FloatingOverlay, FloatingPortal, hide, type Middleware, type MiddlewareState, offset, type Placement, shift, size, useDismiss, useFloating, useInteractions, useRole, useTransitionStatus } from "@floating-ui/react";
 import { type CSSProperties, createContext, type MutableRefObject, type ReactNode, useContext, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { DESIGN, LAYOUT } from "../../design";
 import { LAYER_MS } from "./motion";
@@ -88,12 +88,20 @@ export function MenuLayer({ open, onClose, root, reference, panelBy = null, labe
 	const [above, setAbove] = useState(0);
 	const [overEl, setOverEl] = useState<HTMLElement | null>(null);
 	const parts = useRef<{ upper: HTMLElement | null; lower: HTMLElement | null }>({ upper: null, lower: null });
+	/** The window less the phone's safe areas (`env(safe-area-inset-*)`, the plugin's `menuRoom`): every part stays inside it. */
+	const safe = useRef<HTMLElement | null>(null);
+	const [safeEl, setSafeEl] = useState<HTMLElement | null>(null);
+	const holdSafe = useCallback((el: HTMLDivElement | null) => {
+		safe.current = el;
+		setSafeEl(el);
+	}, []);
+	const within = safeEl ? { boundary: safeEl } : {};
 	const copy = useFloating({
 		open,
 		placement: "bottom-start",
 		strategy: "fixed",
 		transform: false,
-		middleware: [size({ apply: ({ rects, elements }) => void Object.assign(elements.floating.style, { minWidth: `${rects.reference.width}px`, maxWidth: keepWidth ? `${rects.reference.width}px` : "", minHeight: `${rects.reference.height}px` }) }), cover],
+		middleware: [size({ apply: ({ rects, elements }) => void Object.assign(elements.floating.style, { minWidth: `${rects.reference.width}px`, maxWidth: keepWidth ? `${rects.reference.width}px` : "", minHeight: `${rects.reference.height}px` }) }), coverIn(safe)],
 		whileElementsMounted: autoUpdate,
 		elements: { reference },
 	});
@@ -105,7 +113,7 @@ export function MenuLayer({ open, onClose, root, reference, panelBy = null, labe
 		placement: "bottom-start",
 		strategy: "fixed",
 		transform: false,
-		middleware: [offset(DESIGN.menuGap), splitBy(parts), shift({ padding: EDGES }), size({ padding: DESIGN.wholeMargin, apply: scrollWithin })],
+		middleware: [offset(DESIGN.menuGap), splitBy(parts, safe), shift({ padding: EDGES, ...within }), size({ padding: DESIGN.wholeMargin, apply: scrollWithin, ...within })],
 		whileElementsMounted: autoUpdate,
 		elements: { reference: panelBy ?? overEl },
 	});
@@ -114,7 +122,7 @@ export function MenuLayer({ open, onClose, root, reference, panelBy = null, labe
 		placement: "top-start",
 		strategy: "fixed",
 		transform: false,
-		middleware: [offset(DESIGN.menuGap), shift({ padding: EDGES }), size({ padding: DESIGN.wholeMargin, apply: scrollWithin })],
+		middleware: [offset(DESIGN.menuGap), shift({ padding: EDGES, ...within }), size({ padding: DESIGN.wholeMargin, apply: scrollWithin, ...within })],
 		whileElementsMounted: autoUpdate,
 		elements: { reference: panelBy ?? overEl },
 	});
@@ -127,7 +135,7 @@ export function MenuLayer({ open, onClose, root, reference, panelBy = null, labe
 		placement: "top-start",
 		strategy: "fixed",
 		transform: false,
-		middleware: [peekPlace(parts, split)],
+		middleware: [peekPlace(parts, split, safe)],
 		whileElementsMounted: autoUpdate,
 		elements: { reference: overEl },
 	});
@@ -154,6 +162,7 @@ export function MenuLayer({ open, onClose, root, reference, panelBy = null, labe
 		<FloatingPortal root={root}>
 			<FloatingOverlay className={`tc-backdrop tc-menu-layer${motion}`} />
 			<div className={`tc-level tc-menu-layer${motion}`}>
+				<div ref={holdSafe} className="tc-safe-room" aria-hidden="true" />
 				<div ref={(el) => {
 					copy.refs.setFloating(el);
 					setOverEl(el);
@@ -200,14 +209,28 @@ export function MenuLayer({ open, onClose, root, reference, panelBy = null, labe
  * moves left and up only as far as it must to stay inside the window less its margin, never past where the pressed thing
  * already reached (the core's `grownStart`).
  */
-const cover: Middleware = {
-	name: "cover",
-	fn: ({ rects, elements }) => {
-		const page = elements.floating.ownerDocument.documentElement;
-		const start = (at: number, size: number, grown: number, room: number) => Math.max(Math.min(at, DESIGN.wholeMargin), Math.min(at, Math.max(at + size, room - DESIGN.wholeMargin) - grown));
-		return { x: start(rects.reference.x, rects.reference.width, rects.floating.width, page.clientWidth), y: start(rects.reference.y, rects.reference.height, rects.floating.height, page.clientHeight) };
-	},
-};
+function coverIn(safe: MutableRefObject<HTMLElement | null>): Middleware {
+	return {
+		name: "cover",
+		async fn(state) {
+			const { rects } = state;
+			const room = await roomOf(state, safe);
+			const start = (at: number, size: number, grown: number, from: number, to: number) => Math.max(Math.min(at, from + DESIGN.wholeMargin), Math.min(at, Math.max(at + size, to - DESIGN.wholeMargin) - grown));
+			return { x: start(rects.reference.x, rects.reference.width, rects.floating.width, room.left, room.right), y: start(rects.reference.y, rects.reference.height, rects.floating.height, room.top, room.bottom) };
+		},
+	};
+}
+
+/** The window less its safe areas, in the floating element's own terms (Floating UI's measure of the level's safe room); the page's size without one. */
+async function roomOf(state: MiddlewareState, safe: MutableRefObject<HTMLElement | null>): Promise<{ readonly top: number; readonly bottom: number; readonly left: number; readonly right: number }> {
+	const el = safe.current;
+	if (el) {
+		const r = (await state.platform.getElementRects({ reference: el, floating: state.elements.floating, strategy: state.strategy })).reference;
+		return { top: r.y, bottom: r.y + r.height, left: r.x, right: r.x + r.width };
+	}
+	const page = state.elements.floating.ownerDocument.documentElement;
+	return { top: 0, bottom: page.clientHeight, left: 0, right: page.clientWidth };
+}
 
 /**
  * Where the start of a description stands (the plugin's `DescriptionPeek.place` and `placeBeside`): over the copy when the
@@ -215,30 +238,30 @@ const cover: Middleware = {
  * its far side; by a panel split over and under the copy, right of its part over the copy, or nowhere where the window
  * is too narrow (the phone). It keeps to its room, `--tc-desc-peek-max` at most, and stays away with less than three lines.
  */
-function peekPlace(parts: MutableRefObject<{ upper: HTMLElement | null; lower: HTMLElement | null }>, split: MutableRefObject<{ count: number; total: number }>): Middleware {
+function peekPlace(parts: MutableRefObject<{ upper: HTMLElement | null; lower: HTMLElement | null }>, split: MutableRefObject<{ count: number; total: number }>, safe: MutableRefObject<HTMLElement | null>): Middleware {
 	return {
 		name: "peek",
-		async fn({ rects, platform, elements, strategy }) {
+		async fn(state) {
+			const { rects, platform, elements, strategy } = state;
 			const { count, total } = split.current;
-			const page = elements.floating.ownerDocument.documentElement;
-			const [height, width] = [page.clientHeight, page.clientWidth];
+			const bounds = await roomOf(state, safe);
 			const copy = rects.reference;
 			const gap = LAYOUT.descPeekGap;
 			const margin = DESIGN.wholeMargin;
 			const least = LAYOUT.descPeekLeast;
-			const freeAbove = copy.y - gap - margin;
-			const freeBelow = height - (copy.y + copy.height) - gap - margin;
+			const freeAbove = copy.y - gap - margin - bounds.top;
+			const freeBelow = bounds.bottom - (copy.y + copy.height) - gap - margin;
 			let over = true;
 			let edge = copy.y - gap;
 			let room = freeAbove;
-			let x = Math.max(margin, Math.min(copy.x, width - margin - rects.floating.width));
+			let x = Math.max(bounds.left + margin, Math.min(copy.x, bounds.right - margin - rects.floating.width));
 			if (count > 0 && count < total) {
 				const upper = parts.current.upper;
 				/** Its left as placed (it grows from that edge) and its width unscaled: it may still be growing in. */
 				const beside = upper ? (await platform.getElementRects({ reference: upper, floating: elements.floating, strategy })).reference : null;
 				const wide = upper ? (await platform.getDimensions(upper)).width : 0;
-				x = beside ? beside.x + wide + DESIGN.menuGap : width;
-				const fits = x + rects.floating.width <= width - margin;
+				x = beside ? beside.x + wide + DESIGN.menuGap : bounds.right;
+				const fits = x + rects.floating.width <= bounds.right - margin;
 				if (!fits) room = 0;
 				else if (freeAbove < least) [over, edge, room] = [false, copy.y + copy.height + gap, freeBelow];
 			} else {
@@ -247,8 +270,8 @@ function peekPlace(parts: MutableRefObject<{ upper: HTMLElement | null; lower: H
 				const span = DESIGN.menuGap + (menu ? (await platform.getDimensions(menu)).height : 0);
 				if (!menuAbove && freeAbove >= least) [over, edge, room] = [true, copy.y - gap, freeAbove];
 				else if (menuAbove && freeBelow >= least) [over, edge, room] = [false, copy.y + copy.height + gap, freeBelow];
-				else if (menuAbove) [over, edge, room] = [true, copy.y - span - gap, copy.y - span - gap - margin];
-				else [over, edge, room] = [false, copy.y + copy.height + span + gap, height - (copy.y + copy.height) - span - gap - margin];
+				else if (menuAbove) [over, edge, room] = [true, copy.y - span - gap, copy.y - span - gap - margin - bounds.top];
+				else [over, edge, room] = [false, copy.y + copy.height + span + gap, bounds.bottom - (copy.y + copy.height) - span - gap - margin];
 			}
 			const most = `${Math.max(0, Math.min(DESIGN.descPeekMax, room))}px`;
 			if (elements.floating.style.maxHeight !== most) {
@@ -270,18 +293,19 @@ function scrollWithin({ availableHeight, elements }: { availableHeight: number; 
  * How many of the panel's groups stand over the copy (the plugin's `groupsAbove` over its `placePanel`): measured by
  * Floating UI as the panel is placed, each group's height wherever it stands now, against the room over and under the copy.
  */
-function splitBy(parts: MutableRefObject<{ upper: HTMLElement | null; lower: HTMLElement | null }>): Middleware {
+function splitBy(parts: MutableRefObject<{ upper: HTMLElement | null; lower: HTMLElement | null }>, safe: MutableRefObject<HTMLElement | null>): Middleware {
 	return {
 		name: "split",
-		async fn({ rects, platform, elements }) {
+		async fn(state) {
+			const { rects, platform } = state;
 			const groups = [parts.current.upper, parts.current.lower].flatMap((part) => (part ? [...part.children] : []));
 			/** As one panel would stand: a group drawn first in its part has no band over it, every group but the panel's first has one. */
 			const heights = await Promise.all(groups.map(async (group, i) => (await platform.getDimensions(group)).height - (group.previousElementSibling ? DESIGN.menuBand : 0) + (i > 0 ? DESIGN.menuBand : 0)));
 			const cuts = heights.slice(0, -1).map((_, i) => heights.slice(0, i + 1).reduce((a, b) => a + b, 0));
 			const total = heights.reduce((a, b) => a + b, 0);
-			const windowHeight = elements.floating.ownerDocument.documentElement.clientHeight;
-			const roomOver = rects.reference.y - DESIGN.menuGap - DESIGN.wholeMargin;
-			const roomUnder = windowHeight - (rects.reference.y + rects.reference.height) - DESIGN.menuGap - DESIGN.wholeMargin;
+			const bounds = await roomOf(state, safe);
+			const roomOver = rects.reference.y - DESIGN.menuGap - DESIGN.wholeMargin - bounds.top;
+			const roomUnder = bounds.bottom - (rects.reference.y + rects.reference.height) - DESIGN.menuGap - DESIGN.wholeMargin;
 			return { data: { above: groupsAbove(cuts, total, roomOver, roomUnder, groups.length > 1) } };
 		},
 	};
