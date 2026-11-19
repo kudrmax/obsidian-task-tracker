@@ -17,6 +17,10 @@ Spec: [`../specs/2026-11-18-ui-engine.md`](../specs/2026-11-18-ui-engine.md). Wh
 
 The ribbon on the stand («The whole screen») is stage 0's pager (round six, ~95 % on Max's swipes). CSS scroll-snap, Embla and Lethargy failed in stage 0 (stage0.md, item 12 and «The ribbon on a real trackpad»).
 
+## Max's decision on the ribbon (2026-11-19, supersedes stage 0 round six)
+
+«Обычное листание колонок, как везде… как фотки в галерее. Я могу остановить палец на середине, но оно в итоге долистнется или не долистнется… что пальцем по экрану, что пальцем по трекпаду — абсолютно одно и то же действие.» So: one behaviour for the finger on the phone and two fingers on the trackpad — the columns follow the fingers 1:1, can be held mid-way, and on release settle to the nearest place or one place on by the swipe's speed (never two); the same feel at any speed. Round six's «trackpad as a pager, no in-between states» is withdrawn; Max now rates the stand's pager as not for production. Built in slices, each shown to Max: first the three stops as plain columns with this behaviour, nothing else.
+
 ## Open problems, in order
 
 1. **Tasks stuck together on the calendar.** A card lying on another card doesn't read as separate. Rejected: hairline ring, tight shadow, tone of the upper card, wide shade all round (it erased the card's edge on the ground). In work: a shade only on the card underneath, only where another card lies on it (Decision 60, rewritten).
