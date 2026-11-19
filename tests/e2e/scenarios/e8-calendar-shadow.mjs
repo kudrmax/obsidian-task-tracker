@@ -6,6 +6,44 @@ import { calendarTools } from "../lib/calendar.mjs";
 const CARDS = `[...document.querySelectorAll(".tc-items > .tc-block:not(.is-new-slot)")].map((b) => { const c = b.querySelector(".tc-block-card"); const r = c.getBoundingClientRect(); return { title: c.querySelector(".tc-card-title")?.textContent ?? null, left: r.left, top: r.top, right: r.right, bottom: r.bottom, z: Number(getComputedStyle(b).zIndex), shadow: getComputedStyle(c).boxShadow, shades: [...b.querySelectorAll(":scope > .tc-shades")].map((s) => { const q = s.getBoundingClientRect(); return { left: q.left, top: q.top, right: q.right, bottom: q.bottom, overflow: getComputedStyle(s).overflow, radius: getComputedStyle(s).borderRadius, card: getComputedStyle(c).borderRadius, n: s.children.length }; }) }; })`;
 const crosses = (a, b) => a.top < b.bottom && b.top < a.bottom && a.left < b.right && b.left < a.right;
 
+/** The colour (R, G, B, each of 255) of the screen at each point (CSS px), the device's pixels of that CSS pixel averaged. */
+async function coloursAt(t, points) {
+	const xs = points.map((p) => p.x), ys = points.map((p) => p.y);
+	const clip = { x: Math.floor(Math.min(...xs)) - 1, y: Math.floor(Math.min(...ys)) - 1, width: 0, height: 0 };
+	clip.width = Math.ceil(Math.max(...xs)) + 2 - clip.x;
+	clip.height = Math.ceil(Math.max(...ys)) + 2 - clip.y;
+	const data = (await t.cdp.send("Page.captureScreenshot", { format: "png", clip: { ...clip, scale: 1 } })).data;
+	return t.cdp.eval(`(async () => {
+		const img = new Image(); img.src = "data:image/png;base64,${data}"; await img.decode();
+		const c = document.createElement("canvas"); c.width = img.width; c.height = img.height; const g = c.getContext("2d"); g.drawImage(img, 0, 0);
+		const px = g.getImageData(0, 0, img.width, img.height).data; const k = img.width / ${clip.width};
+		return ${JSON.stringify(points)}.map((p) => { const rgb = [0, 0, 0]; let n = 0;
+			for (let dy = 0; dy < k; dy++) for (let dx = 0; dx < k; dx++) { const i = ((Math.floor((Math.floor(p.y) - ${clip.y}) * k) + dy) * img.width + Math.floor((Math.floor(p.x) - ${clip.x}) * k) + dx) * 4; rgb[0] += px[i]; rgb[1] += px[i + 1]; rgb[2] += px[i + 2]; n++; }
+			return rgb.map((v) => Math.round(v / n)); });
+	})()`);
+}
+
+/**
+ * A card lying on a card keeps its rounded ends (Max, 2026-11-19: «справа задача стала КВАДРАТНОЙ»): the two cards are
+ * the same colour and share their right edge, so where the upper card's right corner lies on the card under it only the
+ * shade tells the corner from that card. Just inside each right corner of the upper card, off its rounded edge, the
+ * screen is not the upper card's colour: the card under it, shaded there as along the upper card's top, or the ground.
+ */
+async function roundedEnds(t, upper, upperTitle) {
+	const r = await t.cdp.eval(`parseFloat(getComputedStyle([...document.querySelectorAll(".tc-block-card")].find((c) => c.querySelector(".tc-card-title")?.textContent === ${JSON.stringify(upperTitle)})).borderTopRightRadius)`);
+	const inset = Math.max(1.5, r * 0.15);
+	const fill = { x: upper.right - 3, y: upper.top + (upper.bottom - upper.top) / 2 };
+	const corners = { "top right": { x: upper.right - inset, y: upper.top + inset }, "bottom right": { x: upper.right - inset, y: upper.bottom - inset } };
+	const [own, ...seen] = await coloursAt(t, [fill, ...Object.values(corners)]);
+	const apart = (a, b) => Math.max(...a.map((v, i) => Math.abs(v - b[i])));
+	const result = { radius: r, own };
+	Object.keys(corners).forEach((name, i) => {
+		result[name] = seen[i];
+		t.expect(apart(seen[i], own) >= 2, `«${upperTitle}»'s ${name} corner is rounded: just inside it the screen is ${seen[i]}, not the card's own ${own}`);
+	});
+	return result;
+}
+
 /**
  * The darkening the shades add in a region (CSS px), read from the screen as drawn with and without them: grey levels
  * of 255 at each CSS pixel (the mean of R, G and B, the device's pixels of it averaged).
@@ -28,6 +66,66 @@ async function darkening(t, clip) {
 			out.push(Math.round(s / n)); }
 		return { w: W, h: H, d: out };
 	})()`);
+}
+
+/**
+ * The card `upperTitle` lying on `lowerTitle` as drawn now (`cards`), measured from the screen with and without the
+ * shades: nothing outside the lower card changes, its darkening along the upper card's edges is soft, and the upper
+ * card keeps its rounded right ends. Returns the measures, or why it was not measured.
+ */
+async function lyingOn(t, cards, lowerTitle, upperTitle) {
+		const lower = cards.find((c) => c.title === lowerTitle);
+		const upper = cards.find((c) => c.title === upperTitle);
+		if (!lower || !upper || !crosses(lower, upper)) return "not lying on it at this zoom";
+		t.expect(upper.z > lower.z, `«${upperTitle}» is drawn over «${lowerTitle}»`);
+		const room = await t.cdp.eval(`(() => { const r = document.querySelector(".tc-timeline").getBoundingClientRect(); return { left: r.left, top: r.top, right: r.right, bottom: r.bottom }; })()`);
+		const clip = { x: Math.max(room.left, lower.left - 24), y: Math.max(room.top, Math.min(lower.top, upper.top) - 24), width: 0, height: 0 };
+		clip.width = Math.min(room.right, lower.right + 24) - clip.x;
+		clip.height = Math.min(room.bottom, Math.max(lower.bottom, upper.bottom) + 24) - clip.y;
+		const { w, h, d } = await darkening(t, clip);
+		const at = (x, y) => d[Math.floor(y - clip.y) * w + Math.floor(x - clip.x)];
+		const inside = (box, x, y, edge = 0) => x >= box.left - edge && x < box.right + edge && y >= box.top - edge && y < box.bottom + edge;
+		let outside = 0;
+		for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (!inside(lower, clip.x + x + 0.5, clip.y + y + 0.5)) outside = Math.max(outside, Math.abs(d[y * w + x]));
+		const mid = upper.left + (upper.right - upper.left) / 2;
+		const above = Array.from({ length: Math.min(16, Math.floor(upper.top - lower.top) - 2) }, (_, i) => at(mid, upper.top - 2 - i));
+		const across = (Math.max(upper.top, lower.top) + Math.min(upper.bottom, lower.bottom)) / 2;
+		const left = Array.from({ length: Math.min(16, Math.floor(upper.left - lower.left) - 2) }, (_, i) => at(upper.left - 2 - i, across));
+		const below = Array.from({ length: Math.max(0, Math.min(16, Math.floor(lower.bottom - upper.bottom) - 1)) }, (_, i) => at(mid, upper.bottom + 1 + i));
+		const ends = await roundedEnds(t, upper, upperTitle);
+		t.expect(outside === 0, `not one pixel outside «${lowerTitle}» changes (${outside})`);
+		const soft = (profile, name) => {
+			if (profile.length === 0) return;
+			t.expect(profile[0] >= 2 && profile[0] <= 40, `«${lowerTitle}» darkens ${name} «${upperTitle}»'s edge, faintly: ${profile}`);
+			t.expect(profile.every((v, i) => i === 0 || v <= profile[i - 1] + 1), `the shade ${name} fades from the edge, never a line: ${profile}`);
+			t.expect(profile.at(-1) <= Math.max(1, profile[0] / 4), `it fades within ${profile.length} px: ${profile}`);
+		};
+		soft(above, "above");
+		soft(left, "left of");
+		soft(below, "below");
+		return { outside, above, left, below, ends };
+}
+
+/**
+ * A zoom in at the calendar's middle, as a person does it: a pinch of two fingers spreading on the phone, Ctrl + wheel
+ * on the desktop.
+ */
+async function zoomIn(t) {
+	const room = await t.cdp.eval(`(() => { const r = document.querySelector(".tc-timeline").getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+	if (t.platform === "phone") {
+		const at = (d) => [{ x: room.x, y: room.y - d, id: 0 }, { x: room.x, y: room.y + d, id: 1 }];
+		await t.cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: at(40) });
+		for (let i = 1; i <= 12; i++) {
+			await t.cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: at(40 + (60 * i) / 12) });
+			await t.sleep(16);
+		}
+		await t.cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+	} else
+		for (let i = 0; i < 12; i++) {
+			await t.input.wheel(room.x, room.y, 0, -8, true);
+			await t.sleep(16);
+		}
+	await t.sleep(600);
 }
 
 /**
@@ -68,40 +166,7 @@ export default {
 			["Обед", "Позвонить в банк"],
 		];
 		const measures = {};
-		for (const [lowerTitle, upperTitle] of pairs) {
-			const lower = cards.find((c) => c.title === lowerTitle);
-			const upper = cards.find((c) => c.title === upperTitle);
-			if (!lower || !upper || !crosses(lower, upper)) {
-				measures[`${upperTitle} on ${lowerTitle}`] = "not lying on it at this zoom";
-				continue;
-			}
-			t.expect(upper.z > lower.z, `«${upperTitle}» is drawn over «${lowerTitle}»`);
-			const room = await t.cdp.eval(`(() => { const r = document.querySelector(".tc-timeline").getBoundingClientRect(); return { left: r.left, top: r.top, right: r.right, bottom: r.bottom }; })()`);
-			const clip = { x: Math.max(room.left, lower.left - 24), y: Math.max(room.top, Math.min(lower.top, upper.top) - 24), width: 0, height: 0 };
-			clip.width = Math.min(room.right, lower.right + 24) - clip.x;
-			clip.height = Math.min(room.bottom, Math.max(lower.bottom, upper.bottom) + 24) - clip.y;
-			const { w, h, d } = await darkening(t, clip);
-			const at = (x, y) => d[Math.floor(y - clip.y) * w + Math.floor(x - clip.x)];
-			const inside = (box, x, y, edge = 0) => x >= box.left - edge && x < box.right + edge && y >= box.top - edge && y < box.bottom + edge;
-			let outside = 0;
-			for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (!inside(lower, clip.x + x + 0.5, clip.y + y + 0.5)) outside = Math.max(outside, Math.abs(d[y * w + x]));
-			const mid = upper.left + (upper.right - upper.left) / 2;
-			const above = Array.from({ length: Math.min(16, Math.floor(upper.top - lower.top) - 2) }, (_, i) => at(mid, upper.top - 2 - i));
-			const across = (Math.max(upper.top, lower.top) + Math.min(upper.bottom, lower.bottom)) / 2;
-			const left = Array.from({ length: Math.min(16, Math.floor(upper.left - lower.left) - 2) }, (_, i) => at(upper.left - 2 - i, across));
-			const below = Array.from({ length: Math.max(0, Math.min(16, Math.floor(lower.bottom - upper.bottom) - 1)) }, (_, i) => at(mid, upper.bottom + 1 + i));
-			measures[`${upperTitle} on ${lowerTitle}`] = { outside, above, left, below };
-			t.expect(outside === 0, `not one pixel outside «${lowerTitle}» changes (${outside})`);
-			const soft = (profile, name) => {
-				if (profile.length === 0) return;
-				t.expect(profile[0] >= 2 && profile[0] <= 40, `«${lowerTitle}» darkens ${name} «${upperTitle}»'s edge, faintly: ${profile}`);
-				t.expect(profile.every((v, i) => i === 0 || v <= profile[i - 1] + 1), `the shade ${name} fades from the edge, never a line: ${profile}`);
-				t.expect(profile.at(-1) <= Math.max(1, profile[0] / 4), `it fades within ${profile.length} px: ${profile}`);
-			};
-			soft(above, "above");
-			soft(left, "left of");
-			soft(below, "below");
-		}
+		for (const [lowerTitle, upperTitle] of pairs) measures[`${upperTitle} on ${lowerTitle}`] = await lyingOn(t, cards, lowerTitle, upperTitle);
 		for (const title of ["Созвон с командой", "Тренировка"]) {
 			const card = cards.find((c) => c.title === title);
 			if (!card) continue;
@@ -126,6 +191,35 @@ export default {
 			const top = Math.min(card.top, lower.top) - 24;
 			await t.shot(name, { x: Math.min(card.left, lower.left) - 24, y: top, width: Math.max(card.right, lower.right) - Math.min(card.left, lower.left) + 48, height: Math.max(card.bottom, lower.bottom) - top + 24 });
 		}
+
+		/** The right ends of a pair, close up: where the upper card's rounded corners lie on the card under it. */
+		const ends = async (drawn, lowerTitle, upperTitle, name) => {
+			const lower = drawn.find((c) => c.title === lowerTitle);
+			const upper = drawn.find((c) => c.title === upperTitle);
+			if (!lower || !upper) return;
+			const top = Math.min(lower.top, upper.top) - 12;
+			await t.shot(name, { x: upper.right - 96, y: top, width: 108, height: Math.max(lower.bottom, upper.bottom) + 12 - top });
+		};
+		await ends(cards, "Ревью дизайна", "Звонок врачу", "doctor-on-review-end");
+
+		/** Zoomed in, «Позвонить в банк» lies on «Обед» (at the base zoom it stands stacked under it), as on Max's stand. */
+		for (let i = 0; i < 6 && Number(await t.cdp.eval(`document.querySelector(".tc-timeline").dataset.hourPx`)) < 120; i++) await zoomIn(t);
+		await cal.scrollTo((await cal.timeOf("Обед")).start, 40);
+		await t.sleep(500);
+		const zoomed = await t.cdp.eval(CARDS);
+		const lunch = await lyingOn(t, zoomed, "Обед", "Позвонить в банк");
+		measures["Позвонить в банк on Обед, zoomed in"] = lunch;
+		t.expect(typeof lunch === "object", `zoomed in, «Позвонить в банк» lies on «Обед»: ${JSON.stringify(lunch)}`);
+		writeFileSync(join(t.out, "measures.json"), JSON.stringify(measures, null, 2));
+		const bank = zoomed.find((c) => c.title === "Позвонить в банк");
+		const lunchCard = zoomed.find((c) => c.title === "Обед");
+		if (bank && lunchCard) {
+			const top = Math.min(bank.top, lunchCard.top) - 24;
+			await t.shot("bank-on-lunch-zoomed", { x: lunchCard.left - 24, y: top, width: lunchCard.right - lunchCard.left + 48, height: Math.max(bank.bottom, lunchCard.bottom) - top + 24 });
+		}
+		await ends(zoomed, "Обед", "Позвонить в банк", "bank-on-lunch-zoomed-end");
+		await cal.scrollTo((await cal.timeOf("Ревью дизайна")).start, 40);
+		await t.sleep(500);
 
 		const review = await cal.blockBy("Ревью дизайна");
 		await cal.tap({ x: review.left + 40, y: review.top + 10 });
