@@ -2,7 +2,7 @@ import { calendarTools } from "../lib/calendar.mjs";
 
 /**
  * E3, a new task on the calendar (F101, F175, F190), the clock at noon: a long press on empty time (on the desktop, the
- * mouse pressed and moved) lifts the new task's place there, its start written on it; moved, it follows by the snap step;
+ * mouse held still too) lifts the new task's place there, its start written on it; moved, it follows by the snap step;
  * let go, the field opens at that time, and what is typed is written today at that time without a length. The plus
  * carried onto the calendar does the same where it is let go.
  */
@@ -21,7 +21,7 @@ export default {
 		const empty = await cal.lineAt(16 * 60);
 		const from = { x: empty.room.left + (empty.room.right - empty.room.left) * 0.6, y: empty.y + 4 };
 		const to = { x: from.x, y: from.y + empty.hour / 2 };
-		const release = await cal.pull(from, to, { holdMs: t.platform === "phone" ? 400 : 0 });
+		const release = await cal.pull(from, to, { holdMs: 400 });
 		const shown = await placeTime();
 		await t.shot("new-place");
 		await release();
