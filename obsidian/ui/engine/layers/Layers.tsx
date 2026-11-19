@@ -109,7 +109,7 @@ export function MenuLayer({ open, onClose, root, reference, label, over, groups,
 	}, [wanted, above]);
 	const { isMounted, status } = useTransitionStatus(lower.context, { duration: { open: LAYER_MS.open, close: LAYER_MS.close } });
 	/** Closed by the click, not the press: the finger's tap ends on the backdrop, never on a card under the fading menu. */
-	const dismiss = useDismiss(lower.context, { outsidePressEvent: "click", outsidePress: (event) => !(overEl && event.target instanceof Node && overEl.contains(event.target)) });
+	const dismiss = useDismiss(lower.context, { outsidePressEvent: "click", outsidePress: (event) => !(event.target instanceof Node && [overEl, parts.current.upper, parts.current.lower].some((part) => part?.contains(event.target as Node))) });
 	const { getFloatingProps } = useInteractions([dismiss, useRole(lower.context, { role: "menu" })]);
 	if (!isMounted) return null;
 	const count = Math.min(above, groups.length);
