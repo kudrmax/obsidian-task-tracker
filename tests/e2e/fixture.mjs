@@ -85,7 +85,8 @@ async function scenarioTools(page, { platform, theme, out }) {
 			writeFileSync(join(out, `${cast ?? "frames"}.json`), JSON.stringify(frames));
 			return frameFaults(frames, checks);
 		},
-		shot: (name) => screenshot(cdp, join(out, `${name}.png`)),
+		/** The screen, or a region of it (`clip`: x, y, width, height) magnified three times. */
+		shot: (name, clip) => screenshot(cdp, join(out, `${name}.png`), clip),
 		/** A recording replayed in a window of its size: an event recorded past this window's edge would never reach the page. */
 		async replay(recording, opts) {
 			const file = join(ROOT, "tests/e2e/recordings", recording);

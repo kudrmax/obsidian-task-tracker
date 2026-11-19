@@ -61,6 +61,8 @@ body {
 	--tc-float-bg: #2C2C2E;
 	--tc-float-month: #AEAEB2;
 	--tc-shadow-lift: 0 14px 32px rgba(0, 0, 0, 0.7), 0 0 0 1px #48484A;
+	/* A task on the calendar casts a light shadow so its edge reads against a card under it and an event's tint (Max, 2026-11-19); on black a shadow barely shows, so a faint ring of the ground draws the edge. The lists' cards have none. */
+	--tc-shadow-block: 0 0 0 0.5px rgba(0, 0, 0, 0.8), 0 1px 3px rgba(0, 0, 0, 0.6);
 	--tc-branch: #48484A;
 	--tc-mask-ink: #000000;
 	/* Obsidian's accent where the board uses it as ink: the month arrows, the chosen day. */
@@ -768,6 +770,7 @@ body.theme-light {
 	--tc-event-past-bg: color-mix(in srgb, var(--tc-bg), var(--tc-text) var(--tc-event-past-lift-light));
 	--tc-event-past-fg: color-mix(in srgb, var(--tc-bg), var(--tc-text) var(--tc-event-past-ink-light));
 	--tc-shadow-lift: 0 14px 32px rgba(0, 0, 0, 0.18), 0 0 0 0.5px rgba(0, 0, 0, 0.12);
+	--tc-shadow-block: 0 0 0 0.5px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.14);
 	--tc-shadow-control: 0 6px 16px rgba(0, 0, 0, 0.12), 0 0 0 0.5px rgba(0, 0, 0, 0.1);
 	--tc-branch: #C7C7CC;
 	--tc-danger: #FF3B30;
@@ -1858,6 +1861,9 @@ body.theme-light .task-calendar.is-engine :is(.tc-event, .tc-allday) { --tc-even
 /* Drawn by a new scale (a zoom, a refit), a block stands on the grid at once, as the hour lines and the events do: a change of scale is no move. */
 .task-calendar.is-engine .tc-canvas.is-rescaled .tc-items > .tc-block { transition: none; }
 .tc-drag-source.is-lifted > .tc-block-card { background: none; box-shadow: none; outline: var(--tc-hairline) dashed var(--tc-dash); outline-offset: calc(-1 * var(--tc-hairline)); }
+/* A task on the calendar casts the calendar's light shadow (Max, 2026-11-19, Decision 56): each card's edge reads over the card under it and over an event. Not its dashed place, not the carried copy; ringed, it keeps the shadow under the ring. */
+.task-calendar.is-engine .tc-items > .tc-block > .tc-drag-source:not(.is-lifted) > .tc-block-card { box-shadow: var(--tc-shadow-block); }
+.task-calendar.is-engine .tc-items > .tc-block:is(.is-selected, .is-found) > .tc-drag-source:not(.is-lifted) > .tc-block-card, .task-calendar.is-engine .tc-items > .tc-block > .tc-drag-source:not(.is-lifted) > .tc-block-card.is-first-step, .task-calendar.is-engine .tc-items > .tc-calendar-entry .tc-quick-field { box-shadow: var(--tc-ring-selected), var(--tc-shadow-block); }
 .tc-drag-source.is-lifted > .tc-block-card > *, .tc-drag-source.is-lifted > .tc-block-card::before { visibility: hidden; }
 /* The carried copy rides the pointer in dnd-kit's overlay, outside the screen's styles: it carries the screen's type itself. */
 .tc-overlay { font-family: var(--tc-font-ui); font-size: var(--tc-font-body); font-weight: var(--tc-weight-normal); line-height: var(--tc-leading-normal); color: var(--tc-text); z-index: var(--tc-layer-float); }

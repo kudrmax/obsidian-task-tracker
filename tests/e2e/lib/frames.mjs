@@ -203,8 +203,8 @@ export class Screencast {
 }
 
 /** A screenshot of the window into `file`. */
-export async function screenshot(cdp, file) {
-	const shot = await cdp.send("Page.captureScreenshot", { format: "png" });
+export async function screenshot(cdp, file, clip) {
+	const shot = await cdp.send("Page.captureScreenshot", clip ? { format: "png", clip: { scale: 3, ...clip } } : { format: "png" });
 	writeFileSync(file, Buffer.from(shot.data, "base64"));
 	return file;
 }
