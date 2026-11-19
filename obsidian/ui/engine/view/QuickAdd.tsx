@@ -1,9 +1,10 @@
-import { memo, type FocusEvent, type CSSProperties } from "react";
+import { memo, type FocusEvent, type CSSProperties, useState } from "react";
 import { PROPERTY } from "../../design";
 import { CarriedPlus } from "../drag/Drag";
 import { useScreen, useScreenApi } from "../store";
 import { Icon } from "./Icon";
 import { ObsidianEditor } from "./ObsidianEditor";
+import { useField } from "../layers/Layers";
 import type { ListId } from "../port";
 
 /**
@@ -38,16 +39,25 @@ const RING = (
  */
 export const EntryField = memo(function EntryField({ depth }: { readonly depth: number }) {
 	const api = useScreenApi();
+	const { setField } = useField();
+	/** The field takes the colour of the level set on the bar or typed as a prefix (the port's `tint`). */
+	const tint = useScreen((s) => (s.entry ? s.entryBar(s.entry, s.draft, s.entryText).tint : null));
+	/** A field opened again elsewhere (its place changed on the bar) keeps what was typed. */
+	const [typed] = useState(() => api.getState().entryText);
 	const commitOnLeave = (event: FocusEvent<HTMLDivElement>, text: () => string) => {
-		if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+		const to = event.relatedTarget as Element | null;
+		/** The bar, or the same field opened again at its new place, keeps the typing going. */
+		if (event.currentTarget.contains(to) || to?.closest?.(".tc-quick-bar, .tc-quick-field")) return;
 		void api.getState().commitEntry(text(), false);
 	};
 	return (
-		<div className="tc-quick-row tc-entry" style={{ [PROPERTY.level]: String(depth) } as CSSProperties}>
+		<div ref={setField} className="tc-quick-row tc-entry" style={{ [PROPERTY.level]: String(depth) } as CSSProperties}>
 			<ObsidianEditor
-				text=""
+				text={typed}
 				className="tc-quick-field tc-title-field"
 				placeholder="New task"
+				priority={tint}
+				onChange={(text) => api.getState().typeEntry(text)}
 				onEnter={(text) => void api.getState().commitEntry(text, true)}
 				onEscape={() => api.getState().openEntry(null)}
 				onTab={(shift) => api.getState().indentEntry(shift ? -1 : 1)}

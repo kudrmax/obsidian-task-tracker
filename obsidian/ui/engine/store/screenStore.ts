@@ -1,12 +1,19 @@
 import { DESIGN } from "../../design";
 import { createStore, type StoreApi } from "zustand/vanilla";
 import { LAYER_MS } from "../layers/motion";
-import type { Destination, Edge, ListId, MenuAction, MenuFrom, MenuModel, Now, ScreenData, ScreenPort, StatusId } from "../port";
+import type { Destination, Edge, EntryBar, EntryDraft, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, ScreenData, ScreenPort, StatusId } from "../port";
 import { share } from "./share";
 
 /** Where the ribbon stands: Inbox–Soon, Soon–the day, the day–its calendar. */
 export type Stop = "inbox" | "soon" | "calendar";
 export const STOPS: readonly Stop[] = ["inbox", "soon", "calendar"];
+/** The lists the ribbon shows at each stop. */
+export const STOP_LISTS: Readonly<Record<Stop, readonly ListId[]>> = { inbox: ["inbox", "soon"], soon: ["soon", "day"], calendar: ["day"] };
+/** Whether a stop shows a list, and the stop the ribbon turns to for a list it doesn't show: the screen's columns, not a task's. */
+const SHOWS: Readonly<Record<Stop, Readonly<Record<ListId, boolean>>>> = { inbox: { inbox: true, soon: true, day: false }, soon: { inbox: false, soon: true, day: true }, calendar: { inbox: false, soon: false, day: true } };
+const STOP_OF: Readonly<Record<ListId, Stop>> = { inbox: "inbox", soon: "soon", day: "soon" };
+
+const NO_DRAFT: EntryDraft = { level: null, project: null };
 
 /** The one gesture that holds the pointer (spec, «Which gesture holds the pointer»). */
 export type Gesture = "drag" | "ribbon" | "resize" | "zoom";
@@ -78,6 +85,9 @@ export interface ScreenState {
 	readonly selected: string | null;
 	/** The task being resized by a dot, and which: its moving edge's time shows on a pill. */
 	readonly resizing: { readonly id: string; readonly edge: "start" | "end" } | null;
+	/** What the bar has set for the task being typed, and the text typed so far (a level's prefix lights the flag). */
+	readonly draft: EntryDraft;
+	readonly entryText: string;
 	/** The task whose card is its rename field now (F117), in a list or on the calendar. */
 	readonly renaming: string | null;
 	/** Counts the fields opened: each new one (after Enter) is a fresh, empty field. */
@@ -158,6 +168,16 @@ export interface ScreenActions {
 	endResize(id: string, edge: Edge, minute: number | null, least: number): boolean;
 	/** Opens the new task's field at `at`; null closes it. */
 	openEntry(at: Destination | null): void;
+	/** The bar of the field at `at` (the port's answer). */
+	entryBar(at: Destination, draft: EntryDraft, text: string): EntryBar;
+	/** The field's text as typed. */
+	typeEntry(text: string): void;
+	/** A level's tile on the bar: set, or taken off when it was the one set. */
+	draftLevel(prefix: string): void;
+	/** A project picked on the bar (null: No project). */
+	draftProject(name: string | null): void;
+	/** A place picked on the bar: the field goes to the end of that list or day, the ribbon and the day turning to show it. */
+	entryPlace(choice: PlaceId, date: string | null): void;
 	/** The plus tapped while the lists `shown` are on the screen: the field opens at the port's place for new tasks (F174). */
 	plusTap(shown: readonly ListId[]): void;
 	/** The field one level deeper (1) or shallower (-1), as Tab and Shift+Tab do. */
@@ -243,6 +263,8 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 			now: port.now(),
 			layer: null,
 			entry: null,
+			draft: NO_DRAFT,
+			entryText: "",
 			renaming: null,
 			entrySeq: 0,
 			plusAt: null,
@@ -416,7 +438,29 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 				if (get().layer) set({ layer: null });
 			},
 			openEntry(at) {
-				set({ entry: at, entrySeq: get().entrySeq + 1, layer: null });
+				set({ entry: at, entrySeq: get().entrySeq + 1, layer: null, entryText: "", ...(at === null ? { draft: NO_DRAFT } : {}) });
+			},
+			entryBar(at, draft, text) {
+				return port.entryBar(at, draft, text);
+			},
+			typeEntry(entryText) {
+				if (get().entryText !== entryText) set({ entryText });
+			},
+			draftLevel(prefix) {
+				const draft = get().draft;
+				set({ draft: { ...draft, level: draft.level === prefix ? null : prefix } });
+			},
+			draftProject(project) {
+				set({ draft: { ...get().draft, project } });
+			},
+			entryPlace(choice, date) {
+				const { entry, stop } = get();
+				if (!entry) return;
+				const to = port.entryPlace(entry, choice, date);
+				if (to.dayOffset !== get().dayOffset) get().showDay(to.dayOffset);
+				const where = to.list;
+				/** The field opens again at its new place, with what was typed (a new field brought into sight, F193). */
+				set({ entry: to, entrySeq: get().entrySeq + 1, ...(SHOWS[stop][where] ? {} : { stop: STOP_OF[where] }) });
 			},
 			plusTap(shown) {
 				get().openEntry(port.newTaskPlace(get().dayOffset, shown));
@@ -430,13 +474,15 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 				if (!entry) return;
 				if (text.trim() === "") {
 					const depth = entry.depth ?? 0;
-					set({ entry: next && depth > 0 ? { ...entry, depth: depth - 1 } : null });
+					set(next && depth > 0 ? { entry: { ...entry, depth: depth - 1, under: undefined } } : { entry: null, draft: NO_DRAFT, entryText: "" });
 					return;
 				}
 				/** A field on the calendar takes one task: its minute is that task's. */
 				const again = next && entry.at === undefined;
-				set({ entry: again ? entry : null, entrySeq: get().entrySeq + 1 });
-				const added = port.add(text, entry);
+				const draft = get().draft;
+				/** The next field keeps the project, not the level (the plugin's batch typing). */
+				set({ entry: again ? entry : null, entrySeq: get().entrySeq + 1, entryText: "", draft: again ? { level: null, project: draft.project } : NO_DRAFT });
+				const added = port.add(text, entry, draft);
 				write(added);
 				await added;
 			},

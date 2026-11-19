@@ -3,8 +3,9 @@ import { PROPERTY } from "../../design";
 import { Drag, type Grab, type Landing } from "../drag/Drag";
 import { Layers } from "../layers/Layers";
 import { Layout, type Place } from "../layout/Layout";
-import { StoreContext, type ScreenStore } from "../store";
+import { StoreContext, type ScreenStore, useScreen } from "../store";
 import { type BlockLook, Card, PressedLook } from "./Card";
+import { QuickBar } from "./QuickBar";
 import { Icon } from "./Icon";
 import { HostContext, type ScreenHost } from "./host";
 
@@ -49,13 +50,22 @@ export function TaskScreen({ store, host, place }: { readonly store: ScreenStore
 			<HostContext.Provider value={host}>
 				<Layers>
 					<Drag doc={host.doc} carried={carried} plus={CARRIED_PLUS} onLift={() => host.haptics.tap()}>
-						<div className={`task-calendar is-engine is-${place}`} onTouchStart={keepTouch} onTouchMove={keepTouch} onTouchEnd={keepTouch} onClick={(event) => letSelectionGo(event, store)}>
-							<Layout place={place} />
-						</div>
+						<Root place={place} store={store} />
 					</Drag>
 				</Layers>
 			</HostContext.Provider>
 		</StoreContext.Provider>
 		</PressedLook.Provider>
+	);
+}
+
+/** The screen's element: its place's class, `is-entering` while a new task is typed (Obsidian's phone toolbar stays away then, the design's «Полоса»). */
+function Root({ place, store }: { readonly place: Place; readonly store: ScreenStore }) {
+	const entering = useScreen((s) => s.entry !== null);
+	return (
+		<div className={`task-calendar is-engine is-${place}${entering ? " is-entering" : ""}`} onTouchStart={keepTouch} onTouchMove={keepTouch} onTouchEnd={keepTouch} onClick={(event) => letSelectionGo(event, store)}>
+			<Layout place={place} />
+			<QuickBar />
+		</div>
 	);
 }

@@ -24,6 +24,8 @@ export interface MockTask {
 	children: MockTask[];
 	/** Its subtasks folded under its card. */
 	folded?: boolean;
+	/** Its project, written `🗂️ Name`. */
+	project?: string;
 	/** How a timed task reminds; none set: Live Activity, as a task first put on a time gets. */
 	reminder?: "live" | "notification" | "alarm" | "none";
 }
@@ -141,6 +143,15 @@ export function mockFile(clock: Date): MockFile {
 
 const noEvents = (): Pick<MockFile, "events" | "allDay"> => ({ events: [], allDay: [] });
 
+/** The made-up projects, the tree in its order: a subproject one deeper; a folder takes no task of its own. */
+export const MOCK_PROJECTS: readonly { readonly name: string; readonly depth: number; readonly folder: boolean }[] = [
+	{ name: "Дом", depth: 0, folder: false },
+	{ name: "Ремонт", depth: 1, folder: false },
+	{ name: "Работа", depth: 0, folder: true },
+	{ name: "Отчёты", depth: 1, folder: false },
+	{ name: "Отпуск", depth: 0, folder: false },
+];
+
 /** The file as a tasks file's text (docs/plugin/file.md): the checks' oracle reads it, never the screen's state. */
 export function fileText(file: MockFile, clock: Date): string {
 	const day = dayOf(clock);
@@ -150,7 +161,7 @@ export function fileText(file: MockFile, clock: Date): string {
 	};
 	const line = (t: MockTask, depth: number): string[] => {
 		const slot = (due: string, s: NonNullable<MockTask["slot"]>) => ` 📌 ${due} ${time(s.start)}${s.end === null ? "" : `-${time(s.end)}`}`;
-		const fields = [t.level ? `${t.level} ` : "", t.title, t.due ? ` 📅 ${t.due}` : "", t.slot ? slot(t.due ?? dateOf(day), t.slot) : "", t.folded ? " 📁" : ""].join("");
+		const fields = [t.level ? `${t.level} ` : "", t.title, t.due ? ` 📅 ${t.due}` : "", t.slot ? slot(t.due ?? dateOf(day), t.slot) : "", t.project ? ` 🗂️ ${t.project}` : "", t.folded ? " 📁" : ""].join("");
 		const own = `${"\t".repeat(depth)}- [${t.status}] ${fields}`;
 		const description = t.description ? [`${"\t".repeat(depth + 1)}- ${t.description}`] : [];
 		return [own, ...description, ...t.children.flatMap((c) => line(c, depth + 1))];

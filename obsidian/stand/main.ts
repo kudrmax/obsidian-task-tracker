@@ -78,7 +78,7 @@ class StandView extends ItemView {
 		this.unmount();
 		this.contentEl.empty();
 		this.contentEl.addClass("tc-view");
-		this.screen = mountScreen(this.contentEl, { port: this.stand.port, place: this.stand.leafPlace, app: this.app, sourcePath: "", haptics: haptics(), zoom: this.stand.zoom(), markdown: markdownOf(this.app) });
+		this.screen = mountScreen(this.contentEl, { port: this.stand.port, place: this.stand.leafPlace, app: this.app, sourcePath: "", haptics: haptics(), zoom: this.stand.zoom(), markdown: markdownOf(this.app), desk: !Platform.isMobile });
 		this.stand.screens.add(this.screen);
 	}
 
@@ -103,7 +103,7 @@ class StandBlock extends MarkdownRenderChild {
 
 	override onload(): void {
 		this.containerEl.addClass("tc-stand-block");
-		this.screen = mountScreen(this.containerEl, { port: this.stand.port, place: "note", app: this.stand.app, sourcePath: this.path, haptics: haptics(), zoom: this.stand.zoom(), markdown: markdownOf(this.stand.app) });
+		this.screen = mountScreen(this.containerEl, { port: this.stand.port, place: "note", app: this.stand.app, sourcePath: this.path, haptics: haptics(), zoom: this.stand.zoom(), markdown: markdownOf(this.stand.app), desk: !Platform.isMobile });
 		this.stand.screens.add(this.screen);
 	}
 

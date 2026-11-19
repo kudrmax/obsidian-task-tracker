@@ -1,5 +1,5 @@
-import { autoUpdate, FloatingFocusManager, FloatingOverlay, FloatingPortal, hide, type Middleware, offset, type Placement, shift, size, useDismiss, useFloating, useInteractions, useRole, useTransitionStatus } from "@floating-ui/react";
-import { createContext, type MutableRefObject, type ReactNode, useContext, useLayoutEffect, useRef, useState } from "react";
+import { autoUpdate, flip, FloatingFocusManager, FloatingOverlay, FloatingPortal, hide, type Middleware, offset, type Placement, shift, size, useDismiss, useFloating, useInteractions, useRole, useTransitionStatus } from "@floating-ui/react";
+import { type CSSProperties, createContext, type MutableRefObject, type ReactNode, useContext, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { DESIGN, LAYOUT } from "../../design";
 import { LAYER_MS } from "./motion";
 import { groupsAbove } from "./split";
@@ -13,10 +13,25 @@ import { groupsAbove } from "./split";
 
 /** The element a layer opens from: the view hands it over as it opens one (a pressed card). */
 const AnchorContext = createContext<MutableRefObject<Element | null> | null>(null);
+/** The new task's field as it stands on the screen: the desktop's capsule stands by it. */
+const FieldContext = createContext<{ readonly field: Element | null; readonly setField: (el: Element | null) => void } | null>(null);
 
 export function Layers({ children }: { readonly children: ReactNode }) {
 	const anchor = useRef<Element | null>(null);
-	return <AnchorContext.Provider value={anchor}>{children}</AnchorContext.Provider>;
+	const [field, setField] = useState<Element | null>(null);
+	const fields = useMemo(() => ({ field, setField }), [field]);
+	return (
+		<AnchorContext.Provider value={anchor}>
+			<FieldContext.Provider value={fields}>{children}</FieldContext.Provider>
+		</AnchorContext.Provider>
+	);
+}
+
+/** The new task's field and how it says where it stands. */
+export function useField(): { readonly field: Element | null; readonly setField: (el: Element | null) => void } {
+	const field = useContext(FieldContext);
+	if (!field) throw new Error("a field outside the screen's layers");
+	return field;
 }
 
 /** Where the next layer opens from. */
@@ -304,5 +319,89 @@ export function Pinned({ reference, placement, into, along, root, children }: Pi
 				{children}
 			</div>
 		</FloatingPortal>
+	);
+}
+
+/**
+ * The new task's capsule on the desktop (the design's «Десктоп: капсула у поля», F185): right under the field, right edges
+ * together, 8 px from it; over the field where there is no room under it; out of sight while no part of the field shows.
+ * Floating UI places it against the field and follows it as the field moves, grows or scrolls. On the phone the bar lies
+ * over the keyboard by its CSS and nothing places it. A press on it never takes the focus from the field.
+ */
+export function FieldBar({ desk, className, children }: { readonly desk: boolean; readonly className: string; readonly children: (side: "under" | "over", capsule: Element | null) => ReactNode }) {
+	const { field } = useField();
+	const [capsule, setCapsule] = useState<Element | null>(null);
+
+	const { refs, floatingStyles, placement, middlewareData, isPositioned } = useFloating({
+		open: desk,
+		placement: "bottom-end",
+		strategy: "absolute",
+		transform: false,
+		middleware: [offset(DESIGN.deskBarGap), flip({ fallbackPlacements: ["top-end"], padding: DESIGN.wholeMargin }), hide()],
+		whileElementsMounted: autoUpdate,
+		elements: { reference: desk ? field : null },
+	});
+	const setFloating = refs.setFloating;
+	const hold = useCallback(
+		(el: HTMLElement | null) => {
+			setFloating(el);
+			setCapsule(el);
+		},
+		[setFloating],
+	);
+	const away = desk && (!isPositioned || middlewareData.hide?.referenceHidden === true);
+	const style: CSSProperties | undefined = desk ? floatingStyles : undefined;
+	return (
+		<div
+			ref={hold}
+			style={style}
+			className={`${className}${desk ? " is-desk" : ""}${away ? " is-away" : ""}`}
+			onPointerDown={keepFocus}
+			onMouseDown={keepFocus}
+		>
+			{children(placement.startsWith("top") ? "over" : "under", capsule)}
+		</div>
+	);
+}
+
+/** A press on the bar or its panels leaves the focus in the field (the plugin's bar). */
+const keepFocus = (event: { preventDefault(): void; target: EventTarget | null }) => {
+	if (!(event.target instanceof Element && event.target.closest("input, textarea, [contenteditable]"))) event.preventDefault();
+};
+
+/**
+ * A panel of the bar (the flag's levels, the projects, the places, the month): on the phone over the bar at its right by
+ * the design's CSS; on the desktop from the capsule (`capsule`), right edges together, on its side away from the field,
+ * or the other where only that has room (the plugin's `panelSide`), placed by Floating UI before it shows. It grows in
+ * and fades out as every panel does (Floating UI's transition status); a press outside it or Escape closes it.
+ */
+export function BarPanel({ open, onClose, reference, capsule, away, className, children }: { readonly open: boolean; readonly onClose: () => void; readonly reference: Element | null; readonly capsule: Element | null; readonly away: "under" | "over"; readonly className: string; readonly children: ReactNode }) {
+	const desk = capsule !== null;
+	const { refs, context, floatingStyles, placement, isPositioned } = useFloating({
+		open,
+		onOpenChange: (next) => {
+			if (!next) onClose();
+		},
+		placement: away === "under" ? "bottom-end" : "top-end",
+		strategy: "fixed",
+		transform: false,
+		middleware: [offset(DESIGN.deskBarGap), flip({ padding: DESIGN.wholeMargin })],
+		whileElementsMounted: autoUpdate,
+		elements: { reference: capsule ?? reference },
+	});
+	const { getFloatingProps } = useInteractions([useDismiss(context, { outsidePress: (event) => !(reference && event.target instanceof Node && reference.contains(event.target)) })]);
+	const { isMounted, status } = useTransitionStatus(context, { duration: { open: LAYER_MS.open, close: LAYER_MS.close } });
+	if (!isMounted) return null;
+	return (
+		<div
+			ref={refs.setFloating}
+			style={desk ? floatingStyles : undefined}
+			className={`tc-panel tc-quick-panel ${className}${desk ? " is-placed" : ""}${(desk ? placement.startsWith("bottom") : away === "under") ? " is-below" : " is-above"}${motionClass(status, !desk || isPositioned)}`}
+			{...getFloatingProps()}
+			onPointerDown={keepFocus}
+			onMouseDown={keepFocus}
+		>
+			{children}
+		</div>
 	);
 }

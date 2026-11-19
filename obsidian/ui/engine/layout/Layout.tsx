@@ -2,7 +2,7 @@ import { type CSSProperties, memo, type ReactNode, useContext, useRef } from "re
 import { type DayTurn, DayTurnContext, useFollowRibbon, useNearerDay } from "../gestures/FollowRibbon";
 import { RibbonTrack, useRibbon } from "../gestures/Ribbon";
 import type { ListId } from "../port";
-import { DayContext, type Stop, useData, useScreen } from "../store";
+import { DayContext, STOP_LISTS, useData, useScreen } from "../store";
 import { useHost } from "../view/host";
 import { PlusButton } from "../view/QuickAdd";
 import { DaySlide, Slide } from "../view/Slide";
@@ -31,21 +31,18 @@ export const Layout = memo(function Layout({ place }: { readonly place: Place })
 		return (
 			<>
 				{place === "column" ? <NoteColumn /> : place === "twoColumns" ? <TwoColumns /> : place === "calendar" ? <CalendarColumns /> : <FollowColumns />}
-				<PlusButton shown={place === "column" ? ["inbox"] : place === "twoColumns" ? ["inbox", "soon"] : place === "calendar" ? ["soon", "day"] : SHOWN[stop]} />
+				<PlusButton shown={place === "column" ? ["inbox"] : place === "twoColumns" ? ["inbox", "soon"] : place === "calendar" ? ["soon", "day"] : STOP_LISTS[stop]} />
 				<TaskMenu />
 			</>
 		);
 	return (
 		<>
 			{place === "leaf" ? <RibbonColumns /> : <NoteColumn />}
-			<PlusButton shown={place === "note" ? ["inbox"] : SHOWN[stop]} />
+			<PlusButton shown={place === "note" ? ["inbox"] : STOP_LISTS[stop]} />
 			<TaskMenu />
 		</>
 	);
 });
-
-/** The lists the ribbon shows at each stop: the plus asks the port where a new task goes by them. */
-const SHOWN: Readonly<Record<Stop, readonly ListId[]>> = { inbox: ["inbox", "soon"], soon: ["soon", "day"], calendar: ["day"] };
 
 function RibbonColumns() {
 	const ribbon = useRef<HTMLDivElement>(null);

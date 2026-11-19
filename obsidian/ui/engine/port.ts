@@ -130,6 +130,38 @@ export interface Destination {
 	readonly end?: number | null;
 	/** When given, a new task goes as the last subtask of this task, wherever it stands (Add subtask on a calendar's task). */
 	readonly under?: string;
+	/** A new task written to Backlog, which the screen doesn't show: its field stays where it stands. */
+	readonly backlog?: boolean;
+}
+
+/** A place the new task's bar offers: the lists, and a day picked on the month. */
+export type PlaceId = "inbox" | "backlog" | "soon" | "now" | "date";
+
+/** What the bar has set for the task being typed: its level and its project. */
+export interface EntryDraft {
+	readonly level: string | null;
+	readonly project: string | null;
+}
+
+/**
+ * The bar of a task being typed (F184–F189, the plugin's `QuickBarState`), as the port answers for the field where it
+ * stands and what is set and typed: each button shown or not, enabled or not, and what it shows.
+ */
+export interface EntryBar {
+	/** The level buttons (none on the calendar's field), and which way the field may go. */
+	readonly indents: boolean;
+	readonly canIndent: boolean;
+	readonly canOutdent: boolean;
+	/** The flag's levels, the one set (or typed as a prefix) on; `tint` the colour of the flag and the field. */
+	readonly levels: readonly LevelTile[];
+	readonly tint: string | null;
+	/** The project button's page (none on a subtask's field): the tree, the one set checked, folders not to be chosen. */
+	readonly projects: { readonly options: readonly { readonly name: string; readonly depth: number; readonly on: boolean; readonly folder: boolean }[]; readonly lit: boolean } | null;
+	/** The place button (none on a subtask's or the calendar's field): what it shows, and the places offered. */
+	readonly where: { readonly id: PlaceId; readonly title: string } | null;
+	readonly places: readonly { readonly id: PlaceId; readonly title: string; readonly on: boolean }[];
+	/** The month page of Date: today, and the day the field stands on (`YYYY-MM-DD`). */
+	readonly date: { readonly today: string; readonly picked: string | null };
 }
 
 /** Where a task's menu is opened from: a list's card, a calendar's block, a card of a block's stack in its menu (F107). */
@@ -236,8 +268,12 @@ export interface ScreenPort {
 	newTaskPlace(dayOffset: number, shown: readonly ListId[]): Destination;
 	/** Where Add subtask opens the field of a new last subtask of `id` in its list (F124): under its last subtask, a level deeper. */
 	subtaskPlace(id: string, dayOffset: number): Destination;
-	/** A new task from its typed text at `at`; resolves with its id once read back. */
-	add(text: string, at: Destination): Promise<string>;
+	/** The bar of the field at `at`, with what is set (`draft`) and typed (`text`). */
+	entryBar(at: Destination, draft: EntryDraft, text: string): EntryBar;
+	/** Where the field goes for a place picked on the bar (`date` with Date): the end of that list or day. */
+	entryPlace(at: Destination, choice: PlaceId, date: string | null): Destination;
+	/** A new task from its typed text at `at`, with what the bar set; resolves with its id once read back. */
+	add(text: string, at: Destination, draft?: EntryDraft): Promise<string>;
 	/** What the menu of the task or event `id` offers, opened `from` there. */
 	menu(id: string, from: MenuFrom): MenuModel;
 	/** Writes what was tapped in the menu of `id`; resolves once written and read back. */

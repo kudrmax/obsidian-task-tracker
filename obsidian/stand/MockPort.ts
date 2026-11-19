@@ -1,6 +1,6 @@
-import type { AllDayEvent, Block, CardFace, DayEvent, Destination, Edge, EditId, EventPaint, ListData, ListId, MenuAction, MenuFrom, MenuModel, MoveId, Now, ReminderKind, StatusId, Row, ScreenData, ScreenPort } from "../ui/engine/port";
+import type { AllDayEvent, Block, CardFace, DayEvent, Destination, Edge, EditId, EntryBar, EntryDraft, EventPaint, ListData, ListId, MenuAction, MenuFrom, MenuModel, MoveId, Now, PlaceId, ReminderKind, StatusId, Row, ScreenData, ScreenPort } from "../ui/engine/port";
 import { bgAlphaFor, eventColors } from "../ui/eventColors";
-import { addDays, CALENDAR_COLORS, DAY_START_HOUR, dateOf, dayOf, fileText, LIST_KEYS, type ListKey, type MockFile, type MockSection, type MockTask, minuteOf, mockFile } from "./mockData";
+import { addDays, CALENDAR_COLORS, DAY_START_HOUR, dateOf, dayOf, fileText, LIST_KEYS, LIST_NAMES, type ListKey, MOCK_PROJECTS, type MockFile, type MockSection, type MockTask, minuteOf, mockFile } from "./mockData";
 
 /** The calendar's largest hour on the stand: the settings' default zoom levels end at 224 px an hour. */
 export const ZOOM_MOST = 224;
@@ -207,13 +207,71 @@ export class MockPort implements ScreenPort {
 	}
 
 	/** A new task (F190): Inbox and Soon without a date, a day's list with its date; on a day's calendar its time too, no length, at the end of Now (today) or Soon. */
-	async add(text: string, at: Destination): Promise<string> {
+	/**
+	 * The bar by the plugin's rules, the simplest: the level buttons in a list (a field goes no deeper than one under the
+	 * task above it), the flag with a typed prefix winning over the level set, the project and the place but on a subtask's
+	 * field and the calendar's (the calendar's keeps the flag and the project).
+	 */
+	entryBar(at: Destination, draft: EntryDraft, text: string): EntryBar {
+		const typed = /^(p1|p2) /.exec(text.trimStart())?.[1] ?? null;
+		const level = typed ?? draft.level;
+		const onCalendar = at.at !== undefined;
+		const depth = at.depth ?? 0;
+		const sub = depth > 0 || at.under !== undefined;
+		const today = dateOf(this.day());
+		const shownDay = dateOf(addDays(this.day(), at.dayOffset));
+		const here: PlaceId = at.backlog ? "backlog" : at.list === "inbox" ? "inbox" : at.list === "soon" ? "soon" : at.dayOffset <= 0 ? "now" : "date";
+		const title = (id: PlaceId) => (id === "date" ? `${Number(shownDay.slice(8))} ${MONTHS[Number(shownDay.slice(5, 7)) - 1].charAt(0)}${MONTHS[Number(shownDay.slice(5, 7)) - 1].slice(1).toLowerCase()}` : LIST_NAMES[id]);
+		const above = this.taskAbove(at);
+		return {
+			indents: !onCalendar,
+			canIndent: !onCalendar && above !== null && depth <= above.depth,
+			canOutdent: !onCalendar && depth > 0,
+			levels: LEVELS.map((l) => ({ ...l, on: l.prefix === level })),
+			tint: level ? LEVEL_COLORS[level as "p1" | "p2"] : null,
+			projects: sub ? null : { options: MOCK_PROJECTS.map((p) => ({ ...p, on: p.name === draft.project })), lit: draft.project !== null },
+			where: sub || onCalendar ? null : { id: here, title: title(here) },
+			places: (["inbox", "backlog", "soon", "now", "date"] as const).map((id) => ({ id, title: id === "date" ? "Date" : LIST_NAMES[id], on: id === here })),
+			date: { today, picked: here === "date" || here === "now" ? shownDay : null },
+		};
+	}
+
+	/** The end of the list picked, in its last section, at the top level; a day picked: Now for today and before, else that day's list; Backlog keeps the field where it stands. */
+	entryPlace(at: Destination, place: PlaceId, date: string | null): Destination {
+		if (place === "backlog") return { ...at, backlog: true };
+		const dayOffset = place === "date" && date ? Math.round((new Date(Number(date.slice(0, 4)), Number(date.slice(5, 7)) - 1, Number(date.slice(8))).getTime() - this.day().getTime()) / 86_400_000) : place === "now" ? 0 : at.dayOffset;
+		const list: ListId = place === "inbox" ? "inbox" : place === "soon" ? "soon" : "day";
+		const sections = this.listOf(this.file, list, dayOffset);
+		const last = sections[sections.length - 1];
+		return { list, section: !last || last.name === null ? null : last.id, before: null, dayOffset, depth: 0 };
+	}
+
+	/** The task the field at `at` would stand under in its list: the row before it, as the list draws the field. */
+	private taskAbove(at: Destination): { readonly depth: number } | null {
+		const rows = this.read(at.dayOffset).lists[at.list].rows;
+		let index = at.before === null ? -1 : rows.findIndex((row) => row.id === at.before);
+		if (index < 0) {
+			const head = at.section ? rows.findIndex((row) => row.id === at.section) : -1;
+			const next = rows.findIndex((row, i) => i > head && row.kind === "section");
+			index = next < 0 ? rows.length : next;
+		}
+		const row = rows[index - 1];
+		return row?.kind === "task" ? { depth: row.depth } : null;
+	}
+
+	async add(text: string, at: Destination, draft: EntryDraft = { level: null, project: null }): Promise<string> {
 		const id = `x${++this.added}`;
 		await this.write((file) => {
 			/** A level's prefix typed first sets it (F182): «p1 Купить молоко». */
 			const prefixed = /^(p1|p2) +(.*)$/.exec(text.trim());
 			const task = this.newTask(prefixed ? prefixed[2] : text.trim(), null, id);
-			if (prefixed) task.level = prefixed[1] as MockTask["level"];
+			task.level = (prefixed?.[1] ?? draft.level) as MockTask["level"];
+			if (draft.project) task.project = draft.project;
+			if (at.backlog) {
+				task.due = null;
+				file.backlog[file.backlog.length - 1].tasks.push(task);
+				return;
+			}
 			if (at.under !== undefined) {
 				this.findBy(file, (t) => t.id === at.under)?.task.children.push(task);
 				return;

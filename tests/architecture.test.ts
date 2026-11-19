@@ -516,7 +516,8 @@ function byHandIn(file: string, text: string): string[] {
 	return BY_HAND.filter((rule) => rule.pattern.test(withoutException(file, rule.name, code)) && !ownedBy(file, rule.allowed)).map((rule) => `${file}: ${rule.name}`);
 }
 
-const readsPlace = (text: string): boolean => /\bplace\b/.test(withoutComments(text));
+/** The word as a name in the code; a CSS class of the design that ends in it (`tc-bar-place`, `is-place`) names a button, not the mounting place. */
+const readsPlace = (text: string): boolean => /(?<![\w-])place\b(?!-)/.test(withoutComments(text));
 
 describe("the engine's owners", () => {
 	const source = (file: string) => readFileSync(join(ROOT, file), "utf8");
@@ -583,5 +584,7 @@ describe("the owners' guard itself", () => {
 	it("tells a word in a comment from the place read in code", () => {
 		expect(readsPlace("/** the place it was mounted */ const x = 1;")).toBe(false);
 		expect(readsPlace("const wide = place === 'leaf';")).toBe(true);
+		expect(readsPlace("const at = { place };")).toBe(true);
+		expect(readsPlace('<button className="tc-btn tc-bar-place" />; <div className="tc-menu-tiles is-place" />')).toBe(false);
 	});
 });

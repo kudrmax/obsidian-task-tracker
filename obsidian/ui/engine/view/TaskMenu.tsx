@@ -150,7 +150,7 @@ function taskGroups(layer: Layer, model: TaskMenuModel, pick: (action: MenuActio
 	return groups;
 }
 
-interface TileSpec {
+export interface TileSpec {
 	readonly label: string;
 	readonly icon: IconName;
 	/** A level's colour: its icon and, while the task has it, its ground. */
@@ -161,7 +161,7 @@ interface TileSpec {
 }
 
 /** A group of tiles row by row: the icon over the label; the level the task has carries a badge with a cross, a tap taking it off. */
-function TileGroup({ kind, rows }: { readonly kind: string; readonly rows: readonly (readonly TileSpec[])[] }) {
+export function TileGroup({ kind, rows }: { readonly kind: string; readonly rows: readonly (readonly TileSpec[])[] }) {
 	return (
 		<div className={`tc-menu-tiles ${kind}`}>
 			{rows.map((row, i) => (
@@ -183,7 +183,7 @@ function TileGroup({ kind, rows }: { readonly kind: string; readonly rows: reado
 	);
 }
 
-interface RowSpec {
+export interface RowSpec {
 	readonly label: string;
 	readonly icon?: IconName;
 	readonly value?: string;
@@ -194,7 +194,7 @@ interface RowSpec {
 	readonly onPick: () => void;
 }
 
-function RowGroup({ rows }: { readonly rows: readonly RowSpec[] }) {
+export function RowGroup({ rows }: { readonly rows: readonly RowSpec[] }) {
 	return (
 		<div className="tc-menu-group">
 			{rows.map((row) => (
@@ -253,7 +253,11 @@ function Ask({ what, title, onCancel, onConfirm }: { readonly what: Asking; read
 
 /** Pick a date (F116): the month of the task's day (today's without one), six weeks from Monday, arrows to the months around it. */
 function MonthPage({ model, pick }: { readonly model: TaskMenuModel; readonly pick: (action: MenuAction) => void }) {
-	const { today, picked } = model.date;
+	return <MonthGrid today={model.date.today} picked={model.date.picked} onPick={(date) => pick({ kind: "date", date })} />;
+}
+
+/** The month picker of the menu and the bar (the plugin's `MonthPicker`). */
+export function MonthGrid({ today, picked, onPick }: { readonly today: string; readonly picked: string | null; readonly onPick: (date: string) => void }) {
 	const [month, setMonth] = useState(() => monthOf(picked ?? today));
 	return (
 		<div className="tc-picker">
@@ -275,7 +279,7 @@ function MonthPage({ model, pick }: { readonly model: TaskMenuModel; readonly pi
 					</span>
 				))}
 				{monthGrid(month).map((cell) => (
-					<button key={cell.date} type="button" data-date={cell.date} className={`tc-btn tc-day${cell.other ? " is-other" : ""}${cell.date === today ? " is-today" : ""}${cell.date === picked ? " is-selected" : ""}`} onClick={() => pick({ kind: "date", date: cell.date })}>
+					<button key={cell.date} type="button" data-date={cell.date} className={`tc-btn tc-day${cell.other ? " is-other" : ""}${cell.date === today ? " is-today" : ""}${cell.date === picked ? " is-selected" : ""}`} onClick={() => onPick(cell.date)}>
 						{cell.day}
 					</button>
 				))}

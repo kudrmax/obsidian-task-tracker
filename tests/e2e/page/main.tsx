@@ -131,7 +131,7 @@ class StandPage {
 	}
 
 	private mount(el: HTMLElement, place: Place, sourcePath: string): MountedScreen {
-		const screen = mountScreen(el, { port: this.port, place, app: this.app, sourcePath, haptics: this.haptics, zoom: keptZoom(load, save), markdown: plainMarkdown });
+		const screen = mountScreen(el, { port: this.port, place, app: this.app, sourcePath, haptics: this.haptics, zoom: keptZoom(load, save), markdown: plainMarkdown, desk: !document.body.classList.contains("is-mobile") });
 		this.screens.add(screen);
 		return screen;
 	}

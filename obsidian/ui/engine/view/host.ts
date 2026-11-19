@@ -17,6 +17,8 @@ export interface ScreenHost {
 	readonly haptics: { tap(): void };
 	/** The calendar's largest hour, in pixels (the zoom's levels in the settings): a pinch stops there. */
 	readonly zoomMost: number;
+	/** Obsidian runs on the desktop: no keyboard rises, the new task's bar is a capsule by its field (the design's «Десктоп»). */
+	readonly desk: boolean;
 	/** Draws markdown into `el` as Obsidian does (a description's start by the menu); returns what takes it away. */
 	readonly markdown: (text: string, el: HTMLElement, sourcePath: string) => () => void;
 }

@@ -5,7 +5,7 @@ import { PLUS, SortableList, SortableRow, useListTarget } from "../drag/Drag";
 import { descendantsOf } from "../drag/tree";
 import { useAnchor } from "../layers/Layers";
 import type { Destination, ListId, Row } from "../port";
-import { useData, useScreen, useScreenApi } from "../store";
+import { DayContext, useData, useScreen, useScreenApi } from "../store";
 import { Card, PressedLook } from "./Card";
 import { MovingRow } from "./MovingRow";
 import { EntryField } from "./QuickAdd";
@@ -43,7 +43,9 @@ export const TaskList = memo(function TaskList({ list }: { readonly list: ListId
 		const slot: Drawn = { kind: "plus", id: PLUS };
 		return [...rows.slice(0, index), slot, ...rows.slice(index)];
 	}, [rows, plusAt, list]);
-	const entry = useScreen((s) => s.entry);
+	/** A day's list draws the field only for its own day: the day sliding out keeps none. */
+	const day = useContext(DayContext);
+	const entry = useScreen((s) => (s.entry && (list !== "day" || day === null || day === s.entry.dayOffset) ? s.entry : null));
 	const entrySeq = useScreen((s) => s.entrySeq);
 	/** The rows drawn: the list's, with the new task's field standing in its slot when it is in this list. */
 	const drawn = useMemo(() => withEntry(withPlus, list, entry), [withPlus, list, entry]);
