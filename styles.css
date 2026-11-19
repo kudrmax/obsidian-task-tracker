@@ -1823,6 +1823,9 @@ button.tc-btn.tc-folder-btn:disabled { opacity: var(--tc-tile-off-opacity); curs
 .task-calendar.is-engine .tc-allday-backing::after { content: ""; position: absolute; left: var(--tc-line-left); right: 0; bottom: 0; height: var(--tc-hairline); background: var(--tc-hour-line); }
 /* Overlapping events (Max, 2026-11-19, Decision 52): each stands in its lane, drawn as ever (its block with the bar inside on the left, its calendar's ground over the calendar's); its title stands past the cluster's last lane in its own line, so none is covered. A block moved down under an earlier title keeps its bar from its true start: the bar's stem runs up from the block, joined to its square corner. */
 .task-calendar.is-engine .tc-items > .tc-event { background: none; border-radius: 0; display: block; }
+/* Only what is drawn of an event takes the pointer (Decision 57, amends 52): its outer box runs from its true start over an earlier event's title, unseen, and must not take a press on that title. */
+.task-calendar.is-engine .tc-items > .tc-event { pointer-events: none; }
+.task-calendar.is-engine .tc-items > .tc-event > :is(.tc-event-block, .tc-event-stem, .tc-event-label) { pointer-events: auto; }
 .tc-event-block { position: absolute; top: var(--tc-block-top); left: 0; right: 0; bottom: 0; display: flex; border-radius: var(--tc-radius-event); background: linear-gradient(var(--tc-event-bg), var(--tc-event-bg)), var(--tc-bg); overflow: clip; }
 .tc-event.is-held > .tc-event-block { border-top-left-radius: 0; }
 .tc-event-stem { position: absolute; top: 0; left: 0; width: var(--tc-bar); height: calc(var(--tc-block-top) + var(--tc-radius-event)); border-radius: var(--tc-radius-bar-cap) var(--tc-radius-bar-cap) 0 0; background: var(--tc-event-bar); }
