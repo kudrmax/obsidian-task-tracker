@@ -1,0 +1,30 @@
+quiet 150 ms only (@use-gesture default)
+  strokes 239; gesture started at the stroke 157 (lag median 0 ms)
+  flick lift late: median 265 ms, p90 534, max 1218 (n 105)
+  held stroke (no momentum) lift late: median 136, max 150 (n 39)
+  false lifts while fingers moved: 1 in 1 strokes; new strokes begun inside one stroke (splits): 1; touches missed: 82; strokes never lifted before the next: 95; momentum taken as a new stroke: 0
+Lethargy 1.0.9 (stage 0 round 4-5)
+  strokes 239; gesture started at the stroke 207 (lag median 63 ms)
+  flick lift late: median 100 ms, p90 136, max 308 (n 146)
+  held stroke (no momentum) lift late: median 36, max 75 (n 5)
+  false lifts while fingers moved: 182 in 64 strokes; new strokes begun inside one stroke (splits): 142; touches missed: 32; strokes never lifted before the next: 88; momentum taken as a new stroke: 53
+wheel-gestures 2.3 (Embla)
+  strokes 239; gesture started at the stroke 89 (lag median 0 ms)
+  flick lift late: median 183 ms, p90 359, max 692 (n 61)
+  held stroke (no momentum) lift late: median 100, max 120 (n 20)
+  false lifts while fingers moved: 5 in 5 strokes; new strokes begun inside one stroke (splits): 2; touches missed: 150; strokes never lifted before the next: 158; momentum taken as a new stroke: 4
+round-six pager WheelStrokes (starts only, no lift)
+  strokes 239; gesture started at the stroke 203 (lag median 31 ms)
+  flick lift late: median NaN ms, p90 NaN, max NaN (n 0)
+  held stroke (no momentum) lift late: median NaN, max NaN (n 0)
+  false lifts while fingers moved: 0 in 0 strokes; new strokes begun inside one stroke (splits): 24; touches missed: 36; strokes never lifted before the next: 239; momentum taken as a new stroke: 24
+WheelFollow {"momentumEvents":4,"momentumMinPx":10,"quietMs":110,"retouchMs":40}
+  strokes 239; gesture started at the stroke 225 (lag median 0 ms)
+  flick lift late: median 25 ms, p90 50, max 1178 (n 179)
+  held stroke (no momentum) lift late: median 110, max 110 (n 31)
+  false lifts while fingers moved: 73 in 53 strokes; new strokes begun inside one stroke (splits): 18; touches missed: 14; strokes never lifted before the next: 29; momentum taken as a new stroke: 17
+WheelFollow {"momentumEvents":3,"momentumMinPx":6,"quietMs":80,"retouchMs":40}
+  strokes 239; gesture started at the stroke 229 (lag median 0 ms)
+  flick lift late: median 16 ms, p90 33, max 1148 (n 173)
+  held stroke (no momentum) lift late: median 80, max 80 (n 27)
+  false lifts while fingers moved: 160 in 95 strokes; new strokes begun inside one stroke (splits): 25; touches missed: 10; strokes never lifted before the next: 39; momentum taken as a new stroke: 18

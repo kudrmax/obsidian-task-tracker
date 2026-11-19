@@ -1,0 +1,3 @@
+max-2026-11-17.json strokes 6 as expected 6 two 0 none 0 extra 0 | finger events 97 not followed 3 | momentum px moving the columns 14.7%
+max-2026-11-17-r5.json strokes 94 as expected 77 two 3 none 13 extra 1 | finger events 3010 not followed 373 | momentum px moving the columns 18.8%
+max-2026-11-17-r6-pager.json strokes 139 as expected 127 two 6 none 6 extra 0 | finger events 2157 not followed 213 | momentum px moving the columns 26.2%

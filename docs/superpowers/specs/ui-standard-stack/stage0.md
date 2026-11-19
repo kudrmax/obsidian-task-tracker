@@ -281,6 +281,48 @@ On Max's own input the case is milder: a real touch stops the macOS momentum, so
 
 **Offline tools** (run on `node_modules/.bin/esbuild spike/wheelPager.ts --bundle --format=esm --platform=node --outfile=spike/checks/wheelPager.mjs`): `pager-offline.mjs` (both detectors over synthetic and recorded streams), `pager-tune.mjs` (the window grid), `pager-rise.mjs` (lag after the rise on a recording), `pager-show.mjs` (deltas around each stroke), `sheet.py` (a contact sheet of a screencast's moving frames).
 
+## Round seven: the trackpad followed as a finger (2026-11-19)
+
+Max withdrew the pager (plan 2026-11-19, «Max's decision on the ribbon»): the columns follow two fingers on the trackpad as they follow a finger on glass, can be held mid-way, and at the lift land on the nearest place or one on by the speed, never two. That needs the lift at the moment it happens, and the momentum after it moving nothing.
+
+**What the platform gives (checked in Chromium's source).** The DOM wheel event has no finger phase. Blink's `MouseWheelEventManager::HandleWheelEvent` returns before dispatching for a phase-ended or cancelled event and for «may begin», so neither the lift nor a resting touch reaches the page; the browser's `MouseWheelEventQueue` makes the first event of a finger phase (`kPhaseBegan`) blocking and, once it was not consumed, the rest non-blocking. So `event.cancelable` may mark a new touch (not the lift); it is not in Max's recordings (they keep `dx`, `dy`, `t`, `ctrl` only), so it is untested and unused. Electron's own `scroll-touch-begin/end` window events were deprecated and Obsidian's renderer cannot reach them. The lift has to be read from the deltas.
+
+**What the deltas show** (Max's three recordings, 5,600 + 4,948 + 513 wheel events). macOS's momentum is the OS's own table, not the fingers': the same runs of deltas recur exactly across swipes (`46 46 45 43 43 41` 20 times, `36 34 34 32 32 30` 23 times; 579 six-delta runs of 8 px and more recur three times or more), one event a display frame (gaps 8.3 ms median, 1 % under 5 ms), never rising by more than the rounding except a short ease-in at its start; the fingers' deltas come unevenly (11 % of their gaps under 5 ms, two events a frame) and rise and fall. A touch during the momentum stops it at once (the next delta falls to a few pixels).
+
+**The reference** (read with hindsight, `round7/ref.mjs`): each run of horizontal deltas split into finger phases and momentum runs; a momentum run starts at the first event of a recurring six-delta run and lasts until a cut (a delta under 0.6 of the one before per frame, a 40 ms gap, a turn). The lift is the momentum's first event; a stroke without momentum lifts at its last delta. It misses momentum faster than the recurring table (some of the fastest flicks in r5 and r6 read as all fingers), so the numbers below count a few right answers as wrong.
+
+**Detectors compared** (`round7/table.mjs`, 239 strokes of 12 px and more):
+
+| Detector | Strokes it began at | Flick: lift found after the real one (median / p90) | Stroke without momentum: let go after its last delta | False lifts while the fingers moved (strokes) | One stroke split into two | Touches missed |
+|---|---|---|---|---|---|---|
+| A quiet gap only (@use-gesture's wheel, 150 ms) | 157 | 265 / 534 ms (the whole tail) | 136 ms | 1 | 1 | 82 |
+| Lethargy 1.0.9 (rounds 4–5) | 207 | 100 / 136 ms | 36 ms | 64 | 142 | 32 |
+| wheel-gestures 2.3 (Embla) | 89 | 183 / 359 ms | 100 ms | 5 | 2 | 150 |
+| The round-six pager (strokes only, no lift) | 203 | — | — | — | 24 | 36 |
+| **`WheelFollow`, chosen** (4 frame-paced non-rising deltas from 10 px a frame; quiet 110 ms) | 225 | **25 / 50 ms** | 110 ms | 53 (most taken back at once: the same stroke going on) | 18 | 14 |
+| `WheelFollow` with 3 deltas from 6 px, quiet 80 ms | 229 | 16 / 33 ms | 80 ms | 95 | 25 | 10 |
+
+Why the libraries fail here: wheel-gestures calls momentum only when five merged pairs each decay by 0.6–0.96, but macOS's table stands on plateaus (`46 46 46`), so it waits for the tail's end or never sees it; Lethargy compares the averages of its last 8 and the 8 before, which lags by about 100 ms and fires inside every uneven slow push.
+
+**The rule chosen** (`obsidian/ui/engine/gestures/wheelFollow.ts`): the momentum has begun once the last 4 deltas came a frame apart each (5–18 ms; an event spanning two frames counts per frame), none above the one before by more than a pixel, the last no larger than the first, from at least 10 px a frame (slower, fingers and momentum look alike; such a momentum moves the columns a little and the lift is read from 110 ms of quiet). At the lift the fingers let go at the momentum's first frame's speed. During the momentum nothing moves; a delta under 0.6 of the one before, a 45 ms gap or a turn is a new touch (a fresh stroke), unless it comes within 40 ms of the lift (no hand touches again that soon; the fingers were slowing); a delta rising 3 px or 15 % over the one before is the same stroke going on (the lift was not one), which keeps the place the stroke began at. The gallery's rule is `FollowPager` (`followPager.ts`): never further than one place either way of where the stroke began; a flick (0.3 px/ms, the core's `SWIPE_FLICK_SPEED`) the way this stroke drew goes one place, against it springs back, slower the nearest place.
+
+**Replayed offline** through `WheelFollow` and `FollowPager` with the strip's spring (`tests/ui/engine/wheelFollow.test.ts`, `round7/sim.mjs`, `round7/agree.mjs`):
+
+| Recording | Result |
+|---|---|
+| Max's six swipes (`max-2026-11-17.json`) | −1 1 −1 −1 −1 1, as his expectation; 3 of 97 finger events not followed |
+| Synthetic chains 150 / 250 / 400 ms (same-way flicks into the last one's momentum) | −1 −1 1 1 1 −1 each, as expected; the same at 60 Hz merging |
+| Synthetic held drags (−401 px, then 133 px, fingers stopping) | one place back, then back to it: the gallery's rule |
+| Max's long sessions r5 / r6 | every stroke lands within one place of where it began; the momentum never moves the columns once the lift is found; against the round-six pager's strokes 92 / 132 landings, of which 6 / 6 the pager had not and 11 / 13 it had: slow pushes under half a place (the gallery springs back, the pager turned), second touches the pager missed (Max: «two quick left swipes sometimes give one»), uneven slow pushes |
+
+**Running the tools:** in `round7/`, `npm install lethargy@1.0.9 wheel-gestures@2.3.0` beside the scripts and bundle the engine's gestures to `engine.mjs` (`esbuild` of an entry exporting `wheelFollow`, `followPager`, `wheelStrokes`, `--bundle --format=esm --platform=node`); then `node table.mjs`, `node sim.mjs v`, `node agree.mjs`, `node trace.mjs <recording> <from s> <to s>`.
+
+**Not met, plainly:**
+- The lift is found 25 ms (median) and 50 ms (p90) after the momentum's first event, so 3 or 4 momentum events move the columns the way the fingers went (15–26 % of the momentum's pixels in all, the start of each tail). The motion goes on smoothly the same way, then lands.
+- A slow push read as momentum (53 strokes in 239) stops the columns for a frame or two, until the next rising delta takes them on (or a new touch, if the fingers dip sharply right after).
+- Fingers resting still on the trackpad send nothing, so a hold mid-way longer than 110 ms lets go where the columns stand; moving again takes them on from there. On the phone a held finger keeps them as long as it likes.
+- `event.cancelable` as a mark of a new touch, and the timing on another Mac's display rate, can only be checked with a new recording by Max.
+
 ## Must a library be swapped?
 
 Updated by the second round: no swap is recommended; the classic line, virtualized as above, is the configuration to build on, and the lift is the one step over 16 ms. The first-round answer follows.
