@@ -8,7 +8,7 @@ import { carry, cardBy } from "../lib/carry.mjs";
  */
 export default {
 	name: "e1-carried-plate",
-	features: ["E1: the carried plate under the pointer"],
+	features: ["E1: the carried plate under the pointer", "E1: a list's dashed place has no fill (Decision 59)"],
 	async run(t) {
 		await t.setStop("inbox");
 		const [, second] = (await t.oracle.tasks("Inbox")).map((task) => task.title);
@@ -16,7 +16,11 @@ export default {
 			const card = await cardBy(t, second, "inbox");
 			const from = { x: card.left + card.width * share, y: card.y };
 			await t.cdp.eval(`(() => { window.__plate = []; (function look(n) { const r = document.querySelector(".tc-overlay .tc-card")?.getBoundingClientRect(); if (r) window.__plate.push([r.left, r.right]); if (n < 90) requestAnimationFrame(() => look(n + 1)); })(0); return 1; })()`);
-			await carry(t, from, async () => ({ x: from.x, y: from.y + card.height }), { steps: 4, stepMs: 8, holdMs: 100 });
+			let place = null;
+			await carry(t, from, async () => ({ x: from.x, y: from.y + card.height }), { steps: 4, stepMs: 8, holdMs: 100, during: async () => {
+				place = await t.cdp.eval(`(() => { const p = document.querySelector('[data-list="inbox"] :is(.tc-drag-source.is-lifted > .tc-card, .tc-card.is-lifted.is-waiting)'); return p ? getComputedStyle(p).backgroundColor : null; })()`);
+			} });
+			t.expect(place === "rgba(0, 0, 0, 0)" || place === "transparent", `a list's dashed place has no fill, only on the calendar it is filled (Max, 2026-11-19, Decision 59): ${place}`);
 			await t.sleep(500);
 			const plates = await t.cdp.eval(`window.__plate`);
 			const off = plates.filter(([left, right]) => from.x < left || from.x > right);
