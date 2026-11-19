@@ -96,6 +96,11 @@ async function scenarioTools(page, { platform, theme, out }) {
 			}
 			return replay(cdp, file, opts);
 		},
+		/** The window resized, as a person drags its edge or turns the phone: the page is not loaded again. */
+		async setViewport(width, height) {
+			await page.setViewportSize({ width, height });
+			await sleep(400);
+		},
 		sleep,
 		/** Waits until `check` answers truthy, as a person waits for the screen, up to `ms`; its last answer. */
 		async waitFor(check, ms = 5000) {

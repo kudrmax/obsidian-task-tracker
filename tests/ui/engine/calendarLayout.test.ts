@@ -65,11 +65,11 @@ describe("the room the calendar measures (review 6)", () => {
 	it("what a person sees is the room less its foot; the whole day fits in it under the label's room, whatever the day's height now", () => {
 		expect(roomMeasure(700, 100)).toEqual({ visible: 600, fit: (600 - 2 * DESIGN.labelLift) / 24 });
 	});
-	it("today opens with the now line at half of what is seen, with room over the first hour or under the last near them (the plugin's scrollPlace)", () => {
-		expect(opening(600, 1344, 600)).toEqual({ above: 300, roomTop: 0, roomBottom: 0 });
-		expect(opening(10, 1344, 600)).toMatchObject({ above: 300, roomTop: 300 - DESIGN.labelLift - 10, roomBottom: 0 });
-		expect(opening(1340, 1344, 600).roomBottom).toBe(600 - 300 - (1344 + DESIGN.labelLift - 1340));
-		expect(opening(100, 500, 600)).toEqual({ above: DESIGN.labelLift + 100, roomTop: 0, roomBottom: 0 });
+	it("today opens with the now line at half of what is seen, the scroll stopping at the day's ends: no room over the first hour or under the last (Max, 2026-11-19)", () => {
+		expect(opening(600, 1344, 600)).toEqual({ above: 300 });
+		expect(opening(10, 1344, 600)).toEqual({ above: 300 });
+		expect(opening(1340, 1344, 600)).toEqual({ above: 300 });
+		expect(opening(100, 500, 600)).toEqual({ above: DESIGN.labelLift + 100 });
 	});
 });
 

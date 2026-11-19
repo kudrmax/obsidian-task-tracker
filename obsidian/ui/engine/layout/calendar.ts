@@ -101,22 +101,18 @@ export function stackEnd(boxes: readonly TaskBox[]): number {
 	return boxes.reduce((bottom, box) => Math.max(bottom, box.top + box.height), 0);
 }
 
-/** Where today opens: how far under the room's top the now line stands, and the room kept over the day's first hour and under its last so it can. */
+/** Where today opens: how far under the room's top the now line stands (the reveal's scroll margin). */
 export interface Opening {
 	readonly above: number;
-	readonly roomTop: number;
-	readonly roomBottom: number;
 }
 
 /**
  * Today opens with the now line at its share of what a person sees of the calendar (`visible`, above the screen's foot),
- * the day `dayHeight` tall and the line `y` down it; near the day's first or last hour, empty room over or under the day
- * lets it stand there all the same; a day that fits needs neither (the plugin's `scrollPlace`).
+ * the day `dayHeight` tall and the line `y` down it; near the day's first or last hour the scroll stops at the day's end,
+ * no room is kept over or under it (Max, 2026-11-19: the day's ends are the calendar's edges at every zoom); a day that
+ * fits stands at its top.
  */
 export function opening(y: number, dayHeight: number, visible: number): Opening {
-	const above = LAYOUT.nowFraction * visible;
-	/** A day that fits what is seen needs no room and no scroll. */
-	if (dayHeight + 2 * DESIGN.labelLift <= visible) return { above: DESIGN.labelLift + y, roomTop: 0, roomBottom: 0 };
-	const line = DESIGN.labelLift + y;
-	return { above, roomTop: Math.max(0, above - line), roomBottom: Math.max(0, visible - above - (dayHeight + DESIGN.labelLift - y)) };
+	if (dayHeight + 2 * DESIGN.labelLift <= visible) return { above: DESIGN.labelLift + y };
+	return { above: LAYOUT.nowFraction * visible };
 }

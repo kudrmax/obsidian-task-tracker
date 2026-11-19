@@ -480,6 +480,24 @@ const BY_HAND: readonly { readonly name: string; readonly pattern: RegExp; reado
 	{ name: "a key handled outside the host's key table", pattern: /\bonKey(?:Down|Up|Press)\b|["']key(?:down|up|press)["']|\bnew Scope\b|\baddCommand\s*\(/, allowed: [] },
 ];
 
+/**
+ * The only exceptions to `BY_HAND`, each approved by Max in chat with the lead on 2026-11-19 (F97, F98), each one call in
+ * one file: the calendar's zoom reads the calendar's top on the page once a pinch (to know the minute under the pointer)
+ * and sets the calendar's scroll offset in one place (to keep that minute under the pointer, as every zoom does); and it
+ * observes the calendar's own size with one `ResizeObserver` (to refit the whole day when the calendar's height changes).
+ * No library the engine owns does either. Anything else of the same rule in that file, or a second such call, still fails.
+ */
+const BY_HAND_EXCEPTIONS: readonly { readonly file: string; readonly rule: string; readonly call: RegExp; readonly most: number }[] = [
+	{ file: `${ENGINE}gestures/Zoom.ts`, rule: "a size read from the page", call: /\.getBoundingClientRect\s*\(\s*\)/g, most: 1 },
+	{ file: `${ENGINE}gestures/Zoom.ts`, rule: "a scroll set by hand", call: /\.scrollTop\s*=(?!=)/g, most: 1 },
+	{ file: `${ENGINE}gestures/Zoom.ts`, rule: "an observer", call: /\.ResizeObserver\s*\(/g, most: 1 },
+];
+
+/** The code a rule reads in `file`: its approved exception's one call taken out, unless there are more of them than approved. */
+function withoutException(file: string, rule: string, code: string): string {
+	return BY_HAND_EXCEPTIONS.filter((e) => e.file === file && e.rule === rule).reduce((text, e) => ((text.match(e.call) ?? []).length <= e.most ? text.replace(e.call, "") : text), code);
+}
+
 /** The mounting place (leaf, note) is read in the layout only; the screen hands it there. */
 const PLACE_READERS = [`${ENGINE}layout/`, `${ENGINE}view/TaskScreen.tsx`, `${ENGINE}mount.tsx`];
 
@@ -495,7 +513,7 @@ function ownerViolations(files: readonly string[], importsOfFile: (file: string)
 
 function byHandIn(file: string, text: string): string[] {
 	const code = withoutComments(text);
-	return BY_HAND.filter((rule) => rule.pattern.test(code) && !ownedBy(file, rule.allowed)).map((rule) => `${file}: ${rule.name}`);
+	return BY_HAND.filter((rule) => rule.pattern.test(withoutException(file, rule.name, code)) && !ownedBy(file, rule.allowed)).map((rule) => `${file}: ${rule.name}`);
 }
 
 const readsPlace = (text: string): boolean => /\bplace\b/.test(withoutComments(text));
@@ -548,6 +566,18 @@ describe("the owners' guard itself", () => {
 		expect(byHandIn(`${ENGINE}gestures/useRibbon.ts`, "animate(x, 1, spring)")).toEqual([]);
 		expect(byHandIn(`${ENGINE}store/screenStore.ts`, "setTimeout(tick, 60000)")).toEqual([]);
 		expect(byHandIn(`${ENGINE}view/Card.tsx`, "// el.addEventListener('x', f)\nconst a = el.scrollTop === 3;")).toEqual([]);
+	});
+
+	it("lets the zoom have its one approved call of each kind and nothing more (Max, 2026-11-19)", () => {
+		const zoom = `${ENGINE}gestures/Zoom.ts`;
+		expect(byHandIn(zoom, "const top = room.getBoundingClientRect().top; room.scrollTop = 4; const o = new view.ResizeObserver(f);")).toEqual([]);
+		expect(byHandIn(zoom, "a.getBoundingClientRect(); b.getBoundingClientRect(); room.scrollTop = 1; room.scrollTop = 2; new view.ResizeObserver(f); new view.ResizeObserver(g);")).toEqual(
+			["a size read from the page", "an observer", "a scroll set by hand"].map((name) => `${zoom}: ${name}`),
+		);
+		expect(byHandIn(zoom, "getComputedStyle(room); room.scrollTo(0, 1); room.scrollLeft = 3; new MutationObserver(f); new ResizeObserver(f);")).toEqual(["a size read from the page", "an observer", "a scroll set by hand"].map((name) => `${zoom}: ${name}`));
+		expect(byHandIn(`${ENGINE}view/Timeline.tsx`, "room.getBoundingClientRect(); room.scrollTop = 1; new view.ResizeObserver(f);")).toEqual(
+			["a size read from the page", "an observer", "a scroll set by hand"].map((name) => `${ENGINE}view/Timeline.tsx: ${name}`),
+		);
 	});
 
 	it("tells a word in a comment from the place read in code", () => {

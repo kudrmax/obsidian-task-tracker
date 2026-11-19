@@ -2,7 +2,7 @@ import { type CSSProperties, memo, type MouseEvent, useCallback, useMemo, useRef
 import { DESIGN, LAYOUT, PROPERTY } from "../../design";
 import { CalendarBlocks, SortableRow, useCalendarDrop, useNewSlot } from "../drag/Drag";
 import { type Edge, useResize } from "../gestures/Resize";
-import { hourOf, type RoomMeasure, useCalendarZoom, type ZoomAnchor } from "../gestures/Zoom";
+import { hourOf, type RoomMeasure, useCalendarZoom } from "../gestures/Zoom";
 import { Pinned, useAnchor } from "../layers/Layers";
 import { type EventBox, layEvents, layTasks, opening, stackEnd, type TaskBox } from "../layout/calendar";
 import { TimeScale } from "../layout/timeScale";
@@ -30,12 +30,12 @@ const paintStyle = (paint: EventPaint) =>
 /**
  * The shown day's calendar (spec, «Time scale»; the design's «Правая колонка — календарь дня» and «Задачи на таймлайне»):
  * its hours and their finer marks, the now line on today, the all-day events over it, its events, its timed tasks as
- * cards stacked by the calendar's layout, each placed by the one time scale at the zoom. It scrolls natively; today opens
- * with the now line a bit above the middle of what a person sees of it (with room over the day's first hour or under its
- * last when the line is near them), another day on the hour the port names, revealed by the browser (`scrollIntoView`).
+ * cards stacked by the calendar's layout, each placed by the one time scale at the zoom, the all-day rows on a band over
+ * it. It scrolls natively between the day's ends; today opens with the now line at the middle of what a person sees of it
+ * as far as those ends let it, another day on the hour the port names, revealed by the browser (`scrollIntoView`).
  * It is a drop target holding its blocks (`useCalendarDrop`, `CalendarBlocks`): a block is carried like a card, and a
  * card carried over it stands as the card it will be, its start written on its dashed place. A long press on empty time
- * lifts a new task's place there (`useNewSlot`); a pinch zooms it (`useCalendarZoom`); a tap or a long press on a task
+ * lifts a new task's place there (`useNewSlot`); a pinch zooms it at the pointer (`useCalendarZoom`); a tap or a long press on a task
  * opens its menu and selects it, its two dots resizing it (`useResize`).
  */
 export const Timeline = memo(function Timeline() {
@@ -67,10 +67,7 @@ export const Timeline = memo(function Timeline() {
 	const minuteAt = useCallback((y: number) => scale.start(y), [scale]);
 	const drop = useCalendarDrop(minuteAt);
 	const slot = useNewSlot();
-	const [anchor, setAnchor] = useState<ZoomAnchor | null>(null);
-	/** How far under the room's content top the day starts: the label's room over the first hour, and today's opening room. */
-	const dayTop = useRef<number>(DESIGN.labelLift);
-	const measure = useCalendarZoom(room, foot, scale, zoomMost, setMeasured, setAnchor, dayTop);
+	const measure = useCalendarZoom(room, foot, scale, zoomMost, setMeasured);
 	const setRoom = useCallback(
 		(element: HTMLDivElement | null) => {
 			room.current = element;
@@ -87,18 +84,17 @@ export const Timeline = memo(function Timeline() {
 		[drop.canvas, slot.ref],
 	);
 	/**
-	 * Where today opens, worked out once the room is measured: the now line at its share of what a person sees, with room
-	 * over the day's first hour or under its last when the line stands near them (the plugin's `scrollPlace`).
+	 * Where today opens, worked out once the room is measured: the now line at its share of what a person sees, as far as
+	 * the day's ends let it (the scroll stops at them: no room is ever kept over the first hour or under the last).
 	 */
 	const [opened] = useState(() => ({ minute: now.minute }));
 	const opens = useMemo(() => (measured && day.isToday ? opening(scale.y(opened.minute), DESIGN.dayHours * scale.hourPx, measured.visible) : null), [measured, day.isToday, opened, scale]);
-	dayTop.current = DESIGN.labelLift + (opens?.roomTop ?? 0);
 	/** The browser's reveal of a mark: put at the top of the room, less its scroll margin. */
 	const reveal = useCallback((el: HTMLElement | null) => el?.scrollIntoView({ block: "start", inline: "nearest" }), []);
 	const nearNow = (minute: number) => day.isToday && Math.abs(scale.y(minute) - scale.y(now.minute)) < TimeScale.NEAR_NOW;
 	const marks = useMemo(() => scale.marks(), [scale]);
 	const top = events.length + boxes.length;
-	const canvas = { [PROPERTY.hour]: px(scale.hourPx), [PROPERTY.stackEnd]: px(end), [PROPERTY.roomTop]: px(opens?.roomTop ?? 0), [PROPERTY.roomBottom]: px(opens?.roomBottom ?? 0) } as CSSProperties;
+	const canvas = { [PROPERTY.hour]: px(scale.hourPx), [PROPERTY.stackEnd]: px(end) } as CSSProperties;
 	return (
 		<CalendarBlocks ids={ids}>
 			<AllDayRows rows={day.allDay} />
@@ -128,7 +124,6 @@ export const Timeline = memo(function Timeline() {
 					) : (
 						<div key="opens" className="tc-reveal" style={{ ...at(day.opensAt, scale), [PROPERTY.anchorOffset]: px(DESIGN.labelLift) } as CSSProperties} ref={reveal} />
 					)}
-					{anchor === null ? null : <div key={scale.hourPx} className="tc-reveal" style={{ ...at(anchor.minute, scale), [PROPERTY.anchorOffset]: px(anchor.offset) } as CSSProperties} ref={reveal} />}
 					<div className="tc-items">
 						{day.events.map((event, i) => (
 							<EventItem key={event.id} event={event} box={events[i]} scale={scale} />
