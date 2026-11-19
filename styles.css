@@ -1930,3 +1930,6 @@ body.theme-light .tc-menu-over .tc-event { --tc-event-bg: var(--tc-event-bg-ligh
 .tc-quick-bar.is-desk .tc-quick-panel.is-placed { position: fixed; right: auto; bottom: auto; }
 /* The menu's room: the window less the phone's safe areas (the status bar, the home indicator), measured by Floating UI; nothing of the menu goes outside it. */
 .tc-level > .tc-safe-room { position: absolute; top: env(safe-area-inset-top); right: env(safe-area-inset-right); bottom: env(safe-area-inset-bottom); left: env(safe-area-inset-left); visibility: hidden; pointer-events: none; }
+/* A part of the menu too tall for its room scrolls under the finger or the wheel without a scrollbar of its own: the question it asks is brought into sight as it opens. */
+.tc-level.tc-menu-layer .tc-panel { scrollbar-width: none; }
+.tc-level.tc-menu-layer .tc-panel::-webkit-scrollbar { display: none; }

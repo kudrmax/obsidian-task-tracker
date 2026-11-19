@@ -95,6 +95,7 @@ export const TaskMenu = memo(function TaskMenu() {
 			panelClass={model.kind === "event" ? "is-event" : shown.layer.page === "picker" ? "is-task is-picker" : "is-task"}
 			page={`${shown.layer.id}:${shown.layer.page}`}
 			keepWidth={model.kind === "event"}
+			holdSplit={shown.layer.asking !== null}
 			peek={model.kind === "task" && model.peek !== null && shown.layer.field === null ? { content: <PeekText text={model.peek} />, onPress: () => pick({ kind: "row", id: "fullScreen" }) } : undefined}
 		/>
 	);

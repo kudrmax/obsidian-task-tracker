@@ -61,6 +61,8 @@ export interface MenuLayerProps {
 	readonly page: string;
 	/** The start of a description by the copy (F129, F130), and what a tap on it does. */
 	readonly peek?: { readonly content: ReactNode; readonly onPress: () => void };
+	/** A question stands in a group's place: the groups keep the side of the copy they stood on (the plugin's `keepAbove`). */
+	readonly holdSplit?: boolean;
 	/** The copy keeps the pressed thing's width (an event wraps its title inside it); otherwise it grows right for its title. */
 	readonly keepWidth?: boolean;
 }
@@ -84,7 +86,7 @@ const motionClass = (status: string, ready: boolean) => (status === "open" && re
  * in from where it stood unplaced. The parts open together and close together (Floating UI's transition status keeps
  * them mounted while they fade, `LAYER_MS`).
  */
-export function MenuLayer({ open, onClose, root, reference, panelBy = null, label, over, groups, panelClass, page, peek, keepWidth = false }: MenuLayerProps) {
+export function MenuLayer({ open, onClose, root, reference, panelBy = null, label, over, groups, panelClass, page, peek, keepWidth = false, holdSplit = false }: MenuLayerProps) {
 	const [above, setAbove] = useState(0);
 
 	const [overEl, setOverEl] = useState<HTMLElement | null>(null);
@@ -148,8 +150,8 @@ export function MenuLayer({ open, onClose, root, reference, panelBy = null, labe
 	/** A new page is laid out afresh: until its split is measured, nothing of it shows. */
 	useLayoutEffect(() => setAbove(0), [page]);
 	useLayoutEffect(() => {
-		if (wanted !== undefined && wanted !== above) setAbove(wanted);
-	}, [wanted, above]);
+		if (!holdSplit && wanted !== undefined && wanted !== above) setAbove(wanted);
+	}, [wanted, above, holdSplit]);
 	const { isMounted, status } = useTransitionStatus(lower.context, { duration: { open: LAYER_MS.open, close: LAYER_MS.close } });
 	/**
 	 * Each part follows what it stands by while the menu is open; closing, it stays where it last stood as it fades out,
@@ -164,7 +166,7 @@ export function MenuLayer({ open, onClose, root, reference, panelBy = null, labe
 	const dismiss = useDismiss(lower.context, { outsidePressEvent: "click", outsidePress: (event) => !(event.target instanceof Node && [overEl, parts.current.upper, parts.current.lower].some((part) => part?.contains(event.target as Node))) });
 	const { getFloatingProps } = useInteractions([dismiss, useRole(lower.context, { role: "menu" })]);
 	if (!isMounted) return null;
-	const settled = wanted === count || (wanted !== undefined && wanted >= groups.length && count === groups.length);
+	const settled = holdSplit || wanted === count || (wanted !== undefined && wanted >= groups.length && count === groups.length);
 	const ready = copy.isPositioned && (count === groups.length || lower.isPositioned) && (count === 0 || upper.isPositioned) && (!peek || peeking.isPositioned) && settled;
 	const motion = motionClass(status, ready);
 	const panel = `tc-panel is-menu ${panelClass}`;

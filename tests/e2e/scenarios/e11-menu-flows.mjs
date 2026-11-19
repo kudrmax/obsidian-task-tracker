@@ -11,7 +11,7 @@ import { menuButton, menuFrames, menuNow } from "../lib/menu.mjs";
 export default {
 	name: "e11-menu-flows",
 	features: ["E4: the menu's flows (F113, F115, F116, F118, F128)"],
-	cases: ["priority", "questions", "pick a date", "reminder"],
+	cases: ["priority", "questions", "question in a small window", "pick a date", "reminder"],
 	async run(t, item) {
 		const tap = (p) => (t.platform === "phone" ? t.input.tap(p.x, p.y) : t.input.click(p.x, p.y));
 		const press = async (words) => {
@@ -54,7 +54,14 @@ export default {
 			t.expect((await menuNow(t))?.words.includes("Done"), "Cancel puts the menu back as it was");
 			const before = await t.file();
 			t.expect(before.includes(title), "nothing was written");
+			/** The verifier's find (2026-11-20): the question reshaped the menu, tiles hopping over the copy, the lower part scrolling with a scrollbar. */
+			const parts = () => t.cdp.eval(`[...document.querySelectorAll(".tc-menu-layer .tc-panel")].map((p) => ({ above: p.classList.contains("is-above"), words: [...p.querySelectorAll(".tc-menu-tile-label, .tc-menu-label")].map((e) => e.textContent), bar: p.offsetWidth - p.clientWidth }))`);
+			const beforeAsk = await parts();
 			await press("Delete");
+			const asked2 = await parts();
+			const sideOf = (all, word) => all.find((p) => p.words.includes(word))?.above ?? null;
+			t.expect(["Done", "p1", "Tomorrow", "Rename"].every((w) => sideOf(beforeAsk, w) === sideOf(asked2, w)), `the question keeps every group on its side of the copy: ${JSON.stringify(beforeAsk.map((p) => [p.above, p.words.slice(0, 3)]))} → ${JSON.stringify(asked2.map((p) => [p.above, p.words.slice(0, 3)]))}`);
+			t.expect(asked2.every((p) => p.bar === 0), `no part shows a scrollbar: ${JSON.stringify(asked2.map((p) => p.bar))}`);
 			const del = await menuNow(t);
 			t.expect(del?.question === `Delete “${title}”?` && del.words.includes("Done"), `Delete asks in place of its row: ${del?.question}`);
 			await t.shot("ask-delete");
@@ -78,6 +85,23 @@ export default {
 			await press("Delete");
 			await t.sleep(400);
 			t.expect(!(await t.file()).includes(next), `Delete confirmed removes the task's line: ${next}`);
+		}
+		if (item === "question in a small window") {
+			/** The verifier's window (2026-11-20): the desktop at 1024×824, the phone as it is; the card «Ответить Косте» of step 8. */
+			if (t.platform === "desktop") await t.setViewport(1024, 824);
+			await t.cdp.eval(`(async () => { window.__tcStand.step("step-menu"); await new Promise((r) => setTimeout(r, 700)); return 1; })()`);
+			await open("Ответить Косте", "day");
+			const parts = () => t.cdp.eval(`[...document.querySelectorAll(".tc-menu-layer .tc-panel")].map((p) => ({ above: p.classList.contains("is-above"), words: [...p.querySelectorAll(".tc-menu-tile-label, .tc-menu-label")].map((e) => e.textContent), scrolls: p.scrollHeight > p.clientHeight + 1, hidden: getComputedStyle(p).scrollbarWidth === "none" }))`);
+			const before = await parts();
+			await press("Delete");
+			await t.sleep(300);
+			const after = await parts();
+			const sideOf = (all, word) => all.find((p) => p.words.includes(word))?.above ?? null;
+			t.expect(["Done", "p1", "Tomorrow", "Rename", "Open in Obsidian"].every((w) => sideOf(before, w) === sideOf(after, w)), `the question keeps every group on its side of the copy: ${JSON.stringify(before.map((p) => [p.above, p.words.slice(0, 2)]))} → ${JSON.stringify(after.map((p) => [p.above, p.words.slice(0, 2)]))}`);
+			t.expect(after.every((p) => !p.scrolls || p.hidden), `a part that must scroll shows no scrollbar: ${JSON.stringify(after.map((p) => [p.scrolls, p.hidden]))}`);
+			const ask = await t.cdp.eval(`(() => { const a = document.querySelector(".tc-menu-layer .tc-menu-ask"); const p = a.closest(".tc-panel"); const r = a.getBoundingClientRect(); const q = p.getBoundingClientRect(); return { inside: r.top >= q.top - 1 && r.bottom <= q.bottom + 1 }; })()`);
+			t.expect(ask.inside, "the question shows whole in its part");
+			await t.shot("ask-small-window");
 		}
 		if (item === "pick a date") {
 			const inbox = (await t.oracle.cards("soon"))[0];
