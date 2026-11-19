@@ -229,6 +229,7 @@ function NewPlace({ minute, box, z, field }: { readonly minute: number; readonly
 		return (
 			<div className="tc-block tc-calendar-entry" data-own-press="" style={boxStyle(box, z)}>
 				<EntryField key={entrySeq} depth={0} />
+				<span className="tc-field-time">{clock}</span>
 			</div>
 		);
 	return (

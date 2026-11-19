@@ -1821,6 +1821,8 @@ body.theme-light .task-calendar.is-engine :is(.tc-event, .tc-allday) { --tc-even
 .tc-drag-source.is-lifted > .tc-block-card > .tc-slot-time { display: block; visibility: visible; position: absolute; left: var(--tc-card-pad-start); top: var(--tc-block-pad-top); font-size: var(--tc-font-body); line-height: var(--tc-leading-card); color: var(--tc-muted); font-variant-numeric: tabular-nums; }
 /* The new task's field on the calendar, a card's height at its minute. */
 .tc-calendar-entry > .tc-quick-row { min-height: var(--tc-card-h); }
+/* The field writes its time on its right, as the plugin's field on the calendar does; the text stops short of it. */
+.tc-calendar-entry .tc-quick-field { padding-right: calc(var(--tc-card-pad-end) + var(--tc-field-time-w) + var(--tc-space-6)); }
 /* The marks the calendar reveals: another day's opening hour, a label's lift under the top; a pinch's minute at its height. */
 .tc-opens-at, .tc-zoom-anchor { position: absolute; top: var(--tc-y); left: 0; width: 0; height: 0; pointer-events: none; }
 .tc-opens-at { scroll-margin-top: var(--tc-label-lift); }
