@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { MockPort } from "../../../obsidian/stand/MockPort";
 import { swipeStep } from "../../../obsidian/ui/engine/gestures/swipeStep";
 import { COLUMN_SHARE, offsetOf, shownAt, STRIP_WIDTH } from "../../../obsidian/ui/engine/layout/columns";
+import { LAYER_MS } from "../../../obsidian/ui/engine/layers/motion";
 import { share } from "../../../obsidian/ui/engine/store/share";
 import { createScreenStore } from "../../../obsidian/ui/engine/store";
 
@@ -14,7 +15,7 @@ function screen() {
 	return { port, store: createScreenStore(port) };
 }
 
-const titles = (port: MockPort, store: ReturnType<typeof screen>["store"], list: "inbox" | "soon" | "day") =>
+const titles = (store: ReturnType<typeof screen>["store"], list: "inbox" | "soon" | "day") =>
 	store.getState().shown.lists[list].rows.flatMap((row) => (row.kind === "task" ? [store.getState().shown.cards[row.id].title] : []));
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
@@ -71,17 +72,17 @@ describe("halves at Inbox and Soon (Max)", () => {
 describe("the screen's store", () => {
 	it("draws a drop at once and keeps it through the write's read-back, each card's face the same object", async () => {
 		const { port, store } = screen();
-		const [a, b, c] = titles(port, store, "inbox");
+		const [a, b, c] = titles(store, "inbox");
 		const ids = store.getState().shown.lists.inbox.rows.filter((r) => r.kind === "task").map((r) => r.id);
 		const face = store.getState().shown.cards[ids[0]];
 		store.getState().start();
 		expect(store.getState().claim("drag")).toBe(true);
 		store.getState().lift(ids[0]);
 		store.getState().drop(ids[0], { list: "inbox", before: ids[3], dayOffset: 0 });
-		expect(titles(port, store, "inbox").slice(0, 3)).toEqual([b, c, a]);
+		expect(titles(store, "inbox").slice(0, 3)).toEqual([b, c, a]);
 		await settle();
 		await settle();
-		expect(titles(port, store, "inbox").slice(0, 3)).toEqual([b, c, a]);
+		expect(titles(store, "inbox").slice(0, 3)).toEqual([b, c, a]);
 		const fileInbox = port.fileText().split("## Inbox\n")[1].split("\n").slice(0, 3).map((line) => line.replace(/^- \[ \] (p1 )?/, ""));
 		expect(fileInbox).toEqual([b, c, a]);
 		expect(store.getState().shown.cards[ids[0]]).toBe(face);
@@ -93,10 +94,10 @@ describe("the screen's store", () => {
 		store.getState().start();
 		store.getState().claim("drag");
 		port.addFromOutside("inbox", "Пришла во время переноса");
-		expect(titles(port, store, "inbox")[0]).not.toBe("Пришла во время переноса");
+		expect(titles(store, "inbox")[0]).not.toBe("Пришла во время переноса");
 		expect(store.getState().pending).toBe(true);
 		store.getState().drop("t1", null);
-		expect(titles(port, store, "inbox")[0]).toBe("Пришла во время переноса");
+		expect(titles(store, "inbox")[0]).toBe("Пришла во время переноса");
 		expect(store.getState().fresh.has(store.getState().shown.lists.inbox.rows.find((r) => r.kind === "task")!.id)).toBe(true);
 	});
 
@@ -109,17 +110,20 @@ describe("the screen's store", () => {
 		expect(store.getState().claim("ribbon")).toBe(true);
 	});
 
-	it("opens a task's menu with what the port offers, and runs an item through the port", async () => {
+	it("opens a task's menu with what the port offers; a tap closes it first and writes once it has faded out", async () => {
 		const { store } = screen();
 		store.getState().start();
 		const id = store.getState().shown.lists.inbox.rows.find((r) => r.kind === "task")!.id;
 		store.getState().openMenu(id);
-		expect(store.getState().layer?.items.map((i) => i.label)).toEqual(["Soon", "Today"]);
-		store.getState().act(id, "soon");
+		const model = store.getState().layer!.model;
+		expect(model.kind === "task" && model.moves).toEqual(["today", "tomorrow", "pick"]);
+		store.getState().pick({ kind: "move", id: "today" });
 		expect(store.getState().layer).toBeNull();
-		await settle();
-		await settle();
-		expect(store.getState().shown.lists.soon.rows[0].id).toBe(id);
+		expect(titles(store, "day")).not.toContain(model.title);
+		await new Promise((resolve) => setTimeout(resolve, LAYER_MS.close + 20));
+		const day = titles(store, "day");
+		expect(day[day.length - 1]).toBe(model.title);
+		expect(titles(store, "inbox")).not.toContain(model.title);
 	});
 });
 

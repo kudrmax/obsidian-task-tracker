@@ -1,6 +1,7 @@
 import { DESIGN } from "../../design";
 import { createStore, type StoreApi } from "zustand/vanilla";
-import type { Destination, Edge, ListId, MenuItem, Now, ScreenData, ScreenPort } from "../port";
+import { LAYER_MS } from "../layers/motion";
+import type { Destination, Edge, ListId, MenuAction, MenuFrom, MenuModel, Now, ScreenData, ScreenPort, StatusId } from "../port";
 import { share } from "./share";
 
 /** Where the ribbon stands: Inbox–Soon, Soon–the day, the day–its calendar. */
@@ -13,8 +14,24 @@ export type Gesture = "drag" | "ribbon" | "resize" | "zoom";
 /** Where the calendar was zoomed to: an hour's height, or the whole day whatever the calendar's height. */
 export type Zoom = number | "wholeDay";
 
-/** An open layer (spec, «Layers and focus»): the task's menu, with what the port offers in it. */
-export type Layer = { readonly kind: "menu"; readonly id: string; readonly items: readonly MenuItem[] };
+/** A page of a task's menu: the menu itself, the month to pick a day in, the Reminder kinds. */
+export type MenuPage = "menu" | "picker" | "reminders";
+
+/** What a menu asks before it acts (Won't do, Stop, Delete), in place of what was pressed. */
+export type Asking = StatusId | "delete";
+
+/**
+ * An open layer (spec, «Layers and focus»): the menu of a task or an event, with what the port offers in it, opened from a
+ * list's card, a calendar's block or a block's stack; the page it shows and the question it asks, if any.
+ */
+export interface Layer {
+	readonly kind: "menu";
+	readonly id: string;
+	readonly from: MenuFrom;
+	readonly model: MenuModel;
+	readonly page: MenuPage;
+	readonly asking: Asking | null;
+}
 
 export interface ScreenState {
 	/** What the screen draws: the last read, or a drop's preview until its write is read back. */
@@ -90,9 +107,18 @@ export interface ScreenActions {
 	carryHome(): void;
 	/** The carried task let go at `to` (null: cancelled, or let go where nothing takes it). */
 	drop(id: string, to: Destination | null): void;
-	openMenu(id: string): void;
+	/** Opens the menu of the task or event `id`, opened `from` there (a list's card unless said). */
+	openMenu(id: string, from?: MenuFrom): void;
 	closeLayer(): void;
-	act(id: string, item: string): void;
+	/** The open menu shows another page. */
+	menuPage(page: MenuPage): void;
+	/** The open menu asks before it acts (null: the question taken back, the menu as it was). */
+	ask(what: Asking | null): void;
+	/**
+	 * A tap in the menu: it closes first, and once it has faded out the port writes what was tapped (F132: the action
+	 * happens on the screen under the menu, after it).
+	 */
+	pick(action: MenuAction): void;
 	setPlusAt(at: { readonly into: ListId; readonly index: number } | null): void;
 	setPlusMinute(minute: number | null): void;
 	setZoom(zoom: Zoom): void;
@@ -308,15 +334,27 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 				set({ lifted: null, liftedDepth: null });
 				get().release("drag");
 			},
-			openMenu(id) {
-				set({ layer: { kind: "menu", id, items: port.menu(id) }, selected: null });
+			openMenu(id, from = "list") {
+				set({ layer: { kind: "menu", id, from, model: port.menu(id, from), page: "menu", asking: null }, ...(from === "list" ? { selected: null } : {}) });
+			},
+			menuPage(page) {
+				const layer = get().layer;
+				if (layer && layer.page !== page) set({ layer: { ...layer, page, asking: null } });
+			},
+			ask(asking) {
+				const layer = get().layer;
+				if (layer && layer.asking !== asking) set({ layer: { ...layer, asking } });
+			},
+			pick(action) {
+				const layer = get().layer;
+				if (!layer) return;
+				set({ layer: null });
+				let done: () => void = () => undefined;
+				write(new Promise<void>((resolve) => (done = resolve)));
+				window.setTimeout(() => void port.act(layer.id, action).finally(done), LAYER_MS.close);
 			},
 			closeLayer() {
 				if (get().layer) set({ layer: null });
-			},
-			act(id, item) {
-				set({ layer: null });
-				write(port.act(id, item));
 			},
 			openEntry(at) {
 				set({ entry: at === null ? null : (at ?? port.newTaskPlace(get().dayOffset)), entrySeq: get().entrySeq + 1, layer: null });

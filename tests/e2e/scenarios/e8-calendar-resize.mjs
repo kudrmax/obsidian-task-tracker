@@ -21,7 +21,7 @@ export default {
 		await cal.scrollTo(6 * 60, 20);
 		await t.sleep(300);
 		const grip = (edge) => t.cdp.eval(`(() => { const g = document.querySelector('.tc-pinned:not(.is-hidden) [data-grip="${edge}"]'); if (!g) return null; const r = g.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
-		const menu = () => t.cdp.eval(`!!document.querySelector(".tc-floating-menu")`);
+		const menu = () => t.cdp.eval(`!!document.querySelector(".tc-menu-layer .tc-panel:not(.is-closing)")`);
 		/** Taps a task: its menu opens and its dots show. */
 		const open = async (title) => {
 			const block = await cal.blockBy(title);

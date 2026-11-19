@@ -122,7 +122,7 @@ export default {
 			await carry(t, nearEdge, once(async () => ({ x: nearEdge.x, y: nearEdge.y })), { holdMs: 1200 });
 			await t.sleep(400);
 			/** On the phone page Chromium sends no move under its touch slop (Decision 18): the press stayed a hold, and let go its menu opened (F106); closed by its backdrop. */
-			if (await t.cdp.eval(`!!document.querySelector(".tc-floating-menu")`)) {
+			if (await t.cdp.eval(`!!document.querySelector(".tc-menu-layer .tc-panel:not(.is-closing)")`)) {
 				await cal.tap({ x: 8, y: 8 });
 				await t.sleep(400);
 			}

@@ -1067,7 +1067,7 @@ button.tc-btn.tc-select-menu.is-off { background: var(--tc-track-bg); color: var
 .tc-progress-dot { position: absolute; left: calc((var(--tc-card-pad-start) - var(--tc-progress-dot)) / 2); top: calc((var(--tc-card-h) - var(--tc-progress-dot)) / 2); width: var(--tc-progress-dot); height: var(--tc-progress-dot); border-radius: var(--tc-radius-circle); background: var(--tc-muted); pointer-events: none; }
 [data-priority] .tc-progress-dot, .tc-quick-row:has(> [data-priority]) > .tc-progress-dot { background: var(--tc-priority-meta); }
 /* The same dot on a card drawn by the screen's components: its task's status is on the card, the stylesheet draws the dot. */
-:is(.tc-card, .tc-block-card)[data-status="inProgress"]::before { content: ""; position: absolute; left: calc((var(--tc-card-pad-start) - var(--tc-progress-dot)) / 2); top: calc((var(--tc-card-h) - var(--tc-progress-dot)) / 2); width: var(--tc-progress-dot); height: var(--tc-progress-dot); border-radius: var(--tc-radius-circle); background: var(--tc-muted); pointer-events: none; }
+:is(.tc-card, .tc-block-card, .tc-menu-over > .tc-lifted)[data-status="inProgress"]::before { content: ""; position: absolute; left: calc((var(--tc-card-pad-start) - var(--tc-progress-dot)) / 2); top: calc((var(--tc-card-h) - var(--tc-progress-dot)) / 2); width: var(--tc-progress-dot); height: var(--tc-progress-dot); border-radius: var(--tc-radius-circle); background: var(--tc-muted); pointer-events: none; }
 [data-priority][data-status="inProgress"]::before { background: var(--tc-priority-meta); }
 .tc-card-title { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; font-size: var(--tc-font-body); -webkit-mask-image: var(--tc-fade-card-end); mask-image: var(--tc-fade-card-end); }
 /* A folded result: the card takes the two-line height everywhere it is drawn (a list, the menu's copy, the card under the finger), a capsule still; the result's own title small over the step's. A tap on the small line, from the card's top edge down, opens the result's menu. */
@@ -1891,11 +1891,28 @@ body:not(.is-mobile) .tc-drag-source:focus-visible > :is(.tc-card, .tc-block-car
 .task-calendar.is-engine .tc-items > .tc-block:has(> .tc-drag-source.is-lifted) { transition: none; }
 .tc-carried > .tc-card[data-priority] { background: var(--tc-priority-fill); }
 .tc-overlay.is-dropping .tc-carried > .tc-card[data-priority] { background: var(--tc-priority-fill); }
-/* A layer placed by Floating UI: shown as it mounts, where Floating UI puts it. */
-.tc-panel.tc-floating-menu { width: var(--tc-menu-w); opacity: 1; transform: none; }
 /* The field the plus opens, over the screen's foot, left of the plus. */
 /* The new task's field stands in its list as a row, at its level. */
 .tc-list-item > .tc-quick-row { margin-left: calc(var(--tc-level) * var(--tc-subtask-indent)); min-height: var(--tc-card-h); }
 /* A note's block: the same screen, one list, a fixed room in the note. */
 .tc-stand-block { position: relative; height: var(--tc-stand-block-h); }
 .tc-note-column { position: absolute; inset: 0; display: flex; }
+
+/* The engine's task menu (E4). Floating UI places each part (its left and top inline, measured before it shows); the design's classes run the motion: the backdrop, the copy over it and the panel fade in together in --tc-duration-menu, the panel growing out from the copy, and fade out together in --tc-duration-collapse. */
+.tc-menu-over { position: fixed; z-index: var(--tc-layer-panel); width: max-content; max-width: calc(100% - 2 * var(--tc-whole-margin)); display: flex; flex-direction: column; pointer-events: none; opacity: 0; transition: opacity var(--tc-duration-menu) var(--tc-ease-out); }
+.tc-level.is-shown > .tc-menu-over { opacity: 1; }
+.tc-level.is-closing > .tc-menu-over { opacity: 0; transition-duration: var(--tc-duration-collapse); }
+.tc-menu-over > .tc-lifted { position: relative; flex: 1 0 auto; opacity: 1; transition: none; }
+.tc-menu-over > .tc-lifted.is-whole { max-width: none; }
+.tc-menu-over > .tc-lifted.is-block { align-items: stretch; }
+.tc-menu-over > .tc-lifted.is-block > :is(.tc-block-card, .tc-event) { position: relative; inset: auto; flex: 1 1 auto; min-width: 0; }
+.tc-menu-over .tc-block-card.is-selected { box-shadow: var(--tc-ring-selected); }
+.tc-menu-over .tc-event { --tc-event-bg: var(--tc-event-bg-dark); --tc-event-bar: var(--tc-event-bar-dark); --tc-event-text: var(--tc-event-text-dark); }
+body.theme-light .tc-menu-over .tc-event { --tc-event-bg: var(--tc-event-bg-light); --tc-event-bar: var(--tc-event-bar-light); --tc-event-text: var(--tc-event-text-light); }
+.tc-level.tc-menu-layer .tc-panel { bottom: auto; overflow-y: auto; overscroll-behavior: contain; }
+.tc-menu-measure { position: fixed; width: 0; height: 0; pointer-events: none; }
+/* A label, a task's name in a question or a row's value too long for its room fades out at the right, as the plugin marks it: the box scrolls only when its text is cut, and only then its scroll timeline runs the fade. */
+@keyframes tc-cut-tile { from, to { text-align: left; -webkit-mask-image: var(--tc-fade-tile-end); mask-image: var(--tc-fade-tile-end); } }
+@keyframes tc-cut-value { from, to { -webkit-mask-image: var(--tc-fade-card-end); mask-image: var(--tc-fade-card-end); } }
+.tc-menu-layer :is(.tc-menu-tile-label, .tc-menu-ask-title) { animation-name: tc-cut-tile; animation-fill-mode: both; animation-timeline: scroll(self inline); }
+.tc-menu-layer .tc-menu-value { animation-name: tc-cut-value; animation-fill-mode: both; animation-timeline: scroll(self inline); }

@@ -1,5 +1,6 @@
-import { type CSSProperties, memo } from "react";
+import { createContext, type CSSProperties, memo } from "react";
 import { PROPERTY } from "../../design";
+import type { CardFace } from "../port";
 import { useData } from "../store";
 import { Icon } from "./Icon";
 
@@ -14,6 +15,9 @@ export interface BlockLook {
 	readonly pill: string | null;
 	readonly clock: string;
 }
+
+/** How a block pressed on the calendar looks there (its corner, its pill): its copy over the menu's backdrop is drawn the same. */
+export const PressedLook = createContext<{ current: BlockLook | null }>({ current: null });
 
 export interface CardProps {
 	readonly id: string;
@@ -36,6 +40,18 @@ export const Card = memo(function Card({ id, depth = 0, copy = false, block }: C
 	const marked = copy ? { "data-copy": id } : block ? { "data-block": id, "data-own-press": "" } : { "data-id": id };
 	return (
 		<div className={block ? "tc-block-card" : "tc-card"} {...marked} data-status={face.inProgress ? "inProgress" : "open"} data-priority={face.color ?? undefined} style={block ? undefined : ({ [PROPERTY.level]: String(depth) } as CSSProperties)}>
+			<CardInsides face={face} block={block} />
+		</div>
+	);
+});
+
+/**
+ * What a card shows inside its edge: its title, the counter and the description's mark, the date in a list, its look on
+ * the calendar. The card and its copy over a menu's backdrop draw the same insides.
+ */
+export function CardInsides({ face, block }: { readonly face: CardFace; readonly block?: BlockLook }) {
+	return (
+		<>
 			<div className="tc-card-title">{block?.step ?? face.title}</div>
 			{face.count || face.description ? (
 				<span className={`tc-meta${face.count && face.description ? " is-pair" : ""}`}>
@@ -58,6 +74,6 @@ export const Card = memo(function Card({ id, depth = 0, copy = false, block }: C
 					<span className="tc-due-mon">{face.due.month}</span>
 				</span>
 			) : null}
-		</div>
+		</>
 	);
-});
+}

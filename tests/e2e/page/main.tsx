@@ -23,6 +23,7 @@ const STEPS: Readonly<Record<string, { place: Place; file?: () => MockFile }>> =
 	"step-long-lists": { place: "twoColumns", file: longListsFile },
 	"step-calendar": { place: "calendar", file: () => calendarFile(new Date()) },
 	"step-swipe": { place: "follow" },
+	"step-menu": { place: "calendar", file: () => calendarFile(new Date()) },
 	"whole-screen": { place: "leaf" },
 };
 

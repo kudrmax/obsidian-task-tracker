@@ -37,7 +37,7 @@ export default {
 		for (const [name, at] of [["Тренировка", { x: gym.x, y: gym.bottom - 8 }], ["Разобрать почту", { x: mail.x, y: mail.y }]]) {
 			await cal.tap(at);
 			await t.sleep(500);
-			t.expect(await t.cdp.eval(`!!document.querySelector(".tc-floating-menu")`), `«${name}»'s menu opens`);
+			t.expect(await t.cdp.eval(`!!document.querySelector(".tc-menu-layer .tc-panel:not(.is-closing)")`), `«${name}»'s menu opens`);
 			await cal.key("Escape", "Escape", 27);
 			await t.sleep(500);
 			const focus = await t.cdp.eval(FOCUS);

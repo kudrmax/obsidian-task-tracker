@@ -1,12 +1,12 @@
 import { defaultRangeExtractor, type Range, useVirtualizer } from "@tanstack/react-virtual";
-import { type CSSProperties, memo, useCallback, useEffect, useMemo, useState } from "react";
+import { type CSSProperties, memo, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { PROPERTY } from "../../design";
 import { PLUS, SortableList, SortableRow, useListTarget } from "../drag/Drag";
 import { descendantsOf } from "../drag/tree";
 import { useAnchor } from "../layers/Layers";
 import type { Destination, ListId, Row } from "../port";
 import { useData, useScreen, useScreenApi } from "../store";
-import { Card } from "./Card";
+import { Card, PressedLook } from "./Card";
 import { MovingRow } from "./MovingRow";
 import { EntryField } from "./QuickAdd";
 
@@ -140,6 +140,7 @@ export const TaskList = memo(function TaskList({ list }: { readonly list: ListId
 const RowFace = memo(function RowFace({ row }: { readonly row: Row }) {
 	const api = useScreenApi();
 	const anchor = useAnchor();
+	const pressed = useContext(PressedLook);
 	if (row.kind === "section")
 		return (
 			<SortableRow id={row.id}>
@@ -152,7 +153,8 @@ const RowFace = memo(function RowFace({ row }: { readonly row: Row }) {
 		<SortableRow
 			id={row.id}
 			onTap={(target) => {
-				anchor.current = target;
+				anchor.current = target.querySelector("[data-id]") ?? target;
+				pressed.current = null;
 				api.getState().openMenu(row.id);
 			}}
 		>

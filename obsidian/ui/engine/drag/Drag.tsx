@@ -506,7 +506,7 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 			api.getState().drop(id, null);
 			if (!fromCalendar && !mouse) return;
 			anchor.current = doc.querySelector(fromCalendar ? `[data-block="${id}"]` : `[data-id="${id}"]`);
-			api.getState().openMenu(id);
+			api.getState().openMenu(id, fromCalendar ? "calendar" : "list");
 			if (fromCalendar) api.getState().select(id);
 			return;
 		}

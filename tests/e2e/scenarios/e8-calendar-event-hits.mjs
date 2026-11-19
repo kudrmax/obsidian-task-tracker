@@ -66,12 +66,12 @@ export default {
 			await t.cdp.eval(`(() => { window.__tcHit = null; return 1; })()`);
 			await cal.tap(aim);
 			await t.sleep(400);
-			const opened = await t.cdp.eval(`({ menu: !!document.querySelector(".tc-floating-menu"), hit: window.__tcHit })`);
+			const opened = await t.cdp.eval(`({ menu: !!document.querySelector(".tc-menu-layer .tc-panel:not(.is-closing)"), hit: window.__tcHit })`);
 			t.expect(opened.menu && opened.hit === own.id, `${zoom}: a click on «${name}»'s title opens its own menu: ${JSON.stringify(opened)} for ${own.id} at ${JSON.stringify(aim)}`);
 			/** The menu closed as a person closes it, a tap beside it. */
 			await cal.tap({ x: 8, y: 8 });
 			await t.sleep(400);
-			t.expect(!(await t.cdp.eval(`!!document.querySelector(".tc-floating-menu")`)), `${zoom}: «${name}»'s menu closes on a tap beside it`);
+			t.expect(!(await t.cdp.eval(`!!document.querySelector(".tc-menu-layer .tc-panel:not(.is-closing)")`)), `${zoom}: «${name}»'s menu closes on a tap beside it`);
 		}
 	},
 };

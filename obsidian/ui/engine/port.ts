@@ -130,11 +130,75 @@ export interface Destination {
 	readonly end?: number | null;
 }
 
-/** A menu's item: the port names it and runs it. */
-export interface MenuItem {
-	readonly id: string;
-	readonly label: string;
+/** Where a task's menu is opened from: a list's card, a calendar's block, a card of a block's stack in its menu (F107). */
+export type MenuFrom = "list" | "calendar" | "stack";
+
+/** A status tile: Done, In progress (Stop progress on a task in progress), Won't do, Stop (a repeating task). */
+export type StatusId = "done" | "inProgress" | "stopProgress" | "wontDo" | "stop";
+/** A row of the edit group, in the plugin's order. */
+export type EditId = "rename" | "reminder" | "description" | "repeat" | "section" | "project" | "subtask" | "firstStep";
+/** A move tile: today, tomorrow, or the month to pick a day in. */
+export type MoveId = "today" | "tomorrow" | "pick";
+/** How a timed task reminds on the iPhone. */
+export type ReminderKind = "live" | "notification" | "alarm" | "none";
+/** A row of the open group. */
+export type OpenId = "fullScreen" | "obsidian";
+
+/** A priority level's tile: its prefix, its colour (a preset's name or `#RRGGBB`) and whether the task has it. */
+export interface LevelTile {
+	readonly prefix: string;
+	readonly color: string;
+	readonly on: boolean;
 }
+
+/**
+ * A task's menu as the port offers it (the plugin's `TaskMenuModel`): every group in the order drawn, a group with nothing
+ * to offer empty. The screen draws it and sends back what was tapped (`MenuAction`).
+ */
+export interface TaskMenuModel {
+	readonly kind: "task";
+	/** The task's title, as a question names it: «Delete “…”?». */
+	readonly title: string;
+	readonly statuses: readonly { readonly id: StatusId; readonly confirm: boolean }[];
+	/** In the settings' order; `disabled` while the task may have no priority. */
+	readonly levels: { readonly tiles: readonly LevelTile[]; readonly disabled: boolean };
+	/** No tile for the day the task already stands on; none for a task put off nowhere. */
+	readonly moves: readonly MoveId[];
+	/** The month page: today, the task's due day (shown picked), and whether Remove due date is offered. Days are `YYYY-MM-DD`. */
+	readonly date: { readonly today: string; readonly picked: string | null; readonly removable: boolean };
+	/** The rows with their values on the right (Reminder's, Repeat's rule, Section's and Project's names); Project on a subtask disabled. */
+	readonly edits: readonly { readonly id: EditId; readonly value: string; readonly disabled: boolean }[];
+	readonly opens: readonly OpenId[];
+	/** Delete, asking first when `confirm`; null: none. */
+	readonly remove: { readonly confirm: boolean } | null;
+	/** The Reminder page's kinds, the task's own checked. */
+	readonly reminders: readonly { readonly kind: ReminderKind; readonly checked: boolean }[];
+	/** The start of the task's description, over its copy (markdown); null without one. */
+	readonly peek: string | null;
+	/** A calendar's task: its open subtasks, standing between its copy and the panel (F107); none elsewhere. */
+	readonly subtasks: readonly string[];
+}
+
+/** An event's menu: its one row, Open in Calendar. */
+export interface EventMenuModel {
+	readonly kind: "event";
+	readonly title: string;
+}
+
+export type MenuModel = TaskMenuModel | EventMenuModel;
+
+/** What a tap in a menu writes; the port says what it means for the task. */
+export type MenuAction =
+	| { readonly kind: "status"; readonly id: StatusId }
+	| { readonly kind: "priority"; readonly prefix: string }
+	| { readonly kind: "move"; readonly id: "today" | "tomorrow" }
+	/** A day picked on the month page (`YYYY-MM-DD`); null: Remove due date. */
+	| { readonly kind: "date"; readonly date: string | null }
+	| { readonly kind: "reminder"; readonly reminder: ReminderKind }
+	| { readonly kind: "rename"; readonly text: string }
+	| { readonly kind: "delete" }
+	/** A row whose own screen is part 2's (Repeat, Section, Project, First step, Add description, the open rows, Open in Calendar): on the stand it closes the menu and writes nothing. */
+	| { readonly kind: "row"; readonly id: EditId | OpenId | "calendar" };
 
 export interface ScreenPort {
 	/** The screen for the day `dayOffset` days from today. */
@@ -170,8 +234,8 @@ export interface ScreenPort {
 	newTaskPlace(dayOffset: number): Destination;
 	/** A new task from its typed text at `at`; resolves with its id once read back. */
 	add(text: string, at: Destination): Promise<string>;
-	/** What the task's menu offers. */
-	menu(id: string): readonly MenuItem[];
-	/** Runs a menu's item on the task. */
-	act(id: string, item: string): Promise<void>;
+	/** What the menu of the task or event `id` offers, opened `from` there. */
+	menu(id: string, from: MenuFrom): MenuModel;
+	/** Writes what was tapped in the menu of `id`; resolves once written and read back. */
+	act(id: string, action: MenuAction): Promise<void>;
 }

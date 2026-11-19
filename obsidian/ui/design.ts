@@ -49,6 +49,12 @@ export const DESIGN = {
 	grip: 10,
 	gripStartRight: 14,
 	gripEndLeft: 14,
+	/** A menu's panel stands this far from the copy of the pressed card. */
+	menuGap: 12,
+	/** What a menu, the copy over it and a grown card keep from the window's edges. */
+	wholeMargin: 10,
+	/** The band between a menu's groups (`--tc-band`'s width). */
+	menuBand: 8,
 } as const;
 
 export type DesignMeasure = keyof typeof DESIGN;
@@ -81,6 +87,9 @@ export const DESIGN_TOKENS: Readonly<Record<DesignMeasure, string>> = {
 	grip: "--tc-grip",
 	gripStartRight: "--tc-grip-start-right",
 	gripEndLeft: "--tc-grip-end-left",
+	menuGap: "--tc-space-12",
+	wholeMargin: "--tc-space-10",
+	menuBand: "--tc-space-8",
 };
 
 /** The custom properties the code sets on elements; styles.css does the arithmetic with them. */

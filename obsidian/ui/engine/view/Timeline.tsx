@@ -9,7 +9,7 @@ import { TimeScale } from "../layout/timeScale";
 import { type DayTurn, DayTurnContext } from "../gestures/FollowRibbon";
 import type { AllDayEvent, Block, DayData, DayEvent, EventPaint, Now } from "../port";
 import { DayContext, useData, useScreen, useScreenApi } from "../store";
-import { Card } from "./Card";
+import { Card, PressedLook } from "./Card";
 import { useHost } from "./host";
 import { MovingRow } from "./MovingRow";
 import { EntryField } from "./QuickAdd";
@@ -19,7 +19,7 @@ const px = (n: number) => `${n}px`;
 const at = (minute: number, scale: TimeScale) => ({ [PROPERTY.y]: px(scale.y(minute)) }) as CSSProperties;
 const boxStyle = (box: TaskBox, z: number) => ({ [PROPERTY.y]: px(box.top), [PROPERTY.length]: px(box.height), [PROPERTY.x]: px(box.left), [PROPERTY.stackZ]: String(z) }) as CSSProperties;
 /** An event's paint in both themes, as the port gives it: the stylesheet shows the theme's own. */
-const paintStyle = (paint: EventPaint) =>
+export const paintStyle = (paint: EventPaint) =>
 	({
 		[PROPERTY.eventBgDark]: paint.dark.bg,
 		[PROPERTY.eventBarDark]: paint.dark.bar,
@@ -291,9 +291,11 @@ function AllDayRow({ row, open }: { readonly row: AllDayEvent; readonly open: (i
 function useOpenMenu(): (id: string, event: MouseEvent<HTMLElement>) => void {
 	const api = useScreenApi();
 	const anchor = useAnchor();
+	const pressed = useContext(PressedLook);
 	return (id, event) => {
-		anchor.current = event.currentTarget;
-		api.getState().openMenu(id);
+		pressed.current = null;
+		anchor.current = event.currentTarget.querySelector(".tc-event-block") ?? event.currentTarget;
+		api.getState().openMenu(id, "calendar");
 	};
 }
 
@@ -343,6 +345,7 @@ const BlockItem = memo(function BlockItem({ block, box, shades, order, z, top, s
 	const resizing = useScreen((s) => (s.resizing?.id === block.id ? s.resizing.edge : null));
 	const api = useScreenApi();
 	const anchor = useAnchor();
+	const pressed = useContext(PressedLook);
 	const [element, setElement] = useState<HTMLDivElement | null>(null);
 	const className = `tc-block${selected ? " is-selected" : ""}${resizing ? " is-resizing" : ""}`;
 	const look = { step: block.step, corner: box.stacked ? block.startParts : box.shortLength ? block.lengthParts : null, pill: resizing === "start" ? block.clock : resizing === "end" ? (block.endClock ?? block.clock) : null, clock: block.clock };
@@ -352,8 +355,9 @@ const BlockItem = memo(function BlockItem({ block, box, shades, order, z, top, s
 				id={block.id}
 				placed
 				onTap={(target) => {
-					anchor.current = target;
-					api.getState().openMenu(block.id);
+					anchor.current = target.querySelector("[data-block]") ?? target;
+					pressed.current = look;
+					api.getState().openMenu(block.id, "calendar");
 					api.getState().select(block.id);
 				}}
 			>

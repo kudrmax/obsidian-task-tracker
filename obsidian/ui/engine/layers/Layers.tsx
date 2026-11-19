@@ -1,5 +1,8 @@
-import { autoUpdate, flip, FloatingFocusManager, FloatingOverlay, FloatingPortal, hide, offset, type Placement, shift, useDismiss, useFloating, useInteractions, useRole } from "@floating-ui/react";
-import { createContext, type MutableRefObject, type ReactNode, useContext, useRef } from "react";
+import { autoUpdate, FloatingFocusManager, FloatingOverlay, FloatingPortal, hide, type Middleware, offset, type Placement, shift, size, useDismiss, useFloating, useInteractions, useRole, useTransitionStatus } from "@floating-ui/react";
+import { createContext, type MutableRefObject, type ReactNode, useContext, useLayoutEffect, useRef, useState } from "react";
+import { DESIGN } from "../../design";
+import { LAYER_MS } from "./motion";
+import { groupsAbove } from "./split";
 
 /**
  * Layers and focus (spec, «The owners»): every menu, popover and sheet is a Floating UI element. It is placed against the
@@ -23,45 +26,177 @@ export function useAnchor(): MutableRefObject<Element | null> {
 	return anchor;
 }
 
-/** The space between a layer and the element it opens from, and kept from the view's edges (the design's `--tc-menu-gap`, `--tc-space-8`). */
-const GAP_PX = 12;
-const EDGE_PX = 8;
-
-export interface PopoverProps {
+export interface MenuLayerProps {
 	readonly open: boolean;
 	readonly onClose: () => void;
 	/** The element of the view's own document that holds the layer. */
 	readonly root: HTMLElement;
+	/** The element pressed: the copy stands over it. */
+	readonly reference: Element | null;
 	readonly label: string;
-	readonly className: string;
-	readonly children: ReactNode;
+	/** The copy of what was pressed, and under it a calendar task's subtasks (F107), drawn over the backdrop where it stood. */
+	readonly over: ReactNode;
+	/** The panel's groups, top to bottom: when the panel fits on neither side of the copy, its first groups stand over it. */
+	readonly groups: readonly ReactNode[];
+	/** The panel's own classes beside `tc-panel is-menu`: its page's. */
+	readonly panelClass: string;
+	/** The page shown: another page lays the panel out afresh. */
+	readonly page: string;
+	/** The start of a description over the copy, or under the panel when there is no room over it (F129). */
+	readonly peek?: ReactNode;
+	/** The copy keeps the pressed thing's width (an event wraps its title inside it); otherwise it grows right for its title. */
+	readonly keepWidth?: boolean;
 }
 
-/** A layer anchored to the element it opened from, over the design's backdrop (Floating UI's `FloatingOverlay`), as Floating UI's docs build a popover menu. */
-export function Popover({ open, onClose, root, label, className, children }: PopoverProps) {
-	const anchor = useAnchor();
-	const { refs, floatingStyles, context } = useFloating({
+/** A panel keeps its left edge on the copy's unless that would take it closer than the menu's gap to the window's right (the plugin's `placePanel`). */
+const EDGES = { left: 0, right: DESIGN.menuGap, top: DESIGN.wholeMargin, bottom: DESIGN.wholeMargin };
+
+/** How a part of the menu stands while it opens, is open and closes: the design's classes, which its CSS transitions run between. */
+const motionClass = (status: string, ready: boolean) => (status === "open" && ready ? " is-shown" : status === "close" ? " is-closing" : "");
+
+/**
+ * The menu over a pressed card, block or event (the plugin's `LiftedMenu`, F110, F297), as Floating UI builds a menu:
+ * the backdrop (`FloatingOverlay`), a copy of what was pressed standing exactly over it (its whole title showing, kept
+ * inside the window by `shift`), and the panel under the copy, its left edge on the copy's. A panel taller than the room
+ * under the copy and over it splits: its first groups, as many as fit whole, stand over the copy and the rest under it,
+ * each part scrolling within its room (`groupsAbove`, the plugin's `placePanel`). Escape and a press on the backdrop
+ * close it (`useDismiss`).
+ *
+ * Every part is placed before it is shown (`isPositioned`): it mounts in its closed state at its place, and only then
+ * takes `is-shown`, so its CSS transition grows it from the copy (`--tc-menu-rise`, `--tc-menu-scale`) and never slides it
+ * in from where it stood unplaced. The parts open together and close together (Floating UI's transition status keeps
+ * them mounted while they fade, `LAYER_MS`).
+ */
+export function MenuLayer({ open, onClose, root, reference, label, over, groups, panelClass, page, peek, keepWidth = false }: MenuLayerProps) {
+	const [above, setAbove] = useState(0);
+	const [overEl, setOverEl] = useState<HTMLElement | null>(null);
+	const parts = useRef<{ upper: HTMLElement | null; lower: HTMLElement | null }>({ upper: null, lower: null });
+	const copy = useFloating({
+		open,
+		placement: "bottom-start",
+		strategy: "fixed",
+		transform: false,
+		middleware: [size({ apply: ({ rects, elements }) => void Object.assign(elements.floating.style, { minWidth: `${rects.reference.width}px`, maxWidth: keepWidth ? `${rects.reference.width}px` : "", minHeight: `${rects.reference.height}px` }) }), cover],
+		whileElementsMounted: autoUpdate,
+		elements: { reference },
+	});
+	const lower = useFloating({
 		open,
 		onOpenChange: (next) => {
 			if (!next) onClose();
 		},
 		placement: "bottom-start",
-		middleware: [offset(GAP_PX), flip({ padding: EDGE_PX }), shift({ padding: EDGE_PX })],
+		strategy: "fixed",
+		transform: false,
+		middleware: [offset(DESIGN.menuGap), split(parts), shift({ padding: EDGES }), size({ padding: DESIGN.wholeMargin, apply: scrollWithin })],
 		whileElementsMounted: autoUpdate,
-		elements: { reference: anchor.current },
+		elements: { reference: overEl },
 	});
-	const { getFloatingProps } = useInteractions([useDismiss(context), useRole(context, { role: "menu" })]);
-	if (!open) return null;
+	const upper = useFloating({
+		open,
+		placement: "top-start",
+		strategy: "fixed",
+		transform: false,
+		middleware: [offset(DESIGN.menuGap), shift({ padding: EDGES }), size({ padding: DESIGN.wholeMargin, apply: scrollWithin })],
+		whileElementsMounted: autoUpdate,
+		elements: { reference: overEl },
+	});
+	const wanted = (lower.middlewareData.split as { above?: number } | undefined)?.above;
+	/** A new page is laid out afresh: until its split is measured, nothing of it shows. */
+	useLayoutEffect(() => setAbove(0), [page]);
+	useLayoutEffect(() => {
+		if (wanted !== undefined && wanted !== above) setAbove(wanted);
+	}, [wanted, above]);
+	const { isMounted, status } = useTransitionStatus(lower.context, { duration: { open: LAYER_MS.open, close: LAYER_MS.close } });
+	/** Closed by the click, not the press: the finger's tap ends on the backdrop, never on a card under the fading menu. */
+	const dismiss = useDismiss(lower.context, { outsidePressEvent: "click", outsidePress: (event) => !(overEl && event.target instanceof Node && overEl.contains(event.target)) });
+	const { getFloatingProps } = useInteractions([dismiss, useRole(lower.context, { role: "menu" })]);
+	if (!isMounted) return null;
+	const count = Math.min(above, groups.length);
+	const settled = wanted === count || (wanted !== undefined && wanted >= groups.length && count === groups.length);
+	const ready = copy.isPositioned && (count === groups.length || lower.isPositioned) && (count === 0 || upper.isPositioned) && settled;
+	const motion = motionClass(status, ready);
+	const panel = `tc-panel is-menu ${panelClass}`;
 	return (
 		<FloatingPortal root={root}>
-			<FloatingOverlay className="tc-backdrop is-shown" />
-			<FloatingFocusManager context={context} modal={false} initialFocus={-1}>
-				<div ref={refs.setFloating} style={floatingStyles} className={className} aria-label={label} {...getFloatingProps()}>
-					{children}
+			<FloatingOverlay className={`tc-backdrop tc-menu-layer${motion}`} />
+			<div className={`tc-level tc-menu-layer${motion}`}>
+				<div ref={(el) => {
+					copy.refs.setFloating(el);
+					setOverEl(el);
+				}} style={copy.floatingStyles} className="tc-menu-over">
+					{over}
 				</div>
-			</FloatingFocusManager>
+				<FloatingFocusManager context={lower.context} modal={false} initialFocus={-1}>
+					<div>
+						{count > 0 ? (
+							<div ref={(el) => {
+								upper.refs.setFloating(el);
+								parts.current.upper = el;
+							}} style={upper.floatingStyles} className={`${panel} is-above${motion}`} aria-label={label} role="menu">
+								{groups.slice(0, count)}
+							</div>
+						) : null}
+						{count < groups.length ? (
+							<div ref={(el) => {
+								lower.refs.setFloating(el);
+								parts.current.lower = el;
+							}} style={lower.floatingStyles} className={`${panel}${motion}`} aria-label={label} {...getFloatingProps()}>
+								{groups.slice(count)}
+							</div>
+						) : (
+							<div ref={(el) => {
+								lower.refs.setFloating(el);
+								parts.current.lower = el;
+							}} style={lower.floatingStyles} className="tc-menu-measure" {...getFloatingProps()} />
+						)}
+					</div>
+				</FloatingFocusManager>
+				{peek ?? null}
+			</div>
 		</FloatingPortal>
 	);
+}
+
+/**
+ * The copy stands exactly over what was pressed (its size the pressed thing's at least: `size`); grown for its title, it
+ * moves left and up only as far as it must to stay inside the window less its margin, never past where the pressed thing
+ * already reached (the core's `grownStart`).
+ */
+const cover: Middleware = {
+	name: "cover",
+	fn: ({ rects, elements }) => {
+		const page = elements.floating.ownerDocument.documentElement;
+		const start = (at: number, size: number, grown: number, room: number) => Math.max(Math.min(at, DESIGN.wholeMargin), Math.min(at, Math.max(at + size, room - DESIGN.wholeMargin) - grown));
+		return { x: start(rects.reference.x, rects.reference.width, rects.floating.width, page.clientWidth), y: start(rects.reference.y, rects.reference.height, rects.floating.height, page.clientHeight) };
+	},
+};
+
+/** A part taller than its room keeps to it and scrolls (the plugin's `keepWithin`). */
+function scrollWithin({ availableHeight, elements }: { availableHeight: number; elements: { floating: HTMLElement } }): void {
+	const floating = elements.floating;
+	floating.style.maxHeight = `${Math.max(0, availableHeight)}px`;
+}
+
+/**
+ * How many of the panel's groups stand over the copy (the plugin's `groupsAbove` over its `placePanel`): measured by
+ * Floating UI as the panel is placed, each group's height wherever it stands now, against the room over and under the copy.
+ */
+function split(parts: MutableRefObject<{ upper: HTMLElement | null; lower: HTMLElement | null }>): Middleware {
+	return {
+		name: "split",
+		async fn({ rects, platform, elements }) {
+			const groups = [parts.current.upper, parts.current.lower].flatMap((part) => (part ? [...part.children] : []));
+			/** As one panel would stand: a group drawn first in its part has no band over it, every group but the panel's first has one. */
+			const heights = await Promise.all(groups.map(async (group, i) => (await platform.getDimensions(group)).height - (group.previousElementSibling ? DESIGN.menuBand : 0) + (i > 0 ? DESIGN.menuBand : 0)));
+			const cuts = heights.slice(0, -1).map((_, i) => heights.slice(0, i + 1).reduce((a, b) => a + b, 0));
+			const total = heights.reduce((a, b) => a + b, 0);
+			const windowHeight = elements.floating.ownerDocument.documentElement.clientHeight;
+			const roomOver = rects.reference.y - DESIGN.menuGap - DESIGN.wholeMargin;
+			const roomUnder = windowHeight - (rects.reference.y + rects.reference.height) - DESIGN.menuGap - DESIGN.wholeMargin;
+			return { data: { above: groupsAbove(cuts, total, roomOver, roomUnder, groups.length > 1) } };
+		},
+	};
 }
 
 export interface PinnedProps {

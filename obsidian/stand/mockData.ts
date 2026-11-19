@@ -14,7 +14,8 @@ export interface MockTask {
 	title: string;
 	/** A level: p1 paints red, p2 orange. */
 	level: "p1" | "p2" | null;
-	status: " " | "/" | "x";
+	/** Open, in progress, done, won't do. */
+	status: " " | "/" | "x" | "-";
 	/** `YYYY-MM-DD`. */
 	due: string | null;
 	/** A time on its due day, minutes from the day's start; no end: no length. */
@@ -23,6 +24,8 @@ export interface MockTask {
 	children: MockTask[];
 	/** Its subtasks folded under its card. */
 	folded?: boolean;
+	/** How a timed task reminds; none set: Live Activity, as a task first put on a time gets. */
+	reminder?: "live" | "notification" | "alarm" | "none";
 }
 
 /** A calendar's event, every day at the same minutes from the day's start; `color` its calendar's. */

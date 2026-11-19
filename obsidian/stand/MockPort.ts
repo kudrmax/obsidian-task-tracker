@@ -1,4 +1,4 @@
-import type { AllDayEvent, Block, CardFace, DayEvent, Destination, Edge, EventPaint, ListData, ListId, MenuItem, Now, Row, ScreenData, ScreenPort } from "../ui/engine/port";
+import type { AllDayEvent, Block, CardFace, DayEvent, Destination, Edge, EditId, EventPaint, ListData, ListId, MenuAction, MenuFrom, MenuModel, MoveId, Now, ReminderKind, StatusId, Row, ScreenData, ScreenPort } from "../ui/engine/port";
 import { bgAlphaFor, eventColors } from "../ui/eventColors";
 import { addDays, CALENDAR_COLORS, DAY_START_HOUR, dateOf, dayOf, fileText, LIST_KEYS, type ListKey, type MockFile, type MockSection, type MockTask, minuteOf, mockFile } from "./mockData";
 
@@ -34,15 +34,16 @@ const clockOf = (minute: number) => {
 const DAY_MINUTES = 24 * 60;
 /** Another day opens at this hour (the «Scroll to hour» setting's default), minutes from the day's start. */
 const OPENS_AT = (9 - DAY_START_HOUR) * 60;
-/** An event's menu: its one row. */
-const EVENT_MENU: readonly MenuItem[] = [{ id: "open-calendar", label: "Open in Calendar" }];
-
-/** The lists a menu sends a task to, by the item's id. */
-const MENU: readonly MenuItem[] = [
-	{ id: "inbox", label: "Inbox" },
-	{ id: "soon", label: "Soon" },
-	{ id: "day", label: "Today" },
-];
+/** The priority levels of the settings, in their order (the plugin's defaults). */
+const LEVELS = [
+	{ prefix: "p1", color: LEVEL_COLORS.p1 },
+	{ prefix: "p2", color: LEVEL_COLORS.p2 },
+] as const;
+/** The file's mark each status tile writes. */
+const STATUS_MARKS: Readonly<Record<StatusId, MockTask["status"]>> = { done: "x", inProgress: "/", stopProgress: " ", wontDo: "-", stop: " " };
+const REMINDERS: readonly ReminderKind[] = ["live", "notification", "alarm", "none"];
+/** A task done or given up leaves the screen; it stays in the file. */
+const closed = (t: MockTask) => t.status === "x" || t.status === "-";
 
 /**
  * The stand's port (spec 2026-11-18, «MockPort»): made-up tasks in memory, the simplest product rules that make each case
@@ -158,7 +159,7 @@ export class MockPort implements ScreenPort {
 	private shownSpan(t: MockTask, dayOffset: number): { readonly start: number; readonly end: number | null } {
 		const { start, end } = t.slot ?? { start: 0, end: null };
 		const present = minuteOf(this.clock());
-		if (dayOffset !== 0 || t.status === "x" || start >= present) return { start, end };
+		if (dayOffset !== 0 || closed(t) || start >= present) return { start, end };
 		return { start: present, end: end === null ? null : present + end - start };
 	}
 
@@ -203,18 +204,97 @@ export class MockPort implements ScreenPort {
 		return id;
 	}
 
-	menu(id: string): readonly MenuItem[] {
-		if (this.file.events.some((e) => e.id === id) || this.file.allDay.some((e) => e.id === id)) return EVENT_MENU;
+	/**
+	 * A task's menu by the plugin's rules, the simplest (`core/application/menus.ts`): Won't do and Delete ask first; the
+	 * levels of the settings; Today and Tomorrow but the day the task stands on; Rename, Reminder for a timed task, Add
+	 * description without one, Repeat, Section for a task of a list with sections, Project (disabled on a subtask), Add
+	 * subtask but in a block's stack, First step but in a stack; a calendar's task its open subtasks.
+	 */
+	menu(id: string, from: MenuFrom): MenuModel {
+		const event = this.file.events.find((e) => e.id === id) ?? this.file.allDay.find((e) => e.id === id);
+		if (event) return { kind: "event", title: event.title };
 		const found = this.findBy(this.file, (t) => t.id === id);
-		const here = found?.list === "inbox" ? "inbox" : found?.list === "now" ? "day" : "soon";
-		return MENU.filter((item) => item.id !== here);
+		if (!found) throw new Error(`no task ${id}`);
+		const { task, list } = found;
+		const today = dateOf(this.day());
+		const tomorrow = dateOf(addDays(this.day(), 1));
+		const top = this.file[list].some((section) => section.tasks.includes(task));
+		const sections = this.file[list].some((section) => section.name !== null);
+		const offered: [EditId, boolean, string][] = [
+			["rename", true, ""],
+			["reminder", task.slot !== null, ""],
+			["description", task.description === null, ""],
+			["repeat", true, ""],
+			["section", from === "list" && top && sections, this.file[list].find((section) => section.tasks.includes(task))?.name ?? ""],
+			["project", true, "No project"],
+			["subtask", from !== "stack", ""],
+			["firstStep", from !== "stack", ""],
+		];
+		const reminder = task.reminder ?? "live";
+		const moves: MoveId[] = [...(task.due === today ? [] : ["today" as const]), ...(task.due === tomorrow ? [] : ["tomorrow" as const]), "pick"];
+		return {
+			kind: "task",
+			title: task.title,
+			statuses: [
+				{ id: "done", confirm: false },
+				{ id: task.status === "/" ? "stopProgress" : "inProgress", confirm: false },
+				{ id: "wontDo", confirm: true },
+			],
+			levels: { tiles: LEVELS.map((level) => ({ ...level, on: task.level === level.prefix })), disabled: false },
+			moves,
+			date: { today, picked: task.due, removable: task.due !== null && task.due !== today },
+			edits: offered.filter(([, on]) => on).map(([edit, , value]) => ({ id: edit, value: edit === "reminder" ? reminder : value, disabled: edit === "project" && !top })),
+			opens: ["fullScreen", "obsidian"],
+			remove: { confirm: true },
+			reminders: REMINDERS.map((kind) => ({ kind, checked: kind === reminder })),
+			peek: task.description,
+			subtasks: from === "calendar" ? task.children.filter((c) => !closed(c)).map((c) => c.id) : [],
+		};
 	}
 
-	async act(id: string, item: string): Promise<void> {
-		if (item === EVENT_MENU[0].id) return;
-		const list = item as ListId;
-		const first = this.screenOf(this.file, 0).lists[list].rows.find((row) => row.kind === "task");
-		await this.move(id, { list, before: first?.id ?? null, dayOffset: 0 });
+	/** What a menu's tap writes, by the plugin's rules, the simplest: a move puts the task at the end of Now (today and before) or Soon, due that day, without its time. */
+	async act(id: string, action: MenuAction): Promise<void> {
+		if (action.kind === "row") return;
+		const today = dateOf(this.day());
+		await this.write((file) => {
+			const found = this.findBy(file, (t) => t.id === id);
+			if (!found) return;
+			const { task } = found;
+			switch (action.kind) {
+				case "status":
+					task.status = STATUS_MARKS[action.id];
+					return;
+				case "priority":
+					task.level = task.level === action.prefix ? null : (action.prefix as MockTask["level"]);
+					return;
+				case "reminder":
+					task.reminder = action.reminder;
+					return;
+				case "rename":
+					task.title = action.text.trim() || task.title;
+					return;
+				case "delete":
+					this.take(file, id);
+					return;
+				case "move":
+					return this.putOff(file, task, action.id === "today" ? today : dateOf(addDays(this.day(), 1)));
+				case "date":
+					if (action.date === null) {
+						task.due = null;
+						return;
+					}
+					return this.putOff(file, task, action.date);
+			}
+		});
+	}
+
+	/** Due `date` without a time, at the end of Now for today and the days before it, of Soon for a later day. */
+	private putOff(file: MockFile, task: MockTask, date: string): void {
+		this.take(file, task.id);
+		task.due = date;
+		task.slot = null;
+		const sections = date <= dateOf(this.day()) ? file.now : file.soon;
+		sections[sections.length - 1].tasks.push(task);
 	}
 
 	// Writes.
@@ -401,7 +481,7 @@ export class MockPort implements ScreenPort {
 	private listData(title: string, sections: readonly MockSection[], cards: Record<string, CardFace>, day: string | null, shows: (t: MockTask) => boolean): ListData {
 		const rows: Row[] = [];
 		const walk = (t: MockTask, depth: number) => {
-			if (t.status === "x") return;
+			if (closed(t)) return;
 			cards[t.id] = this.faceOf(t, day);
 			rows.push({ kind: "task", id: t.id, depth });
 			if (!t.folded) for (const child of t.children) walk(child, depth + 1);
@@ -438,7 +518,8 @@ export class MockPort implements ScreenPort {
 		for (const key of ["now", "soon"] as const)
 			for (const s of file[key])
 				for (const t of s.tasks) {
-					if (!t.slot || t.status === "x" || t.due !== shown) continue;
+					if (!t.slot || closed(t) || t.due !== shown) continue;
+					for (const c of t.children) if (!closed(c)) cards[c.id] = this.faceOf(c, shown);
 					cards[t.id] = this.faceOf(t, shown);
 					const { start: from, end } = t.slot;
 					const length = end === null ? null : end - from;
@@ -458,7 +539,7 @@ export class MockPort implements ScreenPort {
 
 	/** A folded task's next open step: its first open subtask, and that one's first open subtask, deeper as far as they go. */
 	private nextStep(t: MockTask): string | null {
-		const open = t.children.find((c) => c.status !== "x");
+		const open = t.children.find((c) => !closed(c));
 		return open ? (this.nextStep(open) ?? open.title) : null;
 	}
 
