@@ -1855,6 +1855,9 @@ body.theme-light .task-calendar.is-engine :is(.tc-event, .tc-allday) { --tc-even
 .tc-pinned > .tc-grip { position: relative; display: block; }
 /* Drag and drop («Decided» 1): while a card is carried the cards part, and its own place stands where it will land, as an outline at its depth. */
 .tc-drag-source { display: flow-root; touch-action: pan-y; }
+/* A card takes the keyboard's focus by its draggable wrapper (focus comes back to it as its menu closes): the wrapper draws nothing, the card draws the design's focus ring inside its own rounded edge, on the desktop only, as the buttons do. */
+.tc-drag-source:focus-visible { outline: none; box-shadow: none; }
+body:not(.is-mobile) .tc-drag-source:focus-visible > :is(.tc-card, .tc-block-card) { outline: var(--tc-focus-ring); outline-offset: calc(-1 * var(--tc-focus-w)); }
 .tc-drag-source.is-lifted > .tc-card { background: none; box-shadow: none; outline: var(--tc-hairline) dashed var(--tc-dash); outline-offset: calc(-1 * var(--tc-hairline)); }
 .tc-drag-source.is-lifted > .tc-card > *, .tc-drag-source.is-lifted > .tc-card::before { visibility: hidden; }
 /* A block is carried by its whole box; its place while carried (or a card's place on the calendar) is the block it will be, as a dashed outline like a card's place. */
