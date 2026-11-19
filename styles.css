@@ -61,8 +61,8 @@ body {
 	--tc-float-bg: #2C2C2E;
 	--tc-float-month: #AEAEB2;
 	--tc-shadow-lift: 0 14px 32px rgba(0, 0, 0, 0.7), 0 0 0 1px #48484A;
-	/* A task on the calendar lies on what is under it (Max, 2026-11-19, Decision 60): a wide, faint shade falls below its bottom and fades far down; drawn from a box narrower than the card and lowered under it, it darkens nothing along its sides or top, so no edge of it reads as a line. */
-	--tc-shadow-block: 0 16px 24px -14px rgba(0, 0, 0, 1);
+	/* A task on the calendar rests on what is under it (Max, 2026-11-19, Decision 60): a wide, faint shade all round it, a little lower than the card, so a card under it reads a tone darker along its edges; fading over some 20 px, it never draws a line. */
+	--tc-shadow-block: 0 2px 24px 0 rgba(0, 0, 0, 0.5), 0 8px 24px 0 rgba(0, 0, 0, 0.4);
 	--tc-branch: #48484A;
 	--tc-mask-ink: #000000;
 	/* Obsidian's accent where the board uses it as ink: the month arrows, the chosen day. */
@@ -770,7 +770,7 @@ body.theme-light {
 	--tc-event-past-bg: color-mix(in srgb, var(--tc-bg), var(--tc-text) var(--tc-event-past-lift-light));
 	--tc-event-past-fg: color-mix(in srgb, var(--tc-bg), var(--tc-text) var(--tc-event-past-ink-light));
 	--tc-shadow-lift: 0 14px 32px rgba(0, 0, 0, 0.18), 0 0 0 0.5px rgba(0, 0, 0, 0.12);
-	--tc-shadow-block: 0 16px 24px -14px rgba(0, 0, 0, 0.14);
+	--tc-shadow-block: 0 2px 24px 0 rgba(0, 0, 0, 0.06), 0 8px 24px 0 rgba(0, 0, 0, 0.06);
 	--tc-shadow-control: 0 6px 16px rgba(0, 0, 0, 0.12), 0 0 0 0.5px rgba(0, 0, 0, 0.1);
 	--tc-branch: #C7C7CC;
 	--tc-danger: #FF3B30;
@@ -1867,7 +1867,7 @@ body:not(.is-mobile) .tc-drag-source:focus-visible > :is(.tc-card, .tc-block-car
 /* Drawn by a new scale (a zoom, a refit), a block stands on the grid at once, as the hour lines and the events do: a change of scale is no move. */
 .task-calendar.is-engine .tc-canvas.is-rescaled .tc-items > .tc-block { transition: none; }
 .tc-drag-source.is-lifted > .tc-block-card { background: var(--tc-bg); box-shadow: none; outline: var(--tc-hairline) dashed var(--tc-dash); outline-offset: calc(-1 * var(--tc-hairline)); }
-/* A task on the calendar casts the shade falling below it (Decision 60), so a card lying on a card or an event reads as on top. Not its dashed place, not the carried copy, not an event, not a list's card; ringed, it keeps the shade under its ring. */
+/* A task on the calendar casts its wide faint shade (Decision 60), so a card lying on a card or an event reads as on top. Not its dashed place, not the carried copy, not an event, not a list's card; ringed, it keeps the shade under its ring. */
 .task-calendar.is-engine .tc-items > .tc-block > .tc-drag-source:not(.is-lifted) > .tc-block-card { box-shadow: var(--tc-shadow-block); }
 .task-calendar.is-engine .tc-items > .tc-block:is(.is-selected, .is-found) > .tc-drag-source:not(.is-lifted) > .tc-block-card, .task-calendar.is-engine .tc-items > .tc-block > .tc-drag-source:not(.is-lifted) > .tc-block-card.is-first-step, .task-calendar.is-engine .tc-items > .tc-calendar-entry .tc-quick-field { box-shadow: var(--tc-ring-selected), var(--tc-shadow-block); }
 .tc-drag-source.is-lifted > .tc-block-card > *, .tc-drag-source.is-lifted > .tc-block-card::before { visibility: hidden; }

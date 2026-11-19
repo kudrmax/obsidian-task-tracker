@@ -9,13 +9,13 @@ const once = (find) => {
 
 /**
  * The shade under a calendar task (Max, 2026-11-19, Decision 60: «просто, что снизу под ней чуть темнее»): every task on the calendar casts
- * `--tc-shadow-block`, a wide faint shade lowered under the card and narrower than it, so it falls below the card and draws no line at its sides or
- * top; the selected one and the new task's field keep it under their ring; the lists' cards and the events cast none. Two cards carried onto an
+ * `--tc-shadow-block`, a wide, faint shade all round it a little lower than the card, so a card under it reads a tone darker along its edges and
+ * no edge reads as a line; the selected one and the new task's field keep it under their ring; the lists' cards and the events cast none. Two cards carried onto an
  * event's start stack over it with «Тренировка»: the shot shows the stack.
  */
 export default {
 	name: "e8-calendar-shadow",
-	features: ["E3: a task on the calendar casts a wide faint shade below it, no rim; a list's card none (Decision 60)"],
+	features: ["E3: a task on the calendar casts a wide faint shade, never a rim; a list's card none (Decision 60)"],
 	async run(t) {
 		await t.setClock("12:00");
 		await t.cdp.eval(`(async () => { window.__tcStand.step("step-calendar"); await new Promise((r) => setTimeout(r, 700)); return 1; })()`);
@@ -36,8 +36,8 @@ export default {
 		const want = await t.cdp.eval(`(() => { const probe = document.createElement("div"); probe.style.boxShadow = "var(--tc-shadow-block)"; document.querySelector(".task-calendar").append(probe); const v = getComputedStyle(probe).boxShadow; probe.remove(); return v; })()`);
 		const ring = await t.cdp.eval(`(() => { const probe = document.createElement("div"); probe.style.boxShadow = "var(--tc-ring-selected), var(--tc-shadow-block)"; document.querySelector(".task-calendar").append(probe); const v = getComputedStyle(probe).boxShadow; probe.remove(); return v; })()`);
 		t.expect(want && want !== "none", `the token gives a shadow: ${want}`);
-		const layers = want.split(/,(?![^(]*\))/).map((layer) => layer.match(/(-?[\d.]+)px/g).map(parseFloat));
-		t.expect(layers.length > 0 && layers.every(([, down, blur, spread]) => down > 0 && blur >= 16 && spread < 0), `a wide shade lowered under the card and narrower than it, never a rim (Max: «не острая и размытая, которая границу размывает и выглядит как обводка»): ${want}`);
+		const layers = want.split(/,(?![^(]*\))/).map((layer) => ({ px: layer.match(/(-?[\d.]+)px/g).map(parseFloat), alpha: Number(/rgba?\([^)]*?,\s*[\d.]+,\s*[\d.]+(?:,\s*([\d.]+))?\)/.exec(layer)?.[1] ?? 1) }));
+		t.expect(layers.length > 0 && layers.every(({ px: [, down, blur, spread], alpha }) => down >= 0 && blur >= 16 && spread <= 0 && alpha <= 0.5), `a wide, faint shade, never a rim (Max: «не острая и размытая, которая границу размывает и выглядит как обводка»): ${want}`);
 		const blocks = await t.cdp.eval(`[...document.querySelectorAll(".tc-items > .tc-block .tc-block-card")].map((c) => [c.querySelector(".tc-card-title")?.textContent, getComputedStyle(c).boxShadow])`);
 		t.expect(blocks.length > 5 && blocks.every(([, shadow]) => shadow === want), `every task on the calendar casts the calendar's shadow ${want}: ${JSON.stringify(blocks)}`);
 		const cards = await t.cdp.eval(`[...document.querySelectorAll(".tc-list .tc-card")].map((c) => getComputedStyle(c).boxShadow)`);
