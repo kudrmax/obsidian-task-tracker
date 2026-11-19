@@ -61,8 +61,10 @@ body {
 	--tc-float-bg: #2C2C2E;
 	--tc-float-month: #AEAEB2;
 	--tc-shadow-lift: 0 14px 32px rgba(0, 0, 0, 0.7), 0 0 0 1px #48484A;
-	/* A task on the calendar rests on what is under it (Max, 2026-11-19, Decision 60): a wide, faint shade all round it, a little lower than the card, so a card under it reads a tone darker along its edges; fading over some 20 px, it never draws a line. */
-	--tc-shadow-block: 0 2px 24px 0 rgba(0, 0, 0, 0.5), 0 8px 24px 0 rgba(0, 0, 0, 0.4);
+	/* A task card lying on another casts a soft shade on that card alone (Max, 2026-11-19, Decision 60: «снизу под ней чуть темнее»): drawn only inside the card under it, never on the ground or an event; it fades over some 12 px from the upper card's edge and draws no line. */
+	--tc-shadow-under: 0 3px 14px 0 rgba(0, 0, 0, 0.55);
+	/* How far past the card under it the shade's caster is drawn on the right, so the shade keeps its strength to that card's right edge. */
+	--tc-shade-reach: 32px;
 	--tc-branch: #48484A;
 	--tc-mask-ink: #000000;
 	/* Obsidian's accent where the board uses it as ink: the month arrows, the chosen day. */
@@ -770,7 +772,7 @@ body.theme-light {
 	--tc-event-past-bg: color-mix(in srgb, var(--tc-bg), var(--tc-text) var(--tc-event-past-lift-light));
 	--tc-event-past-fg: color-mix(in srgb, var(--tc-bg), var(--tc-text) var(--tc-event-past-ink-light));
 	--tc-shadow-lift: 0 14px 32px rgba(0, 0, 0, 0.18), 0 0 0 0.5px rgba(0, 0, 0, 0.12);
-	--tc-shadow-block: 0 2px 24px 0 rgba(0, 0, 0, 0.06), 0 8px 24px 0 rgba(0, 0, 0, 0.06);
+	--tc-shadow-under: 0 3px 20px 0 rgba(0, 0, 0, 0.09);
 	--tc-shadow-control: 0 6px 16px rgba(0, 0, 0, 0.12), 0 0 0 0.5px rgba(0, 0, 0, 0.1);
 	--tc-branch: #C7C7CC;
 	--tc-danger: #FF3B30;
@@ -1867,9 +1869,10 @@ body:not(.is-mobile) .tc-drag-source:focus-visible > :is(.tc-card, .tc-block-car
 /* Drawn by a new scale (a zoom, a refit), a block stands on the grid at once, as the hour lines and the events do: a change of scale is no move. */
 .task-calendar.is-engine .tc-canvas.is-rescaled .tc-items > .tc-block { transition: none; }
 .tc-drag-source.is-lifted > .tc-block-card { background: var(--tc-bg); box-shadow: none; outline: var(--tc-hairline) dashed var(--tc-dash); outline-offset: calc(-1 * var(--tc-hairline)); }
-/* A task on the calendar casts its wide faint shade (Decision 60), so a card lying on a card or an event reads as on top. Not its dashed place, not the carried copy, not an event, not a list's card; ringed, it keeps the shade under its ring. */
-.task-calendar.is-engine .tc-items > .tc-block > .tc-drag-source:not(.is-lifted) > .tc-block-card { box-shadow: var(--tc-shadow-block); }
-.task-calendar.is-engine .tc-items > .tc-block:is(.is-selected, .is-found) > .tc-drag-source:not(.is-lifted) > .tc-block-card, .task-calendar.is-engine .tc-items > .tc-block > .tc-drag-source:not(.is-lifted) > .tc-block-card.is-first-step, .task-calendar.is-engine .tc-items > .tc-calendar-entry .tc-quick-field { box-shadow: var(--tc-ring-selected), var(--tc-shadow-block); }
+/* The shades a card takes from the cards lying on it (Decision 60): clipped to its own rounded shape, each drawn where its caster lies (the layout's box, relative to this card), gliding with the cards; the ground and the events take none. */
+.tc-block > .tc-shades { position: absolute; inset: 0; border-radius: var(--tc-radius-card); overflow: hidden; pointer-events: none; }
+.tc-shade { position: absolute; top: var(--tc-y); left: var(--tc-x); right: calc(-1 * var(--tc-shade-reach)); height: var(--tc-len); border-radius: var(--tc-radius-card); box-shadow: var(--tc-shadow-under); transition: top var(--tc-duration-slide) var(--tc-ease-out), left var(--tc-duration-slide) var(--tc-ease-out), height var(--tc-duration-slide) var(--tc-ease-out); }
+.task-calendar.is-engine .tc-canvas.is-rescaled .tc-shade { transition: none; }
 .tc-drag-source.is-lifted > .tc-block-card > *, .tc-drag-source.is-lifted > .tc-block-card::before { visibility: hidden; }
 /* The carried copy rides the pointer in dnd-kit's overlay, outside the screen's styles: it carries the screen's type itself. */
 .tc-overlay { font-family: var(--tc-font-ui); font-size: var(--tc-font-body); font-weight: var(--tc-weight-normal); line-height: var(--tc-leading-normal); color: var(--tc-text); z-index: var(--tc-layer-float); }

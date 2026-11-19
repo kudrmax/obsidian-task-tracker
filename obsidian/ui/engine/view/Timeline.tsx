@@ -4,7 +4,7 @@ import { CalendarBlocks, SortableRow, useCalendarDrop, useNewSlot } from "../dra
 import { type Edge, useResize } from "../gestures/Resize";
 import { hourOf, type RoomMeasure, useCalendarZoom } from "../gestures/Zoom";
 import { Pinned, useAnchor } from "../layers/Layers";
-import { type EventBox, layEvents, layTasks, opening, stackEnd, type TaskBox } from "../layout/calendar";
+import { type EventBox, layEvents, layTasks, opening, type Shade, shadesOn, stackEnd, type TaskBox } from "../layout/calendar";
 import { TimeScale } from "../layout/timeScale";
 import type { AllDayEvent, Block, DayEvent, EventPaint } from "../port";
 import { useData, useScreen, useScreenApi } from "../store";
@@ -94,6 +94,7 @@ export const Timeline = memo(function Timeline() {
 	const nearNow = (minute: number) => day.isToday && Math.abs(scale.y(minute) - scale.y(now.minute)) < TimeScale.NEAR_NOW;
 	const marks = useMemo(() => scale.marks(), [scale]);
 	const top = events.length + boxes.length;
+	const shades = useShades(boxes, day.blocks, events.length, top, plusMinute === null);
 	const canvas = { [PROPERTY.hour]: px(scale.hourPx), [PROPERTY.stackEnd]: px(end) } as CSSProperties;
 	return (
 		<CalendarBlocks ids={ids}>
@@ -129,7 +130,7 @@ export const Timeline = memo(function Timeline() {
 							<EventItem key={event.id} event={event} box={events[i]} scale={scale} />
 						))}
 						{drawn.map(({ block, box }) => (
-							<BlockItem key={block.id} block={block} box={box} order={order} z={events.length + box.rank} top={top} scale={scale} />
+							<BlockItem key={block.id} block={block} box={box} shades={shades.get(block.id) ?? NO_SHADES} order={order} z={events.length + box.rank} top={top} scale={scale} />
 						))}
 						{extra === null ? null : <NewPlace minute={extra} box={boxes[boxes.length - 1]} z={top} field={plusMinute === null} />}
 					</div>
@@ -144,6 +145,29 @@ export const Timeline = memo(function Timeline() {
 		</CalendarBlocks>
 	);
 });
+
+const NO_SHADES: readonly Shade[] = [];
+
+/**
+ * The shades each block takes from the cards drawn over it (Decision 60), by its id: a card lies higher by its rank in the
+ * stack, the selected or resized one and the new task's field over every other; a carried task's dashed place and the
+ * new task's place neither cast nor take one.
+ */
+function useShades(boxes: readonly TaskBox[], blocks: readonly Block[], events: number, top: number, field: boolean): ReadonlyMap<string, readonly Shade[]> {
+	const lifted = useScreen((s) => s.lifted);
+	const selected = useScreen((s) => s.selected);
+	const resizing = useScreen((s) => s.resizing?.id ?? null);
+	return useMemo(() => {
+		const height = boxes.map((box, i) => {
+			const block = blocks[i];
+			if (!block) return field ? top : null;
+			if (block.id === lifted) return null;
+			return block.id === selected || block.id === resizing ? top : events + box.rank;
+		});
+		const cast = shadesOn(boxes, height);
+		return new Map(blocks.map((block, i) => [block.id, cast[i]]));
+	}, [boxes, blocks, events, top, field, lifted, selected, resizing]);
+}
 
 /**
  * Why the blocks stand where they are drawn: the scale last changed (a zoom, a refit), or what the day holds (a task
@@ -229,7 +253,7 @@ const EventItem = memo(function EventItem({ event, box, scale }: { readonly even
  * shorter than the card; while a dot is pulled, the moving edge's time on a pill; carried, its dashed place writes the
  * start it will take.
  */
-const BlockItem = memo(function BlockItem({ block, box, order, z, top, scale }: { readonly block: Block; readonly box: TaskBox; readonly order: string; readonly z: number; readonly top: number; readonly scale: TimeScale }) {
+const BlockItem = memo(function BlockItem({ block, box, shades, order, z, top, scale }: { readonly block: Block; readonly box: TaskBox; readonly shades: readonly Shade[]; readonly order: string; readonly z: number; readonly top: number; readonly scale: TimeScale }) {
 	const lifted = useScreen((s) => s.lifted === block.id);
 	const selected = useScreen((s) => s.selected === block.id);
 	const resizing = useScreen((s) => (s.resizing?.id === block.id ? s.resizing.edge : null));
@@ -251,6 +275,13 @@ const BlockItem = memo(function BlockItem({ block, box, order, z, top, scale }: 
 			>
 				<Card id={block.id} block={look} />
 			</SortableRow>
+			{shades.length > 0 ? (
+				<div className="tc-shades" aria-hidden="true">
+					{shades.map((shade, i) => (
+						<div key={i} className="tc-shade" style={{ [PROPERTY.y]: px(shade.top), [PROPERTY.x]: px(shade.left), [PROPERTY.length]: px(shade.height) } as CSSProperties} />
+					))}
+				</div>
+			) : null}
 			{(selected || resizing) && !lifted && element ? <Grips block={block} reference={element} scale={scale} /> : null}
 		</MovingRow>
 	);

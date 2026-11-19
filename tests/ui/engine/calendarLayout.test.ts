@@ -3,7 +3,7 @@ import { DESIGN, LAYOUT } from "../../../obsidian/ui/design";
 import { EdgeHeading } from "../../../obsidian/ui/engine/drag/edgeHeading";
 import { edgeMinute, leastLength } from "../../../obsidian/ui/engine/gestures/Resize";
 import { hourOf, roomMeasure, zoomAfterPinch } from "../../../obsidian/ui/engine/gestures/Zoom";
-import { CARD, layEvents, layTasks, opening, stackEnd } from "../../../obsidian/ui/engine/layout/calendar";
+import { CARD, layEvents, layTasks, opening, shadesOn, stackEnd } from "../../../obsidian/ui/engine/layout/calendar";
 import { BASE_SCALE, TimeScale } from "../../../obsidian/ui/engine/layout/timeScale";
 import type { Block } from "../../../obsidian/ui/engine/port";
 
@@ -52,6 +52,27 @@ describe("the calendar's tasks", () => {
  * «Планирование квартала» 18:30–20:00, «Звонок с клиентом» 19:00–19:30, «Синк с Олей» 19:15–19:45): lanes of a bar and
  * its gap, titles one under another past the last lane, the bar from the true start, the block to its end or its title.
  */
+/** Decision 60: a card lying on another casts its shade on that card alone, where it lies on it. */
+describe("the shade a card casts on the card under it", () => {
+	const boxes = layTasks([{ start: 120, length: 120 }, { start: 150, length: 30 }, { start: 600, length: null }], [], BASE_SCALE);
+	it("falls only on the card it lies on, in that card's own box", () => {
+		const shades = shadesOn(boxes, boxes.map((b) => b.rank));
+		expect(shades[0]).toEqual([{ top: boxes[1].top - boxes[0].top, left: boxes[1].left - boxes[0].left, height: boxes[1].height }]);
+		expect(shades[0][0].left).toBe(LAYOUT.overlayInset);
+		expect(shades[1]).toEqual([]);
+		expect(shades[2]).toEqual([]);
+	});
+	it("follows which is drawn higher: the selected card lying over the other casts it instead", () => {
+		const shades = shadesOn(boxes, [99, 1, 2]);
+		expect(shades[0]).toEqual([]);
+		expect(shades[1]).toEqual([{ top: boxes[0].top - boxes[1].top, left: boxes[0].left - boxes[1].left, height: boxes[0].height }]);
+	});
+	it("a dashed place neither casts nor takes one", () => {
+		expect(shadesOn(boxes, [0, null, 2])).toEqual([[], [], []]);
+		expect(shadesOn(boxes, [null, 1, 2])).toEqual([[], [], []]);
+	});
+});
+
 describe("overlapping events", () => {
 	const evening = [
 		{ start: 17 * 60, end: 18 * 60 },

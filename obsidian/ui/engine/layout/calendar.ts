@@ -169,6 +169,30 @@ export function layTasks(tasks: readonly TaskSpan[], events: readonly EventBox[]
 	return boxes;
 }
 
+/** A card lying on another, in that card's own box: where the shade it casts on it is drawn (Decision 60). */
+export interface Shade {
+	readonly top: number;
+	readonly left: number;
+	readonly height: number;
+}
+
+/**
+ * The shades cast on each card (Max, 2026-11-19, Decision 60: «снизу под ней чуть темнее»): every card drawn higher
+ * (`height`, its z; null: it neither casts nor takes one, as a dashed place) that crosses its time lies on it, and casts
+ * its shade on it alone, never on the ground or an event. The cards share their right edge, so crossing in time is lying on it.
+ */
+export function shadesOn(boxes: readonly TaskBox[], height: readonly (number | null)[]): Shade[][] {
+	return boxes.map((under, i) => {
+		const z = height[i];
+		if (z === null) return [];
+		return boxes.flatMap((over, j) => {
+			const above = height[j];
+			if (above === null || above <= z || over.top >= under.top + under.height || under.top >= over.top + over.height) return [];
+			return [{ top: over.top - under.top, left: over.left - under.left, height: over.height }];
+		});
+	});
+}
+
 /** The bottom of the lowest card: a stack running past the day's end lengthens the day. */
 export function stackEnd(boxes: readonly TaskBox[]): number {
 	return boxes.reduce((bottom, box) => Math.max(bottom, box.top + box.height), 0);
