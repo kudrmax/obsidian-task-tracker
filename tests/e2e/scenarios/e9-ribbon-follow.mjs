@@ -7,8 +7,13 @@ const RECORDINGS = new URL("../recordings/", import.meta.url).pathname;
 const REPLAYED = ["max-2026-11-17.json", "synthetic-chained-150ms.json", "synthetic-chained-250ms.json", "synthetic-chained-400ms.json", "synthetic-held-drags.json", "max-2026-11-17-r5.json 1/2", "max-2026-11-17-r5.json 2/2", "max-2026-11-17-r6-pager.json"];
 /** r5 runs 115 s with its pauses shortened: replayed in two parts, cut in its 32-minute pause. */
 const SPANS = { "1/2": [0, 1_000_000], "2/2": [1_000_000, Infinity] };
-/** Max's long sessions: the page takes the wheel's events a frame at a time, so a release right at half-way may land the other way than offline (the replay's `ASTRAY_SHARE`). */
+/**
+ * Max's long sessions: the page takes the wheel's events a frame at a time, so a release near half-way may land the other
+ * way than offline. Offline, his raw events against the same merged at 120 Hz (any phase) part at 1–5 of 89 and 132 landings
+ * (r5, r6), each landing still within one place of its stroke's: so up to 6 %, at least two.
+ */
 const LONG = new Set(["max-2026-11-17-r5.json", "max-2026-11-17-r6-pager.json"]);
+const LONG_ASTRAY = 0.06;
 
 /** The places a run of steps stands at from Soon, between Inbox and the calendar. */
 function atRow(steps) {
@@ -45,7 +50,7 @@ export default {
 			const swipes = JSON.parse(readFileSync(expectFile, "utf8")).swipes;
 			t.expect(JSON.stringify(atRow(steps)) === JSON.stringify(atRow(swipes)), `offline the rule lands as expected: ${JSON.stringify(steps)} against ${JSON.stringify(swipes)}`);
 		}
-		const result = await t.replay(file, { startPlace: 1, steps, last: 2, tolerant: LONG.has(file), span });
+		const result = await t.replay(file, { startPlace: 1, steps, last: 2, tolerant: LONG.has(file) && LONG_ASTRAY, span });
 		t.expect(result.ok, `${file}: stops ${JSON.stringify(result.observed)} against ${JSON.stringify(result.expected)}, astray ${result.astray}, stalls ${result.stalls}, frame faults ${JSON.stringify(result.faults.slice(0, 3))}`);
 	},
 };

@@ -36,6 +36,8 @@ export const WHEEL_FOLLOW: WheelFollowTuning = { momentumEvents: 4, momentumMinP
 /** A touch stops the momentum at once: the next delta falls under this share of the momentum's last, or none comes this long. */
 const CUT = 0.6;
 const MOMENTUM_GAP_MS = 45;
+/** The momentum's last pixels come sparser, 17–67 ms apart (Max's recordings): none of them is a touch, nor a gap between them. */
+const TAIL_GAP_MS = 100;
 /** The momentum never rises: a delta this much above the one before is the fingers pushing on (the lift was not one). */
 const RISE_PX = 3;
 const RISE = 0.15;
@@ -62,6 +64,10 @@ export class WheelFollow {
 
 	feed(e: WheelSample): WheelCue[] {
 		if (e.ctrl || Math.abs(e.dx) <= Math.abs(e.dy)) return [];
+		if (this.inTail(e)) {
+			this.last = e.t;
+			return [];
+		}
 		const cues: WheelCue[] = [...this.tick(e.t)];
 		const prev = this.recent[this.recent.length - 1];
 		const d = Math.abs(e.dx) / (prev && e.t - prev.t <= MOMENTUM_GAP_MS ? Math.max(1, Math.round((e.t - prev.t) / FRAME_MS)) : 1);
@@ -71,7 +77,8 @@ export class WheelFollow {
 			if (this.state === "fingers") cues.push(this.release(this.last, 0));
 			cues.push(this.begin(e, true));
 		} else if (this.state === "momentum" && prev) {
-			if (d < prev.d * CUT) cues.push(this.begin(e, e.t - this.lifted > this.tuning.retouchMs));
+			/** A fall within the rounding (2 px to 1) is the momentum's own. */
+			if (d < prev.d * CUT && prev.d - d > ROUNDING) cues.push(this.begin(e, e.t - this.lifted > this.tuning.retouchMs));
 			else if (d >= prev.d + Math.max(RISE_PX, prev.d * RISE)) cues.push(this.begin(e, false));
 		}
 		this.dir = dir;
@@ -90,13 +97,26 @@ export class WheelFollow {
 	/** The fingers quiet past `quietMs`: they let go where they stand, without speed. */
 	tick(now: number): WheelCue[] {
 		if (this.state === "fingers" && now - this.last > this.tuning.quietMs) return [this.release(this.last + this.tuning.quietMs, 0)];
-		if (this.state === "momentum" && now - this.last > MOMENTUM_GAP_MS) this.state = "idle";
+		if (this.state === "momentum" && now - this.last > (this.tailing() ? TAIL_GAP_MS : MOMENTUM_GAP_MS)) this.state = "idle";
 		return [];
 	}
 
 	/** When the next `tick` can let go, if nothing comes before. */
 	get quietAt(): number | null {
 		return this.state === "fingers" ? this.last + this.tuning.quietMs : null;
+	}
+
+	/** The momentum fallen to the rounding: a pixel a frame and less. */
+	private tailing(): boolean {
+		const prev = this.recent[this.recent.length - 1];
+		return this.state === "momentum" && !!prev && prev.d <= ROUNDING;
+	}
+
+	/** One of the momentum's last pixels: the same way, a pixel or less, however sparse the OS lets them come. */
+	private inTail(e: WheelSample): boolean {
+		const prev = this.recent[this.recent.length - 1];
+		const fading = this.state === "momentum" && !!prev && prev.d <= 2 * ROUNDING;
+		return fading && Math.sign(e.dx) === this.dir && Math.abs(e.dx) <= ROUNDING && e.t - this.last <= TAIL_GAP_MS;
 	}
 
 	private begin(e: WheelSample, fresh: boolean): WheelCue {

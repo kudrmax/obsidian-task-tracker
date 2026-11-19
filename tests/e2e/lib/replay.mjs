@@ -34,7 +34,8 @@ export async function replay(cdp, file, { startPlace = 1, strokes = [], steps: g
 	const expectFile = file.replace(/\.json$/, ".expect.json");
 	/**
 	 * A step's own expectation (`steps`: each landing its way, `last` the row's end) before the pager's hand-made file;
-	 * `tolerant`: the steps are a rule run offline on a long session, held as the pager's rule is (`ASTRAY_SHARE`).
+	 * `tolerant`: the steps are a rule run offline on a long session; the page may part from them at this share of the steps
+	 * (true: `ASTRAY_SHARE`, as the pager's rule), at least two.
 	 */
 	const expected = given ?? (existsSync(expectFile) ? JSON.parse(readFileSync(expectFile, "utf8")).swipes : null);
 	const frames = new FrameRecorder(cdp);
@@ -111,7 +112,7 @@ export async function replay(cdp, file, { startPlace = 1, strokes = [], steps: g
 	const astray = Math.max(seen.length, sent.length) - commonLength(seen, sent);
 	const faults = frameFaults(shown);
 	const ends = observed.at(-1) === expectedPlaces.at(-1);
-	const onPath = expected && !tolerant ? astray === 0 && ends : astray <= Math.max(1, Math.floor(sent.length * ASTRAY_SHARE));
+	const onPath = expected && !tolerant ? astray === 0 && ends : tolerant ? astray <= Math.max(2, Math.floor(sent.length * (tolerant === true ? ASTRAY_SHARE : tolerant))) : astray <= Math.max(1, Math.floor(sent.length * ASTRAY_SHARE));
 	return { recording: file.split("/").pop(), expected: expected ? expectedPlaces : `${sent.length} steps by the pager's rule`, observed: expected ? observed : `${seen.length} steps`, astray, stalls, faults, frames: shown.length, ok: onPath && stalls === 0 && faults.length === 0 };
 }
 

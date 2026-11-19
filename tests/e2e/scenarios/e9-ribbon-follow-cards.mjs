@@ -66,7 +66,12 @@ export default {
 		t.expect(after > before + 100, `a vertical swipe over the cards scrolls the list: ${before} → ${after}`);
 		await is(["Today"], "and moves no stop");
 		await t.input.swipe({ x: list.x, y: list.top + list.height * 0.2 }, { x: list.x, y: list.top + list.height * 0.8 }, { steps: 12, stepMs: 16 });
-		await t.sleep(600);
+		/** The list's fling ends before the press: a finger landing on a list still scrolling stops it, and the card moving under it is no long press. */
+		await t.waitFor(async () => {
+			const a = await t.cdp.eval(`document.querySelector('[data-list="day"]').scrollTop`);
+			await t.sleep(200);
+			return a === (await t.cdp.eval(`document.querySelector('[data-list="day"]').scrollTop`));
+		}, 3000);
 
 		const held = await t.oracle.rect('[data-list="day"] .tc-card[data-id]', 0);
 		const ribbonBefore = await scrollLeft();
