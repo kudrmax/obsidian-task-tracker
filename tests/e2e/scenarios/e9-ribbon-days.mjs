@@ -76,7 +76,11 @@ export default {
 			const head = await t.oracle.rect(".tc-stage-col.is-day .tc-stage-head");
 			const y = head.y + ribbon.height * 0.4;
 			const view = await t.oracle.rect(".task-calendar");
-			const held = (from, to) => t.input.swipe({ x: view.left + view.width * from, y }, { x: view.left + view.width * to, y }, { steps: Math.ceil((Math.abs(to - from) * view.width) / 2.5), stepMs: 12, restMs: 200 });
+			/**
+			 * A slow finger is drawn over the headers: over a card or the calendar a finger that has barely moved when the long
+			 * press is up (5 px in 250 ms) lifts what is under it, as it should; the cards are watched all the same.
+			 */
+			const held = (from, to) => t.input.swipe({ x: view.left + view.width * from, y: head.y }, { x: view.left + view.width * to, y: head.y }, { steps: Math.ceil((Math.abs(to - from) * view.width) / 2.5), stepMs: 12, restMs: 200 });
 			const flick = (dir) => t.input.swipe({ x: view.left + view.width * (dir > 0 ? 0.7 : 0.3), y }, { x: view.left + view.width * (dir > 0 ? 0.3 : 0.7), y: y + 2 }, { steps: 6, stepMs: 12 });
 			await check("held-into-tomorrow", () => held(0.9, 0.2), () => is(["Tomorrow"], "held past half-way into tomorrow and let go"));
 			await check("flick-on", () => flick(1), async () => t.expect(dayAfter(await columns()), `a flick on: the day after tomorrow, one day: ${JSON.stringify(await columns())}`));
