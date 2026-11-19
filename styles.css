@@ -1805,6 +1805,17 @@ button.tc-btn.tc-folder-btn:disabled { opacity: var(--tc-tile-off-opacity); curs
 .tc-ribbon-track { height: 100%; display: flex; }
 .tc-ribbon-track > .tc-stage-col { flex: none; }
 .tc-ribbon-track > .tc-stage-col:is(.is-day, .is-timeline) { overflow: clip; }
+/*
+ * The stand's step 7: the ribbon as the browser's own paging scroller (CSS Scroll Snap). The browser follows the finger and
+ * the trackpad, carries the momentum and snaps to a stop's column; `scroll-snap-stop: always` keeps one swipe to one stop.
+ * Inside it the lists and the calendar let a sideways pan through to it (a list alone takes only the vertical).
+ */
+.task-calendar.is-engine > .tc-snap-ribbon { position: absolute; inset: 0; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; overscroll-behavior-x: contain; scrollbar-width: none; }
+.tc-snap-ribbon::-webkit-scrollbar { display: none; }
+.tc-snap-ribbon > .tc-ribbon-track > .tc-stage-col.is-stop { scroll-snap-align: start; scroll-snap-stop: always; }
+.tc-snap-ribbon > .tc-ribbon-track > .tc-stage-col.is-opening { scroll-initial-target: nearest; }
+.tc-snap-ribbon :is(.tc-list, .tc-card, .tc-group-head, .tc-group-empty, .tc-timeline, .tc-block) { touch-action: pan-x pan-y; }
+.tc-snap-ribbon :is(.tc-list, .tc-timeline) { overscroll-behavior-x: auto; }
 /* A region that slides (the shown day's list and its calendar): one layer filling its column, the next sliding in beside it. */
 .tc-slide { position: absolute; inset: 0; display: flex; flex-direction: column; }
 .tc-slide > .tc-stage-body > .tc-timeline { top: 0; }

@@ -22,6 +22,7 @@ const STEPS: Readonly<Record<string, { place: Place; file?: () => MockFile }>> =
 	"step-sections": { place: "twoColumns", file: sectionsFile },
 	"step-long-lists": { place: "twoColumns", file: longListsFile },
 	"step-calendar": { place: "calendar", file: () => calendarFile(new Date()) },
+	"step-swipe": { place: "snap" },
 	"whole-screen": { place: "leaf" },
 };
 
@@ -49,6 +50,7 @@ class StandPage {
 	readonly port = new MockPort();
 	private readonly screens = new Set<MountedScreen>();
 	private leafScreen: MountedScreen | null = null;
+	private leafPlace: Place = "leaf";
 	private readonly app = {} as App;
 	private readonly haptics = detectHaptics(window as unknown as HapticsHost);
 
@@ -56,6 +58,7 @@ class StandPage {
 
 	showLeaf(place: Place): void {
 		this.clear();
+		this.leafPlace = place;
 		const content = this.leaf.ownerDocument.createElement("div");
 		content.className = "view-content tc-view";
 		this.leaf.appendChild(content);
@@ -91,7 +94,8 @@ class StandPage {
 		if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
 		const key = KEYS.find((k) => k.key === event.key && k.modifiers.length === 0);
 		const screen = this.leafScreen?.store.getState();
-		if (!key || !screen || !takesKeys(screen)) return;
+		/** The step of the ribbon as a gallery has no keys yet, as on the stand. */
+		if (!key || !screen || !takesKeys(screen) || this.leafPlace === "snap") return;
 		key.run(screen);
 		event.preventDefault();
 	};

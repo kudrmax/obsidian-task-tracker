@@ -409,7 +409,9 @@ describe("styles.css keeps to its design system", () => {
 			expect(of(selector), selector).toEqual(["overflow: clip"]);
 		}
 		const strip = /^\.task-calendar(\.[\w-]+)*( > [^ ,]+)?$|^\.tc-(left|soon|inbox|done|right|projects)$/;
-		expect(sheet.rules.filter((d) => strip.test(d.selector) && d.property.startsWith("overflow") && d.value !== "clip")).toEqual([]);
+		/** A scroller that snaps mandatorily to its stops (the stand's step 7, the ribbon as the browser's paging) never rests half-way: a field brought into sight leaves it on a stop. */
+		const snapsToStops = (selector: string) => sheet.rules.some((d) => d.selector === selector && d.property === "scroll-snap-type" && d.value === "x mandatory");
+		expect(sheet.rules.filter((d) => strip.test(d.selector) && d.property.startsWith("overflow") && d.value !== "clip" && !snapsToStops(d.selector))).toEqual([]);
 	});
 
 	/**

@@ -46,7 +46,8 @@ class StandView extends ItemView {
 	runKey(id: string): boolean {
 		const screen = this.screen?.store.getState();
 		const key = KEYS.find((k) => k.id === id);
-		if (!screen || !key || !takesKeys(screen)) return true;
+		/** The step of the ribbon as a gallery has no keys yet: only the fingers move it. */
+		if (!screen || !key || !takesKeys(screen) || this.stand.leafPlace === "snap") return true;
 		key.run(screen);
 		return false;
 	}
@@ -172,6 +173,7 @@ export default class TaskCalendarStand extends Plugin {
 		this.addCommand({ id: "step-sections", name: "Step 4: sections", callback: () => void this.showStep("twoColumns", sectionsFile()) });
 		this.addCommand({ id: "step-long-lists", name: "Step 5: long lists", callback: () => void this.showStep("twoColumns", longListsFile()) });
 		this.addCommand({ id: "step-calendar", name: "Step 6: onto and off the calendar", callback: () => void this.showStep("calendar", calendarFile(new Date())) });
+		this.addCommand({ id: "step-swipe", name: "Step 7: swipe the columns", callback: () => void this.showStep("snap") });
 		this.addCommand({ id: "whole-screen", name: "The whole screen", callback: () => void this.showStep("leaf") });
 		for (const delay of WRITE_DELAYS) this.addCommand({ id: `delay-${delay}`, name: `Write delay ${delay} ms`, callback: () => (port.delay = delay) });
 	}
