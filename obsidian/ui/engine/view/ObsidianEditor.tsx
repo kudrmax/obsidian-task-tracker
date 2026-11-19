@@ -8,6 +8,8 @@ const EDITOR_HOST: EditorHost = { activeEditor: null };
 export interface ObsidianEditorProps {
 	readonly text: string;
 	readonly className: string;
+	/** The colour its task's level paints the field in (`data-priority`). */
+	readonly priority?: string | null;
 	/** Enter: the text as typed. */
 	readonly onEnter: (text: string) => void;
 	readonly onEscape: () => void;
@@ -22,7 +24,7 @@ export interface ObsidianEditorProps {
  * (`EmbeddedEditor`, stage 0 blocker 8): `[[` opens the note search, the look is Obsidian's. Made once as it mounts, given
  * the focus, destroyed as it goes.
  */
-export function ObsidianEditor({ text, className, onEnter, onEscape, onTab, onLeave }: ObsidianEditorProps) {
+export function ObsidianEditor({ text, className, priority = null, onEnter, onEscape, onTab, onLeave }: ObsidianEditorProps) {
 	const { app, sourcePath } = useHost();
 	const container = useRef<HTMLDivElement>(null);
 	const handlers = useRef({ onEnter, onEscape, onTab });
@@ -46,5 +48,5 @@ export function ObsidianEditor({ text, className, onEnter, onEscape, onTab, onLe
 		// The editor is made once per mount; its text after that is the person's.
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
-	return <div ref={container} className={className} onBlur={onLeave ? (event) => onLeave(event, () => editorRef.current?.value ?? "") : undefined} />;
+	return <div ref={container} className={className} data-priority={priority ?? undefined} onBlur={onLeave ? (event) => onLeave(event, () => editorRef.current?.value ?? "") : undefined} />;
 }

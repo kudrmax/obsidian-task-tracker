@@ -31,6 +31,10 @@ export interface Layer {
 	readonly model: MenuModel;
 	readonly page: MenuPage;
 	readonly asking: Asking | null;
+	/** A field typed in the menu itself: a stack card renamed in its copy's place, or a new subtask at the end of a calendar task's stack (F108). */
+	readonly field: "rename" | "subtask" | null;
+	/** A subtask's menu opened from a calendar menu's stack: the task whose copy and stack stay drawn, and the stack's cards. */
+	readonly stack: { readonly of: string; readonly ids: readonly string[] } | null;
 }
 
 export interface ScreenState {
@@ -74,6 +78,8 @@ export interface ScreenState {
 	readonly selected: string | null;
 	/** The task being resized by a dot, and which: its moving edge's time shows on a pill. */
 	readonly resizing: { readonly id: string; readonly edge: "start" | "end" } | null;
+	/** The task whose card is its rename field now (F117), in a list or on the calendar. */
+	readonly renaming: string | null;
 	/** Counts the fields opened: each new one (after Enter) is a fresh, empty field. */
 	readonly entrySeq: number;
 	/** Tasks new in the last read: their rows come in; a row merely scrolled into sight does not. */
@@ -119,6 +125,20 @@ export interface ScreenActions {
 	 * happens on the screen under the menu, after it).
 	 */
 	pick(action: MenuAction): void;
+	/**
+	 * Rename from the menu (F117, F108): the menu closes and in the same tap the card (a list's, a calendar's block) becomes
+	 * the field; a card of a calendar menu's stack becomes it in the menu, which stays.
+	 */
+	startRename(): void;
+	/** The rename field let go: `text` written (shown at once, before it is read back, F298); null or nothing changed writes nothing. */
+	endRename(text: string | null): void;
+	/**
+	 * Add subtask from the menu (F124, F108): a list's card opens the new task's field under its last subtask, the menu
+	 * closed in the same tap; a calendar's task types it at the end of its stack in the menu, which stays.
+	 */
+	startSubtask(): void;
+	/** Enter in the stack's field: the subtask written under the menu's task, the field emptied for the next (batch typing); empty, the menu closes. */
+	commitStackSubtask(text: string): void;
 	setPlusAt(at: { readonly into: ListId; readonly index: number } | null): void;
 	setPlusMinute(minute: number | null): void;
 	setZoom(zoom: Zoom): void;
@@ -182,7 +202,9 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 			const next = share(s.read, port.read(s.dayOffset));
 			const known = s.read.cards;
 			const fresh = new Set(Object.keys(next.cards).filter((id) => !(id in known)));
-			set({ read: next, shown: share(s.shown, next), pending: false, fresh: fresh.size === 0 && s.fresh.size === 0 ? s.fresh : fresh });
+			/** An open menu shows its task as it now stands (a subtask typed into its stack, F108). */
+			const layer = s.layer && s.layer.model.kind === "task" && next.cards[s.layer.id] ? { ...s.layer, model: port.menu(s.layer.id, s.layer.from) } : s.layer;
+			set({ read: next, shown: share(s.shown, next), pending: false, fresh: fresh.size === 0 && s.fresh.size === 0 ? s.fresh : fresh, layer });
 		};
 
 		const write = (done: Promise<unknown>) => {
@@ -219,6 +241,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 			now: port.now(),
 			layer: null,
 			entry: null,
+			renaming: null,
 			entrySeq: 0,
 			plusAt: null,
 			plusMinute: null,
@@ -335,7 +358,41 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 				get().release("drag");
 			},
 			openMenu(id, from = "list") {
-				set({ layer: { kind: "menu", id, from, model: port.menu(id, from), page: "menu", asking: null }, ...(from === "list" ? { selected: null } : {}) });
+				const over = get().layer;
+				const stack = from !== "stack" || !over ? null : (over.stack ?? (over.model.kind === "task" ? { of: over.id, ids: over.model.subtasks } : null));
+				set({ layer: { kind: "menu", id, from, model: port.menu(id, from), page: "menu", asking: null, field: null, stack }, ...(from === "list" ? { selected: null } : {}) });
+			},
+			startRename() {
+				const layer = get().layer;
+				if (!layer) return;
+				if (layer.from === "stack") set({ layer: { ...layer, field: "rename", asking: null } });
+				else set({ layer: null, renaming: layer.id });
+			},
+			endRename(text) {
+				const { layer, renaming } = get();
+				const id = renaming ?? (layer?.field === "rename" ? layer.id : null);
+				if (!id) return;
+				set({ renaming: null, ...(layer?.field === "rename" ? { layer: null } : {}) });
+				const was = get().shown.cards[id];
+				const typed = text?.trim() ?? "";
+				if (!was || typed === "" || typed === was.title) return;
+				/** The new name on every card at once, until the write is read back (F298). */
+				const shown = get().shown;
+				set({ shown: { ...shown, cards: { ...shown.cards, [id]: { ...was, title: typed } } } });
+				write(port.act(id, { kind: "rename", text: typed }));
+			},
+			startSubtask() {
+				const layer = get().layer;
+				if (!layer) return;
+				if (layer.from === "calendar") return set({ layer: { ...layer, field: "subtask", asking: null } });
+				set({ layer: null, entry: port.subtaskPlace(layer.id, get().dayOffset), entrySeq: get().entrySeq + 1 });
+			},
+			commitStackSubtask(text) {
+				const layer = get().layer;
+				if (!layer) return;
+				if (text.trim() === "") return set({ layer: null });
+				set({ entrySeq: get().entrySeq + 1 });
+				write(port.add(text, { list: "day", before: null, dayOffset: get().dayOffset, under: layer.id }));
 			},
 			menuPage(page) {
 				const layer = get().layer;
@@ -361,7 +418,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 			},
 			indentEntry(by) {
 				const entry = get().entry;
-				if (entry) set({ entry: { ...entry, depth: Math.max(0, (entry.depth ?? 0) + by) } });
+				if (entry) set({ entry: { ...entry, under: undefined, depth: Math.max(0, (entry.depth ?? 0) + by) } });
 			},
 			async commitEntry(text, next) {
 				const entry = get().entry;

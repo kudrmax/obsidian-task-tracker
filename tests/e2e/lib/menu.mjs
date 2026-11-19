@@ -30,6 +30,8 @@ export function menuButton(t, words) {
 		const all = [...document.querySelectorAll(".tc-menu-layer button")];
 		const el = all.find((b) => b.dataset.date === ${JSON.stringify(words)}) ?? all.find((b) => (b.querySelector(".tc-menu-tile-label, .tc-menu-label, .tc-btn-label")?.textContent ?? b.textContent).trim() === ${JSON.stringify(words)});
 		if (!el) return null;
+		/** A person scrolls a part of the menu that scrolls until the row shows. */
+		el.scrollIntoView({ block: "nearest" });
 		const r = el.getBoundingClientRect();
 		return { x: r.left + r.width / 2, y: r.top + r.height / 2, disabled: el.disabled };
 	})()`);

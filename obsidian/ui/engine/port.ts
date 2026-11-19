@@ -128,6 +128,8 @@ export interface Destination {
 	readonly at?: number;
 	/** With `at`: the end it takes (null: no length); absent, a task keeps its length (none when it had no time). */
 	readonly end?: number | null;
+	/** When given, a new task goes as the last subtask of this task, wherever it stands (Add subtask on a calendar's task). */
+	readonly under?: string;
 }
 
 /** Where a task's menu is opened from: a list's card, a calendar's block, a card of a block's stack in its menu (F107). */
@@ -232,6 +234,8 @@ export interface ScreenPort {
 	clockAt(minute: number): string;
 	/** Where the plus puts a new task's field on the screen showing the day `dayOffset` days from today. */
 	newTaskPlace(dayOffset: number): Destination;
+	/** Where Add subtask opens the field of a new last subtask of `id` in its list (F124): under its last subtask, a level deeper. */
+	subtaskPlace(id: string, dayOffset: number): Destination;
 	/** A new task from its typed text at `at`; resolves with its id once read back. */
 	add(text: string, at: Destination): Promise<string>;
 	/** What the menu of the task or event `id` offers, opened `from` there. */

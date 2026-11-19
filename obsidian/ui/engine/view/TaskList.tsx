@@ -9,6 +9,7 @@ import { useData, useScreen, useScreenApi } from "../store";
 import { Card, PressedLook } from "./Card";
 import { MovingRow } from "./MovingRow";
 import { EntryField } from "./QuickAdd";
+import { RenameField } from "./RenameField";
 
 /** A row counts as this tall until it is drawn and measured (a card and its gap at the default size). */
 const ESTIMATE_PX = 37;
@@ -141,6 +142,7 @@ const RowFace = memo(function RowFace({ row }: { readonly row: Row }) {
 	const api = useScreenApi();
 	const anchor = useAnchor();
 	const pressed = useContext(PressedLook);
+	const renaming = useScreen((s) => (s.renaming === row.id ? s.shown.cards[row.id] : null));
 	if (row.kind === "section")
 		return (
 			<SortableRow id={row.id}>
@@ -149,6 +151,8 @@ const RowFace = memo(function RowFace({ row }: { readonly row: Row }) {
 				</div>
 			</SortableRow>
 		);
+	/** Rename (F117): the card itself is the field, at its level. */
+	if (renaming) return <RenameField face={renaming} depth={row.depth} className="" onDone={(text) => api.getState().endRename(text)} />;
 	return (
 		<SortableRow
 			id={row.id}

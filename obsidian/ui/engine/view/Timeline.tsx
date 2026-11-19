@@ -10,6 +10,7 @@ import { type DayTurn, DayTurnContext } from "../gestures/FollowRibbon";
 import type { AllDayEvent, Block, DayData, DayEvent, EventPaint, Now } from "../port";
 import { DayContext, useData, useScreen, useScreenApi } from "../store";
 import { Card, PressedLook } from "./Card";
+import { RenameField } from "./RenameField";
 import { useHost } from "./host";
 import { MovingRow } from "./MovingRow";
 import { EntryField } from "./QuickAdd";
@@ -343,11 +344,12 @@ const BlockItem = memo(function BlockItem({ block, box, shades, order, z, top, s
 	const lifted = useScreen((s) => s.lifted === block.id);
 	const selected = useScreen((s) => s.selected === block.id);
 	const resizing = useScreen((s) => (s.resizing?.id === block.id ? s.resizing.edge : null));
+	const renaming = useScreen((s) => (s.renaming === block.id ? s.shown.cards[block.id] : null));
 	const api = useScreenApi();
 	const anchor = useAnchor();
 	const pressed = useContext(PressedLook);
 	const [element, setElement] = useState<HTMLDivElement | null>(null);
-	const className = `tc-block${selected ? " is-selected" : ""}${resizing ? " is-resizing" : ""}`;
+	const className = `tc-block${selected ? " is-selected" : ""}${resizing ? " is-resizing" : ""}${renaming ? " is-renaming" : ""}`;
 	const look = { step: block.step, corner: box.stacked ? block.startParts : box.shortLength ? block.lengthParts : null, pill: resizing === "start" ? block.clock : resizing === "end" ? (block.endClock ?? block.clock) : null, clock: block.clock };
 	return (
 		<MovingRow ref={setElement} id={block.id} order={order} carried={lifted} fresh={false} placed className={className} style={boxStyle(box, selected || resizing ? top : z)}>
@@ -363,6 +365,8 @@ const BlockItem = memo(function BlockItem({ block, box, shades, order, z, top, s
 			>
 				<Card id={block.id} block={look} />
 			</SortableRow>
+			{/* Rename on the calendar (F108): the block becomes the field over its place, growing down for a long name. */}
+			{renaming ? <RenameField face={renaming} className="tc-block-rename" onDone={(text) => api.getState().endRename(text)} /> : null}
 			{shades.length > 0 ? (
 				<div className="tc-shades" aria-hidden="true">
 					{shades.map((shade, i) => (

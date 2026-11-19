@@ -33,6 +33,8 @@ export interface MenuLayerProps {
 	readonly root: HTMLElement;
 	/** The element pressed: the copy stands over it. */
 	readonly reference: Element | null;
+	/** What the panel goes by when not the copy: a card of the stack under the copy (a subtask's menu, F107). */
+	readonly panelBy?: Element | null;
 	readonly label: string;
 	/** The copy of what was pressed, and under it a calendar task's subtasks (F107), drawn over the backdrop where it stood. */
 	readonly over: ReactNode;
@@ -67,7 +69,7 @@ const motionClass = (status: string, ready: boolean) => (status === "open" && re
  * in from where it stood unplaced. The parts open together and close together (Floating UI's transition status keeps
  * them mounted while they fade, `LAYER_MS`).
  */
-export function MenuLayer({ open, onClose, root, reference, label, over, groups, panelClass, page, peek, keepWidth = false }: MenuLayerProps) {
+export function MenuLayer({ open, onClose, root, reference, panelBy = null, label, over, groups, panelClass, page, peek, keepWidth = false }: MenuLayerProps) {
 	const [above, setAbove] = useState(0);
 	const [overEl, setOverEl] = useState<HTMLElement | null>(null);
 	const parts = useRef<{ upper: HTMLElement | null; lower: HTMLElement | null }>({ upper: null, lower: null });
@@ -90,7 +92,7 @@ export function MenuLayer({ open, onClose, root, reference, label, over, groups,
 		transform: false,
 		middleware: [offset(DESIGN.menuGap), splitBy(parts), shift({ padding: EDGES }), size({ padding: DESIGN.wholeMargin, apply: scrollWithin })],
 		whileElementsMounted: autoUpdate,
-		elements: { reference: overEl },
+		elements: { reference: panelBy ?? overEl },
 	});
 	const upper = useFloating({
 		open,
@@ -99,7 +101,7 @@ export function MenuLayer({ open, onClose, root, reference, label, over, groups,
 		transform: false,
 		middleware: [offset(DESIGN.menuGap), shift({ padding: EDGES }), size({ padding: DESIGN.wholeMargin, apply: scrollWithin })],
 		whileElementsMounted: autoUpdate,
-		elements: { reference: overEl },
+		elements: { reference: panelBy ?? overEl },
 	});
 	const count = Math.min(above, groups.length);
 	/** Floating UI keeps a middleware whose code reads the same, so what changes between renders is read through a ref. */

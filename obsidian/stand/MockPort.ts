@@ -187,11 +187,31 @@ export class MockPort implements ScreenPort {
 		return { list: "inbox", section: null, before: null, dayOffset, depth: 0 };
 	}
 
+	/** Under its last subtask, at any depth, in the list the task's card stands in. */
+	subtaskPlace(id: string, dayOffset: number): Destination {
+		const data = this.read(dayOffset);
+		for (const list of ["inbox", "soon", "day"] as const) {
+			const rows = data.lists[list].rows;
+			const at = rows.findIndex((row) => row.id === id);
+			if (at < 0) continue;
+			const depth = (rows[at] as { depth: number }).depth;
+			let end = at + 1;
+			while (end < rows.length && rows[end].kind === "task" && (rows[end] as { depth: number }).depth > depth) end++;
+			const next = rows[end];
+			return { list, before: next?.kind === "task" ? next.id : null, dayOffset, depth: depth + 1, under: id };
+		}
+		return { list: "inbox", before: null, dayOffset, depth: 1, under: id };
+	}
+
 	/** A new task (F190): Inbox and Soon without a date, a day's list with its date; on a day's calendar its time too, no length, at the end of Now (today) or Soon. */
 	async add(text: string, at: Destination): Promise<string> {
 		const id = `x${++this.added}`;
 		await this.write((file) => {
 			const task = this.newTask(text.trim(), null, id);
+			if (at.under !== undefined) {
+				this.findBy(file, (t) => t.id === at.under)?.task.children.push(task);
+				return;
+			}
 			task.due = at.list === "day" ? dateOf(addDays(this.day(), at.dayOffset)) : null;
 			if (at.at !== undefined) {
 				task.slot = { start: at.at, end: null };
