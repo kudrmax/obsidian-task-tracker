@@ -373,6 +373,10 @@ const BOUNDS = (to) => `(() => {
 	const backing = document.querySelector(".tc-allday-rows > .tc-allday-backing");
 	const band = backing?.getBoundingClientRect();
 	const style = backing && getComputedStyle(backing);
+	const after = backing && getComputedStyle(backing, "::after");
+	const hourLine = room.querySelector(".tc-hour-mark > .tc-hour-line:not(.is-minor)");
+	const line = hourLine.getBoundingClientRect();
+	const lineStyle = getComputedStyle(hourLine);
 	const canvas = room.querySelector(".tc-canvas");
 	const stackOver = Math.max(0, parseFloat(canvas.style.getPropertyValue("--tc-stack-end")) - 24 * hour);
 	const over = [];
@@ -380,7 +384,8 @@ const BOUNDS = (to) => `(() => {
 	return {
 		hour, scroll: room.scrollTop, max: room.scrollHeight - room.clientHeight,
 		roomTop: r.top, first: +(lines[0] - r.top).toFixed(2), under: +(r.bottom - foot - (lines[lines.length - 1] + hour)).toFixed(2), stackOver: +stackOver.toFixed(2),
-		divider: band ? { bottom: band.bottom, width: style.borderBottomWidth, colour: style.borderBottomColor, ground: style.backgroundColor } : null,
+		divider: band ? { bottom: band.bottom, left: band.left + parseFloat(after.left), right: band.right - parseFloat(after.right), height: parseFloat(after.height), colour: after.backgroundColor, ground: style.backgroundColor } : null,
+		hourLine: { left: line.left, right: line.right, height: line.height, colour: lineStyle.backgroundColor },
 		over: over.slice(0, 5), overCount: over.length,
 	};
 })()`;
@@ -388,7 +393,7 @@ const BOUNDS = (to) => `(() => {
 /**
  * The calendar's bounds (Max, 2026-11-19: they looked random): at every zoom the scroll stops with the day's start right
  * under the all-day band's divider and the day's end where the screen's foot begins, the label's room each side and no
- * blank room beyond; zoomed out, the whole day fits exactly. The all-day rows stand on a solid band with a hairline divider,
+ * blank room beyond; zoomed out, the whole day fits exactly. The all-day rows stand on a solid band, its divider an hour line's,
  * the room beginning right under it: nothing of a block scrolled up shows over the divider or through the band.
  */
 async function dayEndsAndBand(t) {
@@ -400,7 +405,9 @@ async function dayEndsAndBand(t) {
 		const start = await t.cdp.eval(BOUNDS("start"));
 		const end = await t.cdp.eval(BOUNDS("end"));
 		console.log(`${label}: start ${JSON.stringify(start)} end ${JSON.stringify(end)}`);
-		t.expect(start.divider !== null && start.divider.width === "1px" && Math.abs(start.divider.bottom - start.roomTop) <= 0.5, `${label}: the room begins right under the all-day band's hairline divider: ${JSON.stringify(start.divider)}, room at ${start.roomTop}`);
+		t.expect(start.divider !== null && Math.abs(start.divider.bottom - start.roomTop) <= 0.5, `${label}: the room begins right under the all-day band's divider: ${JSON.stringify(start.divider)}, room at ${start.roomTop}`);
+		const d = start.divider, h = start.hourLine;
+		t.expect(d !== null && Math.abs(d.left - h.left) <= 0.5 && Math.abs(d.right - h.right) <= 0.5 && d.height === h.height && d.colour === h.colour, `${label}: the divider is drawn as an hour line (Decision 55): its start, its end, its thickness and its colour: divider ${JSON.stringify(d)}, hour line ${JSON.stringify(h)}`);
 		t.expect(start.divider !== null && !/rgba\(.*, 0\)|transparent/.test(start.divider.ground), `${label}: the band is solid: ${start.divider?.ground}`);
 		t.expect(Math.abs(start.first - lift) <= 1, `${label}: scrolled to the start, the day's first hour line stands the label's room under the divider: ${start.first}`);
 		t.expect(Math.abs(end.under - lift - end.stackOver) <= 1, `${label}: scrolled to the end, the day ends the label's room over where the foot begins (or the stack's end does): ${end.under}, the stack ${end.stackOver} past the day`);

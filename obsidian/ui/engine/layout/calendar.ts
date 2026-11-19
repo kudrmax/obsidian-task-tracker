@@ -39,7 +39,7 @@ export interface TaskBox {
  * An event's box. What it spans: its top and height at its true times, how deep it lies over others (`level`, which the
  * tasks over it are indented by) and how high it lies (`layer`). How it is drawn (Max's rule of 2026-11-19, Decision 52):
  * its lane's left edge, the lanes right of it in its cluster (its title stands past them), where its block starts under
- * its top (`blockTop`: 0, or lower when an earlier title of the cluster holds its start's line; its bar still starts at
+ * its top (`blockTop`: 0, or lower when an earlier title's text of the cluster reaches its start; its bar still starts at
  * its top), how tall it is drawn from its top, the room its title has under the block's top, and whether it is tiny.
  */
 export interface EventBox {
@@ -72,14 +72,21 @@ const overlayLeft = (level: number): number => (level === 0 ? DESIGN.itemInset :
 /** Under half a pixel below its top a block still starts on its own line. */
 const LINE_SLACK = 0.5;
 
+/** How far under its block's top an event title's text ends. */
+const TITLE_TEXT = DESIGN.eventTitlePad + DESIGN.eventTitleLine;
+
+/** The title's padding under its text less the micro gap: a title's room ends this far over its block's bottom. */
+const TITLE_UNDER = DESIGN.eventTitlePad - DESIGN.eventTextGap;
+
 /**
  * Each event's box, in the order given (Max, 2026-11-19, Decision 52). By start, the longer first on a tie, events
  * overlapping form a cluster: each one starting before the cluster's last end joins it. In a cluster the events stand in
  * lanes by start, lane i's left edge i lanes (a bar and its gap) in, the later lying higher; every title of the cluster
- * starts right of its last lane, so no title is ever covered. Titles take the label lines top-down in start order: a
- * block starts at its event's start unless an earlier title holds that line, else at the first free line under it; its
- * bar still starts at the true start (the view draws the bar's stem above the block), and the block reaches its end or
- * its title's bottom, whichever is lower. A title's room runs to the next title of the cluster, or to its block's bottom.
+ * starts right of its last lane, so no title is ever covered. In start order a block starts at its event's start, or
+ * lower only as far as the earlier title's text and a micro gap under it need (Max, 2026-11-19, Decision 54); its bar
+ * still starts at the true start (the view draws the bar's stem above the block), and the block reaches its end or its
+ * title's bottom, whichever is lower. A title's text may reach, the micro gap under it, the next block of the cluster or
+ * its own block's bottom less its padding.
  * A lone event is drawn as ever, tiny when shorter than a line; in a cluster every title has its whole line.
  */
 export function layEvents(events: readonly EventSpan[], scale: TimeScale): EventBox[] {
@@ -112,12 +119,12 @@ export function layEvents(events: readonly EventSpan[], scale: TimeScale): Event
 			const blockAt = clustered ? Math.max(top, free) : top;
 			const blockTop = blockAt - top > LINE_SLACK ? blockAt - top : 0;
 			const bottom = clustered ? Math.max(top + height, top + blockTop + DESIGN.eventLabel) : top + height;
-			free = top + blockTop + DESIGN.eventLabel + DESIGN.itemGap;
+			free = top + blockTop + TITLE_TEXT + DESIGN.eventTextGap;
 			drawn.push({ index, top, height, blockTop, bottom });
 		}
 		drawn.forEach(({ index, top, height, blockTop, bottom }, lane) => {
 			const next = drawn[lane + 1];
-			const labelBottom = next ? Math.min(next.top + next.blockTop, bottom) : bottom;
+			const labelBottom = next ? Math.min(next.top + next.blockTop, bottom - TITLE_UNDER) : bottom - TITLE_UNDER;
 			boxes[index] = {
 				top,
 				height,

@@ -25,6 +25,11 @@ export const DESIGN = {
 	eventLane: 6,
 	/** An event's title line with its padding: a cluster's titles take lines this tall, one under another (Decision 52). */
 	eventLabel: 23,
+	/** An event title's padding over its text, and its text's line: the text's bottom stands this far under the block's top. */
+	eventTitlePad: 4,
+	eventTitleLine: 15,
+	/** The micro gap a later block of a cluster keeps under an earlier title's text (Max, 2026-11-19, Decision 54). */
+	eventTextGap: 2,
 	/** The bar over the keyboard while a task is typed: the field stands above it. */
 	barHeight: 44,
 	/** On the desktop the bar is a capsule next to the field, this far from it; its panels stand as far from it. */
@@ -62,6 +67,9 @@ export const DESIGN_TOKENS: Readonly<Record<DesignMeasure, string>> = {
 	itemGap: "--tc-item-gap",
 	eventLane: "--tc-event-lane",
 	eventLabel: "--tc-event-label",
+	eventTitlePad: "--tc-space-4",
+	eventTitleLine: "--tc-leading-block",
+	eventTextGap: "--tc-event-text-gap",
 	barHeight: "--tc-bar-h",
 	deskBarGap: "--tc-desk-bar-gap",
 	treeIndent: "--tc-tree-indent",

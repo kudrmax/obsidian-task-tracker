@@ -581,9 +581,10 @@ body {
 	--tc-items-right: 4px;
 	--tc-item-inset: 1px;
 	--tc-item-gap: 2px;
-	/* Overlapping events (Decision 52): a lane is a bar and its gap; a cluster's titles take lines this tall, one under another. */
+	/* Overlapping events (Decision 52): a lane is a bar and its gap; a title's line with its padding; a later block keeps this micro gap under an earlier title's text (Decision 54). */
 	--tc-event-lane: 6px;
 	--tc-event-label: 23px;
+	--tc-event-text-gap: 2px;
 	/* The bottom of the last task card; the code sets it on the canvas. */
 	--tc-stack-end: 0px;
 	/* Empty room over the day's first hour and under its last; the code sets it on the canvas. */
@@ -1812,15 +1813,18 @@ button.tc-btn.tc-folder-btn:disabled { opacity: var(--tc-tile-off-opacity); curs
 /* The calendar's tasks and events lie over each other in the stack's order (--tc-stack-z), inside the items: the now line stays over them all. */
 .task-calendar.is-engine .tc-items { isolation: isolate; }
 .task-calendar.is-engine .tc-items > :is(.tc-block, .tc-event, .tc-grips) { z-index: var(--tc-stack-z); }
-/* The all-day rows stand on a solid band of the calendar's ground, a hairline divider under it, as iOS Calendar's all-day section (Max, 2026-11-19): the calendar's room begins right under the divider, so a block scrolled up is cut there. No all-day event, no band. */
+/* The all-day rows stand on a solid band of the calendar's ground, a divider under it drawn as an hour line, as iOS Calendar's all-day section (Max, 2026-11-19): the calendar's room begins right under the divider, so a block scrolled up is cut there. No all-day event, no band. */
 .task-calendar.is-engine .tc-allday-rows { position: relative; }
-.task-calendar.is-engine .tc-allday-backing { height: auto; bottom: calc(-1 * var(--tc-hairline)); box-sizing: border-box; border-bottom: var(--tc-hairline) solid var(--tc-line); }
+.task-calendar.is-engine .tc-allday-backing { height: auto; bottom: calc(-1 * var(--tc-hairline)); }
+/* The divider is drawn as an hour line is (Max, 2026-11-19, Decision 55): its colour, from where the hour lines start to the right edge, a hairline. */
+.task-calendar.is-engine .tc-allday-backing::after { content: ""; position: absolute; left: var(--tc-line-left); right: 0; bottom: 0; height: var(--tc-hairline); background: var(--tc-hour-line); }
 /* Overlapping events (Max, 2026-11-19, Decision 52): each stands in its lane, drawn as ever (its block with the bar inside on the left, its calendar's ground over the calendar's); its title stands past the cluster's last lane in its own line, so none is covered. A block moved down under an earlier title keeps its bar from its true start: the bar's stem runs up from the block, joined to its square corner. */
 .task-calendar.is-engine .tc-items > .tc-event { background: none; border-radius: 0; display: block; }
 .tc-event-block { position: absolute; top: var(--tc-block-top); left: 0; right: 0; bottom: 0; display: flex; border-radius: var(--tc-radius-event); background: linear-gradient(var(--tc-event-bg), var(--tc-event-bg)), var(--tc-bg); overflow: clip; }
 .tc-event.is-held > .tc-event-block { border-top-left-radius: 0; }
 .tc-event-stem { position: absolute; top: 0; left: 0; width: var(--tc-bar); height: calc(var(--tc-block-top) + var(--tc-radius-event)); border-radius: var(--tc-radius-bar-cap) var(--tc-radius-bar-cap) 0 0; background: var(--tc-event-bar); }
-.tc-event-label { position: absolute; top: var(--tc-block-top); left: calc(var(--tc-lanes-after) * var(--tc-event-lane) + var(--tc-bar)); right: 0; height: var(--tc-label-room); }
+/* The title's room is how far its text may reach with the micro gap under it; its padding under the text may lie under the next block (Decision 54). */
+.tc-event-label { position: absolute; top: var(--tc-block-top); left: calc(var(--tc-lanes-after) * var(--tc-event-lane) + var(--tc-bar)); right: 0; height: calc(var(--tc-label-room) + var(--tc-space-4) - var(--tc-event-text-gap)); }
 .tc-event-label > .tc-event-body { box-sizing: border-box; min-height: var(--tc-event-label); }
 .tc-event.is-tiny .tc-event-label > .tc-event-body { min-height: 0; }
 .tc-event.is-past > .tc-event-block { background: linear-gradient(var(--tc-event-past-bg), var(--tc-event-past-bg)), var(--tc-bg); }

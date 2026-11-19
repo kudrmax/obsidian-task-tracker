@@ -59,7 +59,9 @@ describe("overlapping events", () => {
 		{ start: 19 * 60, end: 19 * 60 + 30 },
 		{ start: 19 * 60 + 15, end: 19 * 60 + 45 },
 	];
-	const line = DESIGN.eventLabel + DESIGN.itemGap;
+	/** An earlier title's text bottom and the micro gap under it (Max, 2026-11-19, Decision 54): not the whole line. */
+	const clear = DESIGN.eventTitlePad + DESIGN.eventTitleLine + DESIGN.eventTextGap;
+	const under = DESIGN.eventTitlePad - DESIGN.eventTextGap;
 	const abs = (b: { top: number; blockTop: number }) => b.top + b.blockTop;
 
 	it("form a cluster when one starts before the cluster's last end; a lone event stands alone", () => {
@@ -79,19 +81,19 @@ describe("overlapping events", () => {
 	for (const scale of [BASE_SCALE, new TimeScale(23)])
 		describe(`at ${scale.hourPx} px an hour`, () => {
 			const [, plan, call, sync] = layEvents(evening, scale);
-			it("each top is the true start; a block starts there unless an earlier title holds the line, then on the first free line", () => {
+			it("each top is the true start; a block starts there unless an earlier title's text reaches it, then the micro gap under that text", () => {
 				expect([plan, call, sync].map((b) => b.top)).toEqual([18.5, 19, 19.25].map((h) => scale.y(h * 60) + DESIGN.itemInset));
 				expect(plan.blockTop).toBe(0);
-				expect(abs(call)).toBe(Math.max(call.top, abs(plan) + line));
-				expect(abs(sync)).toBe(Math.max(sync.top, abs(call) + line));
+				expect(abs(call)).toBe(Math.max(call.top, abs(plan) + clear));
+				expect(abs(sync)).toBe(Math.max(sync.top, abs(call) + clear));
 				for (const b of [call, sync]) expect(b.blockTop).toBeGreaterThanOrEqual(0);
 			});
-			it("no title covers another: each title's room ends where the next title's line begins, or at its block's bottom", () => {
-				const bottom = (b: { top: number; drawnHeight: number }) => b.top + b.drawnHeight;
+			it("no title covers another: a title's text, the micro gap under it, reaches the next block at most, or its block's bottom less its padding", () => {
+				const bottom = (b: { top: number; drawnHeight: number }) => b.top + b.drawnHeight - under;
 				expect(plan.labelRoom).toBe(Math.min(abs(call), bottom(plan)) - abs(plan));
 				expect(call.labelRoom).toBe(Math.min(abs(sync), bottom(call)) - abs(call));
-				for (const b of [plan, call]) expect(b.labelRoom).toBeGreaterThanOrEqual(DESIGN.eventLabel);
-				expect(sync.labelRoom).toBe(sync.top + sync.drawnHeight - abs(sync));
+				for (const b of [plan, call]) expect(b.labelRoom).toBeGreaterThanOrEqual(clear);
+				expect(sync.labelRoom).toBe(bottom(sync) - abs(sync));
 			});
 			it("a block reaches its end, or its title's bottom when that is lower", () => {
 				for (const b of [plan, call, sync]) expect(b.top + b.drawnHeight).toBe(Math.max(b.top + b.height, abs(b) + DESIGN.eventLabel));
@@ -101,12 +103,23 @@ describe("overlapping events", () => {
 			});
 		});
 
-	it("at the base zoom, «Звонок с клиентом» holds its start's line and «Синк с Олей» goes under its title", () => {
+	it("at the base zoom, «Звонок с клиентом» holds its start's line and «Синк с Олей» goes only just under its title's text", () => {
 		const [, plan, call, sync] = layEvents(evening, BASE_SCALE);
 		expect(call.blockTop).toBe(0);
 		expect(abs(call) - abs(plan)).toBe(28);
-		expect(abs(sync)).toBe(abs(call) + line);
-		expect(sync.blockTop).toBeCloseTo(line - BASE_SCALE.y(15));
+		expect(abs(sync)).toBe(abs(call) + clear);
+		expect(sync.blockTop).toBeCloseTo(clear - BASE_SCALE.y(15));
+		expect(clear).toBe(21);
+	});
+
+	it("a later block clear of an earlier title's text stands at its true start, though inside the title's whole line (Max: «Микрозазора будет достаточно»)", () => {
+		const scale = new TimeScale(60);
+		const [first, second] = layEvents([{ start: 600, end: 720 }, { start: 622, end: 660 }], scale);
+		expect(second.top - first.top).toBe(22);
+		expect(second.top - first.top).toBeLessThan(DESIGN.eventLabel + DESIGN.itemGap);
+		expect(second.blockTop).toBe(0);
+		const [, pushed] = layEvents([{ start: 600, end: 720 }, { start: 620, end: 660 }], scale);
+		expect(pushed.top + pushed.blockTop - first.top).toBe(clear);
 	});
 
 	it("at the whole day, the titles push down and a block may reach below its end", () => {
@@ -118,7 +131,7 @@ describe("overlapping events", () => {
 
 	it("a lone event is drawn as ever: its block at its start, its height, tiny when shorter than a line", () => {
 		const [lone, short] = layEvents([{ start: 60, end: 120 }, { start: 600, end: 615 }], BASE_SCALE);
-		expect(lone).toMatchObject({ lane: 0, lanesAfter: 0, blockTop: 0, drawnHeight: lone.height, labelRoom: lone.height, left: DESIGN.itemInset, tiny: false });
+		expect(lone).toMatchObject({ lane: 0, lanesAfter: 0, blockTop: 0, drawnHeight: lone.height, labelRoom: lone.height - under, left: DESIGN.itemInset, tiny: false });
 		expect(short.tiny).toBe(true);
 		expect(short.drawnHeight).toBe(short.height);
 	});
