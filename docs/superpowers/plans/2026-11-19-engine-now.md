@@ -21,7 +21,7 @@ The ribbon on the stand («The whole screen») is stage 0's pager (round six, ~9
 
 1. **Tasks stuck together on the calendar.** A card lying on another card doesn't read as separate. Rejected: hairline ring, tight shadow, tone of the upper card, wide shade all round (it erased the card's edge on the ground). In work: a shade only on the card underneath, only where another card lies on it (Decision 60, rewritten).
 2. **The engine feels jerky** (Max): the swipes turn too much, headers and sections jump, animations unpleasant. The frame audit (scratchpad `jank/`, 192 runs) ranked them; fixed one at a time, each to the stand, in this order:
-   1. A quick drop: rows still parting snap the rest of the way in one frame — headers and cards jump 22–37 px. **In work** (branch `ui-jank-1`).
+   1. A quick drop: rows still parting snap the rest of the way in one frame — headers and cards jump 22–37 px. Fixed as Decision 61 and **reverted** the same day (ebc3befd): Max hadn't reported it, and the rework made dragging worse (the place lagged behind the pointer in its own column). An audit item is not a bug until Max confirms it is what he sees.
    2. A carried card leaving a list: the gap shuts at once.
    3. Phone: turning the day at the calendar swings the ribbon the wrong way; every flick hitches at release.
    4. Lifting a task with subtasks: rows below jump 148 px; at the drop the subtasks pop in over other cards.
