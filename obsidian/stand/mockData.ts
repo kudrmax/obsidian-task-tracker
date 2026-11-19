@@ -225,7 +225,7 @@ export function calendarFile(clock: Date): MockFile {
 	const late = Math.max(0, hour - 45);
 	file.now[0].tasks = [
 		...["Разобрать почту", "Полить цветы", "Ответить Косте", "Оплатить свет", "Купить молоко", "Позвонить маме"].map((title, i) => plain(`h${i + 1}`, title, today)),
-		...blocks.map(([title, start, length], i) => plain(`k${i + 1}`, title, today, { start, end: length === null ? null : start + length })),
+		...blocks.map(([title, start, length], i) => ({ ...plain(`k${i + 1}`, title, today, { start, end: length === null ? null : start + length }), description: title === "Тренировка" ? "разминка, потом зал" : null })),
 		folded,
 		...(late < minuteOf(clock) ? [plain("k12", "Прошедшая по времени", today, { start: late, end: late + 30 })] : []),
 	];

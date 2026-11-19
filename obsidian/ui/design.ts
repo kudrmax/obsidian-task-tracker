@@ -36,6 +36,10 @@ export const DESIGN = {
 	/** A card's height and the gap between cards at the default card size: the calendar's stack lays its cards out by them. */
 	cardHeight: 35,
 	cardGap: 2,
+	/** A selected task's dot, and how far in from the card's right (the top one) and its left (the bottom one). */
+	grip: 10,
+	gripStartRight: 14,
+	gripEndLeft: 14,
 } as const;
 
 export type DesignMeasure = keyof typeof DESIGN;
@@ -60,6 +64,9 @@ export const DESIGN_TOKENS: Readonly<Record<DesignMeasure, string>> = {
 	subtaskIndent: "--tc-subtask-indent",
 	cardHeight: "--tc-card-h",
 	cardGap: "--tc-card-gap",
+	grip: "--tc-grip",
+	gripStartRight: "--tc-grip-start-right",
+	gripEndLeft: "--tc-grip-end-left",
 };
 
 /** The custom properties the code sets on elements; styles.css does the arithmetic with them. */
@@ -97,9 +104,14 @@ export const PROPERTY = {
 	scrolled: "--tc-scrolled",
 	scrolledBelow: "--tc-scrolled-below",
 	roomBottom: "--tc-room-bottom",
-	/** An event's calendar colour: its fill, bar and title are mixed from it per theme in the stylesheet. */
-	eventColor: "--tc-event-color",
-	/** How far under the calendar's top a pinch holds its minute: the scroll margin of the mark the calendar reveals at every step. */
+	/** An event's paint in each theme, as the port gives it: the stylesheet takes the theme's own. */
+	eventBgDark: "--tc-event-bg-dark",
+	eventBarDark: "--tc-event-bar-dark",
+	eventTextDark: "--tc-event-text-dark",
+	eventBgLight: "--tc-event-bg-light",
+	eventBarLight: "--tc-event-bar-light",
+	eventTextLight: "--tc-event-text-light",
+	/** How far under the calendar's top a mark it reveals stands (a pinch's minute, today's now line, another day's hour): its scroll margin. */
 	anchorOffset: "--tc-anchor-offset",
 	/** How high a block or event of the calendar lies among the others: a card lying over another is drawn over it. */
 	stackZ: "--tc-stack-z",

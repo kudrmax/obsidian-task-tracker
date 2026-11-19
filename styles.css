@@ -6,7 +6,7 @@
  * number, a colour or a radius written straight into a rule, and on a token no rule uses. To change how something
  * looks, change its token, or add one here with a name that says what it is for.
  *
- * Properties the code sets per element (--tc-list-width, --tc-grab-x, --tc-grab-y, --tc-landing-level, --tc-landing-w, --tc-landing-h, --tc-hour, --tc-allday-extra-rows, --tc-y, --tc-stack-z, --tc-anchor-offset, --tc-event-color,
+ * Properties the code sets per element (--tc-list-width, --tc-grab-x, --tc-grab-y, --tc-landing-level, --tc-landing-w, --tc-landing-h, --tc-hour, --tc-allday-extra-rows, --tc-y, --tc-stack-z, --tc-anchor-offset, --tc-event-bg-dark, --tc-event-bar-dark, --tc-event-text-dark, --tc-event-bg-light, --tc-event-bar-light, --tc-event-text-light,
  * --tc-len, --tc-x, --tc-level, --tc-pass, --tc-stack-end, --tc-room-top, --tc-room-bottom, --tc-scrolled, --tc-scrolled-below, --tc-event-bg, --tc-event-bar, --tc-event-text, and per priority colour --tc-priority-ink, --tc-priority-fill, --tc-priority-meta) carry a measure from the layout
  * into these rules; the rules do the arithmetic.
  */
@@ -34,12 +34,6 @@ body {
 	--tc-event-past-ink-light: 10%;
 	--tc-event-past-bg: color-mix(in srgb, var(--tc-bg), var(--tc-text) var(--tc-event-past-lift));
 	--tc-event-past-fg: color-mix(in srgb, var(--tc-bg), var(--tc-text) var(--tc-event-past-ink));
-	/* An event of the engine's calendar in its calendar's colour (--tc-event-color): the fill that colour at this share, the title the colour mixed toward the ink, the bar the colour itself (the design's «События календарей»: dark 22 % and half white, light about 15 % and darkened to about 65 %). */
-	--tc-event-alpha: 22%;
-	--tc-event-alpha-light: 15%;
-	--tc-event-ink: #FFFFFF;
-	--tc-event-ink-share: 50%;
-	--tc-event-ink-share-light: 35%;
 	--tc-on-strong: #000000;
 	--tc-now-ink: #FFFFFF;
 	/* Text on the accent: the time pill of a stretched task and of the drop line. */
@@ -711,6 +705,7 @@ body {
 	--tc-layer-panel: 1001;
 	/* What Obsidian's editor shows for a field in a menu, its note search and its toolbar over the keyboard, over the menu. */
 	--tc-layer-editor: 1002;
+	--tc-layer-pinned: 1002;
 
 	/* Opacity */
 	/* A button while the finger or the mouse is on it. */
@@ -766,7 +761,6 @@ body.theme-light {
 	--tc-float-month: #8E8E93;
 	--tc-event-past-bg: color-mix(in srgb, var(--tc-bg), var(--tc-text) var(--tc-event-past-lift-light));
 	--tc-event-past-fg: color-mix(in srgb, var(--tc-bg), var(--tc-text) var(--tc-event-past-ink-light));
-	--tc-event-ink: #000000;
 	--tc-shadow-lift: 0 14px 32px rgba(0, 0, 0, 0.18), 0 0 0 0.5px rgba(0, 0, 0, 0.12);
 	--tc-shadow-control: 0 6px 16px rgba(0, 0, 0, 0.12), 0 0 0 0.5px rgba(0, 0, 0, 0.1);
 	--tc-branch: #C7C7CC;
@@ -1813,9 +1807,9 @@ button.tc-btn.tc-folder-btn:disabled { opacity: var(--tc-tile-off-opacity); curs
 /* The calendar's tasks and events lie over each other in the stack's order (--tc-stack-z), inside the items: the now line stays over them all. */
 .task-calendar.is-engine .tc-items { isolation: isolate; }
 .task-calendar.is-engine .tc-items > :is(.tc-block, .tc-event, .tc-grips) { z-index: var(--tc-stack-z); }
-/* An event takes its calendar's colour: fill, bar and title mixed from it per theme. */
-.task-calendar.is-engine :is(.tc-event, .tc-allday) { --tc-event-bg: color-mix(in srgb, var(--tc-event-color) var(--tc-event-alpha), transparent); --tc-event-bar: var(--tc-event-color); --tc-event-text: color-mix(in srgb, var(--tc-event-color), var(--tc-event-ink) var(--tc-event-ink-share)); cursor: pointer; }
-body.theme-light .task-calendar.is-engine :is(.tc-event, .tc-allday) { --tc-event-bg: color-mix(in srgb, var(--tc-event-color) var(--tc-event-alpha-light), transparent); --tc-event-text: color-mix(in srgb, var(--tc-event-color), var(--tc-event-ink) var(--tc-event-ink-share-light)); }
+/* An event takes its calendar's paint in the theme shown (the port gives both, by the plugin's rule). */
+.task-calendar.is-engine :is(.tc-event, .tc-allday) { --tc-event-bg: var(--tc-event-bg-dark); --tc-event-bar: var(--tc-event-bar-dark); --tc-event-text: var(--tc-event-text-dark); cursor: pointer; }
+body.theme-light .task-calendar.is-engine :is(.tc-event, .tc-allday) { --tc-event-bg: var(--tc-event-bg-light); --tc-event-bar: var(--tc-event-bar-light); --tc-event-text: var(--tc-event-text-light); }
 /* The start a carried task will take, written on its dashed place on the calendar where its title stands, stepping with it. */
 .tc-slot-time { display: none; }
 .tc-drag-source.is-lifted > .tc-block-card > .tc-slot-time { display: block; visibility: visible; position: absolute; left: var(--tc-card-pad-start); top: var(--tc-block-pad-top); font-size: var(--tc-font-body); line-height: var(--tc-leading-card); color: var(--tc-muted); font-variant-numeric: tabular-nums; }
@@ -1823,10 +1817,14 @@ body.theme-light .task-calendar.is-engine :is(.tc-event, .tc-allday) { --tc-even
 .tc-calendar-entry > .tc-quick-row { min-height: var(--tc-card-h); }
 /* The field writes its time on its right, as the plugin's field on the calendar does; the text stops short of it. */
 .tc-calendar-entry .tc-quick-field { padding-right: calc(var(--tc-card-pad-end) + var(--tc-field-time-w) + var(--tc-space-6)); }
-/* The marks the calendar reveals: another day's opening hour, a label's lift under the top; a pinch's minute at its height. */
-.tc-opens-at, .tc-zoom-anchor { position: absolute; top: var(--tc-y); left: 0; width: 0; height: 0; pointer-events: none; }
-.tc-opens-at { scroll-margin-top: var(--tc-label-lift); }
-.tc-zoom-anchor { scroll-margin-top: var(--tc-anchor-offset); }
+/* A mark the calendar reveals (today's now line, another day's hour, a pinch's minute): the browser puts it its scroll margin under the room's top. */
+.tc-reveal { position: absolute; top: var(--tc-y); left: 0; width: 0; height: 0; pointer-events: none; scroll-margin-top: var(--tc-anchor-offset); }
+/* The room under the day kept for the screen's foot, as tall as the room's own padding there: the calendar measures what a person sees by it. */
+.tc-foot-probe { position: absolute; top: 0; left: 0; width: 0; height: var(--tc-foot-fade-day); visibility: hidden; pointer-events: none; }
+/* A selected task's dots, pinned on it over every layer (the menu's backdrop too). */
+.tc-pinned { z-index: var(--tc-layer-pinned); }
+.tc-pinned.is-hidden { visibility: hidden; }
+.tc-pinned > .tc-grip { position: relative; display: block; }
 /* Drag and drop («Decided» 1): while a card is carried the cards part, and its own place stands where it will land, as an outline at its depth. */
 .tc-drag-source { display: flow-root; touch-action: pan-y; }
 .tc-drag-source.is-lifted > .tc-card { background: none; box-shadow: none; outline: var(--tc-hairline) dashed var(--tc-dash); outline-offset: calc(-1 * var(--tc-hairline)); }

@@ -1,4 +1,4 @@
-import { autoUpdate, flip, FloatingFocusManager, FloatingOverlay, FloatingPortal, offset, shift, useDismiss, useFloating, useInteractions, useRole } from "@floating-ui/react";
+import { autoUpdate, flip, FloatingFocusManager, FloatingOverlay, FloatingPortal, hide, offset, type Placement, shift, useDismiss, useFloating, useInteractions, useRole } from "@floating-ui/react";
 import { createContext, type MutableRefObject, type ReactNode, useContext, useRef } from "react";
 
 /**
@@ -60,6 +60,41 @@ export function Popover({ open, onClose, root, label, className, children }: Pop
 					{children}
 				</div>
 			</FloatingFocusManager>
+		</FloatingPortal>
+	);
+}
+
+export interface PinnedProps {
+	/** The element it stands on. */
+	readonly reference: Element;
+	/** Where on it: `top-end` its top edge at the right, `bottom-start` its bottom edge at the left. */
+	readonly placement: Placement;
+	/** How far into the element across its edge (half its own height centres it on the edge) and along it from the corner. */
+	readonly into: number;
+	readonly along: number;
+	/** The element of the view's own document that holds the layer. */
+	readonly root: HTMLElement;
+	readonly children: ReactNode;
+}
+
+/**
+ * Something pinned onto an element of the screen and lying over every layer, a menu's backdrop too: a selected task's dots
+ * (F102, F103), which stay where they can be pulled while the task's menu is open. Floating UI places it against the
+ * element and follows it every frame (the element glides and stretches); hidden while the element is scrolled out of
+ * sight (`hide`).
+ */
+export function Pinned({ reference, placement, into, along, root, children }: PinnedProps) {
+	const { refs, floatingStyles, middlewareData } = useFloating({
+		placement,
+		middleware: [offset({ mainAxis: -into, crossAxis: along }), hide()],
+		whileElementsMounted: (reference, floating, update) => autoUpdate(reference, floating, update, { animationFrame: true }),
+		elements: { reference },
+	});
+	return (
+		<FloatingPortal root={root}>
+			<div ref={refs.setFloating} style={floatingStyles} className={`tc-pinned${middlewareData.hide?.referenceHidden ? " is-hidden" : ""}`}>
+				{children}
+			</div>
 		</FloatingPortal>
 	);
 }

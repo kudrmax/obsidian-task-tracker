@@ -42,8 +42,6 @@ export interface Block {
 	readonly start: number;
 	/** Its length; null: none, drawn a card's height. */
 	readonly length: number | null;
-	/** Its start in the file: a resize at the bottom of a task riding the now line keeps it. */
-	readonly from: number;
 	/** Its start and end as the clock writes them: «14:15»; no end without a length. */
 	readonly clock: string;
 	readonly endClock: string | null;
@@ -54,6 +52,19 @@ export interface Block {
 	readonly step: string | null;
 }
 
+/** How an event is painted in one theme: its ground, its bar and its title (CSS colours). */
+export interface EventInk {
+	readonly bg: string;
+	readonly bar: string;
+	readonly text: string;
+}
+
+/** An event's paint in each theme, from its calendar's colour by the plugin's rule: the screen shows the theme's own. */
+export interface EventPaint {
+	readonly dark: EventInk;
+	readonly light: EventInk;
+}
+
 /** A calendar's event on the shown day: read-only, in its calendar's colour; one already over is faded (`past`). */
 export interface DayEvent {
 	readonly id: string;
@@ -62,8 +73,7 @@ export interface DayEvent {
 	readonly start: number;
 	readonly end: number;
 	readonly past: boolean;
-	/** Its calendar's colour, `#RRGGBB`. */
-	readonly color: string;
+	readonly paint: EventPaint;
 }
 
 /** An all-day event, a row over the calendar. */
@@ -71,8 +81,11 @@ export interface AllDayEvent {
 	readonly id: string;
 	readonly title: string;
 	readonly past: boolean;
-	readonly color: string;
+	readonly paint: EventPaint;
 }
+
+/** A selected task's dot: the top one moves its start, the bottom one its end. */
+export type Edge = "start" | "end";
 
 export interface DayData {
 	/** Today, Tomorrow, Yesterday or a date. */
@@ -137,6 +150,18 @@ export interface ScreenPort {
 	preview(id: string, to: Destination): ScreenData;
 	/** Whether `to` takes the task: a place that refuses opens no place for it, and the card's place stays where it was. */
 	takes(id: string, to: Destination): boolean;
+	/**
+	 * The screen while the `edge` dot of the calendar's task `id` is held at `minute` (from the shown day's start): the
+	 * task drawn stretched as far as the rules let it (the end no earlier than the start; the start no later than the end,
+	 * and on a task without a length no later than its start, which becomes its end).
+	 */
+	stretched(id: string, dayOffset: number, edge: Edge, minute: number): ScreenData;
+	/**
+	 * Where the task goes once its `edge` dot is let go at `minute`; null when nothing changes. Stretched no longer than
+	 * `least` minutes it keeps no length; the bottom dot changes only how long it lasts (a task riding the now line keeps its
+	 * start in the file).
+	 */
+	resized(id: string, dayOffset: number, edge: Edge, minute: number, least: number): Destination | null;
 	/** Writes a task to `to`; resolves once written and read back. */
 	move(id: string, to: Destination): Promise<void>;
 	/** A minute from the day's start as the clock writes it: «14:15» (the day starts at the port's hour). */

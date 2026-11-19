@@ -36,17 +36,39 @@ export default {
 		t.expect(walk?.start === 16 * 60 + 30 && walk.end === null && now.some((task) => task.title === "Вечерняя прогулка" && task.dated), `written today at 21:30 without a length: ${JSON.stringify(walk)}`);
 		t.expect((await cal.blockBy("Вечерняя прогулка")) !== null && !(await field()), "it stands on the calendar, the field closed");
 
-		const plus = await t.cdp.eval(`(() => { const r = document.querySelector(".task-calendar button.tc-plus").getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+		/** Review 12: the plus onto the calendar takes its own top as the start (the pointer less where it took the button), as a card does. */
+		const plus = await t.cdp.eval(`(() => { const r = document.querySelector(".task-calendar button.tc-plus").getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, top: r.top }; })()`);
 		const at = await cal.lineAt(17 * 60);
-		const carried = await cal.pull(plus, { x: from.x, y: at.y + 4 });
+		const carried = await cal.pull(plus, { x: from.x, y: at.y + (plus.y - plus.top) + 3 });
 		const plusShown = await placeTime();
 		await carried();
-		t.expect(plusShown === "22:00", `the plus over the calendar: its place there with its start: «${plusShown}»`);
+		t.expect(plusShown === "22:00", `the plus over the calendar: its place there with its start, its top on 22:00: «${plusShown}»`);
 		t.expect(await field(), "the plus let go on the calendar: the field opens at that time");
 		await t.cdp.send("Input.insertText", { text: "Почитать" });
 		await cal.key("Enter", "Enter", 13);
 		await t.sleep(500);
 		const read = await cal.timeOf("Почитать");
 		t.expect(read?.start === 17 * 60 && read.end === null, `the plus onto the calendar: written at that time without a length: ${JSON.stringify(read)}`);
+
+		/** Review 10: a press held still on empty time (a finger, or the mouse as the plugin's long tap), let go unmoved, opens the field there. */
+		const still = await cal.lineAt(18 * 60);
+		const p = { x: from.x, y: still.y + 4 };
+		if (t.platform === "phone") {
+			await t.cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: p.x, y: p.y, id: 0 }] });
+			await t.sleep(450);
+			await t.cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+		} else {
+			await t.cdp.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: p.x, y: p.y, button: "none", buttons: 0 });
+			await t.cdp.send("Input.dispatchMouseEvent", { type: "mousePressed", x: p.x, y: p.y, button: "left", buttons: 1, clickCount: 1 });
+			await t.sleep(450);
+			await t.cdp.send("Input.dispatchMouseEvent", { type: "mouseReleased", x: p.x, y: p.y, button: "left", buttons: 0, clickCount: 1 });
+		}
+		await t.sleep(500);
+		t.expect(await field(), "a press held still on empty time opens the field there");
+		await t.cdp.send("Input.insertText", { text: "Позвонить бабушке" });
+		await cal.key("Enter", "Enter", 13);
+		await t.sleep(500);
+		const call = await cal.timeOf("Позвонить бабушке");
+		t.expect(call?.start === 18 * 60 && call.end === null, `held still on empty time: written at that time: ${JSON.stringify(call)}`);
 	},
 };

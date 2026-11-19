@@ -4,7 +4,9 @@ import { CSS, getEventCoordinates } from "@dnd-kit/utilities";
 import { type CSSProperties, memo, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Destination, ListId, Row } from "../port";
+import { useAnchor } from "../layers/Layers";
 import { useScreen, useScreenApi } from "../store";
+import { EdgeHeading } from "./edgeHeading";
 import { descendantsOf, finalOrder, levelAt, levelBetween, spotKey, shiftOf, type Slot, slotOf, SwipeLevel } from "./tree";
 
 /**
@@ -36,23 +38,80 @@ const ownPress = (event: Event, context: SensorContext | undefined): boolean => 
 /** What dnd-kit tells a sensor's activator besides the event: the draggable it would lift. */
 type SensorContext = { readonly active: { readonly id: UniqueIdentifier } };
 
+/** A sensor's option of ours: whether another gesture holds the pointer now (a pinch, a resize), so nothing is lifted. */
+interface Gate {
+	readonly busy?: () => boolean;
+}
+const free = (options: unknown): boolean => !(options as Gate).busy?.();
+
+/** What a pointer sensor of dnd-kit keeps while a press waits to become a drag (its own fields, which its types keep private). */
+interface PendingSensor {
+	readonly activated: boolean;
+	readonly initialCoordinates: { readonly x: number; readonly y: number } | null;
+	timeoutId: ReturnType<typeof setTimeout> | null;
+	readonly documentListeners: { add(name: string, handler: (event: Event) => void, options?: AddEventListenerOptions): void };
+	handleStart(): void;
+	handleCancel(): void;
+}
+
 /**
- * Sensors as dnd-kit's custom sensors are made (a sensor's activators filter what may start it). A card is lifted by the
- * mouse or by the long press of a finger (touch events); the plus moves at once under a finger (the old plugin's F175),
- * started by the pointer events of a touch on it, so the two never listen to the same event (dnd-kit keeps one listener
- * per event name).
+ * Sensors as dnd-kit's custom sensors are made (a sensor's activators filter what may start it): nothing is lifted while a
+ * pinch or a resize holds the pointer (`busy`). A card is lifted by the long press of a finger (touch events); a second
+ * finger landing while it waits makes the press part of a pinch, and it is forgotten (the plugin's `LongPress`). The mouse
+ * lifts a card once it moved, or once held still for the long press (then, let go unmoved, the card's menu opens, as the
+ * plugin's mouse long tap does; on empty calendar time, the new task's place). The plus moves at once under a finger (the
+ * old plugin's F175), started by the pointer events of a touch on it, so the sensors never listen to the same event
+ * (dnd-kit keeps one listener per event name). A sensor's own listeners go through its own registry, removed with it.
  */
 class CardTouchSensor extends TouchSensor {
-	static override activators = TouchSensor.activators.map((activator) => ({ ...activator, handler: (event: Parameters<typeof activator.handler>[0], options: Parameters<typeof activator.handler>[1], context?: SensorContext) => !onPlus(event.nativeEvent) && !ownPress(event.nativeEvent, context) && activator.handler(event, options) }));
+	static override activators = TouchSensor.activators.map((activator) => ({ ...activator, handler: (event: Parameters<typeof activator.handler>[0], options: Parameters<typeof activator.handler>[1], context?: SensorContext) => free(options) && !onPlus(event.nativeEvent) && !ownPress(event.nativeEvent, context) && activator.handler(event, options) }));
+	constructor(props: ConstructorParameters<typeof TouchSensor>[0]) {
+		super(props);
+		const sensor = this as unknown as PendingSensor;
+		sensor.documentListeners.add(
+			"touchstart",
+			(event) => {
+				if (!sensor.activated && (event as TouchEvent).touches.length > 1) sensor.handleCancel();
+			},
+			{ capture: true, passive: true },
+		);
+		/** A touch that became a drag sends no click and no mouse after it: let go unmoved, the field it opened keeps the focus. */
+		sensor.documentListeners.add(
+			"touchend",
+			(event) => {
+				if (sensor.activated && event.cancelable) event.preventDefault();
+			},
+			{ capture: true, passive: false },
+		);
+	}
 }
 class CardMouseSensor extends MouseSensor {
-	static override activators = MouseSensor.activators.map((activator) => ({ ...activator, handler: (event: Parameters<typeof activator.handler>[0], options: Parameters<typeof activator.handler>[1], context?: SensorContext) => !ownPress(event.nativeEvent, context) && activator.handler(event, options) }));
+	static override activators = MouseSensor.activators.map((activator) => ({ ...activator, handler: (event: Parameters<typeof activator.handler>[0], options: Parameters<typeof activator.handler>[1], context?: SensorContext) => free(options) && !ownPress(event.nativeEvent, context) && activator.handler(event, options) }));
+	constructor(props: ConstructorParameters<typeof MouseSensor>[0]) {
+		super(props);
+		const sensor = this as unknown as PendingSensor;
+		/** Waiting out the hold, a mouse moved past the start distance lifts at once. */
+		sensor.documentListeners.add(
+			"mousemove",
+			(event) => {
+				const from = sensor.initialCoordinates;
+				const at = getEventCoordinates(event);
+				if (sensor.activated || !from || !at || Math.hypot(at.x - from.x, at.y - from.y) <= MOUSE_DISTANCE_PX) return;
+				if (sensor.timeoutId !== null) clearTimeout(sensor.timeoutId);
+				sensor.timeoutId = null;
+				sensor.handleStart();
+			},
+			{ capture: true },
+		);
+	}
 }
 class PlusTouchSensor extends PointerSensor {
-	static override activators = PointerSensor.activators.map((activator) => ({ ...activator, handler: (event: Parameters<typeof activator.handler>[0], options: Parameters<typeof activator.handler>[1]) => event.nativeEvent.pointerType === "touch" && onPlus(event.nativeEvent) && activator.handler(event, options) }));
+	static override activators = PointerSensor.activators.map((activator) => ({ ...activator, handler: (event: Parameters<typeof activator.handler>[0], options: Parameters<typeof activator.handler>[1]) => free(options) && event.nativeEvent.pointerType === "touch" && onPlus(event.nativeEvent) && activator.handler(event, options) }));
 }
 const LONG_PRESS_MS = 250;
 const LONG_PRESS_TOLERANCE_PX = 5;
+/** Waiting out a mouse's hold, any move is fine: past the start distance it lifts at once (`CardMouseSensor`). */
+const HOLD_ANYWHERE = Number.POSITIVE_INFINITY;
 
 /**
  * The copy let go flies into the card's place: short, translation only (stage 0, round four). While it flies it takes the
@@ -121,11 +180,16 @@ export interface DragProps {
 
 export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 	const api = useScreenApi();
+	const busy = useCallback(() => {
+		const held = api.getState().gesture;
+		return held === "zoom" || held === "resize";
+	}, [api]);
 	const sensors = useSensors(
-		useSensor(CardMouseSensor, { activationConstraint: { distance: MOUSE_DISTANCE_PX } }),
-		useSensor(CardTouchSensor, { activationConstraint: { delay: LONG_PRESS_MS, tolerance: LONG_PRESS_TOLERANCE_PX } }),
-		useSensor(PlusTouchSensor, { activationConstraint: { distance: MOUSE_DISTANCE_PX } }),
+		useSensor(CardMouseSensor, { activationConstraint: { delay: LONG_PRESS_MS, tolerance: HOLD_ANYWHERE }, busy }),
+		useSensor(CardTouchSensor, { activationConstraint: { delay: LONG_PRESS_MS, tolerance: LONG_PRESS_TOLERANCE_PX }, busy }),
+		useSensor(PlusTouchSensor, { activationConstraint: { distance: MOUSE_DISTANCE_PX }, busy }),
 	);
+	const anchor = useAnchor();
 	const [active, setActive] = useState<string | null>(null);
 
 	/**
@@ -135,8 +199,12 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 	 * two lists at their border.
 	 */
 	const lastOver = useRef<UniqueIdentifier | null>(null);
-	/** Where the pointer is, as dnd-kit gives it to the collision detection. */
+	/** Where the pointer is and where the targets stand, as dnd-kit gives them to the collision detection. */
 	const pointer = useRef<{ readonly x: number; readonly y: number } | null>(null);
+	const rects = useRef<ReadonlyMap<UniqueIdentifier, { readonly top: number; readonly bottom: number; readonly height: number }>>(new Map());
+	const heading = useRef(new EdgeHeading());
+	/** The carried task went further than a long press's tolerance since it was lifted: let go, it is a drop, not a hold. */
+	const moved = useRef(false);
 	const justMoved = useRef(false);
 	const lists = useScreen((s) => s.shown.lists);
 	const plusAt = useScreen((s) => s.plusAt);
@@ -146,6 +214,7 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 	}, [lists, plusAt]);
 	const collision: CollisionDetection = useCallback((args) => {
 		pointer.current = args.pointerCoordinates;
+		rects.current = args.droppableRects;
 		const underPointer = pointerWithin(args);
 		/** Over the calendar the target is the calendar itself: the card's place there is at the minute under its top, among no rows. */
 		const onCalendar = underPointer.some((hit) => hit.id === CALENDAR_TARGET || hit.id === CALENDAR_ROOM);
@@ -218,17 +287,18 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 	 * that list's row at the place under the pointer, and from then on the rows part around it as they do for a card. Over
 	 * no list, it is no list's row.
 	 */
-	const plusOver = (event: { readonly activatorEvent: Event; readonly delta: { readonly x: number; readonly y: number }; readonly active: Sortable & { readonly rect: { readonly current: { readonly translated: { readonly top: number } | null } } } }, over: (Sortable & { readonly rect: { readonly top: number; readonly height: number }; readonly data: { readonly current?: unknown } }) | null) => {
+	const plusOver = (event: { readonly activatorEvent: Event; readonly delta: { readonly x: number; readonly y: number }; readonly active: Sortable & { readonly rect: { readonly current: { readonly translated: { readonly top: number } | null; readonly initial: { readonly top: number } | null } } } }, over: (Sortable & { readonly rect: { readonly top: number; readonly height: number }; readonly data: { readonly current?: unknown } }) | null) => {
 		if (over?.id === CALENDAR_TARGET) {
 			api.getState().setPlusAt(null);
 			/**
-			 * The new task's place stands with its top at the pointer: where the finger is, the field opens. The pointer as
-			 * the collision detection last read it, in the window's terms as the canvas's measure is (the event's delta counts
-			 * the calendar's scroll once more for something carried in from outside it).
+			 * The new task's place stands with its top at the plus's top (where the pointer took the plus, as a card's top is
+			 * where it took the card), or for a long press on empty time at the pointer: the pointer as the collision detection
+			 * last read it, in the window's terms as the canvas's measure is (the event's delta counts the calendar's scroll once
+			 * more for something carried in from outside it).
 			 */
-			const top = pointer.current?.y;
-			const minute = top === undefined ? null : ((over.data.current as CalendarData | undefined)?.minuteAt(top - over.rect.top) ?? null);
-			if (minute !== null) api.getState().setPlusMinute(minute);
+			const top = pointer.current === null ? undefined : pointer.current.y - (event.active.id === PLUS ? grab(event) : 0);
+			const minuteAt = (over.data.current as CalendarData | undefined)?.minuteAt;
+			if (top !== undefined && minuteAt) api.getState().setPlusMinute(minuteAt(top - over.rect.top));
 			return;
 		}
 		if (event.active.id === NEW_SLOT) return;
@@ -283,14 +353,12 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 		const minuteAt = (over.data.current as CalendarData | undefined)?.minuteAt;
 		/** The carried task's top: the pointer less where it took the task (both in the window's terms, as the canvas's measure). */
 		const initial = event.active.rect.current.initial?.top;
-		if (grabbedAt.current === null && initial !== undefined) grabbedAt.current = (getEventCoordinates(event.activatorEvent)?.y ?? 0) - initial;
-		const top = pointer.current === null || grabbedAt.current === null ? undefined : pointer.current.y - grabbedAt.current;
+		const top = pointer.current === null || initial === undefined ? undefined : pointer.current.y - grab(event);
 		if (!minuteAt || top === undefined) return;
 		/** A block taken from a stack stands below its time: its top read where it was taken is its own start, so brought back there it writes nothing. */
 		if (liftAt.current !== null && homeTop.current === null && initial !== undefined) homeTop.current = minuteAt(initial - over.rect.top);
 		const read = minuteAt(top - over.rect.top);
-		const at = read !== null && read === homeTop.current ? liftAt.current : read;
-		if (at === null) return;
+		const at = read === homeTop.current && liftAt.current !== null ? liftAt.current : read;
 		if (at === carriedAt.current && containerOf(event.active) === CALENDAR) {
 			refusedNow.current = false;
 			return;
@@ -302,17 +370,36 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 		carriedAt.current = at;
 		api.getState().carryInto(id, to);
 	};
-	/** The column the pointer is over, for the auto-scroll's quarter-second wait: the calendar, or a list (its row's or its own). */
-	const columnOf = (over: DragMoveEvent["over"]): string | null => {
+	/** How far under the carried thing's top the pointer took it, read once dnd-kit has measured it. */
+	const grab = (event: { readonly activatorEvent: Event; readonly active: { readonly rect: { readonly current: { readonly initial: { readonly top: number } | null } } } }): number => {
+		const initial = event.active.rect.current.initial?.top;
+		if (grabbedAt.current === null && initial !== undefined) grabbedAt.current = (getEventCoordinates(event.activatorEvent)?.y ?? 0) - initial;
+		return grabbedAt.current ?? 0;
+	};
+	/** The room the pointer is over, scrolling under it: the calendar's, or a list's (its row's or its own); by its target's id. */
+	const roomOf = (over: DragMoveEvent["over"]): string | null => {
 		if (!over) return null;
 		const id = String(over.id);
-		if (id === CALENDAR_TARGET || id === CALENDAR_ROOM) return CALENDAR;
-		if (id.startsWith(LIST_TARGET)) return id.slice(LIST_TARGET.length);
-		return containerOf(over as unknown as Sortable);
+		if (id === CALENDAR_TARGET || id === CALENDAR_ROOM) return CALENDAR_ROOM;
+		if (id.startsWith(LIST_TARGET)) return id;
+		const list = containerOf(over as unknown as Sortable);
+		return list === null || list === CALENDAR ? null : `${LIST_TARGET}${list}`;
+	};
+	/**
+	 * The edge the pointer heads into, for dnd-kit's auto-scroll to wait a quarter second there (F162, the plugin's
+	 * `AutoScroll`): near the room's top or bottom (dnd-kit's own threshold), coming towards it.
+	 */
+	const followEdge = (over: DragMoveEvent["over"]) => {
+		const room = roomOf(over);
+		const box = room === null ? undefined : rects.current.get(room);
+		const y = pointer.current?.y;
+		const edge = !box || y === undefined ? 0 : y < box.top + box.height * AUTO_SCROLL.threshold.y ? -1 : y > box.bottom - box.height * AUTO_SCROLL.threshold.y ? 1 : 0;
+		api.getState().scrollToward(heading.current.feed(room, y ?? 0, edge));
 	};
 	const move = (event: DragMoveEvent) => {
 		const { active: lifted, over } = event;
-		api.getState().scrollOver(columnOf(over));
+		if (Math.hypot(event.delta.x, event.delta.y) > LONG_PRESS_TOLERANCE_PX) moved.current = true;
+		followEdge(over);
 		if (isPlus(lifted.id)) {
 			plusOver(event, over);
 			if (lifted.id === NEW_SLOT || over?.id === CALENDAR_TARGET) return;
@@ -334,6 +421,11 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 		refusedNow.current = false;
 		const liftX = getEventCoordinates(event.activatorEvent)?.x ?? 0;
 		grabbedAt.current = null;
+		heading.current = new EdgeHeading();
+		moved.current = false;
+		carriedAt.current = null;
+		liftAt.current = null;
+		homeTop.current = null;
 		swipe.current = new SwipeLevel(null, 0, liftX, performance.now());
 		if (isPlus(lifted.id)) {
 			screen.openEntry(null);
@@ -352,7 +444,6 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 		const block = container === CALENDAR ? (screen.shown.day.blocks.find((b) => b.id === String(lifted.id)) ?? null) : null;
 		carriedAt.current = block?.start ?? null;
 		liftAt.current = block?.start ?? null;
-		homeTop.current = null;
 		setOrigin(container === null ? null : { container, ...slotOf(rows, itemsOf(lifted), String(lifted.id)), depth, at: block?.start ?? null });
 		onLift();
 	};
@@ -362,7 +453,7 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 	 */
 	const overList = (event: DragOverEvent) => {
 		const { active: lifted, over } = event;
-		api.getState().scrollOver(columnOf(over));
+		followEdge(over);
 		if (isPlus(lifted.id)) return plusOver(event, over);
 		if (over?.id === CALENDAR_TARGET) return overCalendar(event, over);
 		const into = crossing(lifted, over);
@@ -387,7 +478,22 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 		if (isPlus(lifted.id)) return dropPlus(event);
 		const id = String(lifted.id);
 		const container = containerOf(lifted);
+		if (api.getState().gesture !== "drag") return;
 		if (container === null || refusedNow.current) return api.getState().drop(id, null);
+		/**
+		 * Held and let go unmoved (the plugin's hold): a task on the calendar is selected with its menu open (F106), a card's
+		 * menu opens under the mouse (the plugin's mouse long tap); it goes back where it was.
+		 */
+		if (!moved.current && origin !== null && origin.container === container) {
+			const fromCalendar = container === CALENDAR;
+			const mouse = !("touches" in event.activatorEvent);
+			api.getState().drop(id, null);
+			if (!fromCalendar && !mouse) return;
+			anchor.current = doc.querySelector(fromCalendar ? `[data-block="${id}"]` : `[data-id="${id}"]`);
+			api.getState().openMenu(id);
+			if (fromCalendar) api.getState().select(id);
+			return;
+		}
 		if (container === CALENDAR) {
 			const at = carriedAt.current;
 			const to: Destination | null = at === null ? null : { list: "day", before: null, dayOffset: api.getState().dayOffset, at };
@@ -410,13 +516,14 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 	};
 
 	const armed = useScreen((s) => s.scrollArmed);
-	const autoScroll = useMemo(() => ({ ...AUTO_SCROLL, enabled: armed }), [armed]);
+	/** Armed, the rooms may scroll; until then none does. dnd-kit's auto-scroll stays on so it keeps the pointer's heading (its scroll intent). */
+	const autoScroll = useMemo(() => ({ ...AUTO_SCROLL, canScroll: armed ? undefined : () => false }), [armed]);
 	return (
 		<DndContext sensors={sensors} collisionDetection={collision} onDragStart={start} onDragMove={move} onDragOver={overList} onDragEnd={end} onDragCancel={cancel} autoScroll={autoScroll} measuring={MEASURING}>
 			{children}
 			{createPortal(
 				<DragOverlay className="tc-overlay" dropAnimation={DROP_ANIMATION}>
-					{active === PLUS ? plus : active ? <Carried id={active} carried={carried} /> : null}
+					{active === PLUS ? plus : active === NEW_SLOT ? null : active ? <Carried id={active} carried={carried} /> : null}
 				</DragOverlay>,
 				doc.body,
 			)}
@@ -468,8 +575,8 @@ const MEASURING: MeasuringConfiguration = {
 
 /**
  * A list scrolls under a card held near its top or bottom edge: dnd-kit's own auto-scroll, faster nearer the edge, up and
- * down only (the columns never slide under a carried card); enabled once the card has stood over the column a quarter
- * second (`scrollArmed`, F162).
+ * down only (the columns never slide under a carried card); a room scrolls once the card has headed into its edge and
+ * stayed there a quarter second (`scrollArmed`, F162).
  */
 const AUTO_SCROLL = { threshold: { x: 0, y: 0.15 } };
 
@@ -480,7 +587,7 @@ const CALENDAR_TARGET = "calendar:";
 /** The room the calendar scrolls in, a droppable only for dnd-kit to measure it: it stands still on the screen while its hours scroll. */
 const CALENDAR_ROOM = "calendar-room:";
 
-/** What the calendar tells the drag: the start a carried task's top at `top` on the screen takes; null before the room is measured. */
+/** What the calendar tells the drag: the start a carried task's top `y` pixels under the day's top takes. */
 interface CalendarData {
 	readonly minuteAt: (y: number) => number;
 }

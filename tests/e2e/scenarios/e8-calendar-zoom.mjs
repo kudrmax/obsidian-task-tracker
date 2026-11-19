@@ -76,14 +76,37 @@ export default {
 
 		await pinch(0.4, 4);
 		const whole = await hour();
-		const fits = await t.cdp.eval(`(() => { const room = document.querySelector(".tc-timeline"); const first = room.querySelector('[data-hour="05"]').getBoundingClientRect(); const last = room.querySelector('[data-hour="04"]').getBoundingClientRect(); const r = room.getBoundingClientRect(); return { top: first.top >= r.top - 1, bottom: last.bottom <= r.bottom + 1, hour: Number(room.dataset.hourPx) }; })()`);
-		t.expect(whole < base && fits.top && fits.bottom, `pinched in past the whole day, it stops at the whole day, every hour on screen: ${JSON.stringify(fits)}`);
+		/** The whole day fills what a person sees of the calendar: from the room's top to where the screen's foot begins (review 6). */
+		const fits = await t.cdp.eval(`(() => { const room = document.querySelector(".tc-timeline"); const first = room.querySelector('[data-hour="05"]').getBoundingClientRect(); const lines = room.querySelectorAll(".tc-hour-mark > .tc-hour-line:not(.is-minor)"); const last = lines[lines.length - 1].getBoundingClientRect(); const r = room.getBoundingClientRect(); const foot = room.querySelector(".tc-foot-probe").getBoundingClientRect().height; const hour = Number(room.dataset.hourPx); return { top: first.top >= r.top - 1, end: last.top + hour, visibleBottom: r.bottom - foot, hour }; })()`);
+		t.expect(whole < base && fits.top && Math.abs(fits.end - fits.visibleBottom) <= 10, `pinched in past the whole day, it stops at the whole day, which fills what is seen down to the foot: ${JSON.stringify(fits)}`);
 		t.expect((await step()) === 30 || (await step()) === 60, `the snap at the whole day is coarse: ${await step()}`);
 		await t.shot("whole-day");
 
 		await t.open();
 		await t.cdp.eval(`(async () => { window.__tcStand.step("step-calendar"); await new Promise((r) => setTimeout(r, 700)); return 1; })()`);
 		t.expect(Math.abs((await hour()) - whole) <= 1, `the zoom is kept on the device: opened again at ${await hour()} for ${whole}`);
+
+		if (t.platform === "desktop") {
+			/** Review 4: Cmd + wheel zooms too on the Mac. */
+			const from = await hour();
+			for (let i = 0; i < 12; i++) {
+				await t.cdp.send("Input.dispatchMouseEvent", { type: "mouseWheel", x: mid.x, y: mid.y, deltaX: 0, deltaY: -8, modifiers: 4 });
+				await t.sleep(16);
+			}
+			await t.sleep(400);
+			t.expect((await hour()) > from + 10, `Cmd + wheel zooms: ${from} → ${await hour()}`);
+		} else {
+			/** Review 2: a second finger landing while a long press on a card waits makes it part of a pinch: nothing is lifted. */
+			const card = await cardBy(t, "Полить цветы", "day");
+			await t.cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: card.x, y: card.y, id: 0 }] });
+			await t.sleep(100);
+			await t.cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: card.x, y: card.y, id: 0 }, { x: card.x, y: card.y + 120, id: 1 }] });
+			await t.sleep(400);
+			const lifted = await t.cdp.eval(`!!document.querySelector(".tc-overlay .tc-card")`);
+			await t.cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+			await t.sleep(300);
+			t.expect(!lifted, "a second finger landing while a long press waits: nothing is lifted");
+		}
 		await t.cdp.eval(`(() => { localStorage.clear(); return 1; })()`);
 	},
 };

@@ -1,5 +1,6 @@
-import type { AllDayEvent, Block, CardFace, DayEvent, Destination, ListData, ListId, MenuItem, Now, Row, ScreenData, ScreenPort } from "../ui/engine/port";
-import { addDays, DAY_START_HOUR, dateOf, dayOf, fileText, LIST_KEYS, type ListKey, type MockFile, type MockSection, type MockTask, minuteOf, mockFile } from "./mockData";
+import type { AllDayEvent, Block, CardFace, DayEvent, Destination, Edge, EventPaint, ListData, ListId, MenuItem, Now, Row, ScreenData, ScreenPort } from "../ui/engine/port";
+import { bgAlphaFor, eventColors } from "../ui/eventColors";
+import { addDays, CALENDAR_COLORS, DAY_START_HOUR, dateOf, dayOf, fileText, LIST_KEYS, type ListKey, type MockFile, type MockSection, type MockTask, minuteOf, mockFile } from "./mockData";
 
 /** The calendar's largest hour on the stand: the settings' default zoom levels end at 224 px an hour. */
 export const ZOOM_MOST = 224;
@@ -20,6 +21,11 @@ const MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const LEVEL_COLORS = { p1: "red", p2: "orange" } as const;
 const pad = (n: number) => String(n).padStart(2, "0");
+/** An event's paint in each theme from its calendar's colour, by the plugin's rule (`eventColors`; the work calendar's ground a touch stronger). */
+const paintOf = (color: string): EventPaint => {
+	const alpha = bgAlphaFor(color === CALENDAR_COLORS.work ? "work" : "google");
+	return { dark: eventColors(color, alpha, "dark"), light: eventColors(color, alpha, "light") };
+};
 /** A minute from the day's start as the clock writes it: «14:15». */
 const clockOf = (minute: number) => {
 	const clock = DAY_START_HOUR * 60 + minute;
@@ -123,6 +129,50 @@ export class MockPort implements ScreenPort {
 		return this.findBy(this.ahead ?? this.file, (t) => t.id === id) !== null;
 	}
 
+	stretched(id: string, dayOffset: number, edge: Edge, minute: number): ScreenData {
+		const file = structuredClone(this.ahead ?? this.file);
+		const task = this.findBy(file, (t) => t.id === id)?.task;
+		if (!task?.slot) return this.screenOf(file, dayOffset);
+		const span = this.stretchedSpan(task, dayOffset, edge, minute);
+		task.slot = { start: span.start, end: span.end > span.start ? span.end : null };
+		return this.screenOf(file, dayOffset, id);
+	}
+
+	/** The plugin's rule (the core's `TimelineSpans.resized`), the simplest form of it. */
+	resized(id: string, dayOffset: number, edge: Edge, minute: number, least: number): Destination | null {
+		const task = this.findBy(this.ahead ?? this.file, (t) => t.id === id)?.task;
+		if (!task?.slot) return null;
+		const shown = this.shownSpan(task, dayOffset);
+		const held = this.stretchedSpan(task, dayOffset, edge, minute);
+		const keeps = held.end - held.start > least;
+		const unmoved = edge === "start" && shown.end === null;
+		const next = keeps ? held : { start: unmoved ? shown.start : held.start, end: null };
+		if (next.start === shown.start && next.end === shown.end) return null;
+		const to = (at: number, end: number | null): Destination => ({ list: "day", before: null, dayOffset, at, end });
+		if (edge === "start") return to(next.start, next.end);
+		const start = task.slot.start;
+		return to(start, next.end === null ? null : start + next.end - next.start);
+	}
+
+	/** Where a timed task is drawn: an open task of today whose start has passed rides the now line, its length kept. */
+	private shownSpan(t: MockTask, dayOffset: number): { readonly start: number; readonly end: number | null } {
+		const { start, end } = t.slot ?? { start: 0, end: null };
+		const present = minuteOf(this.clock());
+		if (dayOffset !== 0 || t.status === "x" || start >= present) return { start, end };
+		return { start: present, end: end === null ? null : present + end - start };
+	}
+
+	/**
+	 * The task while a dot is held at `minute`: the end no earlier than the start nor past the day; the start no earlier than
+	 * the day nor past the end, and on a task without a length no later than its start, which becomes the end.
+	 */
+	private stretchedSpan(t: MockTask, dayOffset: number, edge: Edge, minute: number): { readonly start: number; readonly end: number } {
+		const shown = this.shownSpan(t, dayOffset);
+		if (edge === "end") return { start: shown.start, end: Math.min(DAY_MINUTES, Math.max(shown.start, minute)) };
+		const end = shown.end ?? shown.start;
+		return { start: Math.max(0, Math.min(minute, end)), end };
+	}
+
 	async move(id: string, to: Destination): Promise<void> {
 		await this.write((file) => this.apply(file, id, to));
 	}
@@ -200,7 +250,7 @@ export class MockPort implements ScreenPort {
 		if (to.at !== undefined) {
 			const length = task.slot && task.slot.end !== null ? task.slot.end - task.slot.start : null;
 			const end = to.end !== undefined ? to.end : length === null ? null : Math.min(DAY_MINUTES, to.at + length);
-			const home = to.dayOffset === 0 ? "now" : "soon";
+			const home = to.dayOffset <= 0 ? "now" : "soon";
 			const stays = task.slot !== null && task.due === due && file[home].some((section) => section.tasks.includes(task));
 			task.slot = { start: to.at, end };
 			task.due = due;
@@ -310,11 +360,11 @@ export class MockPort implements ScreenPort {
 		return { id, title, level: null, status: " ", due, slot: null, description: null, children: [] };
 	}
 
-	/** A screen list's sections in the file: today's list is Now, another day's is Soon (its tasks due that day). */
+	/** A screen list's sections in the file: a day's list is Now for today and the days before it (F190), Soon for a later day (its tasks due that day). */
 	private listOf(file: MockFile, list: ListId, dayOffset: number): MockSection[] {
 		if (list === "inbox") return file.inbox;
 		if (list === "soon") return file.soon;
-		return dayOffset === 0 ? file.now : file.soon;
+		return dayOffset <= 0 ? file.now : file.soon;
 	}
 
 	private day(): Date {
@@ -323,7 +373,8 @@ export class MockPort implements ScreenPort {
 
 	// Reads.
 
-	private screenOf(file: MockFile, dayOffset: number): ScreenData {
+	/** The screen as `file` says; `held`, a task held by a dot, drawn where it is stretched to, not riding the now line. */
+	private screenOf(file: MockFile, dayOffset: number, held: string | null = null): ScreenData {
 		const shown = dateOf(addDays(this.day(), dayOffset));
 		const cards: Record<string, CardFace> = {};
 		const today = dayOffset === 0;
@@ -331,15 +382,15 @@ export class MockPort implements ScreenPort {
 			lists: {
 				inbox: this.listData("Inbox", file.inbox, cards, null, () => true),
 				soon: this.listData("Soon", file.soon, cards, null, (t) => t.due === null),
-				day: this.listData(this.titleOf(dayOffset), today ? file.now : file.soon, cards, shown, today ? (t) => t.slot === null : (t) => t.due === shown && t.slot === null),
+				day: this.listData(this.titleOf(dayOffset), this.listOf(file, "day", dayOffset), cards, shown, today ? (t) => t.slot === null : (t) => t.due === shown && t.slot === null),
 			},
 			cards,
 			day: {
 				title: this.titleOf(dayOffset),
 				isToday: today,
-				blocks: this.blocksOf(file, cards, shown, today),
+				blocks: this.blocksOf(file, cards, shown, today, held),
 				events: this.eventsOf(file, dayOffset),
-				allDay: file.allDay.map((e): AllDayEvent => ({ id: e.id, title: e.title, past: dayOffset < 0, color: e.color })),
+				allDay: file.allDay.map((e): AllDayEvent => ({ id: e.id, title: e.title, past: dayOffset < 0, paint: paintOf(e.color) })),
 				hours: Array.from({ length: 24 }, (_, i) => pad((DAY_START_HOUR + i) % 24)),
 				opensAt: OPENS_AT,
 			},
@@ -381,7 +432,7 @@ export class MockPort implements ScreenPort {
 	 * the present minute, its length kept, its time in the file as it was (the design's «Едет за линией»; at its very minute
 	 * it still stands). A folded task's block is named by its next open step.
 	 */
-	private blocksOf(file: MockFile, cards: Record<string, CardFace>, shown: string, today: boolean): Block[] {
+	private blocksOf(file: MockFile, cards: Record<string, CardFace>, shown: string, today: boolean, held: string | null = null): Block[] {
 		const present = minuteOf(this.clock());
 		const blocks: Block[] = [];
 		for (const key of ["now", "soon"] as const)
@@ -393,9 +444,8 @@ export class MockPort implements ScreenPort {
 					const length = end === null ? null : end - from;
 					blocks.push({
 						id: t.id,
-						start: today && present > from ? present : from,
+						start: today && t.id !== held && present > from ? present : from,
 						length,
-						from,
 						clock: clockOf(from),
 						endClock: end === null ? null : clockOf(end),
 						startParts: [String(Math.floor((DAY_START_HOUR * 60 + from) / 60) % 24), pad(from % 60)],
@@ -415,7 +465,7 @@ export class MockPort implements ScreenPort {
 	/** The day's events: every made-up event each day; over once its end is past the present minute, and every one of a past day. */
 	private eventsOf(file: MockFile, dayOffset: number): DayEvent[] {
 		const present = minuteOf(this.clock());
-		return file.events.map((e) => ({ id: e.id, title: e.title, start: e.start, end: e.end, color: e.color, past: dayOffset < 0 || (dayOffset === 0 && e.end <= present) }));
+		return file.events.map((e) => ({ id: e.id, title: e.title, start: e.start, end: e.end, paint: paintOf(e.color), past: dayOffset < 0 || (dayOffset === 0 && e.end <= present) }));
 	}
 
 	private titleOf(dayOffset: number): string {

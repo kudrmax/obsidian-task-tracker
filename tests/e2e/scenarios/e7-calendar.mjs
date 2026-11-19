@@ -101,6 +101,35 @@ export default {
 		await t.sleep(400);
 		t.expect(plate && low.y - 30 >= plate.top - 1 && low.y - 30 <= plate.bottom + 1, `a tall block taken near its bottom: the plate under the finger: ${JSON.stringify(plate)} at ${low.y - 30}`);
 
+		/** Decision 41: a block taken from a stack (drawn below its time), carried away and brought back where it was taken, writes nothing (away from the edges, where a held card scrolls the calendar). */
+		await cal.scrollTo(base + 60, 200);
+		await t.sleep(300);
+		const stacked = await blockBy("Заметки к созвону");
+		const kept = await file();
+		t.expect(stacked?.corner === "13:05", `«Заметки к созвону» stands in a stack, writing its start: ${stacked?.corner}`);
+		await carry(t, stacked, (() => {
+			let i = 0;
+			return async () => (i++ === 0 ? { x: stacked.x, y: stacked.y + 90 } : { x: stacked.x, y: stacked.y });
+		})());
+		await t.sleep(500);
+		t.expect((await file()) === kept, `a stacked block brought back where it was taken writes nothing: ${JSON.stringify(await timeOf("Заметки к созвону"))}`);
+
+		/** Review 5: a card lifted near the calendar's bottom edge and held there, never heading into it, leaves it as it is. */
+		/** The calendar scrolled so a block's head stands in the room's bottom edge, where a card heading there would scroll it. */
+		const nearEdge = await t.cdp.eval(`(async () => { const roomEl = document.querySelector(".tc-timeline"); const el = [...document.querySelectorAll(".tc-block-card")].find((b) => b.querySelector(".tc-card-title")?.textContent === "Тренировка"); let room = roomEl.getBoundingClientRect(); roomEl.scrollTop += el.getBoundingClientRect().top - (room.bottom - room.height * 0.1); await new Promise((r) => setTimeout(r, 300)); room = roomEl.getBoundingClientRect(); const r = el.getBoundingClientRect(); const x = r.left + r.width / 2; const y = r.top + 10; return document.elementFromPoint(x, y)?.closest(".tc-block-card") === el && y > room.bottom - room.height * 0.15 ? { id: el.dataset.block, x, y, top: r.top, scroll: roomEl.scrollTop } : null; })()`);
+		if (nearEdge) {
+			const unmovedFile = await file();
+			await carry(t, nearEdge, once(async () => ({ x: nearEdge.x, y: nearEdge.y })), { holdMs: 1200 });
+			await t.sleep(400);
+			/** On the phone page Chromium sends no move under its touch slop (Decision 18): the press stayed a hold, and let go its menu opened (F106); closed by its backdrop. */
+			if (await t.cdp.eval(`!!document.querySelector(".tc-floating-menu")`)) {
+				await cal.tap({ x: 8, y: 8 });
+				await t.sleep(400);
+			}
+			const after = await t.cdp.eval(`document.querySelector(".tc-timeline").scrollTop`);
+			t.expect(after === nearEdge.scroll && (await file()) === unmovedFile, `a card lifted near the edge and held there scrolls nothing: ${nearEdge.scroll} → ${after}`);
+		} else t.expect(false, "a block near the calendar's bottom edge to lift");
+
 		/** The reviewer of E1, 2026-11-18: held at the calendar's bottom edge, the calendar scrolls under the card (dnd-kit's auto-scroll), and the card lands later in the day. */
 		await t.cdp.eval(`(() => { document.querySelector(".tc-timeline").scrollTop = 0; return 1; })()`);
 		await t.sleep(300);

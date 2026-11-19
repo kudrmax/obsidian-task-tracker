@@ -101,12 +101,22 @@ export function stackEnd(boxes: readonly TaskBox[]): number {
 	return boxes.reduce((bottom, box) => Math.max(bottom, box.top + box.height), 0);
 }
 
-/** The length a task resized to `start`–`end` keeps: none once it is no taller than a card (the design's «Отпустили при высоте не больше 40 px — длительности нет»). */
-export function keptLength(start: number, end: number, scale: TimeScale, card: CardMeasure = CARD): number | null {
-	return scale.y(end - start) <= card.height ? null : end - start;
+/** Where today opens: how far under the room's top the now line stands, and the room kept over the day's first hour and under its last so it can. */
+export interface Opening {
+	readonly above: number;
+	readonly roomTop: number;
+	readonly roomBottom: number;
 }
 
-/** The minutes a card's height spans at this zoom: where a task without a length ends as drawn. */
-export function cardMinutes(scale: TimeScale, card: CardMeasure = CARD): number {
-	return scale.minute(card.height);
+/**
+ * Today opens with the now line at its share of what a person sees of the calendar (`visible`, above the screen's foot),
+ * the day `dayHeight` tall and the line `y` down it; near the day's first or last hour, empty room over or under the day
+ * lets it stand there all the same; a day that fits needs neither (the plugin's `scrollPlace`).
+ */
+export function opening(y: number, dayHeight: number, visible: number): Opening {
+	const above = LAYOUT.nowFraction * visible;
+	/** A day that fits what is seen needs no room and no scroll. */
+	if (dayHeight + 2 * DESIGN.labelLift <= visible) return { above: DESIGN.labelLift + y, roomTop: 0, roomBottom: 0 };
+	const line = DESIGN.labelLift + y;
+	return { above, roomTop: Math.max(0, above - line), roomBottom: Math.max(0, visible - above - (dayHeight + DESIGN.labelLift - y)) };
 }

@@ -31,9 +31,9 @@ const carried = (id: string, grab: Grab, landing: Landing) => (
 	</div>
 );
 
-/** A tap anywhere but on a calendar's task or its dots lets the selected task go (F102). */
+/** A tap anywhere on the screen but on a calendar's task or its dots lets the selected task go (F102); one on a layer (the menu, its backdrop) leaves it. */
 const letSelectionGo = (event: MouseEvent, store: ScreenStore) => {
-	if (!(event.target as Element | null)?.closest?.(".tc-block, .tc-grips")) store.getState().select(null);
+	if (!(event.target as Element | null)?.closest?.(".tc-block, .tc-pinned, .tc-backdrop, .tc-panel")) store.getState().select(null);
 };
 
 /**

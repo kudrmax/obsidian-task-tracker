@@ -39,6 +39,12 @@ export default {
 		t.expect(gym && Math.abs(gym.height - (1.5 * hourPx - 2)) <= 1.5, `a task with a length is its length's height: ${gym?.height} for 90 minutes at ${hourPx}`);
 		t.expect(gym?.corner === null, `a lone task with a length writes nothing on the right: ${gym?.corner}`);
 
+		/** Review 7: one card face for lists and the calendar: a task with a description shows its mark there too. */
+		t.expect(await t.cdp.eval(`!![...document.querySelectorAll(".tc-block-card")].find((b) => b.querySelector(".tc-card-title")?.textContent === "Тренировка")?.querySelector(".tc-desc-mark")`), "a task with a description shows its mark on the calendar too (F91: the card of the lists)");
+		/** Review 11: the plugin's per-colour paint: on the light theme the deep work blue takes a 13 % ground, the bright Google orange 16 %; on the dark one the work blue 24 %, the orange 22 %. */
+		const grounds = await t.cdp.eval(`Object.fromEntries([...document.querySelectorAll(".tc-timeline .tc-event")].map((e) => [e.textContent, getComputedStyle(e).getPropertyValue("--tc-event-bg").trim()]))`);
+		const want = t.theme === "light" ? { "Планирование квартала": "rgba(10, 132, 255, 0.13)", "Встреча с дизайнером": "rgba(255, 159, 10, 0.16)" } : { "Планирование квартала": "rgba(10, 132, 255, 0.24)", "Встреча с дизайнером": "rgba(255, 159, 10, 0.22)" };
+		t.expect(Object.entries(want).every(([title, bg]) => grounds[title] === bg), `events take the plugin's paint per colour and theme: ${JSON.stringify(grounds)}`);
 		const moving = await cal.blockBy("Упаковать книги");
 		t.expect(moving !== null && (await cal.blockBy("Переезд")) === null, "a folded task's card is named by its next step");
 

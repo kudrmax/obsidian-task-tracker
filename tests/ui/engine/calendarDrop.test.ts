@@ -84,18 +84,25 @@ describe("the stand's port onto and off the calendar (spec, Decisions 25)", () =
 		const tomorrow = port.preview(idOf(port, "Полить цветы"), { list: "day", before: null, dayOffset: 1, at: 60 });
 		expect(tomorrow.day.blocks.map((b) => tomorrow.cards[b.id].title)).toEqual(["Полить цветы"]);
 	});
-	it("a resize's end: a length written, or none", () => {
+	it("a move's end: a length written, or none", () => {
 		const { port } = calendar();
 		const lunch = blockOf(port, "Обед");
 		const id = idOf(port, "Обед");
-		expect(port.preview(id, { list: "day", before: null, dayOffset: 0, at: lunch?.from ?? 0, end: (lunch?.from ?? 0) + 90 }).day.blocks.find((b) => b.id === id)).toMatchObject({ length: 90 });
-		expect(port.preview(id, { list: "day", before: null, dayOffset: 0, at: lunch?.from ?? 0, end: null }).day.blocks.find((b) => b.id === id)).toMatchObject({ length: null });
+		expect(port.preview(id, { list: "day", before: null, dayOffset: 0, at: lunch?.start ?? 0, end: (lunch?.start ?? 0) + 90 }).day.blocks.find((b) => b.id === id)).toMatchObject({ length: 90 });
+		expect(port.preview(id, { list: "day", before: null, dayOffset: 0, at: lunch?.start ?? 0, end: null }).day.blocks.find((b) => b.id === id)).toMatchObject({ length: null });
+	});
+	it("a task put on a past day's calendar or list goes to Now with that day's date (F190), not to Soon", () => {
+		const { port } = calendar();
+		const id = idOf(port, "Сдать отчёт");
+		port.move(id, { list: "day", before: null, dayOffset: -1, at: 600 });
+		expect(port.fileText().split("## Soon")[0]).toContain("Сдать отчёт 📅 2026-11-17 📌 2026-11-17 15:00");
+		const yesterday = port.read(-1);
+		expect(yesterday.day.blocks.map((b) => yesterday.cards[b.id].title)).toEqual(["Сдать отчёт"]);
 	});
 	it("an open task of today whose time has passed rides the now line, its time in the file unchanged (F96)", () => {
 		const { port } = calendar();
 		const late = blockOf(port, "Прошедшая по времени");
-		expect(late).toMatchObject({ start: 14 * 60 + 20 - 5 * 60, length: 30 });
-		expect(late?.from).toBeLessThan(late?.start ?? 0);
+		expect(late).toMatchObject({ start: 14 * 60 + 20 - 5 * 60, length: 30, clock: "13:15" });
 		expect(port.fileText()).toContain("Прошедшая по времени 📅 2026-11-18 📌 2026-11-18 13:15-13:45");
 	});
 	it("a folded task's block is named by its next open step (F94); events: the one over is past", () => {
@@ -140,5 +147,90 @@ describe("a drag during a drop's write", () => {
 		expect(store.getState().shown.day.blocks.some((b) => b.id === mail)).toBe(true);
 		expect(dayTitles(store.getState().shown)).toContain("Полить цветы");
 		await written;
+	});
+});
+
+/** The plugin's resize (the core's `TimelineSpans.stretched` and `resized`, docs/plugin/tasks.md «Длительность») as the stand's port gives it. */
+describe("what a dot writes (the port's rule)", () => {
+	/** A card and its gap at the base zoom, in minutes: the shortest length kept is longer than that. */
+	const LEAST = ((35 + 2) / 56) * 60;
+	const to = (at: number, end: number | null) => ({ list: "day", before: null, dayOffset: 0, at, end });
+	it("the bottom dot moves the end, the start kept; shrunk to a card and its gap the task loses its length", () => {
+		const { port } = calendar();
+		const lunch = idOf(port, "Обед");
+		expect(port.resized(lunch, 0, "end", 750, LEAST)).toEqual(to(660, 750));
+		expect(port.resized(lunch, 0, "end", 695, LEAST)).toEqual(to(660, null));
+		expect(port.resized(lunch, 0, "end", 720, LEAST)).toBeNull();
+	});
+	it("the top dot moves the start, the end kept, never past the end", () => {
+		const { port } = calendar();
+		const lunch = idOf(port, "Обед");
+		expect(port.resized(lunch, 0, "start", 600, LEAST)).toEqual(to(600, 720));
+		expect(port.resized(lunch, 0, "start", 800, LEAST)).toEqual(to(720, null));
+	});
+	it("a task without a length: its top dot pulled down writes nothing; pulled up short of the minimum, nothing; pulled up enough, the old start becomes the end (review 1)", () => {
+		const { port } = calendar();
+		const bank = idOf(port, "Позвонить в банк");
+		expect(port.resized(bank, 0, "start", 1440, LEAST)).toBeNull();
+		expect(port.resized(bank, 0, "start", 675, LEAST)).toBeNull();
+		expect(port.resized(bank, 0, "start", 630, LEAST)).toEqual(to(630, 690));
+	});
+	it("while a dot is held, the task is drawn stretched; a task without a length pulled down by its top dot stays where it was", () => {
+		const { port } = calendar();
+		const bank = idOf(port, "Позвонить в банк");
+		const drawn = (screen: ReturnType<MockPort["read"]>) => screen.day.blocks.find((b) => b.id === bank);
+		expect(drawn(port.stretched(bank, 0, "start", 900))).toMatchObject({ start: 690, length: null });
+		expect(drawn(port.stretched(bank, 0, "start", 630))).toMatchObject({ start: 630, length: 60 });
+		expect(drawn(port.stretched(bank, 0, "end", 750))).toMatchObject({ start: 690, length: 60 });
+	});
+	it("a task riding the now line: the bottom dot keeps its start in the file and ends where let go; the top dot writes a new start (F105)", () => {
+		const { port } = calendar();
+		const late = idOf(port, "Прошедшая по времени");
+		expect(port.resized(late, 0, "end", 620, LEAST)).toEqual(to(495, 555));
+		expect(port.resized(late, 0, "start", 545, LEAST)).toEqual(to(545, 590));
+	});
+});
+
+/** The review of E3: a drag never takes the pointer from a pinch or a resize. */
+describe("the gesture slot", () => {
+	it("a drag takes it from the ribbon, never from a pinch or a resize", () => {
+		const { store } = calendar();
+		store.getState().claim("ribbon");
+		expect(store.getState().claim("drag")).toBe(true);
+		store.getState().release("drag");
+		for (const held of ["zoom", "resize"] as const) {
+			expect(store.getState().claim(held)).toBe(true);
+			expect(store.getState().claim("drag")).toBe(false);
+			store.getState().release(held);
+		}
+	});
+	it("a resize let go where nothing changes, or cancelled, writes nothing and puts the task back", () => {
+		const { port, store } = calendar();
+		const lunch = idOf(port, "Обед");
+		const before = port.fileText();
+		store.getState().claim("resize");
+		store.getState().startResize(lunch, "end");
+		store.getState().resizeTo(lunch, "end", 900);
+		expect(store.getState().shown.day.blocks.find((b) => b.id === lunch)?.length).toBe(240);
+		expect(store.getState().endResize(lunch, "end", null, 37)).toBe(false);
+		expect(store.getState().shown.day.blocks.find((b) => b.id === lunch)?.length).toBe(60);
+		expect(store.getState().gesture).toBeNull();
+		expect(store.getState().resizing).toBeNull();
+		expect(port.fileText()).toBe(before);
+	});
+});
+
+/** The review of E3: events take the plugin's per-colour paint (obsidian/ui/eventColors.ts), both themes from the port. */
+describe("an event's paint", () => {
+	it("deep colours take a lighter ground and a darker title on the light theme than bright ones; the work calendar's ground is a touch stronger", () => {
+		const { port } = calendar();
+		const events = port.read(0).day.events;
+		const work = events.find((e) => e.title === "Стендап")?.paint;
+		const google = events.find((e) => e.title === "Встреча с дизайнером")?.paint;
+		expect(work?.dark.bg).toBe("rgba(10, 132, 255, 0.24)");
+		expect(work?.light.bg).toBe("rgba(10, 132, 255, 0.13)");
+		expect(google?.dark.bg).toBe("rgba(255, 159, 10, 0.22)");
+		expect(google?.light.bg).toBe("rgba(255, 159, 10, 0.16)");
+		expect(google?.dark.text).toBe("#FFCF85");
 	});
 });

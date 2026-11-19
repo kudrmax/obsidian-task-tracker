@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { DESIGN, LAYOUT } from "../../../obsidian/ui/design";
-import { resized } from "../../../obsidian/ui/engine/gestures/Resize";
-import { hourOf, zoomAfterPinch } from "../../../obsidian/ui/engine/gestures/Zoom";
-import { CARD, keptLength, layEvents, layTasks, stackEnd } from "../../../obsidian/ui/engine/layout/calendar";
+import { EdgeHeading } from "../../../obsidian/ui/engine/drag/edgeHeading";
+import { edgeMinute, leastLength } from "../../../obsidian/ui/engine/gestures/Resize";
+import { hourOf, roomMeasure, zoomAfterPinch } from "../../../obsidian/ui/engine/gestures/Zoom";
+import { CARD, layEvents, layTasks, opening, stackEnd } from "../../../obsidian/ui/engine/layout/calendar";
 import { BASE_SCALE, TimeScale } from "../../../obsidian/ui/engine/layout/timeScale";
 import type { Block } from "../../../obsidian/ui/engine/port";
 
@@ -44,35 +45,53 @@ describe("the calendar's tasks", () => {
 		const boxes = layTasks([{ start: 1430, length: null }, { start: 1430, length: null }], [], BASE_SCALE);
 		expect(stackEnd(boxes)).toBeGreaterThan(y(1440));
 	});
-	it("shrunk to a card's height or less, a task keeps no length (F103)", () => {
-		expect(keptLength(60, 90, BASE_SCALE)).toBeNull();
-		expect(keptLength(60, 120, BASE_SCALE)).toBe(60);
+});
+
+/** The review of E3: a dot's gesture is only an edge and a minute; the port says the rest. */
+describe("a dot's gesture", () => {
+	const block: Block = { id: "a", start: 600, length: null, clock: "15:00", endClock: null, startParts: ["15", "00"], lengthParts: null, step: null };
+	it("starts from where the dot stands: the top one at the start, the bottom one at the end (a task without a length: its start)", () => {
+		expect(edgeMinute(block, "start")).toBe(600);
+		expect(edgeMinute(block, "end")).toBe(600);
+		expect(edgeMinute({ ...block, length: 45 }, "end")).toBe(645);
+	});
+	it("keeps no length at a card and its gap or less (the plugin's 35 + 2 px)", () => {
+		expect(leastLength(BASE_SCALE)).toBeCloseTo((37 / 56) * 60);
+		expect(leastLength(new TimeScale(112))).toBeCloseTo((37 / 112) * 60);
 	});
 });
 
-const block = (more: Partial<Block>): Block => ({ id: "a", start: 600, length: 60, from: 600, clock: "15:00", endClock: "16:00", startParts: ["15", "00"], lengthParts: ["1", "H"], step: null, ...more });
+describe("the room the calendar measures (review 6)", () => {
+	it("what a person sees is the room less its foot; the whole day fits in it under the label's room, whatever the day's height now", () => {
+		expect(roomMeasure(700, 100)).toEqual({ visible: 600, fit: (600 - 2 * DESIGN.labelLift) / 24 });
+	});
+	it("today opens with the now line at half of what is seen, with room over the first hour or under the last near them (the plugin's scrollPlace)", () => {
+		expect(opening(600, 1344, 600)).toEqual({ above: 300, roomTop: 0, roomBottom: 0 });
+		expect(opening(10, 1344, 600)).toMatchObject({ above: 300, roomTop: 300 - DESIGN.labelLift - 10, roomBottom: 0 });
+		expect(opening(1340, 1344, 600).roomBottom).toBe(600 - 300 - (1344 + DESIGN.labelLift - 1340));
+		expect(opening(100, 500, 600)).toEqual({ above: DESIGN.labelLift + 100, roomTop: 0, roomBottom: 0 });
+	});
+});
 
-/** The design's «Выделение и длительность» and «Задача, которую прошла линия «сейчас»». */
-describe("resizing by the dots", () => {
-	it("the bottom dot moves the end by the snap step, the start kept", () => {
-		expect(resized(block({}), "end", y(32), BASE_SCALE, 0, true)).toMatchObject({ at: 600, end: 690 });
+/** The review of E3: auto-scroll waits for a pointer heading into an edge (the plugin's AutoScroll). */
+describe("heading into an edge", () => {
+	it("a card lifted near the edge and held there heads nowhere", () => {
+		const h = new EdgeHeading();
+		expect(h.feed("list:day", 790, 1)).toBeNull();
+		expect(h.feed("list:day", 790, 1)).toBeNull();
 	});
-	it("the top dot moves the start, the end kept", () => {
-		expect(resized(block({}), "start", -y(30), BASE_SCALE, 0, true)).toMatchObject({ at: 570, end: 660 });
+	it("coming towards the bottom edge it heads into it; held still it keeps heading; turning back it stops", () => {
+		const h = new EdgeHeading();
+		h.feed("list:day", 600, 0);
+		expect(h.feed("list:day", 780, 1)).toBe("list:day:1");
+		expect(h.feed("list:day", 780, 1)).toBe("list:day:1");
+		expect(h.feed("list:day", 770, 1)).toBeNull();
 	});
-	it("shrunk to the minimum, the task loses its length", () => {
-		expect(resized(block({}), "end", -y(45), BASE_SCALE, 0, true)).toMatchObject({ at: 600, end: null });
-	});
-	it("a task without a length pulled up by its top dot: the start earlier, the old start its end", () => {
-		expect(resized(block({ length: null, endClock: null }), "start", -y(60), BASE_SCALE, 0, true)).toMatchObject({ at: 540, end: 600 });
-	});
-	it("a task riding the now line: the bottom dot keeps its start in the file and ends where let go; the top dot writes a new start (F105)", () => {
-		const riding = block({ start: 700, from: 600, length: 30 });
-		expect(resized(riding, "end", y(60), BASE_SCALE, 0, true)).toMatchObject({ at: 600, end: 695 });
-		expect(resized(riding, "start", -y(15), BASE_SCALE, 0, true)).toMatchObject({ at: 690, end: 730 });
-	});
-	it("the step follows the zoom: 5 minutes at 112 px an hour", () => {
-		expect(resized(block({}), "end", new TimeScale(112).y(7), new TimeScale(112), 0, true)).toMatchObject({ end: 665 });
+	it("coming into another room across its top edge moving down heads into nothing", () => {
+		const h = new EdgeHeading();
+		h.feed("list:soon", 780, 1);
+		expect(h.feed("calendar-room:", 120, -1)).toBeNull();
+		expect(h.feed("calendar-room:", 140, -1)).toBeNull();
 	});
 });
 

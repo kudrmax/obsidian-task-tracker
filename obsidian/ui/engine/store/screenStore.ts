@@ -1,6 +1,6 @@
 import { DESIGN } from "../../design";
 import { createStore, type StoreApi } from "zustand/vanilla";
-import type { Destination, ListId, MenuItem, Now, ScreenData, ScreenPort } from "../port";
+import type { Destination, Edge, ListId, MenuItem, Now, ScreenData, ScreenPort } from "../port";
 import { share } from "./share";
 
 /** Where the ribbon stands: Inbox–Soon, Soon–the day, the day–its calendar. */
@@ -47,8 +47,8 @@ export interface ScreenState {
 	/** Where the carried plus would open the field on the calendar: a minute of the shown day, where its place stands. */
 	readonly plusMinute: number | null;
 	/**
-	 * Whether a carried card may scroll the column it is over (F162): only once it has stood over that column a quarter
-	 * second, so a card carried across a column's edge into another never scrolls it.
+	 * Whether a carried card may scroll the room it is over (F162, the plugin's `AutoScroll`): only once it has headed into
+	 * the room's edge and stayed there a quarter second; heading away, it stops.
 	 */
 	readonly scrollArmed: boolean;
 	/** The calendar's zoom (spec, «Time scale»): kept on the device by the host. */
@@ -69,7 +69,7 @@ export interface ScreenActions {
 	/** The ribbon one stop on (1) or back (-1); past the day's calendar, the days. */
 	step(shift: -1 | 1): void;
 	setStop(stop: Stop): void;
-	/** Takes the pointer for `gesture` unless another holds it; whether it got it. A drag always gets it: its long press already proved no other gesture moved (dnd-kit's activation constraint). */
+	/** Takes the pointer for `gesture` unless another holds it; whether it got it. A drag takes it from the ribbon (its long press already proved the ribbon still, dnd-kit's activation constraint), never from a pinch or a resize. */
 	claim(gesture: Gesture): boolean;
 	release(gesture: Gesture): void;
 	lift(id: string): void;
@@ -89,16 +89,20 @@ export interface ScreenActions {
 	setPlusAt(at: { readonly into: ListId; readonly index: number } | null): void;
 	setPlusMinute(minute: number | null): void;
 	setZoom(zoom: Zoom): void;
-	/** The carried card is over the column `column` (null: none): a new one waits a quarter second before it may scroll. */
-	scrollOver(column: string | null): void;
+	/** The edge the carried card heads into (`room:edge`; null: none): a new one waits a quarter second before it may scroll. */
+	scrollToward(edge: string | null): void;
 	/** A minute of the day as the clock writes it (the port's): «14:15». */
 	clockOf(minute: number): string;
 	/** Selects a task on the calendar (null: none). */
 	select(id: string | null): void;
-	/** A dot taken: the task's time changes as it is pulled (`resizeTo`, the port's preview), written at the end (null: put back). */
-	startResize(id: string, edge: "start" | "end"): void;
-	resizeTo(id: string, to: Destination): void;
-	endResize(id: string, to: Destination | null): void;
+	/** A dot taken: the menu closes and the task is drawn as the port stretches it while the dot is pulled (`resizeTo`). */
+	startResize(id: string, edge: Edge): void;
+	resizeTo(id: string, edge: Edge, minute: number): void;
+	/**
+	 * The dot let go at `minute` (null: the pull cancelled, the task put back): what the port says it writes, written;
+	 * `least`, the minutes of the shortest length kept. Whether anything was written.
+	 */
+	endResize(id: string, edge: Edge, minute: number | null, least: number): boolean;
 	/** Opens the new task's field at `at`, or at the port's place for new tasks; null closes it. */
 	openEntry(at?: Destination | null): void;
 	/** The field one level deeper (1) or shallower (-1), as Tab and Shift+Tab do. */
@@ -116,7 +120,7 @@ export type Screen = ScreenState & ScreenActions;
 export type ScreenStore = StoreApi<Screen>;
 
 const MINUTE_MS = 60_000;
-/** How long a carried card stands over a column before the column may scroll under it (F162: a quarter second). */
+/** How long a carried card stays at a room's edge it headed into before the room scrolls under it (F162: a quarter second). */
 const SCROLL_DWELL_MS = 250;
 /** Days kept for regions sliding out: as many as fast strokes can leave sliding at once. */
 const LEFT_KEPT = 4;
@@ -130,8 +134,8 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 	let writing = 0;
 	/** The screen as it stood when the carried task was lifted: its place's home, a drop's in-flight write drawn in it. */
 	let home: ScreenData | null = null;
-	/** The column a carried card stands over, and the wait before it may scroll. */
-	let scrollColumn: string | null = null;
+	/** The edge a carried card heads into, and the wait before its room may scroll. */
+	let scrollEdge: string | null = null;
 	let scrollWait = 0;
 	const first = port.read(0);
 	return createStore<Screen>()((set, get) => {
@@ -183,12 +187,12 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 			plusMinute: null,
 			zoom,
 			scrollArmed: false,
-			scrollOver(column) {
-				if (column === scrollColumn) return;
-				scrollColumn = column;
+			scrollToward(edge) {
+				if (edge === scrollEdge) return;
+				scrollEdge = edge;
 				window.clearTimeout(scrollWait);
 				if (get().scrollArmed) set({ scrollArmed: false });
-				if (column !== null) scrollWait = window.setTimeout(() => set({ scrollArmed: true }), SCROLL_DWELL_MS);
+				if (edge !== null) scrollWait = window.setTimeout(() => set({ scrollArmed: true }), SCROLL_DWELL_MS);
 			},
 			selected: null,
 			resizing: null,
@@ -208,10 +212,11 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 				home = get().shown;
 				set({ resizing: { id, edge }, layer: null });
 			},
-			resizeTo(id, to) {
-				set({ shown: share(get().shown, port.preview(id, to)) });
+			resizeTo(id, edge, minute) {
+				set({ shown: share(get().shown, port.stretched(id, get().dayOffset, edge, minute)) });
 			},
-			endResize(id, to) {
+			endResize(id, edge, minute, least) {
+				const to = minute === null ? null : port.resized(id, get().dayOffset, edge, minute, least);
 				if (to) {
 					set({ shown: share(get().shown, port.preview(id, to)) });
 					write(port.move(id, to));
@@ -219,6 +224,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 				home = null;
 				set({ resizing: null });
 				get().release("resize");
+				return to !== null;
 			},
 			setPlusAt(at) {
 				const was = get().plusAt;
@@ -239,13 +245,14 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 			},
 			claim(gesture) {
 				const held = get().gesture;
-				if (held !== null && held !== gesture && gesture !== "drag") return false;
+				/** A drag takes the pointer from the ribbon (its long press proved the ribbon still), never from a pinch or a resize. */
+				if (held !== null && held !== gesture && (gesture !== "drag" || held === "zoom" || held === "resize")) return false;
 				if (held !== gesture) set({ gesture });
 				return true;
 			},
 			release(gesture) {
 				if (get().gesture !== gesture) return;
-				if (gesture === "drag") get().scrollOver(null);
+				if (gesture === "drag") get().scrollToward(null);
 				set({ gesture: null });
 				if (get().pending) refresh();
 			},
