@@ -20,6 +20,15 @@ The ribbon on the stand («The whole screen») is stage 0's pager (round six, ~9
 ## Open problems, in order
 
 1. **Tasks stuck together on the calendar.** A card lying on another card doesn't read as separate. Rejected: hairline ring, tight shadow, tone of the upper card, wide shade all round (it erased the card's edge on the ground). In work: a shade only on the card underneath, only where another card lies on it (Decision 60, rewritten).
-2. **The engine feels jerky** (Max): the swipes turn too much, headers and sections jump, animations unpleasant. In work: a read-only frame audit of every interaction on every step, ranked. Then fixes one at a time, each to the stand.
+2. **The engine feels jerky** (Max): the swipes turn too much, headers and sections jump, animations unpleasant. The frame audit (scratchpad `jank/`, 192 runs) ranked them; fixed one at a time, each to the stand, in this order:
+   1. A quick drop: rows still parting snap the rest of the way in one frame — headers and cards jump 22–37 px. **In work** (branch `ui-jank-1`).
+   2. A carried card leaving a list: the gap shuts at once.
+   3. Phone: turning the day at the calendar swings the ribbon the wrong way; every flick hitches at release.
+   4. Lifting a task with subtasks: rows below jump 148 px; at the drop the subtasks pop in over other cards.
+   5. Hold and let go without moving: the plate pops into the card.
+   6. The calendar's blocks wiggle while a card passes over a stack.
+   7. Zoom across the stacking threshold: blocks change width 18 px in one frame.
+   8. Phone: long frames (41–116 ms) while carrying onto the calendar.
+   Clean: slow drags, cancel, resize, new task by press, scrolling, desktop trackpad strokes; no double triggers.
 3. **Swipes, step by step on stage 0's pager.** What to do with `ui-ribbon` is decided after the audit: its pieces come in one per step, each shown to Max.
 4. Tasks covering event titles on the calendar: Max's question, parked.
