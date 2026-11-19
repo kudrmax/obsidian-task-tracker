@@ -1,4 +1,4 @@
-import { ItemView, MarkdownRenderChild, Platform, Plugin, Scope, type TFile, type WorkspaceLeaf } from "obsidian";
+import { type App, Component, ItemView, MarkdownRenderChild, MarkdownRenderer, Platform, Plugin, Scope, type TFile, type WorkspaceLeaf } from "obsidian";
 import { KEYS, takesKeys } from "../ui/engine/keys";
 import type { Place } from "../ui/engine/layout/Layout";
 import { type MountedScreen, mountScreen } from "../ui/engine/mount";
@@ -16,6 +16,19 @@ const BLOCK_LANGUAGE = "task-calendar-stand";
 const BLOCK_NOTE = "Заметка о доме.md";
 
 const haptics = () => detectHaptics(window as unknown as HapticsHost);
+
+/** Markdown drawn by Obsidian's own renderer, its component kept until the drawing is taken away. */
+const markdownOf =
+	(app: App) =>
+	(text: string, el: HTMLElement, sourcePath: string): (() => void) => {
+		const component = new Component();
+		component.load();
+		void MarkdownRenderer.render(app, text, el, sourcePath, component);
+		return () => {
+			component.unload();
+			el.empty();
+		};
+	};
 
 /** The engine's screen in a leaf of its own, as the plugin's view will show it; the key table on its scope. */
 class StandView extends ItemView {
@@ -65,7 +78,7 @@ class StandView extends ItemView {
 		this.unmount();
 		this.contentEl.empty();
 		this.contentEl.addClass("tc-view");
-		this.screen = mountScreen(this.contentEl, { port: this.stand.port, place: this.stand.leafPlace, app: this.app, sourcePath: "", haptics: haptics(), zoom: this.stand.zoom() });
+		this.screen = mountScreen(this.contentEl, { port: this.stand.port, place: this.stand.leafPlace, app: this.app, sourcePath: "", haptics: haptics(), zoom: this.stand.zoom(), markdown: markdownOf(this.app) });
 		this.stand.screens.add(this.screen);
 	}
 
@@ -90,7 +103,7 @@ class StandBlock extends MarkdownRenderChild {
 
 	override onload(): void {
 		this.containerEl.addClass("tc-stand-block");
-		this.screen = mountScreen(this.containerEl, { port: this.stand.port, place: "note", app: this.stand.app, sourcePath: this.path, haptics: haptics(), zoom: this.stand.zoom() });
+		this.screen = mountScreen(this.containerEl, { port: this.stand.port, place: "note", app: this.stand.app, sourcePath: this.path, haptics: haptics(), zoom: this.stand.zoom(), markdown: markdownOf(this.stand.app) });
 		this.stand.screens.add(this.screen);
 	}
 

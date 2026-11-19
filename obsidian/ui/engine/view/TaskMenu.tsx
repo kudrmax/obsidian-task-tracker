@@ -1,4 +1,4 @@
-import { memo, type ReactNode, useContext, useRef, useState } from "react";
+import { memo, type ReactNode, useContext, useEffect, useRef, useState } from "react";
 import type { IconName } from "../../kit/icons";
 import { MenuLayer, useAnchor } from "../layers/Layers";
 import { monthGrid, monthOf, monthTitle } from "../layout/month";
@@ -78,6 +78,7 @@ export const TaskMenu = memo(function TaskMenu() {
 			panelClass={model.kind === "event" ? "is-event" : shown.layer.page === "picker" ? "is-task is-picker" : "is-task"}
 			page={`${shown.layer.id}:${shown.layer.page}`}
 			keepWidth={model.kind === "event"}
+			peek={model.kind === "task" && model.peek !== null ? { content: <PeekText text={model.peek} />, onPress: () => pick({ kind: "row", id: "fullScreen" }) } : undefined}
 		/>
 	);
 });
@@ -296,4 +297,12 @@ function MenuCopy({ id, look }: { readonly id: string; readonly look: BlockLook 
 			<CardInsides face={face} />
 		</div>
 	);
+}
+
+/** The start of a task's description, drawn by Obsidian (the design's «Описание задачи»: the panel's text is Obsidian's markdown). */
+function PeekText({ text }: { readonly text: string }) {
+	const { markdown, sourcePath } = useHost();
+	const el = useRef<HTMLDivElement>(null);
+	useEffect(() => (el.current ? markdown(text, el.current, sourcePath) : undefined), [markdown, text, sourcePath]);
+	return <div ref={el} className="tc-desc-text markdown-rendered" />;
 }

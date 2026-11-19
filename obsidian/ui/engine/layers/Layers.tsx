@@ -1,6 +1,6 @@
 import { autoUpdate, FloatingFocusManager, FloatingOverlay, FloatingPortal, hide, type Middleware, offset, type Placement, shift, size, useDismiss, useFloating, useInteractions, useRole, useTransitionStatus } from "@floating-ui/react";
 import { createContext, type MutableRefObject, type ReactNode, useContext, useLayoutEffect, useRef, useState } from "react";
-import { DESIGN } from "../../design";
+import { DESIGN, LAYOUT } from "../../design";
 import { LAYER_MS } from "./motion";
 import { groupsAbove } from "./split";
 
@@ -42,8 +42,8 @@ export interface MenuLayerProps {
 	readonly panelClass: string;
 	/** The page shown: another page lays the panel out afresh. */
 	readonly page: string;
-	/** The start of a description over the copy, or under the panel when there is no room over it (F129). */
-	readonly peek?: ReactNode;
+	/** The start of a description by the copy (F129, F130), and what a tap on it does. */
+	readonly peek?: { readonly content: ReactNode; readonly onPress: () => void };
 	/** The copy keeps the pressed thing's width (an event wraps its title inside it); otherwise it grows right for its title. */
 	readonly keepWidth?: boolean;
 }
@@ -88,7 +88,7 @@ export function MenuLayer({ open, onClose, root, reference, label, over, groups,
 		placement: "bottom-start",
 		strategy: "fixed",
 		transform: false,
-		middleware: [offset(DESIGN.menuGap), split(parts), shift({ padding: EDGES }), size({ padding: DESIGN.wholeMargin, apply: scrollWithin })],
+		middleware: [offset(DESIGN.menuGap), splitBy(parts), shift({ padding: EDGES }), size({ padding: DESIGN.wholeMargin, apply: scrollWithin })],
 		whileElementsMounted: autoUpdate,
 		elements: { reference: overEl },
 	});
@@ -101,6 +101,23 @@ export function MenuLayer({ open, onClose, root, reference, label, over, groups,
 		whileElementsMounted: autoUpdate,
 		elements: { reference: overEl },
 	});
+	const count = Math.min(above, groups.length);
+	/** Floating UI keeps a middleware whose code reads the same, so what changes between renders is read through a ref. */
+	const split = useRef({ count, total: groups.length });
+	split.current = { count, total: groups.length };
+	const peeking = useFloating({
+		open,
+		placement: "top-start",
+		strategy: "fixed",
+		transform: false,
+		middleware: [peekPlace(parts, split)],
+		whileElementsMounted: autoUpdate,
+		elements: { reference: overEl },
+	});
+	const placePeek = peeking.update;
+	/** The panel split or joined: the description goes by it again. */
+	useLayoutEffect(() => placePeek(), [count, placePeek]);
+	const peekSide = peeking.middlewareData.peek as { under: boolean; away: boolean } | undefined;
 	const wanted = (lower.middlewareData.split as { above?: number } | undefined)?.above;
 	/** A new page is laid out afresh: until its split is measured, nothing of it shows. */
 	useLayoutEffect(() => setAbove(0), [page]);
@@ -112,9 +129,8 @@ export function MenuLayer({ open, onClose, root, reference, label, over, groups,
 	const dismiss = useDismiss(lower.context, { outsidePressEvent: "click", outsidePress: (event) => !(event.target instanceof Node && [overEl, parts.current.upper, parts.current.lower].some((part) => part?.contains(event.target as Node))) });
 	const { getFloatingProps } = useInteractions([dismiss, useRole(lower.context, { role: "menu" })]);
 	if (!isMounted) return null;
-	const count = Math.min(above, groups.length);
 	const settled = wanted === count || (wanted !== undefined && wanted >= groups.length && count === groups.length);
-	const ready = copy.isPositioned && (count === groups.length || lower.isPositioned) && (count === 0 || upper.isPositioned) && settled;
+	const ready = copy.isPositioned && (count === groups.length || lower.isPositioned) && (count === 0 || upper.isPositioned) && (!peek || peeking.isPositioned) && settled;
 	const motion = motionClass(status, ready);
 	const panel = `tc-panel is-menu ${panelClass}`;
 	return (
@@ -152,7 +168,11 @@ export function MenuLayer({ open, onClose, root, reference, label, over, groups,
 						)}
 					</div>
 				</FloatingFocusManager>
-				{peek ?? null}
+				{peek ? (
+					<div ref={peeking.refs.setFloating} style={peeking.floatingStyles} className={`tc-desc-peek${peekSide?.under ? " is-under" : ""}${peekSide?.away ? " is-away" : ""}${motion}`} onClick={peek.onPress}>
+						{peek.content}
+					</div>
+				) : null}
 			</div>
 		</FloatingPortal>
 	);
@@ -172,6 +192,57 @@ const cover: Middleware = {
 	},
 };
 
+/**
+ * Where the start of a description stands (the plugin's `DescriptionPeek.place` and `placeBeside`): over the copy when the
+ * panel is under it and there is room for three lines, else under the copy past a panel over it, else past the panel on
+ * its far side; by a panel split over and under the copy, right of its part over the copy, or nowhere where the window
+ * is too narrow (the phone). It keeps to its room, `--tc-desc-peek-max` at most, and stays away with less than three lines.
+ */
+function peekPlace(parts: MutableRefObject<{ upper: HTMLElement | null; lower: HTMLElement | null }>, split: MutableRefObject<{ count: number; total: number }>): Middleware {
+	return {
+		name: "peek",
+		async fn({ rects, platform, elements, strategy }) {
+			const { count, total } = split.current;
+			const page = elements.floating.ownerDocument.documentElement;
+			const [height, width] = [page.clientHeight, page.clientWidth];
+			const copy = rects.reference;
+			const gap = LAYOUT.descPeekGap;
+			const margin = DESIGN.wholeMargin;
+			const least = LAYOUT.descPeekLeast;
+			const freeAbove = copy.y - gap - margin;
+			const freeBelow = height - (copy.y + copy.height) - gap - margin;
+			let over = true;
+			let edge = copy.y - gap;
+			let room = freeAbove;
+			let x = Math.max(margin, Math.min(copy.x, width - margin - rects.floating.width));
+			if (count > 0 && count < total) {
+				const upper = parts.current.upper;
+				/** Its left as placed (it grows from that edge) and its width unscaled: it may still be growing in. */
+				const beside = upper ? (await platform.getElementRects({ reference: upper, floating: elements.floating, strategy })).reference : null;
+				const wide = upper ? (await platform.getDimensions(upper)).width : 0;
+				x = beside ? beside.x + wide + DESIGN.menuGap : width;
+				const fits = x + rects.floating.width <= width - margin;
+				if (!fits) room = 0;
+				else if (freeAbove < least) [over, edge, room] = [false, copy.y + copy.height + gap, freeBelow];
+			} else {
+				const menuAbove = count === total;
+				const menu = menuAbove ? parts.current.upper : parts.current.lower;
+				const span = DESIGN.menuGap + (menu ? (await platform.getDimensions(menu)).height : 0);
+				if (!menuAbove && freeAbove >= least) [over, edge, room] = [true, copy.y - gap, freeAbove];
+				else if (menuAbove && freeBelow >= least) [over, edge, room] = [false, copy.y + copy.height + gap, freeBelow];
+				else if (menuAbove) [over, edge, room] = [true, copy.y - span - gap, copy.y - span - gap - margin];
+				else [over, edge, room] = [false, copy.y + copy.height + span + gap, height - (copy.y + copy.height) - span - gap - margin];
+			}
+			const most = `${Math.max(0, Math.min(DESIGN.descPeekMax, room))}px`;
+			if (elements.floating.style.maxHeight !== most) {
+				elements.floating.style.maxHeight = most;
+				return { reset: { rects: true } };
+			}
+			return { x, y: over ? edge - rects.floating.height : edge, data: { under: !over, away: room < least } };
+		},
+	};
+}
+
 /** A part taller than its room keeps to it and scrolls (the plugin's `keepWithin`). */
 function scrollWithin({ availableHeight, elements }: { availableHeight: number; elements: { floating: HTMLElement } }): void {
 	const floating = elements.floating;
@@ -182,7 +253,7 @@ function scrollWithin({ availableHeight, elements }: { availableHeight: number; 
  * How many of the panel's groups stand over the copy (the plugin's `groupsAbove` over its `placePanel`): measured by
  * Floating UI as the panel is placed, each group's height wherever it stands now, against the room over and under the copy.
  */
-function split(parts: MutableRefObject<{ upper: HTMLElement | null; lower: HTMLElement | null }>): Middleware {
+function splitBy(parts: MutableRefObject<{ upper: HTMLElement | null; lower: HTMLElement | null }>): Middleware {
 	return {
 		name: "split",
 		async fn({ rects, platform, elements }) {

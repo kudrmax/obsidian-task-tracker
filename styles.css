@@ -1916,3 +1916,5 @@ body.theme-light .tc-menu-over .tc-event { --tc-event-bg: var(--tc-event-bg-ligh
 @keyframes tc-cut-value { from, to { -webkit-mask-image: var(--tc-fade-card-end); mask-image: var(--tc-fade-card-end); } }
 .tc-menu-layer :is(.tc-menu-tile-label, .tc-menu-ask-title) { animation-name: tc-cut-tile; animation-fill-mode: both; animation-timeline: scroll(self inline); }
 .tc-menu-layer .tc-menu-value { animation-name: tc-cut-value; animation-fill-mode: both; animation-timeline: scroll(self inline); }
+@keyframes tc-cut-peek { from, to { -webkit-mask-image: var(--tc-fade-peek-bottom); mask-image: var(--tc-fade-peek-bottom); } }
+.tc-level.tc-menu-layer > .tc-desc-peek .tc-desc-text { animation-name: tc-cut-peek; animation-fill-mode: both; animation-timeline: scroll(self block); }

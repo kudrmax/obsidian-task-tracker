@@ -17,6 +17,8 @@ export interface ScreenHost {
 	readonly haptics: { tap(): void };
 	/** The calendar's largest hour, in pixels (the zoom's levels in the settings): a pinch stops there. */
 	readonly zoomMost: number;
+	/** Draws markdown into `el` as Obsidian does (a description's start by the menu); returns what takes it away. */
+	readonly markdown: (text: string, el: HTMLElement, sourcePath: string) => () => void;
 }
 
 export const HostContext = createContext<ScreenHost | null>(null);

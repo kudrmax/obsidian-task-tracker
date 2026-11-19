@@ -44,6 +44,15 @@ const save = (value: unknown): void => {
 	}
 };
 
+/** The page has no Obsidian to draw markdown: a paragraph of its text, in the class Obsidian's drawing has. */
+const plainMarkdown = (text: string, el: HTMLElement): (() => void) => {
+	const p = el.ownerDocument.createElement("p");
+	p.textContent = text;
+	el.classList.add("markdown-rendered");
+	el.appendChild(p);
+	return () => p.remove();
+};
+
 /** The note the stand's block sits in, as Obsidian's reading view lays it out. */
 const NOTE_PATH = "Заметка о доме.md";
 
@@ -121,7 +130,7 @@ class StandPage {
 	}
 
 	private mount(el: HTMLElement, place: Place, sourcePath: string): MountedScreen {
-		const screen = mountScreen(el, { port: this.port, place, app: this.app, sourcePath, haptics: this.haptics, zoom: keptZoom(load, save) });
+		const screen = mountScreen(el, { port: this.port, place, app: this.app, sourcePath, haptics: this.haptics, zoom: keptZoom(load, save), markdown: plainMarkdown });
 		this.screens.add(screen);
 		return screen;
 	}
