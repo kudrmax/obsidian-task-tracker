@@ -8,7 +8,7 @@ const once = (find) => {
 };
 
 /**
- * The calendar's light shadow (Max, 2026-11-19, Decision 56): every task on the calendar casts `--tc-shadow-block`, so a
+ * The calendar's light shadow (Max, 2026-11-19, Decision 56): every task on the calendar casts `--tc-shadow-block`, a soft shadow falling down with no ring, so a
  * card's edge reads over the card under it and over an event's tint; the selected one and the new task's field keep it under their ring; the lists'
  * cards cast none. Two cards carried onto an event's start stack over it with «Тренировка»: the shot shows the stack.
  */
@@ -35,6 +35,8 @@ export default {
 		const want = await t.cdp.eval(`(() => { const probe = document.createElement("div"); probe.style.boxShadow = "var(--tc-shadow-block)"; document.querySelector(".task-calendar").append(probe); const v = getComputedStyle(probe).boxShadow; probe.remove(); return v; })()`);
 		const ring = await t.cdp.eval(`(() => { const probe = document.createElement("div"); probe.style.boxShadow = "var(--tc-ring-selected), var(--tc-shadow-block)"; document.querySelector(".task-calendar").append(probe); const v = getComputedStyle(probe).boxShadow; probe.remove(); return v; })()`);
 		t.expect(want && want !== "none", `the token gives a shadow: ${want}`);
+		const layers = want.split(/,(?![^(]*\))/).map((layer) => layer.match(/(-?[\d.]+)px/g).map(parseFloat));
+		t.expect(layers.every(([, down, blur, spread]) => down > 0 && blur > 0 && spread === 0), `a shadow falling down, no ring or outline (Max: «это ОБВОДКА а не тень»): ${want}`);
 		const blocks = await t.cdp.eval(`[...document.querySelectorAll(".tc-items > .tc-block .tc-block-card")].map((c) => [c.querySelector(".tc-card-title")?.textContent, getComputedStyle(c).boxShadow])`);
 		t.expect(blocks.length > 5 && blocks.every(([, shadow]) => shadow === want), `every task on the calendar casts the calendar's shadow ${want}: ${JSON.stringify(blocks)}`);
 		const cards = await t.cdp.eval(`[...document.querySelectorAll(".tc-list .tc-card")].map((c) => getComputedStyle(c).boxShadow)`);
