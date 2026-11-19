@@ -22,7 +22,7 @@ const STEPS: Readonly<Record<string, { place: Place; file?: () => MockFile }>> =
 	"step-sections": { place: "twoColumns", file: sectionsFile },
 	"step-long-lists": { place: "twoColumns", file: longListsFile },
 	"step-calendar": { place: "calendar", file: () => calendarFile(new Date()) },
-	"step-swipe": { place: "snap" },
+	"step-swipe": { place: "follow" },
 	"whole-screen": { place: "leaf" },
 };
 
@@ -95,7 +95,7 @@ class StandPage {
 		const key = KEYS.find((k) => k.key === event.key && k.modifiers.length === 0);
 		const screen = this.leafScreen?.store.getState();
 		/** The step of the ribbon as a gallery has no keys yet, as on the stand. */
-		if (!key || !screen || !takesKeys(screen) || this.leafPlace === "snap") return;
+		if (!key || !screen || !takesKeys(screen) || this.leafPlace === "follow") return;
 		key.run(screen);
 		event.preventDefault();
 	};

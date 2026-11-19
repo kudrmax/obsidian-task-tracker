@@ -2,8 +2,10 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { FollowPager } from "../../../obsidian/ui/engine/gestures/followPager";
-import { type WheelCue, WheelFollow } from "../../../obsidian/ui/engine/gestures/wheelFollow";
+import { WheelFollow } from "../../../obsidian/ui/engine/gestures/wheelFollow";
 import { WheelStrokes } from "../../../obsidian/ui/engine/gestures/wheelStrokes";
+// @ts-expect-error the e2e checks' shared replay of the rule is plain JavaScript
+import { followSteps } from "../../e2e/lib/follow.mjs";
 
 const RECORDINGS = join(__dirname, "..", "..", "e2e", "recordings");
 
@@ -19,57 +21,8 @@ function recording(file: string): { readonly width: number; readonly wheels: Whe
 	return { width: w / 2, wheels: events.filter((e) => e.type === "wheel").map((e) => ({ dx: e.dx ?? 0, dy: e.dy ?? 0, t: e.t, ctrl: e.ctrl })) };
 }
 
-/** The strip's landing spring (stiffness 1400, damping 75: critically damped), as the ribbon's Motion spring runs it. */
-const OMEGA = Math.sqrt(1400) / 1000;
-
-interface Run {
-	/** Each landing decided, as a step from the place before. */
-	readonly steps: number[];
-	/** The furthest any stroke's landing lay from the place it began at. */
-	readonly furthest: number;
-	/** Columns moved between a lift and the next stroke: the momentum moving them. */
-	readonly movedInMomentum: number;
-}
-
 /** Max's wheel events through the trackpad's cues and the gallery's rule, unbounded on either side, as the ribbon runs them. */
-function follow(wheels: readonly Wheel[], width: number): Run {
-	const fingers = new WheelFollow();
-	const pager = new FollowPager(1000, 2000);
-	let at = 1000;
-	let landing: { from: number; to: number; t: number } | null = null;
-	let origin = 1000;
-	let furthest = 0;
-	let movedInMomentum = 0;
-	const steps: number[] = [];
-	const stand = (t: number) => (landing ? landing.to + (landing.from - landing.to) * (1 + OMEGA * (t - landing.t)) * Math.exp(-OMEGA * (t - landing.t)) : at);
-	const apply = (cues: readonly WheelCue[]) => {
-		for (const cue of cues) {
-			if (cue.kind === "begin") {
-				at = stand(cue.t);
-				landing = null;
-				if (cue.fresh) origin = pager.stop;
-				/** The same stroke going on takes back the landing its false lift decided. */
-				else if (pager.stop !== origin) steps.pop();
-				pager.begin(at, cue.fresh);
-			} else if (cue.kind === "move") {
-				if (!pager.following) movedInMomentum++;
-				at = pager.move(cue.dx, width);
-			} else {
-				const was = pager.stop;
-				const to = pager.release(at, cue.speed, width);
-				if (to !== was) steps.push(to - was);
-				furthest = Math.max(furthest, Math.abs(to - origin));
-				landing = { from: at, to, t: cue.t };
-			}
-		}
-	};
-	for (const e of wheels) {
-		apply(fingers.tick(e.t));
-		apply(fingers.feed(e));
-	}
-	apply(fingers.tick(Infinity));
-	return { steps, furthest, movedInMomentum };
-}
+const follow = (wheels: readonly Wheel[], width: number): { steps: number[]; furthest: number; movedInMomentum: number } => followSteps(wheels, width);
 
 const run = (file: string) => {
 	const { wheels, width } = recording(file);

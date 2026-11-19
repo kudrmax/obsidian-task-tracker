@@ -26,13 +26,13 @@ export interface WheelFollowTuning {
 	readonly momentumEvents: number;
 	/** Slower than this a frame, px, the fingers and their momentum look alike: such a momentum is taken as the fingers' and moves the columns a little, the lift then read from the quiet. */
 	readonly momentumMinPx: number;
-	/** No delta this long while the fingers are on: they stopped and lifted (or rest; the page cannot tell, the OS sends nothing). */
+	/** No delta this long while the fingers are on: they stopped and lifted (or rest; the page cannot tell, the OS sends nothing). Just under @use-gesture's wheel end (140 ms), which asks. */
 	readonly quietMs: number;
 	/** No hand touches again this soon after it lifted: a fall of the deltas this soon after a lift was the fingers slowing, the same stroke. */
 	readonly retouchMs: number;
 }
 
-export const WHEEL_FOLLOW: WheelFollowTuning = { momentumEvents: 4, momentumMinPx: 10, quietMs: 110, retouchMs: 40 };
+export const WHEEL_FOLLOW: WheelFollowTuning = { momentumEvents: 4, momentumMinPx: 10, quietMs: 130, retouchMs: 40 };
 /** A touch stops the momentum at once: the next delta falls under this share of the momentum's last, or none comes this long. */
 const CUT = 0.6;
 const MOMENTUM_GAP_MS = 45;

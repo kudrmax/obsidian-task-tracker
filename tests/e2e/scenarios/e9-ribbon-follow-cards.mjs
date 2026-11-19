@@ -1,23 +1,21 @@
 import { carry } from "../lib/carry.mjs";
 
 /**
- * Step 7 under a finger on the phone (spec 2026-11-18, Decisions 61 and 63): the ribbon is the browser's own paging, and a
- * finger moves it from anywhere inside a column, not only from the titles. A sideways swipe started over a card or over the
+ * Step 7 under a finger on the phone (spec 2026-11-18, Decisions 63 and 64): a finger moves the ribbon from anywhere inside
+ * a column, not only from the titles. A sideways swipe started over a card or over the
  * calendar's empty time moves the columns one stop and lifts nothing; a vertical swipe over the cards scrolls the list and
  * moves no stop; a press held past the long press lifts the card, and carried sideways it moves the card, never the ribbon
  * (stage 0, blocker 10: a finger that moves before the long press is a swipe).
  */
-const RIBBON = ".tc-snap-ribbon";
-
 export default {
-	name: "e9-ribbon-snap-touch",
-	features: ["Step 7: swipe the columns (CSS Scroll Snap), touch"],
+	name: "e9-ribbon-follow-cards",
+	features: ["Step 7: swipe the columns (touch over cards and the calendar)"],
 	platforms: ["phone"],
 	async run(t) {
 		await t.cdp.eval(`(async () => { window.__tcStand.step("step-swipe"); await new Promise((r) => setTimeout(r, 800)); return 1; })()`);
 		const columns = async () => (await t.oracle.columns()).filter((title) => title !== "");
 		const is = async (want, what) => t.expect(JSON.stringify(await columns()) === JSON.stringify(want), `${what}: ${JSON.stringify(await columns())}`);
-		const scrollLeft = () => t.cdp.eval(`document.querySelector(${JSON.stringify(RIBBON)}).scrollLeft`);
+		const scrollLeft = () => t.cdp.eval(`document.querySelector(".tc-ribbon-track").getBoundingClientRect().left`);
 		const lifted = () => t.cdp.eval(`document.querySelectorAll(".tc-drag-source.is-lifted").length`);
 		const swipeBack = (at) => t.input.swipe(at, { x: at.x + 150, y: at.y + 3 }, { steps: 8, stepMs: 14 });
 		const swipeOn = (at) => t.input.swipe(at, { x: at.x - 150, y: at.y + 3 }, { steps: 8, stepMs: 14 });

@@ -1,4 +1,5 @@
 import { type CSSProperties, memo, type ReactNode, useRef } from "react";
+import { useFollowRibbon } from "../gestures/FollowRibbon";
 import { RibbonTrack, useRibbon } from "../gestures/Ribbon";
 import type { ListId } from "../port";
 import { DayContext, useData, useScreen } from "../store";
@@ -8,15 +9,15 @@ import { Slide } from "../view/Slide";
 import { TaskList } from "../view/TaskList";
 import { TaskMenu } from "../view/TaskMenu";
 import { Timeline } from "../view/Timeline";
-import { COLUMN_SHARE, STRIP, STRIP_WIDTH, shownAt } from "./columns";
+import { COLUMN_SHARE, STRIP_WIDTH } from "./columns";
 
 /**
  * Where a screen is mounted: Obsidian's leaf (the main screen, a pop-out), a note's block, or the stand's steps alone:
  * one column (a list and drag, nothing else on screen), then two columns side by side (drag between them), then Soon,
  * the day's list and the day's calendar side by side (drag onto and off the calendar), then the ribbon's three stops
- * as the browser's own paging scroller (`snap`).
+ * swiped as a gallery (`follow`: the strip follows a finger and two on the trackpad alike, nothing else of the ribbon).
  */
-export type Place = "leaf" | "note" | "column" | "twoColumns" | "calendar" | "snap";
+export type Place = "leaf" | "note" | "column" | "twoColumns" | "calendar" | "follow";
 
 /**
  * Where things stand (spec, «The owners»): the place's columns. The only module that reads the place. A leaf shows the
@@ -25,10 +26,10 @@ export type Place = "leaf" | "note" | "column" | "twoColumns" | "calendar" | "sn
  * «Behaviours Max had to ask for twice»); at the day's calendar too until the divider comes (E2).
  */
 export const Layout = memo(function Layout({ place }: { readonly place: Place }) {
-	if (place === "column" || place === "twoColumns" || place === "calendar" || place === "snap")
+	if (place === "column" || place === "twoColumns" || place === "calendar" || place === "follow")
 		return (
 			<>
-				{place === "column" ? <NoteColumn /> : place === "twoColumns" ? <TwoColumns /> : place === "calendar" ? <CalendarColumns /> : <SnapColumns />}
+				{place === "column" ? <NoteColumn /> : place === "twoColumns" ? <TwoColumns /> : place === "calendar" ? <CalendarColumns /> : <FollowColumns />}
 				<PlusButton />
 				<TaskMenu />
 			</>
@@ -79,28 +80,26 @@ function RibbonColumns() {
 }
 
 /**
- * The stand's step 7, the ribbon as a gallery (plan 2026-11-19, «Max's decision on the ribbon»), built as the web's own
- * paging: a horizontal scroller with CSS Scroll Snap (`scroll-snap-type: x mandatory`, each stop's column
- * `scroll-snap-align: start` and `scroll-snap-stop: always`, so one swipe never passes a stop). The browser follows the
- * finger and the trackpad's fingers, carries the momentum and snaps; nothing of ours moves it. It opens at the store's stop
- * (`scroll-initial-target`); the day is today's only, its title still. Standard: CSS Scroll Snap 1 and 2.
+ * The stand's step of the ribbon as a gallery (stage0.md, «Round seven»): the four columns at their widths, the strip
+ * standing at three stops; the day is today's only (no days past the calendar), its title still.
  */
-function SnapColumns() {
-	const opening = STRIP.indexOf(shownAt(useScreen((s) => s.stop))[0]);
-	const stop = (at: number) => `is-stop${at === opening ? " is-opening" : ""}`;
+function FollowColumns() {
+	const ribbon = useRef<HTMLDivElement>(null);
+	const { win } = useHost();
+	const { at, bind } = useFollowRibbon(ribbon, win);
 	return (
-		<div className="tc-snap-ribbon">
-			<div className="tc-ribbon-track" style={{ width: `${STRIP_WIDTH}%` } as CSSProperties}>
-				<ListColumn list="inbox" className={stop(0)} />
-				<ListColumn list="soon" className={stop(1)} />
-				<ListColumn list="day" className={stop(2)} />
+		<div className="tc-ribbon" ref={ribbon} {...bind()}>
+			<RibbonTrack at={at} className="tc-ribbon-track" width={STRIP_WIDTH} share={COLUMN_SHARE}>
+				<ListColumn list="inbox" />
+				<ListColumn list="soon" />
+				<ListColumn list="day" />
 				<ColumnBox className="is-timeline">
 					<ColumnHead title={null} />
 					<div className="tc-stage-body">
 						<Timeline />
 					</div>
 				</ColumnBox>
-			</div>
+			</RibbonTrack>
 		</div>
 	);
 }
@@ -144,10 +143,10 @@ function CalendarColumns() {
 	);
 }
 
-const ListColumn = memo(function ListColumn({ list, share = COLUMN_SHARE, className = "" }: { readonly list: ListId; readonly share?: number; readonly className?: string }) {
+const ListColumn = memo(function ListColumn({ list, share = COLUMN_SHARE }: { readonly list: ListId; readonly share?: number }) {
 	const title = useData((d) => d.lists[list].title);
 	return (
-		<ColumnBox className={`is-${list} ${className}`.trim()} share={share}>
+		<ColumnBox className={`is-${list}`} share={share}>
 			<ColumnHead title={title} />
 			<div className="tc-stage-body">
 				<TaskList list={list} />

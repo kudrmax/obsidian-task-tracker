@@ -62,3 +62,27 @@ export class FollowPager {
 		return Math.min(this.last, origin + 1, Math.max(0, origin - 1, at));
 	}
 }
+
+/** The columns' landing: a spring that settles in about 200 ms (critically damped, stage 0 round six). */
+export const LANDING = { stiffness: 1400, damping: 75 } as const;
+const OMEGA = Math.sqrt(LANDING.stiffness);
+
+/**
+ * The speed the landing starts at, places/s: the fingers' own (`speed` px/ms, positive on), so the columns go on as the
+ * fingers left them; only the part toward the landing place, and no faster than lets the spring reach it without passing
+ * it. Never the speed the strip was last set at: a wheel's deltas come in bursts and read as a throw of thousands of
+ * pixels a second, which flung the columns places past their landing (the chained strokes, 2026-11-19).
+ */
+export function landingVelocity(at: number, to: number, speed: number, width: number): number {
+	const toward = Math.sign(to - at);
+	const v = width > 0 ? (speed * 1000) / width : 0;
+	if (toward === 0 || Math.sign(v) !== toward) return 0;
+	return toward * Math.min(Math.abs(v), OMEGA * Math.abs(to - at));
+}
+
+/** Where the landing stands `ms` after it began at `from` with `velocity` places/s toward `to` (the spring, solved). */
+export function landingAt(from: number, to: number, velocity: number, ms: number): number {
+	const s = ms / 1000;
+	const e = from - to;
+	return to + (e + (velocity + OMEGA * e) * s) * Math.exp(-OMEGA * s);
+}

@@ -19,8 +19,10 @@ const STALL_FRAMES = 60;
  * places the ribbon stood at, in order, against the recording's `.expect.json` (each stroke one place its way, clamped at
  * the row's ends); never two places at once; never a stall between places; and the shared frame checks.
  */
-export async function replay(cdp, file, { startPlace = 1, strokes = [] } = {}) {
+export async function replay(cdp, file, { startPlace = 1, strokes = [], steps: given = null, last = Infinity, tolerant = false, span = null } = {}) {
 	const rec = JSON.parse(readFileSync(file, "utf8"));
+	/** A part of a long session (`span`: from and to, ms from its start): the frames of two minutes at once overrun the page. */
+	if (span) rec.events = inSpan(rec.events, span);
 	let removed = 0;
 	let prev = rec.events[0].t;
 	for (const e of rec.events) {
@@ -30,7 +32,11 @@ export async function replay(cdp, file, { startPlace = 1, strokes = [] } = {}) {
 		e.t -= removed;
 	}
 	const expectFile = file.replace(/\.json$/, ".expect.json");
-	const expected = existsSync(expectFile) ? JSON.parse(readFileSync(expectFile, "utf8")).swipes : null;
+	/**
+	 * A step's own expectation (`steps`: each landing its way, `last` the row's end) before the pager's hand-made file;
+	 * `tolerant`: the steps are a rule run offline on a long session, held as the pager's rule is (`ASTRAY_SHARE`).
+	 */
+	const expected = given ?? (existsSync(expectFile) ? JSON.parse(readFileSync(expectFile, "utf8")).swipes : null);
 	const frames = new FrameRecorder(cdp);
 	await frames.start();
 	/**
@@ -82,7 +88,7 @@ export async function replay(cdp, file, { startPlace = 1, strokes = [] } = {}) {
 	 */
 	const steps = expected ?? strokes;
 	const path = [startPlace];
-	for (const s of steps) path.push(Math.max(0, path.at(-1) + s));
+	for (const s of steps) path.push(Math.min(last, Math.max(0, path.at(-1) + s)));
 	const expectedPlaces = dedupe(path);
 	let stalls = 0;
 	for (let i = 0; i + STALL_FRAMES <= places.length; i++) {
@@ -105,8 +111,14 @@ export async function replay(cdp, file, { startPlace = 1, strokes = [] } = {}) {
 	const astray = Math.max(seen.length, sent.length) - commonLength(seen, sent);
 	const faults = frameFaults(shown);
 	const ends = observed.at(-1) === expectedPlaces.at(-1);
-	const onPath = expected ? astray === 0 && ends : astray <= Math.max(1, Math.floor(sent.length * ASTRAY_SHARE));
+	const onPath = expected && !tolerant ? astray === 0 && ends : astray <= Math.max(1, Math.floor(sent.length * ASTRAY_SHARE));
 	return { recording: file.split("/").pop(), expected: expected ? expectedPlaces : `${sent.length} steps by the pager's rule`, observed: expected ? observed : `${seen.length} steps`, astray, stalls, faults, frames: shown.length, ok: onPath && stalls === 0 && faults.length === 0 };
+}
+
+/** The events of `[from, to)` ms from the recording's first. */
+export function inSpan(events, [from, to]) {
+	const t0 = events[0].t;
+	return events.filter((e) => e.t - t0 >= from && e.t - t0 < to);
 }
 
 const dedupe = (xs) => xs.filter((x, i) => i === 0 || x !== xs[i - 1]);
