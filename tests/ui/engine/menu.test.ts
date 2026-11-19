@@ -197,3 +197,28 @@ describe("the menu's fields and the plus, in the store", () => {
 		expect(store.getState().layer).toBeNull();
 	});
 });
+
+describe("the stand's calendar at any hour of its day (verifier, 2026-11-20)", () => {
+	const blocksAt = (h: number, m: number) => {
+		const clock = new Date(2026, 10, 20, h, m);
+		const p = new MockPort(() => clock);
+		p.reset(calendarFile(clock));
+		return { blocks: p.read(0).day.blocks, now: p.now().minute, events: p.read(0).day.events };
+	};
+
+	it("at noon the plan stands as before: an hour after the present hour, over eight hours", () => {
+		const { blocks, now } = blocksAt(12, 0);
+		const starts = blocks.filter((b) => b.id !== "k12").map((b) => b.start);
+		expect(Math.min(...starts)).toBe(Math.floor(now / 60) * 60 + 60);
+		expect(Math.max(...starts) - Math.min(...starts)).toBe(420);
+	});
+
+	it("after midnight (the stand's day starts at 05:00) the plan still stands ahead of the now line, inside the day", () => {
+		const { blocks, now, events } = blocksAt(0, 12);
+		const ahead = blocks.filter((b) => b.id !== "k12");
+		expect(ahead.every((b) => b.start > now)).toBe(true);
+		expect(ahead.every((b) => b.start + (b.length ?? 30) <= 24 * 60)).toBe(true);
+		expect(new Set(ahead.map((b) => b.start)).size).toBeGreaterThan(5);
+		expect(events.every((e) => e.end <= 24 * 60)).toBe(true);
+	});
+});

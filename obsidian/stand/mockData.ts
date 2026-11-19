@@ -224,18 +224,25 @@ export function calendarFile(clock: Date): MockFile {
 	const plain = (id: string, title: string, due: string | null, slot: MockTask["slot"] = null, children: MockTask[] = []): MockTask => ({ id, title, level: null, status: " ", due, slot, description: null, children });
 	file.soon[0].tasks = ["Купить подарок", "Сдать отчёт", "Написать письмо", "Забрать посылку", "Обновить резюме", "Сходить в зал"].map((title, i) => plain(`g${i + 1}`, title, null));
 	file.inbox[0].tasks = [];
-	/** The blocks start an hour after the present hour, never so late that the last would leave the day. */
-	const hour = Math.min(Math.max(0, Math.floor(minuteOf(clock) / 60) * 60), 24 * 60 - 10 * 60);
+	/**
+	 * The blocks start an hour after the present hour and spread over the next eight. Late in the stand's day (it starts at
+	 * 05:00, so 00:12 is its twentieth hour) there are fewer hours left: the plan draws closer together, down to a quarter of
+	 * its spread, so it stands ahead of the now line as far as the day lets it, never past the day's end.
+	 */
+	const hour = Math.max(0, Math.floor(minuteOf(clock) / 60) * 60);
+	const DAY = 24 * 60;
+	const spread = Math.min(1, Math.max(0.25, (DAY - hour - 60 - 30) / 480));
+	const ahead = (offset: number, length = 30) => Math.min(hour + 60 + Math.round(((offset - 60) * spread) / 5) * 5, DAY - length);
 	const blocks: [string, number, number | null][] = [
-		["Созвон с командой", hour + 60, 30],
-		["Заметки к созвону", hour + 65, null],
-		["Обед", hour + 120, 60],
-		["Позвонить в банк", hour + 150, null],
-		["Ревью дизайна", hour + 240, 60],
-		["Звонок врачу", hour + 270, 30],
-		["Тренировка", hour + 360, 90],
+		["Созвон с командой", ahead(60), 30],
+		["Заметки к созвону", ahead(65), null],
+		["Обед", ahead(120, 60), 60],
+		["Позвонить в банк", ahead(150), null],
+		["Ревью дизайна", ahead(240, 60), 60],
+		["Звонок врачу", ahead(270), 30],
+		["Тренировка", ahead(360, 90), 90],
 	];
-	const folded = plain("k8", "Переезд", today, { start: hour + 480, end: null }, [{ ...plain("k9", "Найти грузчиков", null), status: "x" }, plain("k10", "Упаковать книги", null), plain("k11", "Заказать машину", null)]);
+	const folded = plain("k8", "Переезд", today, { start: ahead(480), end: null }, [{ ...plain("k9", "Найти грузчиков", null), status: "x" }, plain("k10", "Упаковать книги", null), plain("k11", "Заказать машину", null)]);
 	folded.folded = true;
 	const late = Math.max(0, hour - 45);
 	file.now[0].tasks = [
@@ -246,11 +253,11 @@ export function calendarFile(clock: Date): MockFile {
 	];
 	file.events = [
 		{ id: "ev1", title: "Стендап", start: Math.max(0, hour - 120), end: Math.max(0, hour - 120) + 30, color: CALENDAR_COLORS.work },
-		{ id: "ev2", title: "Встреча с дизайнером", start: hour + 330, end: hour + 390, color: CALENDAR_COLORS.google },
-		{ id: "ev3", title: "Планирование квартала", start: hour + 420, end: hour + 510, color: CALENDAR_COLORS.work },
-		{ id: "ev4", title: "Звонок с клиентом", start: hour + 450, end: hour + 480, color: CALENDAR_COLORS.pink },
-		{ id: "ev5", title: "Синк с Олей", start: hour + 465, end: hour + 495, color: CALENDAR_COLORS.google },
-	];
+		{ id: "ev2", title: "Встреча с дизайнером", start: ahead(330, 60), end: ahead(330, 60) + 60, color: CALENDAR_COLORS.google },
+		{ id: "ev3", title: "Планирование квартала", start: ahead(420, 90), end: ahead(420, 90) + 90, color: CALENDAR_COLORS.work },
+		{ id: "ev4", title: "Звонок с клиентом", start: ahead(450), end: ahead(450) + 30, color: CALENDAR_COLORS.pink },
+		{ id: "ev5", title: "Синк с Олей", start: ahead(465), end: ahead(465) + 30, color: CALENDAR_COLORS.google },
+	].filter((e) => e.end <= DAY);
 	file.allDay = [{ id: "ad1", title: "День рождения Кости", color: CALENDAR_COLORS.green }];
 	return file;
 }
