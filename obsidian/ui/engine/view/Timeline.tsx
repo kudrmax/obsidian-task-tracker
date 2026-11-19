@@ -242,7 +242,6 @@ const BlockItem = memo(function BlockItem({ block, box, order, z, top, scale }: 
 		<MovingRow ref={setElement} id={block.id} order={order} carried={lifted} fresh={false} placed className={className} style={boxStyle(box, selected || resizing ? top : z)}>
 			<SortableRow
 				id={block.id}
-				placed
 				onTap={(target) => {
 					anchor.current = target;
 					api.getState().openMenu(block.id);

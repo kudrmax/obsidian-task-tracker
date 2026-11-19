@@ -4,8 +4,9 @@ import { type CSSProperties, forwardRef, type ReactNode } from "react";
 /**
  * Rows that move (spec, «The owners»): a row glides to its new place whatever moved it, a drag, a command, Sync, a new
  * task. Motion's `layout="position"` keyed by the task's id, as stage 0 settled it («Integration findings» 2–3, «Drop
- * flicker» 3): the layout is measured only when the order *as read* changes (`order`), never on the drag's own reorder;
- * the carried row has no layout and no layout id; no crossfade; a row comes in only when its task is new. A row whose task
+ * flicker» 3): the layout is measured only when its list's order changes (`order`), never on the drag's own parting; a
+ * list row stands inside the slot that dnd-kit parts, so a row let go mid-parting glides on from where it is drawn
+ * (Decision 61); the carried row has no layout and no layout id; no crossfade; a row comes in only when its task is new. A row whose task
  * left goes in the same frame; a task moved to another region glides there by its layout id. No `LayoutGroup`: a list's
  * rows already measure together (one `order`), and a group would make a row going away at a drop measure every other
  * row in the middle of the drop, without the place dnd-kit has them at, so they would glide back from where they stood
@@ -35,7 +36,7 @@ export const MovingRow = forwardRef<HTMLDivElement, MovingRowProps>(function Mov
 
 export interface MovingRowProps {
 	readonly id: string;
-	/** The order of its list as read: a change measures the rows and glides them. */
+	/** The order of its list (held while a card is carried): a change measures the rows and glides them. */
 	readonly order: string;
 	readonly carried: boolean;
 	/**

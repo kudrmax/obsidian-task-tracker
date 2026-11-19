@@ -1,7 +1,7 @@
 import { defaultRangeExtractor, type Range, useVirtualizer } from "@tanstack/react-virtual";
-import { type CSSProperties, memo, useCallback, useEffect, useMemo, useState } from "react";
+import { type CSSProperties, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PROPERTY } from "../../design";
-import { PLUS, SortableList, SortableRow, useListTarget } from "../drag/Drag";
+import { DragSource, PLUS, SortableList, SortableSlot, useListTarget } from "../drag/Drag";
 import { descendantsOf } from "../drag/tree";
 import { useAnchor } from "../layers/Layers";
 import type { Destination, ListId, Row } from "../port";
@@ -19,11 +19,10 @@ const OVERSCAN = 6;
  * The one list component (spec, «Long lists»): a list scrolls natively in its own room and mounts only the rows in sight,
  * as TanStack Virtual's dynamic list draws them (the rows in flow inside one block translated to the first one's start,
  * each measured; a carried card's row kept mounted). Every task's id stays in the list's `SortableContext`, mounted or not (stage 0, second round); every row
- * is a `MovingRow`. A task the store asks to reveal is scrolled into sight by the virtualizer's `scrollToIndex`.
+ * is a `MovingRow` inside its `SortableSlot` (Decision 61). A task the store asks to reveal is scrolled into sight by the virtualizer's `scrollToIndex`.
  */
 export const TaskList = memo(function TaskList({ list }: { readonly list: ListId }) {
 	const allRows = useData((d) => d.lists[list].rows);
-	const readRows = useData((d) => d.lists[list].rows, true);
 	const lifted = useScreen((s) => s.lifted);
 	const liftedDepth = useScreen((s) => s.liftedDepth);
 	/** A carried task's subtasks fold away under it while it is carried (dnd-kit's «Sortable tree»): they travel with it. */
@@ -48,7 +47,16 @@ export const TaskList = memo(function TaskList({ list }: { readonly list: ListId
 	const drawn = useMemo(() => withEntry(withPlus, list, entry), [withPlus, list, entry]);
 	const fresh = useScreen((s) => s.fresh);
 	const reveal = useScreen((s) => s.reveal);
-	const order = useMemo(() => readRows.map((row) => row.id).join(" "), [readRows]);
+	/**
+	 * The order the rows glide by (Motion's `layoutDependency`): the list's order as drawn, held as it stood at the lift
+	 * while a card is carried (dnd-kit parts the rows then, stage 0 «Integration findings» 3). Let go, it is the drop's
+	 * order in the same frame the rows take their new places, so they glide on from where dnd-kit's parting left them
+	 * (Decision 61); the read of the drop's write keeps that order and measures nothing again.
+	 */
+	const drawnOrder = useMemo(() => allRows.map((row) => row.id).join(" "), [allRows]);
+	const held = useRef(drawnOrder);
+	if (lifted === null) held.current = drawnOrder;
+	const order = held.current;
 	/** Every row is in the sortable list: headers move aside like cards; a card goes after a header into its section. */
 	const ids = useMemo(() => withPlus.map((row) => row.id), [withPlus]);
 	const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
@@ -111,11 +119,13 @@ export const TaskList = memo(function TaskList({ list }: { readonly list: ListId
 								const row = drawn[item.index];
 								if (row.kind === "plus")
 									return (
-										<MovingRow key={row.id} id={row.id} index={item.index} ref={virtualizer.measureElement} order={order} carried fresh={false} className="tc-list-item">
-											<SortableRow id={row.id} gap>
-												<div className="tc-card" style={{ [PROPERTY.level]: String(liftedDepth ?? 0) } as CSSProperties} />
-											</SortableRow>
-										</MovingRow>
+										<SortableSlot key={row.id} id={row.id} index={item.index} measure={virtualizer.measureElement} carried={false}>
+											<MovingRow id={row.id} order={order} carried fresh={false} className="tc-list-item">
+												<DragSource gap>
+													<div className="tc-card" style={{ [PROPERTY.level]: String(liftedDepth ?? 0) } as CSSProperties} />
+												</DragSource>
+											</MovingRow>
+										</SortableSlot>
 									);
 								if (row.kind === "entry")
 									return (
@@ -124,9 +134,11 @@ export const TaskList = memo(function TaskList({ list }: { readonly list: ListId
 										</MovingRow>
 									);
 								return (
-									<MovingRow key={row.id} id={row.id} index={item.index} ref={virtualizer.measureElement} order={order} carried={lifted === row.id} fresh={fresh.has(row.id)} className="tc-list-item">
-										<RowFace row={row.kind === "task" && row.id === lifted && liftedDepth !== null ? { ...row, depth: liftedDepth } : row} />
-									</MovingRow>
+									<SortableSlot key={row.id} id={row.id} index={item.index} measure={virtualizer.measureElement} carried={row.kind === "task"}>
+										<MovingRow id={row.id} order={order} carried={lifted === row.id} fresh={fresh.has(row.id)} className="tc-list-item">
+											<RowFace row={row.kind === "task" && row.id === lifted && liftedDepth !== null ? { ...row, depth: liftedDepth } : row} />
+										</MovingRow>
+									</SortableSlot>
 								);
 							})}
 					</SortableList>
@@ -142,22 +154,21 @@ const RowFace = memo(function RowFace({ row }: { readonly row: Row }) {
 	const anchor = useAnchor();
 	if (row.kind === "section")
 		return (
-			<SortableRow id={row.id}>
+			<DragSource>
 				<div className="tc-group-head">
 					<span className="tc-group-name">{row.title}</span>
 				</div>
-			</SortableRow>
+			</DragSource>
 		);
 	return (
-		<SortableRow
-			id={row.id}
+		<DragSource
 			onTap={(target) => {
 				anchor.current = target;
 				api.getState().openMenu(row.id);
 			}}
 		>
 			<Card id={row.id} depth={row.depth} />
-		</SortableRow>
+		</DragSource>
 	);
 });
 
