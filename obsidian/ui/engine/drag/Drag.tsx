@@ -29,8 +29,8 @@ const isPlus = (id: UniqueIdentifier): boolean => id === PLUS || id === NEW_SLOT
 const onPlus = (event: Event): boolean => (event.target as Element | null)?.closest?.("[data-plus]") != null;
 
 /**
- * Empty time on the calendar is carried as a new task's place (F101): a long press there (the mouse: a drag) lifts it at
- * that minute, it follows the finger by the snap step, and let go the new task's field opens where it stands. A press on
+ * Empty time on the calendar is carried as a new task's place (F101): a long press there (the mouse held still too) lifts
+ * it at that minute, it follows the finger by the snap step, and let go the new task's field opens where it stands. A press on
  * something of its own there (a block, an event, a dot, a field) is that thing's.
  */
 export const NEW_SLOT = "new-slot";
@@ -59,8 +59,8 @@ interface PendingSensor {
  * pinch or a resize holds the pointer (`busy`). A card is lifted by the long press of a finger (touch events); a second
  * finger landing while it waits makes the press part of a pinch, and it is forgotten (the plugin's `LongPress`). The mouse
  * lifts a card once it moved, or once held still for the long press (then, let go unmoved, the card's menu opens, as the
- * plugin's mouse long tap does; on empty calendar time, the new task's place). The plus moves at once under a finger (the
- * old plugin's F175), started by the pointer events of a touch on it, so the sensors never listen to the same event
+ * plugin's mouse long tap does); on empty calendar time only the hold lifts the new task's place, as a finger's long
+ * press. The plus moves at once under a finger (the old plugin's F175), started by the pointer events of a touch on it, so the sensors never listen to the same event
  * (dnd-kit keeps one listener per event name). A sensor's own listeners go through its own registry, removed with it.
  */
 class CardTouchSensor extends TouchSensor {
@@ -90,13 +90,22 @@ class CardMouseSensor extends MouseSensor {
 	constructor(props: ConstructorParameters<typeof MouseSensor>[0]) {
 		super(props);
 		const sensor = this as unknown as PendingSensor;
-		/** Waiting out the hold, a mouse moved past the start distance lifts at once. */
+		/**
+		 * Waiting out the hold, a mouse moved past the start distance lifts a card at once. Empty time is no thing to drag:
+		 * there only a hold lifts the new task's place, and a mouse that moves first is no long tap (the finger's tolerance).
+		 */
 		sensor.documentListeners.add(
 			"mousemove",
 			(event) => {
 				const from = sensor.initialCoordinates;
 				const at = getEventCoordinates(event);
-				if (sensor.activated || !from || !at || Math.hypot(at.x - from.x, at.y - from.y) <= MOUSE_DISTANCE_PX) return;
+				if (sensor.activated || !from || !at) return;
+				const distance = Math.hypot(at.x - from.x, at.y - from.y);
+				if (props.active === NEW_SLOT) {
+					if (distance > LONG_PRESS_TOLERANCE_PX) sensor.handleCancel();
+					return;
+				}
+				if (distance <= MOUSE_DISTANCE_PX) return;
 				if (sensor.timeoutId !== null) clearTimeout(sensor.timeoutId);
 				sensor.timeoutId = null;
 				sensor.handleStart();
@@ -191,6 +200,12 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 	);
 	const anchor = useAnchor();
 	const [active, setActive] = useState<string | null>(null);
+	/**
+	 * Whether what was lifted last has a copy that flies into its place when let go. The calendar's new place has none: its
+	 * draggable node is the calendar's canvas itself, which dnd-kit's drop animation would hide (`styles.active`) and scroll
+	 * to while a copy flew, so the calendar went blank before the field. Kept past the drag's end, when the animation runs.
+	 */
+	const [flies, setFlies] = useState(true);
 
 	/**
 	 * Which target the pointer is over, as dnd-kit's «multiple containers» example decides it: what is under the pointer,
@@ -427,6 +442,7 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 		liftAt.current = null;
 		homeTop.current = null;
 		swipe.current = new SwipeLevel(null, 0, liftX, performance.now());
+		setFlies(lifted.id !== NEW_SLOT);
 		if (isPlus(lifted.id)) {
 			screen.openEntry(null);
 			screen.select(null);
@@ -522,7 +538,7 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 		<DndContext sensors={sensors} collisionDetection={collision} onDragStart={start} onDragMove={move} onDragOver={overList} onDragEnd={end} onDragCancel={cancel} autoScroll={autoScroll} measuring={MEASURING}>
 			{children}
 			{createPortal(
-				<DragOverlay className="tc-overlay" dropAnimation={DROP_ANIMATION}>
+				<DragOverlay className="tc-overlay" dropAnimation={flies ? DROP_ANIMATION : null}>
 					{active === PLUS ? plus : active === NEW_SLOT ? null : active ? <Carried id={active} carried={carried} /> : null}
 				</DragOverlay>,
 				doc.body,
