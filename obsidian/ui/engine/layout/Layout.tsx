@@ -1,11 +1,11 @@
-import { type CSSProperties, memo, type ReactNode, useRef } from "react";
-import { useFollowRibbon } from "../gestures/FollowRibbon";
+import { type CSSProperties, memo, type ReactNode, useContext, useRef } from "react";
+import { type DayTurn, DayTurnContext, useFollowRibbon, useNearerDay } from "../gestures/FollowRibbon";
 import { RibbonTrack, useRibbon } from "../gestures/Ribbon";
 import type { ListId } from "../port";
 import { DayContext, useData, useScreen } from "../store";
 import { useHost } from "../view/host";
 import { PlusButton } from "../view/QuickAdd";
-import { Slide } from "../view/Slide";
+import { DaySlide, Slide } from "../view/Slide";
 import { TaskList } from "../view/TaskList";
 import { TaskMenu } from "../view/TaskMenu";
 import { Timeline } from "../view/Timeline";
@@ -81,27 +81,67 @@ function RibbonColumns() {
 
 /**
  * The stand's step of the ribbon as a gallery (stage0.md, «Round seven»): the four columns at their widths, the strip
- * standing at three stops; the day is today's only (no days past the calendar), its title still.
+ * standing at three stops; past the calendar the days, one place a day (docs/plugin/screen.md, «Свайп по экрану и дни»):
+ * the strip stands and in the day's list and its calendar the day slides out as the next comes in, the headers and the
+ * hours standing still.
  */
 function FollowColumns() {
 	const ribbon = useRef<HTMLDivElement>(null);
 	const { win } = useHost();
-	const { at, bind } = useFollowRibbon(ribbon, win);
+	const { at, turn, bind } = useFollowRibbon(ribbon, win);
 	return (
 		<div className="tc-ribbon" ref={ribbon} {...bind()}>
-			<RibbonTrack at={at} className="tc-ribbon-track" width={STRIP_WIDTH} share={COLUMN_SHARE}>
-				<ListColumn list="inbox" />
-				<ListColumn list="soon" />
-				<ListColumn list="day" />
-				<ColumnBox className="is-timeline">
-					<ColumnHead title={null} />
-					<div className="tc-stage-body">
-						<Timeline />
-					</div>
-				</ColumnBox>
-			</RibbonTrack>
+			<DayTurnContext.Provider value={turn}>
+				<RibbonTrack at={at} className="tc-ribbon-track" width={STRIP_WIDTH} share={COLUMN_SHARE}>
+					<ListColumn list="inbox" />
+					<ListColumn list="soon" />
+					<TurningDayColumn />
+					<ColumnBox className="is-timeline">
+						<ColumnHead title={null} />
+						<div className="tc-stage-body">
+							<Timeline />
+						</div>
+					</ColumnBox>
+				</RibbonTrack>
+			</DayTurnContext.Provider>
 		</div>
 	);
+}
+
+/** The day's list as the days turn: its header names the day nearer in sight and stands; below it each day drawn slides through the column. */
+function TurningDayColumn() {
+	const turn = useContext(DayTurnContext);
+	if (!turn) return null;
+	return (
+		<ColumnBox className="is-day">
+			<ColumnHead title={<NearerDayTitle turn={turn} />} />
+			<div className="tc-day-lane">
+				{turn.days.map((day) => (
+					<DaySlide key={day} day={day} at={turn.at} window="lane" className="tc-slide">
+						<DayContext.Provider value={day}>
+							<div className="tc-stage-body">
+								<TaskList list="day" />
+							</div>
+						</DayContext.Provider>
+					</DaySlide>
+				))}
+			</div>
+		</ColumnBox>
+	);
+}
+
+/** The day's title: the day that stands nearer in sight. */
+function NearerDayTitle({ turn }: { readonly turn: DayTurn }) {
+	return (
+		<DayContext.Provider value={useNearerDay(turn)}>
+			<DayListTitle />
+		</DayContext.Provider>
+	);
+}
+
+function DayListTitle() {
+	const title = useData((d) => d.lists.day.title);
+	return <span className="tc-day-title">{title}</span>;
 }
 
 function NoteColumn() {

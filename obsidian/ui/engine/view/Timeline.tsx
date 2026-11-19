@@ -1,4 +1,4 @@
-import { type CSSProperties, memo, type MouseEvent, useCallback, useMemo, useRef, useState } from "react";
+import { type CSSProperties, memo, type MouseEvent, useCallback, useContext, useMemo, useRef, useState } from "react";
 import { DESIGN, PROPERTY } from "../../design";
 import { CalendarBlocks, SortableRow, useCalendarDrop, useNewSlot } from "../drag/Drag";
 import { type Edge, useResize } from "../gestures/Resize";
@@ -6,12 +6,14 @@ import { hourOf, type RoomMeasure, useCalendarZoom } from "../gestures/Zoom";
 import { Pinned, useAnchor } from "../layers/Layers";
 import { type EventBox, layEvents, layTasks, opening, type Shade, shadesOn, stackEnd, type TaskBox } from "../layout/calendar";
 import { TimeScale } from "../layout/timeScale";
-import type { AllDayEvent, Block, DayEvent, EventPaint } from "../port";
-import { useData, useScreen, useScreenApi } from "../store";
+import { type DayTurn, DayTurnContext } from "../gestures/FollowRibbon";
+import type { AllDayEvent, Block, DayData, DayEvent, EventPaint, Now } from "../port";
+import { DayContext, useData, useScreen, useScreenApi } from "../store";
 import { Card } from "./Card";
 import { useHost } from "./host";
 import { MovingRow } from "./MovingRow";
 import { EntryField } from "./QuickAdd";
+import { DaySlide } from "./Slide";
 
 const px = (n: number) => `${n}px`;
 const at = (minute: number, scale: TimeScale) => ({ [PROPERTY.y]: px(scale.y(minute)) }) as CSSProperties;
@@ -45,21 +47,16 @@ export const Timeline = memo(function Timeline() {
 	const plusMinute = useScreen((s) => s.plusMinute);
 	const entry = useScreen((s) => s.entry);
 	const dayOffset = useScreen((s) => s.dayOffset);
+	const own = useContext(DayContext);
+	const turn = useContext(DayTurnContext);
 	const { zoomMost } = useHost();
 	const [measured, setMeasured] = useState<RoomMeasure | null>(null);
 	const scale = useMemo(() => new TimeScale(hourOf(zoom, measured?.fit ?? null, zoomMost)), [zoom, measured, zoomMost]);
-	const events = useMemo(() => layEvents(day.events, scale), [day.events, scale]);
 	/** A new task's place or field on the calendar stands in the stack as a card without a length. */
 	const extra = plusMinute !== null ? plusMinute : entry?.at !== undefined && entry.dayOffset === dayOffset ? entry.at : null;
-	const boxes = useMemo(() => layTasks([...day.blocks.map((b) => ({ start: b.start, length: b.length })), ...(extra === null ? [] : [{ start: extra, length: null }])], events, scale), [day.blocks, extra, events, scale]);
+	const { boxes, drawn } = useDayLayout(day, extra, scale);
 	const end = stackEnd(boxes);
 	const placedBy = usePlacedBy(scale.hourPx, day.blocks, day.events, extra);
-	const order = useMemo(() => day.blocks.map((b) => `${b.id}@${b.start}+${b.length}`).join(" "), [day.blocks]);
-	/**
-	 * The blocks drawn in one order whatever their times (by id): each is placed by its own box, and a node the browser moves
-	 * among its siblings drops its running glide; which lies over which is its rank in the stack.
-	 */
-	const drawn = useMemo(() => day.blocks.map((block, index) => ({ block, box: boxes[index] })).sort((a, b) => (a.block.id < b.block.id ? -1 : a.block.id > b.block.id ? 1 : 0)), [day.blocks, boxes]);
 	const ids = useMemo(() => drawn.map(({ block }) => block.id), [drawn]);
 	const room = useRef<HTMLDivElement | null>(null);
 	const foot = useRef<HTMLDivElement | null>(null);
@@ -84,21 +81,26 @@ export const Timeline = memo(function Timeline() {
 		[drop.canvas, slot.ref],
 	);
 	/**
-	 * Where today opens, worked out once the room is measured: the now line at its share of what a person sees, as far as
-	 * the day's ends let it (the scroll stops at them: no room is ever kept over the first hour or under the last).
+	 * Where the calendar opens, worked out once the room is measured, for the day it opened on: today with the now line at
+	 * its share of what a person sees, as far as the day's ends let it (the scroll stops at them: no room is ever kept over
+	 * the first hour or under the last); another day on the port's hour. Days turned to by a finger keep the hours where
+	 * they stand (the plugin's «заголовок и часы стоят»).
 	 */
-	const [opened] = useState(() => ({ minute: now.minute }));
-	const opens = useMemo(() => (measured && day.isToday ? opening(scale.y(opened.minute), DESIGN.dayHours * scale.hourPx, measured.visible) : null), [measured, day.isToday, opened, scale]);
+	const [opened] = useState(() => ({ minute: now.minute, isToday: day.isToday, opensAt: day.opensAt }));
+	const opens = useMemo(() => (measured && opened.isToday ? opening(scale.y(opened.minute), DESIGN.dayHours * scale.hourPx, measured.visible) : null), [measured, opened, scale]);
 	/** The browser's reveal of a mark: put at the top of the room, less its scroll margin. */
 	const reveal = useCallback((el: HTMLElement | null) => el?.scrollIntoView({ block: "start", inline: "nearest" }), []);
-	const nearNow = (minute: number) => day.isToday && Math.abs(scale.y(minute) - scale.y(now.minute)) < TimeScale.NEAR_NOW;
+	/** The days drawn: a turn's, or the one this calendar shows. */
+	const days = turn?.days ?? [own ?? dayOffset];
+	/** An hour's label gives way to the now line while today is drawn. */
+	const todayDrawn = turn ? days.includes(0) : day.isToday;
+	const nearNow = (minute: number) => todayDrawn && Math.abs(scale.y(minute) - scale.y(now.minute)) < TimeScale.NEAR_NOW;
 	const marks = useMemo(() => scale.marks(), [scale]);
-	const top = events.length + boxes.length;
-	const shades = useShades(boxes, day.blocks, events.length, top, plusMinute === null);
 	const canvas = { [PROPERTY.hour]: px(scale.hourPx), [PROPERTY.stackEnd]: px(end) } as CSSProperties;
+	const layers = days.map((d) => <DayItems key={d} day={d} turn={turn} scale={scale} shown={d === (own ?? dayOffset)} now={now} />);
 	return (
 		<CalendarBlocks ids={ids}>
-			<AllDayRows rows={day.allDay} />
+			<AllDayBand days={days} turn={turn} shownDay={own ?? dayOffset} />
 			<div className="tc-timeline" data-timeline="" data-hour-px={scale.hourPx} data-step={scale.step} style={{ [PROPERTY.allDayExtraRows]: String(Math.max(0, day.allDay.length - 1)) } as CSSProperties} ref={setRoom}>
 				<div className="tc-foot-probe" ref={foot} />
 				<div className={`tc-canvas${placedBy === "scale" ? " is-rescaled" : ""}`} style={canvas} ref={setCanvas} {...slot.listeners}>
@@ -120,31 +122,107 @@ export const Timeline = memo(function Timeline() {
 							<div className="tc-hour-line is-minor" style={at(mark.minute, scale)} />
 						</div>
 					))}
-					{measured === null ? null : day.isToday ? (
+					{measured === null ? null : opened.isToday ? (
 						<div key="now" className="tc-reveal" style={{ ...at(opened.minute, scale), [PROPERTY.anchorOffset]: px(opens?.above ?? 0) } as CSSProperties} ref={reveal} />
 					) : (
-						<div key="opens" className="tc-reveal" style={{ ...at(day.opensAt, scale), [PROPERTY.anchorOffset]: px(DESIGN.labelLift) } as CSSProperties} ref={reveal} />
+						<div key="opens" className="tc-reveal" style={{ ...at(opened.opensAt, scale), [PROPERTY.anchorOffset]: px(DESIGN.labelLift) } as CSSProperties} ref={reveal} />
 					)}
-					<div className="tc-items">
-						{day.events.map((event, i) => (
-							<EventItem key={event.id} event={event} box={events[i]} scale={scale} />
-						))}
-						{drawn.map(({ block, box }) => (
-							<BlockItem key={block.id} block={block} box={box} shades={shades.get(block.id) ?? NO_SHADES} order={order} z={events.length + box.rank} top={top} scale={scale} />
-						))}
-						{extra === null ? null : <NewPlace minute={extra} box={boxes[boxes.length - 1]} z={top} field={plusMinute === null} />}
-					</div>
-					{day.isToday ? (
-						<div className="tc-now" style={at(now.minute, scale)}>
-							<span className="tc-now-pill">{now.label}</span>
-							<div className="tc-now-line" />
-						</div>
-					) : null}
+					{turn ? layers : <DayContext.Provider value={own}>{layers}</DayContext.Provider>}
 				</div>
 			</div>
 		</CalendarBlocks>
 	);
 });
+
+/** The day's items laid out: its events, its blocks with the new task's place, and the blocks in one order by id. */
+function useDayLayout(day: DayData, extra: number | null, scale: TimeScale) {
+	const events = useMemo(() => layEvents(day.events, scale), [day.events, scale]);
+	const boxes = useMemo(() => layTasks([...day.blocks.map((b) => ({ start: b.start, length: b.length })), ...(extra === null ? [] : [{ start: extra, length: null }])], events, scale), [day.blocks, extra, events, scale]);
+	/**
+	 * The blocks drawn in one order whatever their times (by id): each is placed by its own box, and a node the browser moves
+	 * among its siblings drops its running glide; which lies over which is its rank in the stack.
+	 */
+	const drawn = useMemo(() => day.blocks.map((block, index) => ({ block, box: boxes[index] })).sort((a, b) => (a.block.id < b.block.id ? -1 : a.block.id > b.block.id ? 1 : 0)), [day.blocks, boxes]);
+	return { events, boxes, drawn };
+}
+
+/**
+ * One day's items on the calendar: its events, its tasks stacked, the new task's place on the shown day, and its now line
+ * on today. As the days turn they slide through the items' room, each seen only within it, the hours standing still.
+ */
+const DayItems = memo(function DayItems({ day, turn, scale, shown, now }: { readonly day: number; readonly turn: DayTurn | null; readonly scale: TimeScale; readonly shown: boolean; readonly now: Now }) {
+	if (!turn) return <DayItemsOf day={day} turn={null} scale={scale} shown={shown} now={now} />;
+	return (
+		<DayContext.Provider value={day}>
+			<DayItemsOf day={day} turn={turn} scale={scale} shown={shown} now={now} />
+		</DayContext.Provider>
+	);
+});
+
+function DayItemsOf({ day: offset, turn, scale, shown, now }: { readonly day: number; readonly turn: DayTurn | null; readonly scale: TimeScale; readonly shown: boolean; readonly now: Now }) {
+	const day = useData((d) => d.day);
+	const plusMinute = useScreen((s) => (shown ? s.plusMinute : null));
+	const entry = useScreen((s) => (shown ? s.entry : null));
+	const dayOffset = useScreen((s) => s.dayOffset);
+	const extra = plusMinute !== null ? plusMinute : entry?.at !== undefined && entry.dayOffset === dayOffset ? entry.at : null;
+	const { events, boxes, drawn } = useDayLayout(day, extra, scale);
+	const order = useMemo(() => day.blocks.map((b) => `${b.id}@${b.start}+${b.length}`).join(" "), [day.blocks]);
+	const top = events.length + boxes.length;
+	const shades = useShades(boxes, day.blocks, events.length, top, plusMinute === null);
+	const turning = turn?.at ?? null;
+	return (
+		<>
+			<DaySlide day={offset} at={turning} window="own" className="tc-items">
+				{day.events.map((event, i) => (
+					<EventItem key={event.id} event={event} box={events[i]} scale={scale} />
+				))}
+				{drawn.map(({ block, box }) => (
+					<BlockItem key={block.id} block={block} box={box} shades={shades.get(block.id) ?? NO_SHADES} order={order} z={events.length + box.rank} top={top} scale={scale} />
+				))}
+				{extra === null ? null : <NewPlace minute={extra} box={boxes[boxes.length - 1]} z={top} field={plusMinute === null} />}
+			</DaySlide>
+			{day.isToday ? (
+				<DaySlide day={offset} at={turning} window="now" className="tc-now-lane">
+					<div className="tc-now" style={at(now.minute, scale)}>
+						<span className="tc-now-pill">{now.label}</span>
+						<div className="tc-now-line" />
+					</div>
+				</DaySlide>
+			) : null}
+		</>
+	);
+}
+
+/**
+ * The all-day rows over the calendar: the band and its line stand; each day's rows slide with its items. The shown day's
+ * rows hold the band's height (a shown day without any has no band); a day coming in lies over it.
+ */
+function AllDayBand({ days, turn, shownDay }: { readonly days: readonly number[]; readonly turn: DayTurn | null; readonly shownDay: number }) {
+	const rows = useData((d) => d.day.allDay);
+	if (!turn || rows.length === 0) return <AllDayRows rows={rows} />;
+	return (
+		<div className="tc-allday-rows">
+			<div className="tc-allday-backing" />
+			{days.map((day) => (
+				<DayContext.Provider key={day} value={day}>
+					<AllDayOf day={day} turn={turn} lying={day !== shownDay} />
+				</DayContext.Provider>
+			))}
+		</div>
+	);
+}
+
+function AllDayOf({ day, turn, lying }: { readonly day: number; readonly turn: DayTurn; readonly lying: boolean }) {
+	const rows = useData((d) => d.day.allDay);
+	const open = useOpenMenu();
+	return (
+		<DaySlide day={day} at={turn.at} window="own" className={`tc-allday-day${lying ? " is-lying" : ""}`}>
+			{rows.map((row) => (
+				<AllDayRow key={row.id} row={row} open={open} />
+			))}
+		</DaySlide>
+	);
+}
 
 const NO_SHADES: readonly Shade[] = [];
 
@@ -194,14 +272,20 @@ const AllDayRows = memo(function AllDayRows({ rows }: { readonly rows: readonly 
 		<div className="tc-allday-rows">
 			<div className="tc-allday-backing" />
 			{rows.map((row) => (
-				<div key={row.id} className={`tc-allday${row.past ? " is-past" : ""}`} data-event={row.id} style={paintStyle(row.paint)} onClick={(e) => open(row.id, e)}>
-					<div className="tc-event-bar" />
-					<div className="tc-allday-title">{row.title}</div>
-				</div>
+				<AllDayRow key={row.id} row={row} open={open} />
 			))}
 		</div>
 	);
 });
+
+function AllDayRow({ row, open }: { readonly row: AllDayEvent; readonly open: (id: string, event: MouseEvent<HTMLElement>) => void }) {
+	return (
+		<div className={`tc-allday${row.past ? " is-past" : ""}`} data-event={row.id} style={paintStyle(row.paint)} onClick={(e) => open(row.id, e)}>
+			<div className="tc-event-bar" />
+			<div className="tc-allday-title">{row.title}</div>
+		</div>
+	);
+}
 
 /** A tap on an event or a task opens its menu, from the element tapped. */
 function useOpenMenu(): (id: string, event: MouseEvent<HTMLElement>) => void {

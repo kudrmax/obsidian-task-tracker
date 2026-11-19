@@ -1,19 +1,47 @@
 import { useGesture } from "@use-gesture/react";
-import { animate, type AnimationPlaybackControls, type MotionValue, useMotionValue } from "motion/react";
-import { type RefObject, useEffect, useRef } from "react";
-import { offsetOf } from "../layout/columns";
-import { STOPS, useScreen, useScreenApi } from "../store";
+import { animate, type AnimationPlaybackControls, type MotionValue, useMotionValue, useMotionValueEvent, useTransform } from "motion/react";
+import { createContext, type RefObject, useEffect, useRef, useState } from "react";
+import { STOPS, type Stop, useScreen, useScreenApi } from "../store";
 import { FollowPager, LANDING, landingVelocity } from "./followPager";
 import { type WheelCue, WheelFollow } from "./wheelFollow";
 
 /** Where the landing counts as done, in places: under a pixel at any width the ribbon has. */
 const REST = 0.001;
 
+/** The ribbon's last stop, the day and its calendar: past it the places are the days, one a day. */
+const CALENDAR = STOPS.length - 1;
+
+/**
+ * The days a turn draws (docs/plugin/screen.md, «Свайп по экрану и дни»): past the calendar the strip stands and in each
+ * of the day's columns the day slides out as the next comes in, the header and the hours standing still.
+ */
+export interface DayTurn {
+	/** Where the days stand, in days from today: 1.3 is a third of the way from tomorrow to the day after. */
+	readonly at: MotionValue<number>;
+	/** The days drawn, in days from today: the shown one, and while a finger may draw them in, its neighbours. */
+	readonly days: readonly number[];
+}
+
+export const DayTurnContext = createContext<DayTurn | null>(null);
+
+/** The day that stands nearer in sight as the days turn, as the plugin's header names it while a finger draws the next day in. */
+export function useNearerDay(turn: DayTurn): number {
+	const [nearer, setNearer] = useState(() => Math.round(turn.at.get()));
+	useMotionValueEvent(turn.at, "change", (p) => setNearer(Math.round(p)));
+	return nearer;
+}
+
 export interface FollowGestures {
 	/** Where the strip stands, in columns from Inbox: 0 Inbox–Soon, 1 Soon–day, 2 the day–its calendar. */
 	readonly at: MotionValue<number>;
+	readonly turn: DayTurn;
 	readonly bind: ReturnType<typeof useGesture>;
 }
+
+/** Where the ribbon stands at a stop and day, in places: the stops 0–2, past the calendar one place a day. */
+const placeOf = (stop: Stop, dayOffset: number) => STOPS.indexOf(stop) + (stop === "calendar" ? Math.max(0, dayOffset) : 0);
+
+const sameDays = (a: readonly number[], b: readonly number[]) => a.length === b.length && a.every((day, i) => day === b[i]);
 
 /**
  * The ribbon as a gallery (Max, 2026-11-19; stage0.md, «Round seven»): one finger on glass and two on the trackpad are
@@ -26,10 +54,16 @@ export interface FollowGestures {
 export function useFollowRibbon(ribbon: RefObject<HTMLElement | null>, win: Window): FollowGestures {
 	const api = useScreenApi();
 	const stop = useScreen((s) => s.stop);
+	const dayOffset = useScreen((s) => s.dayOffset);
 	const dragging = useScreen((s) => s.gesture === "drag");
-	const at = useMotionValue(offsetOf(stop));
+	/** Where the ribbon stands, in places: the strip's stops, then the days past the calendar. */
+	const along = useMotionValue(placeOf(stop, dayOffset));
+	const at = useTransform(along, (p) => Math.min(p, CALENDAR));
+	const dayAt = useTransform(along, (p) => Math.max(0, p - CALENDAR));
+	const [days, setDays] = useState<readonly number[]>(() => [Math.max(0, dayOffset)]);
+	const drawnDays = useRef(days);
 	const glide = useRef<AnimationPlaybackControls | null>(null);
-	const pager = useRef(new FollowPager(STOPS.indexOf(stop), STOPS.length - 1));
+	const pager = useRef(new FollowPager(placeOf(stop, dayOffset), Infinity));
 	const fingers = useRef(new WheelFollow());
 	/** The finger's movement so far in this drag, px on: the pager takes it piece by piece. */
 	const drawn = useRef(0);
@@ -37,42 +71,71 @@ export function useFollowRibbon(ribbon: RefObject<HTMLElement | null>, win: Wind
 	/** Half the ribbon: one column, the way a step goes (the browser's width of the ribbon, read as a stroke moves, as @use-gesture's pager example reads the window's). */
 	const column = () => (ribbon.current?.clientWidth ?? 0) / 2;
 
-	/** One landing, the same after a finger, two fingers or a stop set from outside; it starts at the fingers' speed (`landingVelocity`), never at the speed Motion read off the strip's last sets. */
-	const land = (to: number, speed = 0) => {
-		glide.current?.stop();
-		const target = offsetOf(STOPS[to]);
-		const velocity = landingVelocity(at.get(), target, speed, column());
-		glide.current = animate(at, target, { type: "spring", ...LANDING, velocity, restDelta: REST, restSpeed: REST });
+	/**
+	 * The days to draw: those in sight now and those a finger can bring into sight from the place the ribbon stands at or
+	 * lands on, mounted ahead (`ahead`), so a stroke never waits for a day to be drawn; while it moves, the days it drew in
+	 * stay until it stands.
+	 */
+	const draw = (moving: boolean) => {
+		const p = along.get() - CALENDAR;
+		const stop = pager.current.stop - CALENDAR;
+		const near = stop < 0 ? [] : [stop - 1, stop, stop + 1];
+		const next = [...new Set([...near, Math.floor(p), Math.ceil(p), ...(moving ? drawnDays.current : [])])].filter((day) => day >= 0).sort((a, b) => a - b);
+		const shown = next.length > 0 ? next : [0];
+		api.getState().peekDays(shown);
+		if (sameDays(drawnDays.current, shown)) return;
+		drawnDays.current = shown;
+		setDays(shown);
 	};
 
-	/** A stop set from outside (a scenario's setup): the strip goes there by the same landing. */
+	/** One landing, the same after a finger, two fingers or a place set from outside; it starts at the fingers' speed (`landingVelocity`), never at the speed Motion read off the strip's last sets. */
+	const land = (to: number, speed = 0) => {
+		glide.current?.stop();
+		const velocity = landingVelocity(along.get(), to, speed, column());
+		const landing = animate(along, to, { type: "spring", ...LANDING, velocity, restDelta: REST, restSpeed: REST });
+		glide.current = landing;
+		void landing.then(() => {
+			if (glide.current === landing && !pager.current.following) draw(false);
+		});
+	};
+
+	/** A stop or day set from outside (a scenario's setup): the ribbon goes there by the same landing. Read as the store stands once the render is in: a finger's lift sets the stop and the day one after the other. */
 	useEffect(() => {
-		const to = STOPS.indexOf(stop);
+		const now = api.getState();
+		const to = placeOf(now.stop, now.dayOffset);
 		if (pager.current.following || pager.current.stop === to) return;
 		pager.current.stop = to;
+		draw(true);
 		land(to);
-	}, [stop]);
-	useEffect(() => () => glide.current?.stop(), []);
+	}, [stop, dayOffset]);
+	useEffect(() => {
+		draw(false);
+		return () => glide.current?.stop();
+	}, []);
 
 	const begin = (fresh: boolean): boolean => {
 		const screen = api.getState();
 		if (!pager.current.following && !screen.claim("ribbon")) return false;
 		glide.current?.stop();
-		pager.current.begin(at.get(), fresh);
-		screen.setStop(STOPS[pager.current.stop]);
+		pager.current.begin(along.get(), fresh);
+		screen.setStop(STOPS[Math.min(pager.current.stop, CALENDAR)]);
+		screen.showDay(Math.max(0, pager.current.stop - CALENDAR));
+		draw(true);
 		return true;
 	};
 
 	const move = (px: number) => {
-		if (pager.current.following) at.set(pager.current.move(px, column()));
+		if (pager.current.following) along.set(pager.current.move(px, column()));
 	};
 
 	const release = (speed: number) => {
 		if (!pager.current.following) return;
-		const to = pager.current.release(at.get(), speed, column());
+		const to = pager.current.release(along.get(), speed, column());
 		const screen = api.getState();
-		screen.setStop(STOPS[to]);
+		screen.setStop(STOPS[Math.min(to, CALENDAR)]);
+		screen.showDay(Math.max(0, to - CALENDAR));
 		screen.release("ribbon");
+		draw(true);
 		land(to, speed);
 	};
 
@@ -115,5 +178,7 @@ export function useFollowRibbon(ribbon: RefObject<HTMLElement | null>, win: Wind
 			},
 		},
 	);
-	return { at, bind };
+	/** A card carried: only the shown day is drawn, so a day out of sight never lies under it as a place to drop on. */
+	const drawnNow = dragging ? [Math.max(0, dayOffset)] : days;
+	return { at, turn: { at: dayAt, days: drawnNow }, bind };
 }

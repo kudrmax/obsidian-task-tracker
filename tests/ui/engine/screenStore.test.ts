@@ -135,6 +135,26 @@ describe("the day's slide", () => {
 		expect(left[2].shown.day.title).not.toBe("Tomorrow");
 		expect(left[1].shown.day.title).toBe("Tomorrow");
 	});
+
+	it("reads the days a finger draws into sight, and keeps what they drew when one of them is shown", () => {
+		const { store } = screen();
+		store.getState().peekDays([0, 1, 2]);
+		const { left, dayOffset } = store.getState();
+		expect(dayOffset).toBe(0);
+		expect(left[1].shown.day.title).toBe("Tomorrow");
+		expect(left[2].shown.day.title).not.toBe("Tomorrow");
+		const drawn = left[1].shown;
+		store.getState().peekDays([0, 1, 2]);
+		expect(store.getState().left[1].shown).toBe(drawn);
+		store.getState().showDay(1);
+		expect(store.getState().dayOffset).toBe(1);
+		expect(store.getState().dayWay).toBe(1);
+		expect(store.getState().shown.lists.day).toBe(drawn.lists.day);
+		expect(store.getState().left[0].shown.day.title).toBe("Today");
+		store.getState().showDay(0);
+		expect(store.getState().dayWay).toBe(-1);
+		expect(store.getState().shown.day.title).toBe("Today");
+	});
 });
 
 describe("structural sharing", () => {

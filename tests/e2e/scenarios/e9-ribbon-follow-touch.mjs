@@ -1,7 +1,7 @@
 /**
  * Step 7 under a finger on the phone (plan 2026-11-19; stage0.md, «Round seven»): the columns follow the finger; held
  * mid-way and let go they land on the nearest stop; a flick goes one stop, never two; two quick flicks, the second during
- * the first's landing, go two stops, one each; past the row's ends nothing moves.
+ * the first's landing, go two stops, one each; past the calendar the days, one a flick; at Inbox nothing moves.
  */
 /** How far the strip may trail the finger: Motion draws a value set on an event at its next frame (e0-ribbon-touch). */
 const FOLLOW_PX = 4;
@@ -35,7 +35,10 @@ export default {
 
 		await flick(1);
 		await t.sleep(500);
-		await is(["Today"], "a flick on at the calendar moves nothing: no day pages in this step");
+		await is(["Tomorrow"], "a flick on at the calendar: tomorrow, one day");
+		await flick(-1);
+		await t.sleep(500);
+		await is(["Today"], "a flick back from tomorrow: today, not past it");
 
 		const one = await t.frames(() => flick(-1), { cast: "flick", maxStep: 260 });
 		await t.sleep(500);

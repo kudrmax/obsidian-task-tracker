@@ -1808,6 +1808,13 @@ button.tc-btn.tc-folder-btn:disabled { opacity: var(--tc-tile-off-opacity); curs
 /* A region that slides (the shown day's list and its calendar): one layer filling its column, the next sliding in beside it. */
 .tc-slide { position: absolute; inset: 0; display: flex; flex-direction: column; }
 .tc-slide > .tc-stage-body > .tc-timeline { top: 0; }
+.tc-day-lane { position: relative; flex: 1 1 0; min-height: 0; overflow: clip; }
+.task-calendar.is-engine .tc-timeline { overflow-x: hidden; }
+.tc-now-lane { position: absolute; top: 0; bottom: 0; left: var(--tc-items-left); right: var(--tc-items-right); z-index: var(--tc-layer-now); pointer-events: none; }
+.tc-now-lane > .tc-now { left: calc(-1 * var(--tc-items-left)); right: calc(-1 * var(--tc-items-right)); }
+.tc-allday-day { position: relative; z-index: var(--tc-layer-allday); margin: 0 var(--tc-items-right) 0 var(--tc-items-left); }
+.tc-allday-day > .tc-allday { margin-left: 0; margin-right: 0; }
+.tc-allday-day.is-lying { position: absolute; top: 0; left: 0; right: 0; }
 /* A long list mounts only the rows in sight (TanStack Virtual): its whole height, the rows in flow in one block placed at the first one's start; a row holds its gap, so its measure is its step. */
 .tc-list-items { position: relative; flex: none; }
 .tc-list-block { position: absolute; top: 0; left: 0; right: 0; }

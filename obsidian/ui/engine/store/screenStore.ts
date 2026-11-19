@@ -69,6 +69,13 @@ export interface ScreenActions {
 	/** The ribbon one stop on (1) or back (-1); past the day's calendar, the days. */
 	step(shift: -1 | 1): void;
 	setStop(stop: Stop): void;
+	/**
+	 * The ribbon's place past the calendar as a finger lets it go (`offset` days from today): the day shown from now on, the
+	 * day turned away from kept for its region still sliding out.
+	 */
+	showDay(offset: number): void;
+	/** Reads the days `offsets` (other than the shown one) for regions a finger draws into sight, kept as the days turned away from are. */
+	peekDays(offsets: readonly number[]): void;
 	/** Takes the pointer for `gesture` unless another holds it; whether it got it. A drag takes it from the ribbon (its long press already proved the ribbon still, dnd-kit's activation constraint), never from a pinch or a resize. */
 	claim(gesture: Gesture): boolean;
 	release(gesture: Gesture): void;
@@ -160,13 +167,17 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 			});
 		};
 
-		const turnDay = (shift: -1 | 1) => {
-			const { dayOffset: from, shown, read } = get();
-			const dayOffset = from + shift;
-			const next = port.read(dayOffset);
-			const kept = Object.entries(get().left).filter(([day]) => Math.abs(Number(day) - dayOffset) <= LEFT_KEPT);
-			set({ left: { ...Object.fromEntries(kept), [from]: { shown, read } }, dayOffset, dayWay: shift, read: next, shown: next, fresh: new Set() });
+		/** The day `dayOffset` shown: the one turned away from kept for its region still sliding out, a day already drawn in sight read again over what it drew. */
+		const showDay = (dayOffset: number, dayWay: -1 | 0 | 1) => {
+			const { dayOffset: from, shown, read, left } = get();
+			if (dayOffset === from) return;
+			const drawn = left[dayOffset];
+			const fresh = port.read(dayOffset);
+			const next = drawn ? share(drawn.read, fresh) : fresh;
+			const kept = Object.entries(left).filter(([day]) => Math.abs(Number(day) - dayOffset) <= LEFT_KEPT);
+			set({ left: { ...Object.fromEntries(kept), [from]: { shown, read } }, dayOffset, dayWay, read: next, shown: drawn ? share(drawn.shown, next) : next, fresh: new Set() });
 		};
+		const turnDay = (shift: -1 | 1) => showDay(get().dayOffset + shift, shift);
 
 		return {
 			shown: first,
@@ -242,6 +253,21 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 			},
 			setStop(stop) {
 				set({ stop });
+			},
+			showDay(offset) {
+				showDay(offset, Math.sign(offset - get().dayOffset) as -1 | 0 | 1);
+			},
+			peekDays(offsets) {
+				const { dayOffset, left } = get();
+				const read = offsets
+					.filter((day) => day !== dayOffset)
+					.map((day): [number, { shown: ScreenData; read: ScreenData }] => {
+						const had = left[day];
+						const data = had ? share(had.read, port.read(day)) : port.read(day);
+						return [day, had && had.read === data && had.shown === data ? had : { shown: data, read: data }];
+					});
+				if (read.every(([day, kept]) => left[day] === kept)) return;
+				set({ left: { ...left, ...Object.fromEntries(read) } });
 			},
 			claim(gesture) {
 				const held = get().gesture;
