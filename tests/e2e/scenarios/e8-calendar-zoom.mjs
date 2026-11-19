@@ -1,3 +1,5 @@
+import { writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { carry, cardBy } from "../lib/carry.mjs";
 import { calendarTools } from "../lib/calendar.mjs";
 
@@ -8,6 +10,40 @@ const MIDDLE = `(() => {
 	const lines = [...document.querySelectorAll(".tc-timeline .tc-hour-mark > .tc-hour-label:not(.is-minor)")].map((l) => ({ hour: Number(l.dataset.hour), y: l.parentElement.querySelector(".tc-hour-line").getBoundingClientRect().top }));
 	for (let i = 0; i + 1 < lines.length; i++) if (lines[i].y <= y && lines[i + 1].y > y) return (i + (y - lines[i].y) / (lines[i + 1].y - lines[i].y)) * 60;
 	return null;
+})()`;
+
+/**
+ * Every frame while the calendar zooms, read off the screen (Max, 2026-11-19: «Купить молоко» at 18:30 stood at 16:00 in
+ * the middle of a zoom, the hour lines already drawn at the new scale): for each task and event on the calendar, how far
+ * its top stands from where the hour lines drawn in that frame put its minute, `minutes` naming each one's minute; and,
+ * for every task, stacked ones too, how far its top stands from its own place at the scale drawn (a glide lagging the zoom).
+ */
+const ZOOM_FRAMES = (minutes) => `(() => {
+	const minutes = ${JSON.stringify(minutes)};
+	const state = { frames: [], run: true };
+	const tick = () => {
+		if (!state.run) return;
+		const room = document.querySelector(".tc-timeline");
+		const canvas = room?.querySelector(".tc-canvas");
+		if (canvas) {
+			const lines = [...room.querySelectorAll(".tc-hour-mark > .tc-hour-label:not(.is-minor)")].map((l) => l.parentElement.querySelector(".tc-hour-line").getBoundingClientRect().top);
+			const lineOf = (minute) => { const i = Math.floor(minute / 60); return lines[i] + (lines[i + 1] - lines[i]) * ((minute % 60) / 60); };
+			const top = canvas.getBoundingClientRect().top;
+			const items = [];
+			for (const el of room.querySelectorAll(".tc-items > .tc-block, .tc-items > .tc-event")) {
+				const title = (el.querySelector(".tc-card-title, .tc-item-title")?.textContent) ?? "";
+				const r = el.getBoundingClientRect();
+				const inset = el.classList.contains("tc-event") ? parseFloat(getComputedStyle(el).getPropertyValue("--tc-item-inset")) : 0;
+				const own = top + parseFloat(el.style.getPropertyValue("--tc-y")) + inset;
+				items.push({ title, lag: +(r.top - own).toFixed(1), off: title in minutes ? +(r.top - inset - lineOf(minutes[title])).toFixed(1) : null });
+			}
+			state.frames.push({ hour: Number(room.dataset.hourPx), items });
+		}
+		requestAnimationFrame(tick);
+	};
+	requestAnimationFrame(tick);
+	window.__tcZoomFrames = () => { state.run = false; return state.frames; };
+	return 1;
 })()`;
 
 /**
@@ -52,10 +88,33 @@ export default {
 			}
 		};
 
+		/**
+		 * The zoom's frames: every task and event stays on its minute against the hour lines drawn in the same frame, and every
+		 * task, stacked ones too, stands at its own place at the scale drawn: a change of scale is no move, nothing glides to it.
+		 * `onLines` names the items whose top is their minute through the whole zoom (unstacked at every zoom it passes).
+		 */
+		const zoomFrames = async (gesture, onLines, label) => {
+			await t.cdp.eval(ZOOM_FRAMES(onLines));
+			await gesture();
+			const frames = await t.cdp.eval(`window.__tcZoomFrames()`);
+			const scales = new Set(frames.map((f) => f.hour)).size;
+			const worst = (key) => frames.flatMap((f) => f.items.filter((i) => i[key] !== null).map((i) => ({ hour: f.hour, title: i.title, [key]: i[key] }))).reduce((w, i) => (w === null || Math.abs(i[key]) > Math.abs(w[key]) ? i : w), null);
+			const lag = worst("lag");
+			const off = worst("off");
+			const seen = new Set(frames.flatMap((f) => f.items.filter((i) => i.off !== null).map((i) => i.title)));
+			console.log(`${label}: ${frames.length} frames, ${scales} scales, worst lag ${JSON.stringify(lag)}, worst off its line ${JSON.stringify(off)}`);
+			writeFileSync(join(t.out, `zoom-frames-${label}.json`), JSON.stringify({ frames: frames.length, scales, lag, off }));
+			t.expect(scales > 3, `${label}: the zoom is seen over several frames: ${scales} scales in ${frames.length} frames`);
+			t.expect(Object.keys(onLines).every((title) => seen.has(title)), `${label}: the items on their lines are measured: ${[...seen].join(", ")} of ${Object.keys(onLines).join(", ")}`);
+			t.expect(!lag || Math.abs(lag.lag) <= 1, `${label}: every task stands at its place at the scale drawn in every frame: worst ${JSON.stringify(lag)}`);
+			t.expect(!off || Math.abs(off.off) <= 1.5, `${label}: every task and event stays on its minute against the hour lines in every frame: worst ${JSON.stringify(off)}`);
+		};
+
 		const before = await t.cdp.eval(MIDDLE);
 		const base = await hour();
 		t.expect(base === 56 && (await step()) === 15, `the calendar opens at the base zoom, its snap 15 minutes: ${base}, ${await step()}`);
-		await pinch(1.8, 2);
+		/** At 12:00 the stand puts «Тренировка» at 18:00 and «Стендап» at 10:00, minutes from 05:00. */
+		await zoomFrames(() => pinch(1.8, 2), { Тренировка: 13 * 60, Стендап: 5 * 60 }, "in");
 		const bigger = await hour();
 		const after = await t.cdp.eval(MIDDLE);
 		t.expect(bigger >= 108, `a pinch out grows the hours: ${base} → ${bigger}`);
@@ -74,7 +133,7 @@ export default {
 		const milkAt = await cal.timeOf("Купить молоко");
 		t.expect(milkAt?.start === 10 * 60 + 5, `a card dropped at 15:05 at this zoom is written at 15:05: ${JSON.stringify(milkAt)}`);
 
-		await pinch(0.4, 4);
+		await zoomFrames(() => pinch(0.4, 4), { Стендап: 5 * 60 }, "out");
 		const whole = await hour();
 		/** The whole day fills what a person sees of the calendar: from the room's top to where the screen's foot begins (review 6). */
 		const fits = await t.cdp.eval(`(() => { const room = document.querySelector(".tc-timeline"); const first = room.querySelector('[data-hour="05"]').getBoundingClientRect(); const lines = room.querySelectorAll(".tc-hour-mark > .tc-hour-line:not(.is-minor)"); const last = lines[lines.length - 1].getBoundingClientRect(); const r = room.getBoundingClientRect(); const foot = room.querySelector(".tc-foot-probe").getBoundingClientRect().height; const hour = Number(room.dataset.hourPx); return { top: first.top >= r.top - 1, end: last.top + hour, visibleBottom: r.bottom - foot, hour }; })()`);

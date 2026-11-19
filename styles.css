@@ -1833,6 +1833,8 @@ body.theme-light .task-calendar.is-engine :is(.tc-event, .tc-allday) { --tc-even
 .tc-block > .tc-drag-source { position: absolute; inset: 0; }
 /* A block glides to wherever the shown day puts it, its lane's width and its length too: a card's place appearing among the blocks, a block moved, a write read back. */
 .task-calendar.is-engine .tc-items > .tc-block { transition: top var(--tc-duration-slide) var(--tc-ease-out), height var(--tc-duration-slide) var(--tc-ease-out), left var(--tc-duration-slide) var(--tc-ease-out), right var(--tc-duration-slide) var(--tc-ease-out); }
+/* Drawn by a new scale (a zoom, a refit), a block stands on the grid at once, as the hour lines and the events do: a change of scale is no move. */
+.task-calendar.is-engine .tc-canvas.is-rescaled .tc-items > .tc-block { transition: none; }
 .tc-drag-source.is-lifted > .tc-block-card { background: none; box-shadow: none; outline: var(--tc-hairline) dashed var(--tc-dash); outline-offset: calc(-1 * var(--tc-hairline)); }
 .tc-drag-source.is-lifted > .tc-block-card > *, .tc-drag-source.is-lifted > .tc-block-card::before { visibility: hidden; }
 /* The carried copy rides the pointer in dnd-kit's overlay, outside the screen's styles: it carries the screen's type itself. */

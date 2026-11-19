@@ -53,6 +53,7 @@ export const Timeline = memo(function Timeline() {
 	const extra = plusMinute !== null ? plusMinute : entry?.at !== undefined && entry.dayOffset === dayOffset ? entry.at : null;
 	const boxes = useMemo(() => layTasks([...day.blocks.map((b) => ({ start: b.start, length: b.length })), ...(extra === null ? [] : [{ start: extra, length: null }])], events, scale), [day.blocks, extra, events, scale]);
 	const end = stackEnd(boxes);
+	const placedBy = usePlacedBy(scale.hourPx, day.blocks, day.events, extra);
 	const order = useMemo(() => day.blocks.map((b) => `${b.id}@${b.start}+${b.length}`).join(" "), [day.blocks]);
 	/**
 	 * The blocks drawn in one order whatever their times (by id): each is placed by its own box, and a node the browser moves
@@ -103,7 +104,7 @@ export const Timeline = memo(function Timeline() {
 			<AllDayRows rows={day.allDay} />
 			<div className="tc-timeline" data-timeline="" data-hour-px={scale.hourPx} data-step={scale.step} style={{ [PROPERTY.allDayExtraRows]: String(Math.max(0, day.allDay.length - 1)) } as CSSProperties} ref={setRoom}>
 				<div className="tc-foot-probe" ref={foot} />
-				<div className="tc-canvas" style={canvas} ref={setCanvas} {...slot.listeners}>
+				<div className={`tc-canvas${placedBy === "scale" ? " is-rescaled" : ""}`} style={canvas} ref={setCanvas} {...slot.listeners}>
 					{day.hours.map((label, hour) => (
 						<div key={label} className="tc-hour-mark">
 							<div className={`tc-hour-label${nearNow(hour * 60) ? " is-hidden" : ""}`} style={at(hour * 60, scale)} data-hour={label}>
@@ -148,6 +149,23 @@ export const Timeline = memo(function Timeline() {
 		</CalendarBlocks>
 	);
 });
+
+/**
+ * Why the blocks stand where they are drawn: the scale last changed (a zoom, a refit), or what the day holds (a task
+ * dropped, resized, written back, a new task's place, an event that stacks them). A change of scale is no move: drawn by
+ * it, the blocks stand on the grid in the same frame as the hour lines, never gliding behind them (Max, 2026-11-19); a
+ * change of what the day holds lets them glide again. It holds until the other changes, not for one render only, so a
+ * render that changes neither keeps the blocks where the last change put them, without a glide.
+ */
+function usePlacedBy(hourPx: number, blocks: readonly Block[], events: readonly DayEvent[], extra: number | null): "scale" | "data" {
+	const [placed, setPlaced] = useState({ hourPx, blocks, events, extra, by: "data" as "scale" | "data" });
+	if (placed.hourPx !== hourPx || placed.blocks !== blocks || placed.events !== events || placed.extra !== extra) {
+		const by = placed.hourPx !== hourPx ? "scale" : "data";
+		setPlaced({ hourPx, blocks, events, extra, by });
+		return by;
+	}
+	return placed.by;
+}
 
 /** The all-day events, a row each over the calendar (the design's «Строка событий на весь день»); a tap opens the event's menu. */
 const AllDayRows = memo(function AllDayRows({ rows }: { readonly rows: readonly AllDayEvent[] }) {
