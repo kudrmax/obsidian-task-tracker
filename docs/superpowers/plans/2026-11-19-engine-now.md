@@ -19,7 +19,7 @@ The ribbon on the stand («The whole screen») is stage 0's pager (round six, ~9
 
 ## Max's decision on the ribbon (2026-11-19, supersedes stage 0 round six)
 
-«Обычное листание колонок, как везде… как фотки в галерее. Я могу остановить палец на середине, но оно в итоге долистнется или не долистнется… что пальцем по экрану, что пальцем по трекпаду — абсолютно одно и то же действие.» So: one behaviour for the finger on the phone and two fingers on the trackpad — the columns follow the fingers 1:1, can be held mid-way, and on release settle to the nearest place or one place on by the swipe's speed (never two); the same feel at any speed. Round six's «trackpad as a pager, no in-between states» is withdrawn; Max now rates the stand's pager as not for production. Built in slices, each shown to Max: first the three stops as plain columns with this behaviour, nothing else — **slice 1 approved by Max on 2026-11-19 («Норм!»)**, branch `ui-ribbon-follow` (Decision 64). Next slice: the days past the calendar (on into tomorrow, back to today) with the same gesture.
+«Обычное листание колонок, как везде… как фотки в галерее. Я могу остановить палец на середине, но оно в итоге долистнется или не долистнется… что пальцем по экрану, что пальцем по трекпаду — абсолютно одно и то же действие.» So: one behaviour for the finger on the phone and two fingers on the trackpad — the columns follow the fingers 1:1, can be held mid-way, and on release settle to the nearest place or one place on by the swipe's speed (never two); the same feel at any speed. Round six's «trackpad as a pager, no in-between states» is withdrawn; Max now rates the stand's pager as not for production. Built in slices, each shown to Max: first the three stops as plain columns with this behaviour, nothing else — **slice 1 approved by Max on 2026-11-19 («Норм!»)**, branch `ui-ribbon-follow` (Decision 64). Slice 2 (the days past the calendar) is committed (bbd55fac), not shown. **Paused by Max (2026-11-19 evening):** «с листанием есть критичные проблемы… вернёмся позже» — ask him for them first when he comes back.
 
 ## Open problems, in order
 
@@ -36,3 +36,7 @@ The ribbon on the stand («The whole screen») is stage 0's pager (round six, ~9
    Clean: slow drags, cancel, resize, new task by press, scrolling, desktop trackpad strokes; no double triggers.
 3. **Swipes, step by step on stage 0's pager.** What to do with `ui-ribbon` is decided after the audit: its pieces come in one per step, each shown to Max.
 4. Tasks covering event titles on the calendar: Max's question, parked.
+
+## In work while Max is away (2026-11-19 evening)
+
+- E4, the task menu and the new-task field, carried over from the plugin and the design exactly, in slices on branch `ui-menu` (from `ui-ribbon-follow`), each its own commit for Max to review later; not deployed to his stand.
