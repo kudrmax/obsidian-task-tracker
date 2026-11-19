@@ -1,7 +1,7 @@
 import { closestCenter, type CollisionDetection, DndContext, defaultDropAnimationSideEffects, getClientRect, getFirstCollision, type MeasuringConfiguration, pointerWithin, rectIntersection, type UniqueIdentifier, useDndContext, useDroppable, type DragEndEvent, type DragMoveEvent, type DragOverEvent, DragOverlay, type DragStartEvent, type DropAnimation, MouseSensor, PointerSensor, TouchSensor, useDraggable, useSensor, useSensors } from "@dnd-kit/core";
 import { arrayMove, SortableContext, type SortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS, getEventCoordinates } from "@dnd-kit/utilities";
-import { createContext, memo, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, memo, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Destination, ListId, Row } from "../port";
 import { useAnchor } from "../layers/Layers";
@@ -575,40 +575,19 @@ function orderAfter(active: Sortable, over: Sortable | null): readonly string[] 
 }
 
 /**
- * Where a row stands for dnd-kit, as its measuring configuration lets an app say (`measuring.droppable.measure`,
- * `measuring.draggable.measure`): its place in the list's layout, never where dnd-kit's parting or a glide has it this
- * frame. A list row as a drop target is its slot (`SortableSlot`) without the slot's own transform (dnd-kit's parting), as
- * dnd-kit measures a row without its own (`getClientRect`, `ignoreTransform`); Motion's glide is inside the slot and never
- * moves it. The place the rows part at then holds still under the pointer while they glide. A lifted row is its drag
- * source, where it stands in that slot: the overlay takes its size, and let go flies to its place, not to where the
- * parting had it a moment before (Decision 61).
+ * Where a row stands for dnd-kit, as its measuring configuration lets an app say (`measuring.droppable.measure`): its
+ * place in the list's layout, never where a glide has it this frame. A row glides by Motion on its list item, so the item
+ * is measured without its transform, as dnd-kit measures a row without its own (`getClientRect`, `ignoreTransform`); the
+ * place the rows part at then holds still under the pointer while they glide.
  */
 const MEASURING: MeasuringConfiguration = {
 	droppable: {
 		measure: (element) => {
-			const slot = rowSlotOf(element);
-			return getClientRect(slot ?? element, { ignoreTransform: true });
-		},
-	},
-	draggable: {
-		measure: (element) => {
-			const box = getClientRect(element, { ignoreTransform: true });
-			const slot = rowSlotOf(element);
-			if (!slot) return box;
-			const still = getClientRect(slot, { ignoreTransform: true });
-			const now = getClientRect(slot);
-			const dx = still.left - now.left;
-			const dy = still.top - now.top;
-			return { ...box, left: box.left + dx, right: box.right + dx, top: box.top + dy, bottom: box.bottom + dy };
+			const item = element.parentElement?.classList.contains("tc-list-item") ? element.parentElement : element;
+			return getClientRect(item, { ignoreTransform: true });
 		},
 	},
 };
-
-/** The slot a list row's drag source stands in, if it is one. */
-function rowSlotOf(element: HTMLElement): HTMLElement | null {
-	const slot = element.closest(`.${SLOT}`);
-	return slot instanceof HTMLElement ? slot : null;
-}
 
 /**
  * A list scrolls under a card held near its top or bottom edge: dnd-kit's own auto-scroll, faster nearer the edge, up and
@@ -705,64 +684,21 @@ export function useListTarget(list: ListId, ids: readonly string[]): (element: H
 }
 
 /**
- * A row of a list in dnd-kit's sortable list, in two parts around the row's Motion glide (`MovingRow`): the slot outside
- * it, and the drag source inside it. dnd-kit's sortable for the row is held by the slot, which also takes dnd-kit's
- * parting (its `transform` and `transition`): Motion measures the glide's start where the row is drawn, and an ancestor's
- * transform is part of that, so a row let go while still parting glides on from where it stands (Decision 61). The drag
- * source inside (`DragSource`) is dnd-kit's node: what it lifts and measures, its listeners, the lifted look.
+ * A row of a list in dnd-kit's sortable list: the thin wrapper dnd-kit draws again around the memoized card (stage 0,
+ * second round). A task's card is carried by it; lifted, it stays where the card will land, as the gap (spec, «Decided»).
+ * A section's header moves aside like cards but is not carried (`onTap` absent): a card goes after it into its section.
+ * A calendar's block is `placed`: its box says where it stands, so dnd-kit never moves it (its box glides by CSS).
  */
-export function SortableSlot({ id, carried, index, measure, children }: { readonly id: string; readonly carried: boolean; readonly index: number; readonly measure: (element: HTMLElement | null) => void; readonly children: ReactNode }) {
-	const sortable = useSortable({ id, disabled: { draggable: !carried, droppable: false } });
-	const { setNodeRef, attributes, listeners, isDragging, transform, transition } = sortable;
-	const source = useMemo((): Source => ({ setNodeRef, attributes, listeners, isDragging }), [setNodeRef, attributes, listeners, isDragging]);
-	return (
-		<div ref={measure} data-index={index} className={SLOT} style={{ transform: CSS.Translate.toString(transform), transition }}>
-			<SourceContext.Provider value={source}>{children}</SourceContext.Provider>
-		</div>
-	);
-}
-
-/** The class of a list row's slot: dnd-kit measures a row there (`MEASURING`). */
-const SLOT = "tc-list-slot";
-
-/** What the slot's sortable gives the drag source inside it. */
-interface Source {
-	readonly setNodeRef: (element: HTMLElement | null) => void;
-	readonly attributes: ReturnType<typeof useSortable>["attributes"];
-	readonly listeners: ReturnType<typeof useSortable>["listeners"];
-	readonly isDragging: boolean;
-}
-const SourceContext = createContext<Source | null>(null);
-
-/**
- * The drag source of a list row, inside its slot (`SortableSlot`): a task's card is carried by it; lifted, it stays where the
- * card will land, as the gap (spec, «Decided»). A section's header moves aside like cards but is not carried (`onTap`
- * absent): a card goes after it into its section.
- */
-export const DragSource = memo(function DragSource({ onTap, gap = false, children }: { readonly onTap?: (target: Element) => void; readonly gap?: boolean; readonly children: ReactNode }) {
-	const source = useContext(SourceContext);
-	if (!source) throw new Error("a drag source outside its row's slot");
-	return <SourceNode source={source} onTap={onTap} gap={gap}>{children}</SourceNode>;
-});
-
-/**
- * A calendar's block in dnd-kit's sortable list: its box says where it stands, so dnd-kit never moves it (its box glides
- * by CSS); carried by its card as a list row is.
- */
-export const SortableRow = memo(function SortableRow({ id, onTap, children }: { readonly id: string; readonly onTap: (target: Element) => void; readonly children: ReactNode }) {
-	const { setNodeRef, attributes, listeners, isDragging } = useSortable({ id, animateLayoutChanges: STAY });
-	return <SourceNode source={{ setNodeRef, attributes, listeners, isDragging }} onTap={onTap} gap={false}>{children}</SourceNode>;
-});
-
-function SourceNode({ source, onTap, gap, children }: { readonly source: Source; readonly onTap: ((target: Element) => void) | undefined; readonly gap: boolean; readonly children: ReactNode }) {
+export const SortableRow = memo(function SortableRow({ id, onTap, gap = false, placed = false, children }: { readonly id: string; readonly onTap?: (target: Element) => void; readonly gap?: boolean; readonly placed?: boolean; readonly children: ReactNode }) {
 	const carried = onTap !== undefined;
-	const { setNodeRef, attributes, listeners, isDragging } = source;
+	const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({ id, disabled: { draggable: !carried, droppable: false }, animateLayoutChanges: placed ? STAY : undefined });
+	const style: CSSProperties = placed ? {} : { transform: CSS.Translate.toString(transform), transition };
 	return (
-		<div ref={setNodeRef} className={`tc-drag-source${isDragging || gap ? " is-lifted" : ""}`} {...(carried ? attributes : {})} {...(carried ? listeners : {})} onClick={carried ? (event) => onTap(event.currentTarget) : undefined}>
+		<div ref={setNodeRef} className={`tc-drag-source${isDragging || gap ? " is-lifted" : ""}`} style={style} {...(carried ? attributes : {})} {...(carried ? listeners : {})} onClick={carried ? (event) => onTap(event.currentTarget) : undefined}>
 			{children}
 		</div>
 	);
-}
+});
 
 /**
  * The plus as dnd-kit carries it: dragged it moves at once; tapped, it does what its `onTap` says. While it is carried, its
