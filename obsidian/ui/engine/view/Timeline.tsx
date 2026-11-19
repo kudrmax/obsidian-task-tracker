@@ -49,8 +49,8 @@ export const Timeline = memo(function Timeline() {
 	const drawn = useMemo(() => day.blocks.map((block, index) => ({ block, box: boxes[index] })).sort((a, b) => (a.block.id < b.block.id ? -1 : a.block.id > b.block.id ? 1 : 0)), [day.blocks, boxes]);
 	const ids = useMemo(() => drawn.map(({ block }) => block.id), [drawn]);
 	const room = useRef<HTMLDivElement | null>(null);
-	/** The start a task's top `y` pixels under the room's top takes: the room's scroll counted, and the label's room over the first hour (the canvas's top margin). */
-	const minuteAt = useCallback((y: number) => scale.start(y + (room.current?.scrollTop ?? 0) - DESIGN.labelLift), [scale]);
+	/** The start a task's top `y` pixels under the day's top takes. */
+	const minuteAt = useCallback((y: number) => scale.start(y), [scale]);
 	const drop = useCalendarDrop(minuteAt);
 	const slot = useNewSlot();
 	const [anchor, setAnchor] = useState<ZoomAnchor | null>(null);
@@ -109,7 +109,7 @@ export const Timeline = memo(function Timeline() {
 							<EventItem key={event.id} event={event} box={events[i]} scale={scale} />
 						))}
 						{drawn.map(({ block, box }) => (
-							<BlockItem key={block.id} block={block} box={box} order={order} z={events.length + box.rank} />
+							<BlockItem key={block.id} block={block} box={box} order={order} z={events.length + box.rank} top={top} />
 						))}
 						{extra === null ? null : <NewPlace minute={extra} box={boxes[boxes.length - 1]} z={top} field={plusMinute === null} />}
 						<Grips blocks={day.blocks} boxes={boxes} scale={scale} z={top + 1} />
@@ -170,13 +170,14 @@ const EventItem = memo(function EventItem({ event, box, scale }: { readonly even
 });
 
 /** A task on the calendar: the card of the lists at its box in the stack, gliding when the box changes. */
-const BlockItem = memo(function BlockItem({ block, box, order, z }: { readonly block: Block; readonly box: TaskBox; readonly order: string; readonly z: number }) {
+/** `top`: how high the selected task lies, over every other (its dots one higher). */
+const BlockItem = memo(function BlockItem({ block, box, order, z, top }: { readonly block: Block; readonly box: TaskBox; readonly order: string; readonly z: number; readonly top: number }) {
 	const lifted = useScreen((s) => s.lifted === block.id);
 	const selected = useScreen((s) => s.selected === block.id);
 	const resizing = useScreen((s) => (s.resizing?.id === block.id ? s.resizing.edge : null));
 	const className = `tc-block${selected ? " is-selected" : ""}${resizing ? " is-resizing" : ""}`;
 	return (
-		<MovingRow id={block.id} order={order} carried={lifted} fresh={false} placed className={className} style={boxStyle(box, z)}>
+		<MovingRow id={block.id} order={order} carried={lifted} fresh={false} placed className={className} style={boxStyle(box, selected || resizing ? top : z)}>
 			<BlockFace block={block} corner={box.stacked ? block.startParts : box.shortLength ? block.lengthParts : null} pill={resizing === "start" ? block.clock : resizing === "end" ? (block.endClock ?? block.clock) : null} />
 		</MovingRow>
 	);

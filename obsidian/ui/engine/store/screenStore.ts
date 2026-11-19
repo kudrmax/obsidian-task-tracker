@@ -46,6 +46,11 @@ export interface ScreenState {
 	readonly plusAt: { readonly into: ListId; readonly index: number } | null;
 	/** Where the carried plus would open the field on the calendar: a minute of the shown day, where its place stands. */
 	readonly plusMinute: number | null;
+	/**
+	 * Whether a carried card may scroll the column it is over (F162): only once it has stood over that column a quarter
+	 * second, so a card carried across a column's edge into another never scrolls it.
+	 */
+	readonly scrollArmed: boolean;
 	/** The calendar's zoom (spec, «Time scale»): kept on the device by the host. */
 	readonly zoom: Zoom;
 	/** The calendar's selected task: its two dots show, to resize it (F102); a tap elsewhere lets it go. */
@@ -84,6 +89,8 @@ export interface ScreenActions {
 	setPlusAt(at: { readonly into: ListId; readonly index: number } | null): void;
 	setPlusMinute(minute: number | null): void;
 	setZoom(zoom: Zoom): void;
+	/** The carried card is over the column `column` (null: none): a new one waits a quarter second before it may scroll. */
+	scrollOver(column: string | null): void;
 	/** A minute of the day as the clock writes it (the port's): «14:15». */
 	clockOf(minute: number): string;
 	/** Selects a task on the calendar (null: none). */
@@ -109,6 +116,8 @@ export type Screen = ScreenState & ScreenActions;
 export type ScreenStore = StoreApi<Screen>;
 
 const MINUTE_MS = 60_000;
+/** How long a carried card stands over a column before the column may scroll under it (F162: a quarter second). */
+const SCROLL_DWELL_MS = 250;
 /** Days kept for regions sliding out: as many as fast strokes can leave sliding at once. */
 const LEFT_KEPT = 4;
 
@@ -121,6 +130,9 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 	let writing = 0;
 	/** The screen as it stood when the carried task was lifted: its place's home, a drop's in-flight write drawn in it. */
 	let home: ScreenData | null = null;
+	/** The column a carried card stands over, and the wait before it may scroll. */
+	let scrollColumn: string | null = null;
+	let scrollWait = 0;
 	const first = port.read(0);
 	return createStore<Screen>()((set, get) => {
 		/** The port's data again; held while a drag or a drop's write keeps the screen still (spec, principle 5). */
@@ -170,6 +182,14 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 			plusAt: null,
 			plusMinute: null,
 			zoom,
+			scrollArmed: false,
+			scrollOver(column) {
+				if (column === scrollColumn) return;
+				scrollColumn = column;
+				window.clearTimeout(scrollWait);
+				if (get().scrollArmed) set({ scrollArmed: false });
+				if (column !== null) scrollWait = window.setTimeout(() => set({ scrollArmed: true }), SCROLL_DWELL_MS);
+			},
 			selected: null,
 			resizing: null,
 			setPlusMinute(plusMinute) {
@@ -225,6 +245,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 			},
 			release(gesture) {
 				if (get().gesture !== gesture) return;
+				if (gesture === "drag") get().scrollOver(null);
 				set({ gesture: null });
 				if (get().pending) refresh();
 			},

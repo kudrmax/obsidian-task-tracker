@@ -37,6 +37,40 @@ export function calendarTools(t) {
 			const line = await this.lineAt(minute);
 			return { x: line.x, y: line.y + (grabbed.y - grabbed.top) + 3 };
 		},
+		/** A tap (the phone) or a click (the desktop) at a point. */
+		async tap(p) {
+			if (t.platform === "phone") {
+				await t.cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: p.x, y: p.y, id: 0 }] });
+				await t.sleep(60);
+				await t.cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+			} else {
+				await t.cdp.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: p.x, y: p.y, button: "none", buttons: 0 });
+				await t.cdp.send("Input.dispatchMouseEvent", { type: "mousePressed", x: p.x, y: p.y, button: "left", buttons: 1, clickCount: 1 });
+				await t.sleep(60);
+				await t.cdp.send("Input.dispatchMouseEvent", { type: "mouseReleased", x: p.x, y: p.y, button: "left", buttons: 0, clickCount: 1 });
+			}
+		},
+		async key(key, code, vk) {
+			await t.cdp.send("Input.dispatchKeyEvent", { type: "keyDown", key, code, windowsVirtualKeyCode: vk });
+			await t.cdp.send("Input.dispatchKeyEvent", { type: "keyUp", key, code, windowsVirtualKeyCode: vk });
+		},
+		/** A finger or the mouse pressed at `from`, moved to `to` at a hand's pace, let go: held `holdMs` first on the phone. */
+		async pull(from, to, { holdMs = 0, steps = 16, stepMs = 16 } = {}) {
+			const phone = t.platform === "phone";
+			const at = (p, type) => (phone ? t.cdp.send("Input.dispatchTouchEvent", { type, touchPoints: type === "touchEnd" ? [] : [{ x: p.x, y: p.y, id: 0 }] }) : t.cdp.send("Input.dispatchMouseEvent", { type, x: p.x, y: p.y, button: "left", buttons: type === "mouseReleased" ? 0 : 1, clickCount: 1 }));
+			if (!phone) await t.cdp.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: from.x, y: from.y, button: "none", buttons: 0 });
+			await at(from, phone ? "touchStart" : "mousePressed");
+			if (holdMs) await t.sleep(holdMs);
+			for (let i = 1; i <= steps; i++) {
+				await at({ x: from.x + ((to.x - from.x) * i) / steps, y: from.y + ((to.y - from.y) * i) / steps }, phone ? "touchMove" : "mouseMoved");
+				await t.sleep(stepMs);
+			}
+			await t.sleep(200);
+			return async () => {
+				await at(to, phone ? "touchEnd" : "mouseReleased");
+				await t.sleep(400);
+			};
+		},
 		/** The words written on the dashed place of the carried task on the calendar. */
 		placeTime: () => t.cdp.eval(`(() => { const el = document.querySelector(".tc-items .tc-drag-source.is-lifted .tc-slot-time"); return el && getComputedStyle(el).display !== "none" ? el.textContent : null; })()`),
 	};

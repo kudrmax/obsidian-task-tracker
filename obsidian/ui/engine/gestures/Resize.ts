@@ -36,7 +36,7 @@ export function resized(block: Block, edge: Edge, moved: number, scale: TimeScal
 export function useResize(block: Block, edge: Edge, scale: TimeScale, dayOffset: number, onWrite: () => void) {
 	const api = useScreenApi();
 	return useDrag(
-		({ first, last, movement: [, my], cancel, event }) => {
+		({ first, last, movement: [, my], cancel, event, memo }) => {
 			event.stopPropagation();
 			const screen = api.getState();
 			if (first) {
@@ -44,12 +44,18 @@ export function useResize(block: Block, edge: Edge, scale: TimeScale, dayOffset:
 				screen.startResize(block.id, edge);
 				onWrite();
 			}
-			if (api.getState().gesture !== "resize") return;
-			const to = resized(block, edge, my, scale, dayOffset, last);
-			const same = to.at === block.from && (to.end ?? null) === (block.length === null ? null : block.from + block.length);
-			if (!last) return api.getState().resizeTo(block.id, to);
-			api.getState().endResize(block.id, same ? null : to);
+			/** The task as it stood when its dot was taken: the previews redraw it as it is pulled. */
+			const taken: Block = memo ?? block;
+			if (api.getState().gesture !== "resize") return taken;
+			const to = resized(taken, edge, my, scale, dayOffset, last);
+			const same = to.at === taken.from && (to.end ?? null) === (taken.length === null ? null : taken.from + taken.length);
+			if (!last) {
+				api.getState().resizeTo(taken.id, to);
+				return taken;
+			}
+			api.getState().endResize(taken.id, same ? null : to);
 			if (!same) onWrite();
+			return taken;
 		},
 		{ pointer: { capture: true }, filterTaps: true },
 	);
