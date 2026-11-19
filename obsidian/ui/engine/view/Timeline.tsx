@@ -1,5 +1,5 @@
 import { type CSSProperties, memo, type MouseEvent, useCallback, useMemo, useRef, useState } from "react";
-import { DESIGN, LAYOUT, PROPERTY } from "../../design";
+import { DESIGN, PROPERTY } from "../../design";
 import { CalendarBlocks, SortableRow, useCalendarDrop, useNewSlot } from "../drag/Drag";
 import { type Edge, useResize } from "../gestures/Resize";
 import { hourOf, type RoomMeasure, useCalendarZoom } from "../gestures/Zoom";
@@ -189,17 +189,34 @@ function useOpenMenu(): (id: string, event: MouseEvent<HTMLElement>) => void {
 	};
 }
 
-/** A read-only event in its calendar's colour, over others it starts during, faded once over; a tap opens its menu. */
+/**
+ * A read-only event in its calendar's colour, faded once over; a tap opens its menu. In a cluster of overlapping events it
+ * stands in its lane, its title past the cluster's last lane; when an earlier title holds the line at its start, its block
+ * begins on the next free line and its bar's stem runs up to its start (Decision 52).
+ */
 const EventItem = memo(function EventItem({ event, box, scale }: { readonly event: DayEvent; readonly box: EventBox; readonly scale: TimeScale }) {
 	const open = useOpenMenu();
-	const length = scale.y(event.end - event.start);
-	const tiny = length - DESIGN.itemGap < LAYOUT.tinyItemHeight;
-	const style = { ...at(event.start, scale), [PROPERTY.length]: px(length), [PROPERTY.x]: px(box.left), [PROPERTY.stackZ]: String(box.layer), ...paintStyle(event.paint) } as CSSProperties;
+	const held = box.blockTop > 0;
+	const style = {
+		...at(event.start, scale),
+		[PROPERTY.length]: px(box.drawnHeight + DESIGN.itemGap),
+		[PROPERTY.x]: px(box.left),
+		[PROPERTY.stackZ]: String(box.layer),
+		[PROPERTY.blockTop]: px(box.blockTop),
+		[PROPERTY.lanesAfter]: String(box.lanesAfter),
+		[PROPERTY.labelRoom]: px(box.labelRoom),
+		...paintStyle(event.paint),
+	} as CSSProperties;
 	return (
-		<div className={`tc-item tc-event${event.past ? " is-past" : ""}${tiny ? " is-tiny" : ""}`} data-event={event.id} data-own-press="" style={style} onClick={(e) => open(event.id, e)}>
-			<div className="tc-event-bar" />
-			<div className="tc-event-body">
-				<div className="tc-item-title">{event.title}</div>
+		<div className={`tc-item tc-event${event.past ? " is-past" : ""}${box.tiny ? " is-tiny" : ""}${held ? " is-held" : ""}`} data-event={event.id} data-own-press="" style={style} onClick={(e) => open(event.id, e)}>
+			{held ? <div className="tc-event-stem" /> : null}
+			<div className="tc-event-block">
+				<div className="tc-event-bar" />
+			</div>
+			<div className="tc-event-label">
+				<div className="tc-event-body">
+					<div className="tc-item-title">{event.title}</div>
+				</div>
 			</div>
 		</div>
 	);

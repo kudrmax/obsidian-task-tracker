@@ -6,7 +6,7 @@
  * number, a colour or a radius written straight into a rule, and on a token no rule uses. To change how something
  * looks, change its token, or add one here with a name that says what it is for.
  *
- * Properties the code sets per element (--tc-list-width, --tc-grab-x, --tc-grab-y, --tc-landing-level, --tc-landing-w, --tc-landing-h, --tc-hour, --tc-allday-extra-rows, --tc-y, --tc-stack-z, --tc-anchor-offset, --tc-event-bg-dark, --tc-event-bar-dark, --tc-event-text-dark, --tc-event-bg-light, --tc-event-bar-light, --tc-event-text-light,
+ * Properties the code sets per element (--tc-list-width, --tc-grab-x, --tc-grab-y, --tc-landing-level, --tc-landing-w, --tc-landing-h, --tc-hour, --tc-allday-extra-rows, --tc-y, --tc-stack-z, --tc-lanes-after, --tc-block-top, --tc-label-room, --tc-anchor-offset, --tc-event-bg-dark, --tc-event-bar-dark, --tc-event-text-dark, --tc-event-bg-light, --tc-event-bar-light, --tc-event-text-light,
  * --tc-len, --tc-x, --tc-level, --tc-pass, --tc-stack-end, --tc-room-top, --tc-room-bottom, --tc-scrolled, --tc-scrolled-below, --tc-event-bg, --tc-event-bar, --tc-event-text, and per priority colour --tc-priority-ink, --tc-priority-fill, --tc-priority-meta) carry a measure from the layout
  * into these rules; the rules do the arithmetic.
  */
@@ -108,6 +108,8 @@ body {
 	--tc-radius-branch: 6px;
 	--tc-radius-float: calc(var(--tc-float-h) / 2);
 	--tc-radius-event: 6px;
+	/* The top end of an event's bar running up from its block to its start: half the bar. */
+	--tc-radius-bar-cap: 1.5px;
 	--tc-radius-time-pill: 6px;
 	--tc-radius-seg: calc(var(--tc-seg) / 2);
 	--tc-radius-seg-btn: calc(var(--tc-seg-btn-h) / 2);
@@ -579,6 +581,9 @@ body {
 	--tc-items-right: 4px;
 	--tc-item-inset: 1px;
 	--tc-item-gap: 2px;
+	/* Overlapping events (Decision 52): a lane is a bar and its gap; a cluster's titles take lines this tall, one under another. */
+	--tc-event-lane: 6px;
+	--tc-event-label: 23px;
 	/* The bottom of the last task card; the code sets it on the canvas. */
 	--tc-stack-end: 0px;
 	/* Empty room over the day's first hour and under its last; the code sets it on the canvas. */
@@ -1810,6 +1815,16 @@ button.tc-btn.tc-folder-btn:disabled { opacity: var(--tc-tile-off-opacity); curs
 /* The all-day rows stand on a solid band of the calendar's ground, a hairline divider under it, as iOS Calendar's all-day section (Max, 2026-11-19): the calendar's room begins right under the divider, so a block scrolled up is cut there. No all-day event, no band. */
 .task-calendar.is-engine .tc-allday-rows { position: relative; }
 .task-calendar.is-engine .tc-allday-backing { height: auto; bottom: calc(-1 * var(--tc-hairline)); box-sizing: border-box; border-bottom: var(--tc-hairline) solid var(--tc-line); }
+/* Overlapping events (Max, 2026-11-19, Decision 52): each stands in its lane, drawn as ever (its block with the bar inside on the left, its calendar's ground over the calendar's); its title stands past the cluster's last lane in its own line, so none is covered. A block moved down under an earlier title keeps its bar from its true start: the bar's stem runs up from the block, joined to its square corner. */
+.task-calendar.is-engine .tc-items > .tc-event { background: none; border-radius: 0; display: block; }
+.tc-event-block { position: absolute; top: var(--tc-block-top); left: 0; right: 0; bottom: 0; display: flex; border-radius: var(--tc-radius-event); background: linear-gradient(var(--tc-event-bg), var(--tc-event-bg)), var(--tc-bg); overflow: clip; }
+.tc-event.is-held > .tc-event-block { border-top-left-radius: 0; }
+.tc-event-stem { position: absolute; top: 0; left: 0; width: var(--tc-bar); height: calc(var(--tc-block-top) + var(--tc-radius-event)); border-radius: var(--tc-radius-bar-cap) var(--tc-radius-bar-cap) 0 0; background: var(--tc-event-bar); }
+.tc-event-label { position: absolute; top: var(--tc-block-top); left: calc(var(--tc-lanes-after) * var(--tc-event-lane) + var(--tc-bar)); right: 0; height: var(--tc-label-room); }
+.tc-event-label > .tc-event-body { box-sizing: border-box; min-height: var(--tc-event-label); }
+.tc-event.is-tiny .tc-event-label > .tc-event-body { min-height: 0; }
+.tc-event.is-past > .tc-event-block { background: linear-gradient(var(--tc-event-past-bg), var(--tc-event-past-bg)), var(--tc-bg); }
+.tc-event.is-past .tc-event-bar, .tc-event.is-past > .tc-event-stem { background: var(--tc-event-past-fg); }
 /* An event takes its calendar's paint in the theme shown (the port gives both, by the plugin's rule). */
 .task-calendar.is-engine :is(.tc-event, .tc-allday) { --tc-event-bg: var(--tc-event-bg-dark); --tc-event-bar: var(--tc-event-bar-dark); --tc-event-text: var(--tc-event-text-dark); cursor: pointer; }
 body.theme-light .task-calendar.is-engine :is(.tc-event, .tc-allday) { --tc-event-bg: var(--tc-event-bg-light); --tc-event-bar: var(--tc-event-bar-light); --tc-event-text: var(--tc-event-text-light); }

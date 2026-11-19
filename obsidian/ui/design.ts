@@ -21,6 +21,10 @@ export const DESIGN = {
 	/** A block starts one pixel under its hour line and ends two pixels short of its length. */
 	itemInset: 1,
 	itemGap: 2,
+	/** An event's lane in a cluster of overlapping events: its bar and the gap after it (Decision 52). */
+	eventLane: 6,
+	/** An event's title line with its padding: a cluster's titles take lines this tall, one under another (Decision 52). */
+	eventLabel: 23,
 	/** The bar over the keyboard while a task is typed: the field stands above it. */
 	barHeight: 44,
 	/** On the desktop the bar is a capsule next to the field, this far from it; its panels stand as far from it. */
@@ -56,6 +60,8 @@ export const DESIGN_TOKENS: Readonly<Record<DesignMeasure, string>> = {
 	nowPillHeight: "--tc-now-h",
 	itemInset: "--tc-item-inset",
 	itemGap: "--tc-item-gap",
+	eventLane: "--tc-event-lane",
+	eventLabel: "--tc-event-label",
 	barHeight: "--tc-bar-h",
 	deskBarGap: "--tc-desk-bar-gap",
 	treeIndent: "--tc-tree-indent",
@@ -115,6 +121,12 @@ export const PROPERTY = {
 	anchorOffset: "--tc-anchor-offset",
 	/** How high a block or event of the calendar lies among the others: a card lying over another is drawn over it. */
 	stackZ: "--tc-stack-z",
+	/** An event's lanes right of its own in its cluster: its title stands past them. */
+	lanesAfter: "--tc-lanes-after",
+	/** How far under an event's start its block begins: an earlier title holds the line at its start. */
+	blockTop: "--tc-block-top",
+	/** How tall an event's title may hold as the calendar scrolls: down to the next title of its cluster. */
+	labelRoom: "--tc-label-room",
 	eventBg: "--tc-event-bg",
 	eventBar: "--tc-event-bar",
 	eventText: "--tc-event-text",

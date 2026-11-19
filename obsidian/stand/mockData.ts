@@ -131,6 +131,7 @@ export function mockFile(clock: Date): MockFile {
 		{ id: "ev2", title: "Встреча с дизайнером", start: quarter(at + 60), end: quarter(at + 60) + 60, color: CALENDAR_COLORS.google },
 		{ id: "ev3", title: "Планирование квартала", start: quarter(at + 180), end: quarter(at + 180) + 90, color: CALENDAR_COLORS.work },
 		{ id: "ev4", title: "Звонок с клиентом", start: quarter(at + 210), end: quarter(at + 210) + 30, color: CALENDAR_COLORS.pink },
+		{ id: "ev5", title: "Синк с Олей", start: quarter(at + 225), end: quarter(at + 225) + 30, color: CALENDAR_COLORS.google },
 	].filter((e) => e.start >= 0 && e.end <= 24 * 60);
 	return { inbox, now, soon, backlog, done, events, allDay: [{ id: "ad1", title: "День рождения Кости", color: CALENDAR_COLORS.green }] };
 }
@@ -200,7 +201,7 @@ export function sectionsFile(): MockFile {
  * The stand's calendar step: Soon, today's list and today's calendar. A dozen plain tasks in Soon and in today's list; on
  * today's calendar, from the hour after the present one: blocks with a length (two of them overlapping), tasks without a
  * length (one standing close under a block, so they stack; one starting on a long block's body), a folded task named by
- * its next step; one task whose time has passed, riding the now line; events (one over, two overlapping, one under a
+ * its next step; one task whose time has passed, riding the now line; events (one over, a dense evening of three overlapping, one under a
  * task) and an all-day event. All within the day.
  */
 export function calendarFile(clock: Date): MockFile {
@@ -234,6 +235,7 @@ export function calendarFile(clock: Date): MockFile {
 		{ id: "ev2", title: "Встреча с дизайнером", start: hour + 330, end: hour + 390, color: CALENDAR_COLORS.google },
 		{ id: "ev3", title: "Планирование квартала", start: hour + 420, end: hour + 510, color: CALENDAR_COLORS.work },
 		{ id: "ev4", title: "Звонок с клиентом", start: hour + 450, end: hour + 480, color: CALENDAR_COLORS.pink },
+		{ id: "ev5", title: "Синк с Олей", start: hour + 465, end: hour + 495, color: CALENDAR_COLORS.google },
 	];
 	file.allDay = [{ id: "ad1", title: "День рождения Кости", color: CALENDAR_COLORS.green }];
 	return file;

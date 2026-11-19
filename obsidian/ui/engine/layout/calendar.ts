@@ -5,8 +5,9 @@ import type { TimeScale } from "./timeScale";
  * Where the calendar's tasks and events stand (spec, «Where things stand», «Time scale»): the design's «Задачи на
  * таймлайне» and «События внахлёст» laid out by the one time scale. Tasks never share the width: by start, each card on
  * its own time or one gap under the head of the one before (a stack, its start then written on the right); a card that
- * starts on a long card's body or on an event lies over it, further in. Events never share the width either: one that
- * starts while another goes on lies over it, further in. The port says what stands where in minutes; this lays it out.
+ * starts on a long card's body or on an event lies over it, further in. Events never share the width either: overlapping
+ * ones stand in narrow lanes, their titles in lines one under another. The port says what stands where in minutes; this
+ * lays it out.
  */
 
 /** A task on the calendar in minutes from the day's start: where it is drawn, and its length (null: none, a card's height). */
@@ -34,13 +35,25 @@ export interface TaskBox {
 	readonly rank: number;
 }
 
-/** An event's box: its top and height, its left edge by how deep it lies over others, and how high it lies. */
+/**
+ * An event's box. What it spans: its top and height at its true times, how deep it lies over others (`level`, which the
+ * tasks over it are indented by) and how high it lies (`layer`). How it is drawn (Max's rule of 2026-11-19, Decision 52):
+ * its lane's left edge, the lanes right of it in its cluster (its title stands past them), where its block starts under
+ * its top (`blockTop`: 0, or lower when an earlier title of the cluster holds its start's line; its bar still starts at
+ * its top), how tall it is drawn from its top, the room its title has under the block's top, and whether it is tiny.
+ */
 export interface EventBox {
 	readonly top: number;
 	readonly height: number;
-	readonly left: number;
 	readonly level: number;
 	readonly layer: number;
+	readonly lane: number;
+	readonly left: number;
+	readonly lanesAfter: number;
+	readonly blockTop: number;
+	readonly drawnHeight: number;
+	readonly labelRoom: number;
+	readonly tiny: boolean;
 }
 
 /** A card's height and the gap between cards (the design's tokens at the default card size). */
@@ -56,16 +69,69 @@ const STACK_SLACK = 0.5;
 
 const overlayLeft = (level: number): number => (level === 0 ? DESIGN.itemInset : level * LAYOUT.overlayInset);
 
-/** Each event's box, in the order given: by start, the longer first on a tie; one starting while another goes on lies over it, one inset in, and higher. */
+/** Under half a pixel below its top a block still starts on its own line. */
+const LINE_SLACK = 0.5;
+
+/**
+ * Each event's box, in the order given (Max, 2026-11-19, Decision 52). By start, the longer first on a tie, events
+ * overlapping form a cluster: each one starting before the cluster's last end joins it. In a cluster the events stand in
+ * lanes by start, lane i's left edge i lanes (a bar and its gap) in, the later lying higher; every title of the cluster
+ * starts right of its last lane, so no title is ever covered. Titles take the label lines top-down in start order: a
+ * block starts at its event's start unless an earlier title holds that line, else at the first free line under it; its
+ * bar still starts at the true start (the view draws the bar's stem above the block), and the block reaches its end or
+ * its title's bottom, whichever is lower. A title's room runs to the next title of the cluster, or to its block's bottom.
+ * A lone event is drawn as ever, tiny when shorter than a line; in a cluster every title has its whole line.
+ */
 export function layEvents(events: readonly EventSpan[], scale: TimeScale): EventBox[] {
 	const order = events.map((span, index) => ({ span, index })).sort((a, b) => a.span.start - b.span.start || b.span.end - a.span.end);
-	const boxes: EventBox[] = new Array(events.length);
+	const levels = new Map<number, number>();
 	const placed: (EventSpan & { readonly level: number })[] = [];
 	for (const { span, index } of order) {
 		const under = placed.filter((p) => p.start <= span.start && span.start < p.end).pop();
 		const level = under ? under.level + 1 : 0;
-		boxes[index] = { top: scale.y(span.start) + DESIGN.itemInset, height: scale.y(span.end - span.start) - DESIGN.itemGap, left: overlayLeft(level), level, layer: placed.length };
+		levels.set(index, level);
 		placed.push({ ...span, level });
+	}
+	const clusters: { readonly members: { span: EventSpan; index: number }[]; end: number }[] = [];
+	for (const item of order) {
+		const last = clusters[clusters.length - 1];
+		if (last && item.span.start < last.end) {
+			last.members.push(item);
+			last.end = Math.max(last.end, item.span.end);
+		} else clusters.push({ members: [item], end: item.span.end });
+	}
+	const boxes: EventBox[] = new Array(events.length);
+	let layer = 0;
+	for (const { members } of clusters) {
+		const clustered = members.length > 1;
+		const drawn: { index: number; top: number; height: number; blockTop: number; bottom: number }[] = [];
+		let free = -Infinity;
+		for (const { span, index } of members) {
+			const top = scale.y(span.start) + DESIGN.itemInset;
+			const height = scale.y(span.end - span.start) - DESIGN.itemGap;
+			const blockAt = clustered ? Math.max(top, free) : top;
+			const blockTop = blockAt - top > LINE_SLACK ? blockAt - top : 0;
+			const bottom = clustered ? Math.max(top + height, top + blockTop + DESIGN.eventLabel) : top + height;
+			free = top + blockTop + DESIGN.eventLabel + DESIGN.itemGap;
+			drawn.push({ index, top, height, blockTop, bottom });
+		}
+		drawn.forEach(({ index, top, height, blockTop, bottom }, lane) => {
+			const next = drawn[lane + 1];
+			const labelBottom = next ? Math.min(next.top + next.blockTop, bottom) : bottom;
+			boxes[index] = {
+				top,
+				height,
+				level: levels.get(index) ?? 0,
+				layer: layer++,
+				lane,
+				left: DESIGN.itemInset + lane * DESIGN.eventLane,
+				lanesAfter: drawn.length - 1 - lane,
+				blockTop,
+				drawnHeight: bottom - top,
+				labelRoom: labelBottom - (top + blockTop),
+				tiny: !clustered && height < LAYOUT.tinyItemHeight,
+			};
+		});
 	}
 	return boxes;
 }

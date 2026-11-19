@@ -5,7 +5,7 @@ import { calendarTools } from "../lib/calendar.mjs";
  * the clock at noon, read from the screen and the file: a task without a length is a card's height, one with a length its
  * length's height; tasks standing close stack, each writing its start on the right; a length shorter than a card is
  * written; an open task whose time has passed rides the now line, its time in the file unchanged; a folded task is named
- * by its next step; events overlapping lie shifted right, the one over faded, a task over an event right of it; the
+ * by its next step; events overlapping lie in lanes (Decision 52), the one over faded, a task over an event right of it; the
  * all-day event is a row over the calendar; the now line stands at its time.
  */
 export default {
@@ -51,7 +51,7 @@ export default {
 		const events = await t.cdp.eval(`[...document.querySelectorAll(".tc-timeline .tc-event")].map((e) => { const r = e.getBoundingClientRect(); return { title: e.textContent, left: r.left, past: e.classList.contains("is-past"), fill: getComputedStyle(e).backgroundImage }; })`);
 		const byTitle = (title) => events.find((e) => e.title === title);
 		t.expect(byTitle("Стендап")?.past === true && byTitle("Звонок с клиентом")?.past === false, `the event that is over fades, the others not: ${JSON.stringify(events.map((e) => [e.title, e.past]))}`);
-		t.expect(Math.abs(byTitle("Звонок с клиентом").left - byTitle("Планирование квартала").left - 18) <= 1, `an event starting during another lies over it, 18 px right: ${JSON.stringify(events.map((e) => [e.title, e.left]))}`);
+		t.expect(Math.abs(byTitle("Звонок с клиентом").left - byTitle("Планирование квартала").left - 6) <= 1, `an event starting during another lies over it in the next lane, 6 px right (Decision 52): ${JSON.stringify(events.map((e) => [e.title, e.left]))}`);
 		t.expect(gym && gym.left >= byTitle("Встреча с дизайнером").left + 16, `a task over an event lies right of it: ${gym?.left} against ${byTitle("Встреча с дизайнером").left}`);
 		const allDay = await t.cdp.eval(`(() => { const row = document.querySelector(".tc-allday"); const room = document.querySelector(".tc-timeline").getBoundingClientRect(); if (!row) return null; const r = row.getBoundingClientRect(); return { title: row.textContent, bottom: r.bottom, room: room.top, height: r.height }; })()`);
 		t.expect(allDay?.title === "День рождения Кости" && Math.abs(allDay.height - 22) <= 0.5, `the all-day event is a row over the calendar: ${JSON.stringify(allDay)}`);

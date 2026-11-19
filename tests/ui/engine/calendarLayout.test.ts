@@ -32,11 +32,11 @@ describe("the calendar's tasks", () => {
 		expect(over.left).toBe(long.left + LAYOUT.overlayInset);
 		expect(over.stacked).toBe(false);
 	});
-	it("a task over an event lies right of it; events overlapping lie shifted right, the later higher (F87)", () => {
+	it("a task over an event lies right of it, as deep as the events under it (F87)", () => {
 		const events = layEvents([{ start: 420, end: 510 }, { start: 450, end: 480 }], BASE_SCALE);
-		expect(events.map((e) => [e.left, e.level, e.layer])).toEqual([
-			[DESIGN.itemInset, 0, 0],
-			[LAYOUT.overlayInset, 1, 1],
+		expect(events.map((e) => [e.level, e.layer])).toEqual([
+			[0, 0],
+			[1, 1],
 		]);
 		const [task] = layTasks([{ start: 460, length: null }], events, BASE_SCALE);
 		expect(task.left).toBe(2 * LAYOUT.overlayInset);
@@ -44,6 +44,83 @@ describe("the calendar's tasks", () => {
 	it("a stack past midnight lengthens the day", () => {
 		const boxes = layTasks([{ start: 1430, length: null }, { start: 1430, length: null }], [], BASE_SCALE);
 		expect(stackEnd(boxes)).toBeGreaterThan(y(1440));
+	});
+});
+
+/**
+ * Overlapping events (Max, 2026-11-19, Decision 52; the mock he approved: «Встреча с дизайнером» 17:00–18:00,
+ * «Планирование квартала» 18:30–20:00, «Звонок с клиентом» 19:00–19:30, «Синк с Олей» 19:15–19:45): lanes of a bar and
+ * its gap, titles one under another past the last lane, the bar from the true start, the block to its end or its title.
+ */
+describe("overlapping events", () => {
+	const evening = [
+		{ start: 17 * 60, end: 18 * 60 },
+		{ start: 18 * 60 + 30, end: 20 * 60 },
+		{ start: 19 * 60, end: 19 * 60 + 30 },
+		{ start: 19 * 60 + 15, end: 19 * 60 + 45 },
+	];
+	const line = DESIGN.eventLabel + DESIGN.itemGap;
+	const abs = (b: { top: number; blockTop: number }) => b.top + b.blockTop;
+
+	it("form a cluster when one starts before the cluster's last end; a lone event stands alone", () => {
+		const boxes = layEvents(evening, BASE_SCALE);
+		expect(boxes.map((b) => b.lane)).toEqual([0, 0, 1, 2]);
+		expect(boxes.map((b) => b.lanesAfter)).toEqual([0, 2, 1, 0]);
+		const chained = layEvents([{ start: 60, end: 180 }, { start: 120, end: 300 }, { start: 240, end: 330 }, { start: 330, end: 360 }], BASE_SCALE);
+		expect(chained.map((b) => b.lane)).toEqual([0, 1, 2, 0]);
+	});
+
+	it("stand in lanes a bar and its gap apart, the later higher, in the order given whatever the times", () => {
+		const boxes = layEvents([...evening].reverse(), BASE_SCALE).reverse();
+		expect(boxes.map((b) => b.left)).toEqual([DESIGN.itemInset, DESIGN.itemInset, DESIGN.itemInset + DESIGN.eventLane, DESIGN.itemInset + 2 * DESIGN.eventLane]);
+		expect(boxes.map((b) => b.layer)).toEqual([0, 1, 2, 3]);
+	});
+
+	for (const scale of [BASE_SCALE, new TimeScale(23)])
+		describe(`at ${scale.hourPx} px an hour`, () => {
+			const [, plan, call, sync] = layEvents(evening, scale);
+			it("each top is the true start; a block starts there unless an earlier title holds the line, then on the first free line", () => {
+				expect([plan, call, sync].map((b) => b.top)).toEqual([18.5, 19, 19.25].map((h) => scale.y(h * 60) + DESIGN.itemInset));
+				expect(plan.blockTop).toBe(0);
+				expect(abs(call)).toBe(Math.max(call.top, abs(plan) + line));
+				expect(abs(sync)).toBe(Math.max(sync.top, abs(call) + line));
+				for (const b of [call, sync]) expect(b.blockTop).toBeGreaterThanOrEqual(0);
+			});
+			it("no title covers another: each title's room ends where the next title's line begins, or at its block's bottom", () => {
+				const bottom = (b: { top: number; drawnHeight: number }) => b.top + b.drawnHeight;
+				expect(plan.labelRoom).toBe(Math.min(abs(call), bottom(plan)) - abs(plan));
+				expect(call.labelRoom).toBe(Math.min(abs(sync), bottom(call)) - abs(call));
+				for (const b of [plan, call]) expect(b.labelRoom).toBeGreaterThanOrEqual(DESIGN.eventLabel);
+				expect(sync.labelRoom).toBe(sync.top + sync.drawnHeight - abs(sync));
+			});
+			it("a block reaches its end, or its title's bottom when that is lower", () => {
+				for (const b of [plan, call, sync]) expect(b.top + b.drawnHeight).toBe(Math.max(b.top + b.height, abs(b) + DESIGN.eventLabel));
+			});
+			it("no event of a cluster is tiny: every title has its line", () => {
+				expect([plan, call, sync].map((b) => b.tiny)).toEqual([false, false, false]);
+			});
+		});
+
+	it("at the base zoom, «Звонок с клиентом» holds its start's line and «Синк с Олей» goes under its title", () => {
+		const [, plan, call, sync] = layEvents(evening, BASE_SCALE);
+		expect(call.blockTop).toBe(0);
+		expect(abs(call) - abs(plan)).toBe(28);
+		expect(abs(sync)).toBe(abs(call) + line);
+		expect(sync.blockTop).toBeCloseTo(line - BASE_SCALE.y(15));
+	});
+
+	it("at the whole day, the titles push down and a block may reach below its end", () => {
+		const scale = new TimeScale(23);
+		const [, , call, sync] = layEvents(evening, scale);
+		expect(call.blockTop).toBeGreaterThan(0);
+		expect(sync.top + sync.drawnHeight).toBeGreaterThan(sync.top + sync.height);
+	});
+
+	it("a lone event is drawn as ever: its block at its start, its height, tiny when shorter than a line", () => {
+		const [lone, short] = layEvents([{ start: 60, end: 120 }, { start: 600, end: 615 }], BASE_SCALE);
+		expect(lone).toMatchObject({ lane: 0, lanesAfter: 0, blockTop: 0, drawnHeight: lone.height, labelRoom: lone.height, left: DESIGN.itemInset, tiny: false });
+		expect(short.tiny).toBe(true);
+		expect(short.drawnHeight).toBe(short.height);
 	});
 });
 
