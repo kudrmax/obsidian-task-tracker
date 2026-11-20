@@ -40,10 +40,11 @@ export async function replay(cdp, file, { startPlace = 1, strokes = [], steps: g
 	let expected = given ?? (existsSync(expectFile) ? JSON.parse(readFileSync(expectFile, "utf8")).swipes : null);
 	/**
 	 * The wheel's events as the page received them: Chromium merges the events of one frame into one (their deltas summed),
-	 * and under load this loop sends some late, while the page's wheel gesture ends by its own clock. Each with its deltas,
-	 * its time, and when it arrived by the page's clock.
+	 * and under load this loop sends some late, while the page's wheel gesture ends by its own clock: @use-gesture ends it
+	 * 140 ms after its last event by a timer, which a timer set the same way here marks (`ended`: the gesture ended after
+	 * this event, before the next). Each with its deltas and its time.
 	 */
-	await cdp.eval(`(() => { window.__tcArrived = []; window.addEventListener("wheel", (e) => window.__tcArrived.push({ dx: e.deltaX, dy: e.deltaY, t: e.timeStamp, ctrl: e.ctrlKey, type: "wheel", at: performance.now() }), { capture: true, passive: true }); return 1; })()`);
+	await cdp.eval(`(() => { window.__tcArrived = []; let timer = 0; window.addEventListener("wheel", (e) => { const got = { dx: e.deltaX, dy: e.deltaY, t: e.timeStamp, ctrl: e.ctrlKey, type: "wheel", ended: false }; window.__tcArrived.push(got); clearTimeout(timer); timer = setTimeout(() => { got.ended = true; }, 140); }, { capture: true, passive: true }); return 1; })()`);
 	const frames = new FrameRecorder(cdp);
 	await frames.start();
 	/**

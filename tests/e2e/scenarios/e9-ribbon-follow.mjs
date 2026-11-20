@@ -56,11 +56,11 @@ export default {
 		}
 		/**
 		 * The page against the rule run on the events as the page received them: Chromium merges a frame's wheel events into
-		 * one, the replay loop sends some late under load, and a gap past @use-gesture's wheel end (by the page's clock) lets
-		 * the fingers go there, on the page as offline. Each landing is still at most one place from its stroke's start.
+		 * one, the replay loop sends some late under load, and @use-gesture's wheel end (by the page's clock, a timer set as
+		 * its own) lets the fingers go there, on the page as offline. Each landing is still at most one place from its stroke's start.
 		 */
 		const stepsFor = (received) => {
-			const asReceived = followSteps(received, rec.w / 2, { start: 1, last: Infinity, arrived: received.map((e) => e.at) });
+			const asReceived = followSteps(received, rec.w / 2, { start: 1, last: Infinity, ended: received.map((e) => e.ended) });
 			t.expect(asReceived.furthest <= 1, `on the events as the page received them, a stroke's landing ${asReceived.furthest} places from where it began (one swipe, one place)`);
 			return asReceived.steps;
 		};

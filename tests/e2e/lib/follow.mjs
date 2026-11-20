@@ -9,17 +9,11 @@ import { WheelFollow } from "../../../obsidian/ui/engine/gestures/wheelFollow.ts
  * (where it began, its place, its starting speed).
  */
 /**
- * How long @use-gesture's wheel gesture waits, by the wall clock, before it ends (its default): the ribbon lets the fingers
- * go then (`FollowRibbon`'s `onWheel` with `last`), whatever the events' own times say.
+ * `ended`: after which events the page's wheel gesture ended by its own clock (@use-gesture's 140 ms timer, `FollowRibbon`'s
+ * `onWheel` with `last`), when known: the fingers let go there, as on the page. Without it the events' own times are the
+ * only clock (a person's events reach the page as they are made).
  */
-const WHEEL_END_MS = 140;
-
-/**
- * `arrived`: when each wheel event reached the page, by its clock (`performance.now()`), when known: a gap of more than
- * @use-gesture's wheel end between two lets the fingers go in between, as the page does. Without it the events' own times
- * are the only clock (a person's events reach the page as they are made).
- */
-export function followSteps(wheels, width, { start = 1000, last = 2000, arrived = null } = {}) {
+export function followSteps(wheels, width, { start = 1000, last = 2000, ended = null } = {}) {
 	const fingers = new WheelFollow();
 	const pager = new FollowPager(start, last);
 	let at = start;
@@ -52,7 +46,7 @@ export function followSteps(wheels, width, { start = 1000, last = 2000, arrived 
 		}
 	};
 	wheels.forEach((e, i) => {
-		if (arrived && i > 0 && arrived[i] - arrived[i - 1] > WHEEL_END_MS) apply(fingers.tick(Infinity));
+		if (ended && i > 0 && ended[i - 1]) apply(fingers.tick(Infinity));
 		apply(fingers.tick(e.t));
 		apply(fingers.feed(e));
 	});
