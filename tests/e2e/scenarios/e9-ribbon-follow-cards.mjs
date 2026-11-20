@@ -73,7 +73,21 @@ export default {
 			return a === (await t.cdp.eval(`document.querySelector('[data-list="day"]').scrollTop`));
 		}, 3000);
 
-		const held = await t.oracle.rect('[data-list="day"] .tc-card[data-id]', 0);
+		/**
+		 * The card a person presses is one they see: the swipe back need not bring the list to its very top (how far a fling
+		 * carries depends on the pace the events reach the page), and a card left above the list's edge is under no finger.
+		 */
+		const held = await t.cdp.eval(`(() => {
+			for (const card of document.querySelectorAll('[data-list="day"] .tc-card[data-id]')) {
+				const r = card.getBoundingClientRect();
+				const x = r.left + r.width / 2;
+				const y = r.top + r.height / 2;
+				if (document.elementFromPoint(x, y)?.closest(".tc-card") === card) return { x, y };
+			}
+			return null;
+		})()`);
+		t.expect(held !== null, "the day shows a card to press");
+		if (!held) return;
 		const ribbonBefore = await scrollLeft();
 		let up = 0;
 		let ribbonDuring = ribbonBefore;

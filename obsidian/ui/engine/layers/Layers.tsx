@@ -70,6 +70,8 @@ export interface MenuLayerProps {
 	readonly panelClass: string;
 	/** The page shown: another page lays the panel out afresh. */
 	readonly page: string;
+	/** What else changes the panel's height on the same page (a question in place of a row): it measures and places the block again, the focus staying where it is. */
+	readonly shape?: string;
 	/** The start of a description by the copy (F129, F130), and what a tap on it does. */
 	readonly peek?: { readonly content: ReactNode; readonly onPress: () => void };
 	/** The copy keeps the pressed thing's width (an event wraps its title inside it); otherwise it grows right for its title. */
@@ -96,7 +98,7 @@ const motionClass = (status: string, ready: boolean) => (status === "open" && re
  * goes back down into the task. Another page grows or shrinks the panel in place (`scrollWithin`). The parts open and
  * close together (Floating UI's transition status keeps them mounted while they fade, `LAYER_MS`).
  */
-export function MenuLayer({ open, onClose, escapes = true, root, reference, label, over, groups, panelClass, page, keepWidth = false, onLift }: MenuLayerProps) {
+export function MenuLayer({ open, onClose, escapes = true, root, reference, label, over, groups, panelClass, page, shape, keepWidth = false, onLift }: MenuLayerProps) {
 	const parts = useRef<{ upper: HTMLElement | null; lower: HTMLElement | null }>({ upper: null, lower: null });
 	/** The window less the phone's safe areas (`env(safe-area-inset-*)`, the plugin's `menuRoom`): every part stays inside it. */
 	const safe = useRef<HTMLElement | null>(null);
@@ -121,7 +123,7 @@ export function MenuLayer({ open, onClose, escapes = true, root, reference, labe
 	const placed = block.middlewareData.block as BlockPlace | undefined;
 	/** Another page measures and places the block again (its panel's own height is set from the page, which the size observer misses). */
 	const placeBlock = block.update;
-	useLayoutEffect(() => placeBlock(), [page, groups.length, placeBlock]);
+	useLayoutEffect(() => placeBlock(), [page, shape, groups.length, placeBlock]);
 	/** Where the block last stood while open: closing, it goes back down into the task from there, though the card under it is gone meanwhile (Rename turns the card into the field in the same tap, F132). */
 	const stood = useRef<{ styles: CSSProperties; spot: BlockPlace | undefined }>({ styles: {}, spot: undefined });
 	if (open && block.isPositioned) stood.current = { styles: block.floatingStyles, spot: placed };

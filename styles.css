@@ -426,8 +426,9 @@ body {
 	--tc-menu-title-h: 40px;
 	--tc-group-gap: var(--tc-space-8);
 	--tc-band: var(--tc-group-gap) solid var(--tc-gap-ink);
-	/* The engine's menu parts its groups by the panel's own ground alone (Max, 2026-11-20: one grey stripe, no black band). */
-	--tc-band-quiet: var(--tc-group-gap) solid transparent;
+	/* The engine's menu parts its groups by one thin grey line across the panel, as Obsidian's menu separator (Max, 2026-11-20: one grey stripe, no black band), the groups close to it. */
+	--tc-menu-split: var(--tc-hairline) solid var(--tc-separator);
+	--tc-menu-split-pad: var(--tc-space-6);
 	--tc-menu-icon: var(--tc-icon-l);
 	--tc-back-icon: var(--tc-icon-m);
 	/* The task menu's tiles: the statuses and the priority levels, the icon over the label. */
@@ -1967,7 +1968,10 @@ body:not(.is-mobile) .tc-drag-source:focus-visible > :is(.tc-card, .tc-block-car
 .tc-menu-over .tc-event { --tc-event-bg: var(--tc-event-bg-dark); --tc-event-bar: var(--tc-event-bar-dark); --tc-event-text: var(--tc-event-text-dark); }
 body.theme-light .tc-menu-over .tc-event { --tc-event-bg: var(--tc-event-bg-light); --tc-event-bar: var(--tc-event-bar-light); --tc-event-text: var(--tc-event-text-light); }
 .tc-level.tc-menu-layer .tc-panel { bottom: auto; overflow-y: auto; overscroll-behavior: contain; }
-.tc-level.tc-menu-layer { --tc-band: var(--tc-band-quiet); }
+.tc-level.tc-menu-layer { --tc-band: var(--tc-menu-split); }
+.tc-menu-layer :is(.tc-menu-tiles, .tc-menu-ask):not(:first-child) { padding-top: var(--tc-menu-split-pad); }
+.tc-menu-layer :is(.tc-menu-tiles, .tc-menu-ask):not(:last-child) { padding-bottom: var(--tc-menu-split-pad); }
+.tc-panel .tc-menu-tiles.is-remove button.tc-menu-row { border-radius: var(--tc-radius-menu-tile); background: var(--tc-menu-tile-bg); }
 /* A label, a task's name in a question or a row's value too long for its room fades out at the right, as the plugin marks it: the box scrolls only when its text is cut, and only then its scroll timeline runs the fade. */
 @keyframes tc-cut-tile { from, to { text-align: left; -webkit-mask-image: var(--tc-fade-tile-end); mask-image: var(--tc-fade-tile-end); } }
 @keyframes tc-cut-value { from, to { -webkit-mask-image: var(--tc-fade-card-end); mask-image: var(--tc-fade-card-end); } }
