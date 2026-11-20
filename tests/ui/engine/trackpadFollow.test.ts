@@ -13,7 +13,7 @@ type Heard =
 	| { readonly heard: number; readonly type: "momentumEnded"; readonly t: number; readonly last: number };
 
 /** Max's probe session (2026-11-20): the native module's signals and the page's wheel events, in the order the page heard them (scripts/trackpad-fixture.mjs). */
-const SESSION = (JSON.parse(readFileSync(join(__dirname, "..", "..", "e2e", "recordings", "max-2026-11-20-trackpad-phases.json"), "utf8")) as { events: Heard[] }).events;
+const SESSION = (JSON.parse(readFileSync(join(__dirname, "fixtures", "max-2026-11-20-trackpad-phases.json"), "utf8")) as { events: Heard[] }).events;
 
 /** @use-gesture's wheel end: this long after the last wheel event the page heard. */
 const WHEEL_END_MS = 140;
