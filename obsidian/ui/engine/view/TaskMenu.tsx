@@ -36,6 +36,8 @@ interface MenuSteps {
 interface ActionLook {
 	readonly label: string;
 	readonly icon: IconName;
+	/** In the rows group, drawn as a tile (icon over label) in one row with the others so drawn, not as a list row (Max, 2026-11-20). */
+	readonly tile?: true;
 	readonly onPick: (action: Offered, steps: MenuSteps) => void;
 }
 
@@ -66,8 +68,8 @@ const MENU_ACTIONS: Readonly<Record<TaskMenuActionId, ActionLook | { readonly ti
 	section: { label: "Section", icon: "section", onPick: leave },
 	subtask: { label: "Subtask", icon: "subtask", onPick: (_, steps) => steps.startSubtask() },
 	firstStep: { label: "First step", icon: "firstStep", onPick: leave },
-	openFull: { label: "Open full screen", icon: "fullScreen", onPick: leave },
-	openInObsidian: { label: "Open in Obsidian", icon: "openFile", onPick: leave },
+	openFull: { label: "Open full screen", icon: "fullScreen", onPick: leave, tile: true },
+	openInObsidian: { label: "Open in Obsidian", icon: "openFile", onPick: leave, tile: true },
 	delete: { label: "Delete", icon: "delete", onPick: (action, steps) => (action.asks ? steps.ask("delete") : steps.pick({ kind: "delete" })) },
 };
 
@@ -206,10 +208,16 @@ function taskGroups(layer: Layer, typing: boolean, model: TaskMenuModel, steps: 
 				groups.push(<TileGroup key={group} kind="is-move is-when" rows={tileRows(actions.flatMap(tile))} />);
 				break;
 			case "edit":
-				groups.push(<TileGroup key={group} kind="is-edit" rows={tileRows(actions.flatMap(tile))} />);
+				groups.push(<TileGroup key={group} kind="is-edit" rows={[actions.flatMap(tile)]} />);
 				break;
 			case "rows":
-				groups.push(<RowGroup key={group} rows={actions.flatMap((action) => tile(action).map(({ focus: _, ...spec }) => spec))} />);
+				{
+					const asTile = (action: Offered) => lookOf(action)?.tile === true;
+					const listed = actions.filter((action) => !asTile(action));
+					const tiled = actions.filter(asTile);
+					if (listed.length > 0) groups.push(<RowGroup key={group} rows={listed.flatMap((action) => tile(action).map(({ focus: _, ...spec }) => spec))} />);
+					if (tiled.length > 0) groups.push(<TileGroup key={`${group}-tiles`} kind="is-edit is-open" rows={[tiled.flatMap(tile)]} />);
+				}
 				break;
 			case "remove":
 				if (asking === "delete") groups.push(<Ask key={group} what="delete" title={model.title} onCancel={() => steps.ask(null)} onConfirm={() => pick({ kind: "delete" })} />);

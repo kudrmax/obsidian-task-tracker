@@ -435,6 +435,7 @@ body {
 	--tc-menu-tile-icon-small: var(--tc-icon-m);
 	/* A tile label's room at each side, and its line: it keeps its height while it is drawn smaller. */
 	--tc-tile-room: var(--tc-space-8);
+	--tc-tile-room-small: var(--tc-space-4);
 	--tc-tile-leading: 16px;
 	/* The hidden copy a tile label is measured by, at this share of its size (short enough to fit any tile), and a container's whole width. */
 	--tc-tile-probe-scale: 0.25;
@@ -1946,7 +1947,7 @@ body.theme-light .tc-menu-over .tc-event { --tc-event-bg: var(--tc-event-bg-ligh
 @property --tc-fit-whole { syntax: "<length>"; inherits: true; initial-value: 0px; }
 @property --tc-fit-left { syntax: "<length>"; inherits: true; initial-value: 0px; }
 .tc-menu-tile > .tc-tile-fit { --tc-tile-font: var(--tc-font-menu-tile); align-self: stretch; box-sizing: border-box; padding: 0 var(--tc-tile-room); display: flex; container-type: inline-size; }
-.tc-menu-tiles.is-edit .tc-menu-tile > .tc-tile-fit { --tc-tile-font: var(--tc-font-menu-tile-small); }
+.tc-menu-tiles.is-edit .tc-menu-tile > .tc-tile-fit { --tc-tile-font: var(--tc-font-menu-tile-small); padding: 0 var(--tc-tile-room-small); }
 .tc-tile-fit > .tc-tile-room { flex: 1 1 0; min-width: 0; container-type: inline-size; --tc-fit-whole: var(--tc-cq-whole); }
 .tc-tile-fit > .tc-tile-probe::before { content: attr(data-text); }
 .tc-tile-fit > .tc-tile-probe { flex: none; visibility: hidden; white-space: nowrap; font-size: calc(var(--tc-tile-font) * var(--tc-tile-probe-scale)); font-weight: var(--tc-weight-menu-tile); }
