@@ -1818,8 +1818,8 @@ ${line}`;
     return [...doc.tasks("now"), ...doc.tasks("soon")];
   }
   function dayList(doc, date, today, boundary = DayBoundary.MIDNIGHT) {
-    const shown2 = (e) => date === today ? e.section === "now" || e.task.dueDate === date : e.task.dueDate === date;
-    return listed(doc).filter((e) => shown2(e) && !slottedOnDate(e, date, boundary));
+    const shown3 = (e) => date === today ? e.section === "now" || e.task.dueDate === date : e.task.dueDate === date;
+    return listed(doc).filter((e) => shown3(e) && !slottedOnDate(e, date, boundary));
   }
   function slottedOn(doc, date, boundary = DayBoundary.MIDNIGHT) {
     const start = (e) => boundary.spanOf(e.task.slot, date).start;
@@ -1848,11 +1848,11 @@ ${line}`;
   function columnGroups(doc, column, today, boundary = DayBoundary.MIDNIGHT) {
     const list = columnList(column, today);
     if (list === null) return [];
-    const shown2 = column.kind === "day" ? dayList(doc, column.date, today, boundary) : column.kind === "soon" ? soonWithoutDate(doc) : doc.tasks(list);
+    const shown3 = column.kind === "day" ? dayList(doc, column.date, today, boundary) : column.kind === "soon" ? soonWithoutDate(doc) : doc.tasks(list);
     const groups = doc.groups(list);
     const ungrouped = ungroupedIndex(groups);
-    const others = shown2.filter((e) => e.section !== list);
-    return groups.map((g) => ({ list, index: g.index, name: g.name, entries: [...g.index === ungrouped ? others : [], ...shown2.filter((e) => e.section === list && g.entries.includes(e))] })).filter((g, i) => g.entries.length > 0 || groups[i].heading && g.name !== null && groups[i].entries.length === 0);
+    const others = shown3.filter((e) => e.section !== list);
+    return groups.map((g) => ({ list, index: g.index, name: g.name, entries: [...g.index === ungrouped ? others : [], ...shown3.filter((e) => e.section === list && g.entries.includes(e))] })).filter((g, i) => g.entries.length > 0 || groups[i].heading && g.name !== null && groups[i].entries.length === 0);
   }
 
   // core/domain/ProjectWrites.ts
@@ -2175,6 +2175,12 @@ ${line}`;
     if (same || entry.section === section) return edited;
     return edited.moveEntry(sameEntryIn(edited, entry), section, "end");
   }
+  function sendTo(doc, entry, placement, today) {
+    if (entry.path.length > 0 || samePlacement(placementOfEntry(entry, today), placement)) return doc;
+    const { section, dueDate } = placementTarget(placement, today);
+    const edited = doc.replace(entry, { ...entry.task, dueDate, ...isUndated(section) ? { slot: null } : {} });
+    return entry.section === section ? edited : edited.moveEntry(sameEntryIn(edited, entry), section, "end");
+  }
   function placeSubtask(doc, entry, draft, today, boundary) {
     const current = placementOfEntry(entry, today);
     const dueDate = samePlacement(current, draft.placement) ? entry.task.dueDate : subtaskDueDate(draft.placement, current, today);
@@ -2273,10 +2279,10 @@ ${line}`;
     const list = columnList(column, today);
     const trimmed = name.trim();
     if (list === null || trimmed === "" || trimmed === groups.ungrouped || trimmed === group) return doc;
-    const shown2 = columnGroups(doc, column, today, boundary).find((g) => g.name === group)?.entries ?? [];
-    const at = before === null ? shown2.length : shown2.findIndex((e) => samePlace(e, before));
+    const shown3 = columnGroups(doc, column, today, boundary).find((g) => g.name === group)?.entries ?? [];
+    const at = before === null ? shown3.length : shown3.findIndex((e) => samePlace(e, before));
     if (at < 0) throw new Error(`Not a task the column shows in its group: ${before.raw}`);
-    const below = shown2.slice(at);
+    const below = shown3.slice(at);
     const own = below.filter((e) => e.section === list);
     const index = groupIndex(doc, list, group);
     const twin = groupIndex(doc, list, trimmed) >= 0;
@@ -3287,8 +3293,8 @@ ${key.title}`.toLowerCase();
     events(date) {
       const chosen = this.shown().days().day(date);
       const events = chosen.events;
-      const shown2 = (name) => events.filter((e) => e.source === name).length;
-      const statuses = [...this.reading.sources].sort((a, b) => WINDOW_ORDER.indexOf(a) - WINDOW_ORDER.indexOf(b)).map((source) => this.status(source, shown2(source), chosen.used.has(source)));
+      const shown3 = (name) => events.filter((e) => e.source === name).length;
+      const statuses = [...this.reading.sources].sort((a, b) => WINDOW_ORDER.indexOf(a) - WINDOW_ORDER.indexOf(b)).map((source) => this.status(source, shown3(source), chosen.used.has(source)));
       const inUse = statuses.filter((s) => s.used);
       const alert = inUse.map((s) => alertOf(s.tone)).reduce((worst, a) => ALERTS.indexOf(a) > ALERTS.indexOf(worst) ? a : worst, "none");
       return {
@@ -3315,9 +3321,9 @@ ${key.title}`.toLowerCase();
       return this.shown().known().map((c) => ({ account: c.key.account, title: c.key.title, accountName: c.accountName, name: c.name, color: c.color, shown: !hidden.has(keyText(c.key)) }));
     }
     /** The settings that show or hide one calendar. */
-    shownChange(account, title, shown2) {
+    shownChange(account, title, shown3) {
       const others = this.hidden().filter((k) => k.account !== account || k.title !== title);
-      return { hiddenCalendars: shown2 ? others : [...others, { account, title }], calendarsMigrated: true };
+      return { hiddenCalendars: shown3 ? others : [...others, { account, title }], calendarsMigrated: true };
     }
     /** On the phone, once both Google's and the phone's files are there: the old choice becomes the list of hidden calendars; null when not now. */
     carryOver(canMigrate) {
@@ -3332,7 +3338,7 @@ ${key.title}`.toLowerCase();
     shown() {
       return new ShownCalendars(this.reading.files, this.settings, this.now);
     }
-    status(source, shown2, used) {
+    status(source, shown3, used) {
       const problem = this.problem(source);
       const file = this.reading.files.get(source);
       const updatedAt = file?.exportedAt ?? null;
@@ -3348,7 +3354,7 @@ ${key.title}`.toLowerCase();
         detail: this.reading.fed(source) ? null : file?.device ?? null,
         tone
       };
-      return { ...facts, events: shown2, stale: problem !== null || old, used, words: sourceWords(facts) };
+      return { ...facts, events: shown3, stale: problem !== null || old, used, words: sourceWords(facts) };
     }
     /** Google logged out says so, whatever its file: there is none to fetch, or what is left of an old login. */
     problem(source) {
@@ -3777,11 +3783,11 @@ ${key.title}`.toLowerCase();
   function projectsView(input) {
     const { tree, state } = input;
     const statuses = input.doc ? projectStatuses(tree, input.doc) : /* @__PURE__ */ new Map();
-    const statusOf2 = (name2) => statuses.get(projectKey(name2)) ?? "waiting";
+    const statusOf3 = (name2) => statuses.get(projectKey(name2)) ?? "waiting";
     const fixed = input.node === void 0 ? null : nodeIn(input.node, tree);
     const selected2 = fixed ?? selectedNode(state, tree);
-    const rows = treeRows(tree, state, selected2, statusOf2, (node) => input.doc !== null && nodeReorders(node, statusOf2), hasLooseOpen(input.doc));
-    const parts = input.doc ? sectionsOf(input, input.doc, selected2, statusOf2) : [];
+    const rows = treeRows(tree, state, selected2, statusOf3, (node) => input.doc !== null && nodeReorders(node, statusOf3), hasLooseOpen(input.doc));
+    const parts = input.doc ? sectionsOf(input, input.doc, selected2, statusOf3) : [];
     const name = projectOfNode(selected2);
     const placed = name === null ? null : tree.find(name);
     return {
@@ -3790,16 +3796,16 @@ ${key.title}`.toLowerCase();
       title: placed ? placed.node.name : selected2 === "none" ? PROJECTS_WORDS.none : selected2 === "done" ? PROJECTS_WORDS.done : PROJECTS_WORDS.all,
       menu: placed ? projectMenu(refOfPlaced(placed, false), input.doc !== null && hasOwnTasks(input.doc, placed.node.name)) : null,
       sections: parts,
-      newTask: selected2 === "done" || placed !== null && (placed.node.folder || statusOf2(placed.node.name) === "done") ? null : inInbox(placed?.node.name ?? null),
+      newTask: selected2 === "done" || placed !== null && (placed.node.folder || statusOf3(placed.node.name) === "done") ? null : inInbox(placed?.node.name ?? null),
       emptyLabel: PROJECTS_WORDS.noTasks,
       missing: input.doc === null,
-      reorders: input.doc !== null && nodeReorders(selected2, statusOf2)
+      reorders: input.doc !== null && nodeReorders(selected2, statusOf3)
     };
   }
   function panelRows(tree, doc, state) {
     const statuses = doc ? projectStatuses(tree, doc) : /* @__PURE__ */ new Map();
-    const statusOf2 = (name) => statuses.get(projectKey(name)) ?? "waiting";
-    return treeRows(tree, state, selectedNode(state, tree), statusOf2, (node) => doc !== null && nodeReorders(node, statusOf2), hasLooseOpen(doc));
+    const statusOf3 = (name) => statuses.get(projectKey(name)) ?? "waiting";
+    return treeRows(tree, state, selectedNode(state, tree), statusOf3, (node) => doc !== null && nodeReorders(node, statusOf3), hasLooseOpen(doc));
   }
   function hasLooseOpen(doc) {
     return doc !== null && tasksOf(doc).some((entry) => entry.task.projects.length === 0 && stageOf(entry) !== "done");
@@ -3821,9 +3827,9 @@ ${key.title}`.toLowerCase();
     const { selected: _gone, ...rest } = state;
     return rest;
   }
-  function nodeReorders(node, statusOf2) {
+  function nodeReorders(node, statusOf3) {
     const name = projectOfNode(node);
-    return node !== "done" && !(name !== null && statusOf2(name) === "done");
+    return node !== "done" && !(name !== null && statusOf3(name) === "done");
   }
   function projectMenu(project, ownTasks) {
     const locked = !project.folder && ownTasks;
@@ -3848,16 +3854,16 @@ ${key.title}`.toLowerCase();
   function inInbox(project) {
     return { place: { kind: "list", list: "inbox", group: null, before: null }, project };
   }
-  function treeRows(tree, state, selected2, statusOf2, reorders, looseOpen) {
+  function treeRows(tree, state, selected2, statusOf3, reorders, looseOpen) {
     const row = (fields) => ({ ...fields, opensOnHover: fields.acceptsTask && !fields.selected && reorders(fields.node) });
     const rows = [row(fixedRow("all", PROJECTS_WORDS.all, selected2, false, false))];
     const walk = (nodes, path, depth, done) => {
       for (const node of nodes) {
-        if (statusOf2(node.name) === "done" !== done) continue;
-        const branch = node.children.filter((child) => statusOf2(child.name) === "done" === done);
+        if (statusOf3(node.name) === "done" !== done) continue;
+        const branch = node.children.filter((child) => statusOf3(child.name) === "done" === done);
         const folded2 = branch.length > 0 && isFolded(state, node.name);
         const own = [...path, node.name];
-        const status = statusOf2(node.name);
+        const status = statusOf3(node.name);
         rows.push(row({
           node: projectNodeOf(node.name),
           kind: "project",
@@ -3880,20 +3886,20 @@ ${key.title}`.toLowerCase();
     };
     walk(tree.roots, [], 0, false);
     rows.push(row({ ...fixedRow("none", PROJECTS_WORDS.none, selected2, false, true), muted: !looseOpen }));
-    const doneTops = doneRoots(tree, statusOf2);
+    const doneTops = doneRoots(tree, statusOf3);
     const open = state.doneOpen === true;
     rows.push(row({ ...fixedRow("done", PROJECTS_WORDS.done, selected2, doneTops.length > 0, false), folded: doneTops.length > 0 && !open }));
-    if (open) for (const top of doneTops) walkDone(top, rows, state, selected2, statusOf2, 1, row);
+    if (open) for (const top of doneTops) walkDone(top, rows, state, selected2, statusOf3, 1, row);
     return rows;
   }
-  function doneRoots(tree, statusOf2) {
+  function doneRoots(tree, statusOf3) {
     return tree.all().filter((placed) => {
-      if (statusOf2(placed.node.name) !== "done") return false;
+      if (statusOf3(placed.node.name) !== "done") return false;
       const parent = placed.path.length > 1 ? placed.path[placed.path.length - 2] : null;
-      return parent === null || statusOf2(parent) !== "done";
+      return parent === null || statusOf3(parent) !== "done";
     });
   }
-  function walkDone(placed, rows, state, selected2, statusOf2, depth, row) {
+  function walkDone(placed, rows, state, selected2, statusOf3, depth, row) {
     const { node, path } = placed;
     const folded2 = node.children.length > 0 && isFolded(state, node.name);
     rows.push(row({
@@ -3904,7 +3910,7 @@ ${key.title}`.toLowerCase();
       tile: false,
       waiting: false,
       muted: true,
-      status: statusOf2(node.name),
+      status: statusOf3(node.name),
       selected: sameNode(selected2, projectNodeOf(node.name)),
       hasBranch: node.children.length > 0,
       folded: folded2,
@@ -3913,7 +3919,7 @@ ${key.title}`.toLowerCase();
       canLift: false,
       unfoldsOnHover: folded2
     }));
-    if (!folded2) for (const child of node.children) walkDone({ node: child, path: [...path, child.name] }, rows, state, selected2, statusOf2, depth + 1, row);
+    if (!folded2) for (const child of node.children) walkDone({ node: child, path: [...path, child.name] }, rows, state, selected2, statusOf3, depth + 1, row);
   }
   function fixedRow(node, title, selected2, hasBranch, acceptsTask) {
     return { node, kind: node, title, depth: 0, tile: true, waiting: false, muted: node !== "all", status: null, selected: selected2 === node, hasBranch, folded: false, project: null, acceptsTask, canLift: false, unfoldsOnHover: false };
@@ -3951,22 +3957,22 @@ ${key.title}`.toLowerCase();
       canDrop: item.open
     };
   }
-  function sectionsOf(input, doc, selected2, statusOf2) {
+  function sectionsOf(input, doc, selected2, statusOf3) {
     const name = projectOfNode(selected2);
     const placed = name === null ? null : input.tree.find(name);
-    if (placed) return projectSections(input, doc, placed, statusOf2);
-    if (selected2 === "done") return doneSections(input, doc, statusOf2);
+    if (placed) return projectSections(input, doc, placed, statusOf3);
+    if (selected2 === "done") return doneSections(input, doc, statusOf3);
     if (selected2 === "none") {
       const loose = tasksOf(doc).filter((entry) => entry.task.projects.length === 0 && stageOf(entry) !== "done");
       return shown([part("none", null, [], 0, byStage(loose).map((e) => cardOf(input, e, null)), inInbox(null))], true);
     }
-    return allSections(input, doc, statusOf2);
+    return allSections(input, doc, statusOf3);
   }
-  function allSections(input, doc, statusOf2) {
+  function allSections(input, doc, statusOf3) {
     const open = tasksOf(doc).filter((entry) => stageOf(entry) !== "done");
-    const tops = input.tree.roots.filter((node) => statusOf2(node.name) !== "done").map((node) => input.tree.find(node.name));
+    const tops = input.tree.roots.filter((node) => statusOf3(node.name) !== "done").map((node) => input.tree.find(node.name));
     const parts = tops.map((top) => {
-      const branch = input.tree.all().filter((p) => p.path.length >= 1 && projectKey(p.path[0]) === projectKey(top.node.name) && statusOf2(p.node.name) !== "done").map((p) => p.node.name);
+      const branch = input.tree.all().filter((p) => p.path.length >= 1 && projectKey(p.path[0]) === projectKey(top.node.name) && statusOf3(p.node.name) !== "done").map((p) => p.node.name);
       const cards = byStage(open.filter((entry) => branch.some((name) => namesProject(entry.task.projects, name)))).map((entry) => {
         const by = entry.task.projects.find((p) => namesProject(branch, p));
         return cardOf(input, entry, by === void 0 ? top.node.name : input.tree.find(by)?.node.name ?? by);
@@ -3976,18 +3982,18 @@ ${key.title}`.toLowerCase();
     const loose = byStage(open.filter((entry) => entry.task.projects.length === 0)).map((e) => cardOf(input, e, null));
     return shown([...parts, part("none", PROJECTS_WORDS.none, [], 0, loose, inInbox(null))], true);
   }
-  function projectSections(input, doc, placed, statusOf2) {
-    const closed = statusOf2(placed.node.name) === "done";
+  function projectSections(input, doc, placed, statusOf3) {
+    const closed = statusOf3(placed.node.name) === "done";
     const top = placed.path.length;
     const whole = subprojectsOn(input.state) || placed.node.folder;
-    const branch = whole ? input.tree.all().filter((p) => p.path.length > top && p.path.slice(0, top).every((n, i) => projectKey(n) === projectKey(placed.path[i])) && (closed || statusOf2(p.node.name) !== "done")) : [];
+    const branch = whole ? input.tree.all().filter((p) => p.path.length > top && p.path.slice(0, top).every((n, i) => projectKey(n) === projectKey(placed.path[i])) && (closed || statusOf3(p.node.name) !== "done")) : [];
     const write = (project) => closed ? null : inInbox(project);
     const own = projectPart(OWN, { ...placed, title: null }, [], 0, byStage(tasksNaming(doc, placed.node.name, closed)).map((e) => cardOf(input, e, placed.node.name)), write(placed.node.name));
     const subs = branch.map((p) => projectPart(`project:${p.node.name}`, p, p.path.slice(top), p.path.length - top, byStage(tasksNaming(doc, p.node.name, closed)).map((e) => cardOf(input, e, p.node.name)), write(p.node.name)));
     return shown([own, ...subs], !closed);
   }
-  function doneSections(input, doc, statusOf2) {
-    const done = input.tree.all().filter((p) => statusOf2(p.node.name) === "done");
+  function doneSections(input, doc, statusOf3) {
+    const done = input.tree.all().filter((p) => statusOf3(p.node.name) === "done");
     return shown(done.map((p) => part(`project:${p.node.name}`, p.node.name, p.path, p.path.length, tasksNaming(doc, p.node.name, true).map((e) => cardOf(input, e, p.node.name)), null)), false);
   }
   var OWN = "own";
@@ -4525,6 +4531,272 @@ ${key.title}`.toLowerCase();
     return { value: repeatValue(rule) ?? "", days: repeatParts(rule).days };
   }
 
+  // core/application/placeChoices.ts
+  var ENTRY_PLACES = ["inbox", "backlog", "soon", "now"];
+  function listChoices(places) {
+    return ENTRY_PLACES.map((kind) => ({ kind, on: places.length > 0 && places.every((place) => place.kind === kind) }));
+  }
+  function placeChoices(place) {
+    const date = place?.kind === "date" ? place.date : null;
+    return [...listChoices(place ? [place] : []), { kind: "date", on: date !== null, date }];
+  }
+  function placeable(tasks) {
+    return tasks.length > 0 && tasks.every((task) => !task.isSubtask);
+  }
+
+  // core/application/taskActions.ts
+  var shown2 = (offered2) => offered2 ? "shown" : "hidden";
+  var one = (ctx) => ctx.of.kind === "task";
+  var always = () => "shown";
+  var COLUMNS = /* @__PURE__ */ new Set(["day", "soon", "inbox", "backlog"]);
+  var FIRST_STEP_FROM = /* @__PURE__ */ new Set([...COLUMNS, "timeline"]);
+  var fromOf = (ctx) => ctx.of.kind === "task" ? ctx.of.from : null;
+  function dayTile(ctx) {
+    const movable = ctx.items.filter((item) => item.can.postpone);
+    if (movable.length === 0) return null;
+    const tomorrow = addDays(ctx.today, 1);
+    return movable.every((item) => item.day === tomorrow) ? "today" : "tomorrow";
+  }
+  var levelOffer = (count, holders) => count === 0 ? "hidden" : holders ? "shown" : "disabled";
+  var ONE_TASK = "It is about one task: each picked task has its own.";
+  var NOT_WRITTEN = "The task isn't written yet, or a rename edits only its title and marks; Escape cancels a new task.";
+  var IN_THE_MENU = "In the task's menu (⋯) on the full screen.";
+  var IN_THE_PLACE = "The field's place button sends the task to a list or a day.";
+  var TASK_ACTIONS = {
+    done: {
+      name: "Done",
+      places: {
+        taskMenu: { group: "statuses", order: 0, offer: always },
+        bulkMenu: { group: "statuses", order: 0, offer: always },
+        field: { absent: NOT_WRITTEN },
+        fullScreen: { group: "title", order: 0, offer: always }
+      }
+    },
+    progress: {
+      name: "In progress",
+      places: {
+        taskMenu: { group: "statuses", order: 1, offer: always },
+        bulkMenu: { group: "statuses", order: 1, offer: always },
+        field: { absent: NOT_WRITTEN },
+        fullScreen: { absent: IN_THE_MENU }
+      }
+    },
+    wontDo: {
+      name: "Won't do",
+      places: {
+        taskMenu: { group: "statuses", order: 2, offer: always, asks: one },
+        bulkMenu: { group: "statuses", order: 2, offer: always },
+        field: { absent: NOT_WRITTEN },
+        fullScreen: { absent: IN_THE_MENU }
+      }
+    },
+    stop: {
+      name: "Stop",
+      places: {
+        taskMenu: { group: "statuses", order: 3, offer: (ctx) => shown2(ctx.statusTasks.every((item) => item.can.stop)), asks: one },
+        bulkMenu: { absent: "Stopping a repeat ends one task's series; it is asked for one task at a time." },
+        field: { absent: NOT_WRITTEN },
+        fullScreen: { absent: IN_THE_MENU }
+      }
+    },
+    level: {
+      name: "Priority",
+      places: {
+        taskMenu: { group: "levels", order: 0, offer: (ctx) => levelOffer(ctx.levels, ctx.items.some((item) => item.can.setPriority)) },
+        bulkMenu: { group: "levels", order: 0, offer: (ctx) => levelOffer(ctx.levels, ctx.items.some((item) => item.can.setPriority)) },
+        field: { group: "flag", order: 0, offer: (ctx) => shown2(ctx.task && ctx.levels > 0) },
+        fullScreen: { absent: IN_THE_MENU }
+      }
+    },
+    label: {
+      name: "Labels",
+      places: {
+        taskMenu: { group: "labels", order: 0, offer: (ctx) => levelOffer(ctx.labels, ctx.items.some((item) => item.can.setLabels)) },
+        bulkMenu: { group: "labels", order: 0, offer: (ctx) => levelOffer(ctx.labels, ctx.items.some((item) => item.can.setLabels)) },
+        field: { group: "flag", order: 1, offer: (ctx) => shown2(ctx.task && ctx.labels > 0) },
+        fullScreen: { absent: IN_THE_MENU }
+      }
+    },
+    today: {
+      name: "Today",
+      places: {
+        taskMenu: { group: "when", order: 0, offer: (ctx) => shown2(dayTile(ctx) === "today") },
+        bulkMenu: { group: "when", order: 0, offer: (ctx) => shown2(dayTile(ctx) === "today") },
+        field: { absent: IN_THE_PLACE },
+        fullScreen: { absent: IN_THE_MENU }
+      }
+    },
+    tomorrow: {
+      name: "Tomorrow",
+      places: {
+        taskMenu: { group: "when", order: 0, offer: (ctx) => shown2(dayTile(ctx) === "tomorrow") },
+        bulkMenu: { group: "when", order: 0, offer: (ctx) => shown2(dayTile(ctx) === "tomorrow") },
+        field: { absent: IN_THE_PLACE },
+        fullScreen: { absent: IN_THE_MENU }
+      }
+    },
+    pickDate: {
+      name: "Pick a date",
+      places: {
+        taskMenu: { group: "when", order: 1, offer: (ctx) => shown2(ctx.items.some((item) => item.can.postpone)) },
+        bulkMenu: { group: "when", order: 1, offer: (ctx) => shown2(ctx.items.some((item) => item.can.postpone)) },
+        field: { group: "place", order: 0, offer: (ctx) => shown2(ctx.task && ctx.place) },
+        fullScreen: { absent: IN_THE_MENU }
+      }
+    },
+    repeat: {
+      name: "Repeat",
+      places: {
+        taskMenu: { group: "when", order: 2, offer: (ctx) => shown2(ctx.items.every((item) => item.repeatable)) },
+        bulkMenu: { group: "when", order: 2, offer: (ctx) => shown2(ctx.items.some((item) => item.repeatable)) },
+        field: { group: "marks", order: 1, offer: (ctx) => shown2(ctx.task && (ctx.renaming?.repeatable ?? true)) },
+        fullScreen: { absent: IN_THE_MENU }
+      }
+    },
+    reminder: {
+      name: "Reminder",
+      places: {
+        taskMenu: { group: "when", order: 3, offer: (ctx) => shown2(ctx.items.every((item) => item.can.remind)) },
+        bulkMenu: { absent: "A reminder belongs to one task on a time; each is set in its own menu." },
+        field: { absent: "A reminder belongs to a task on a time; it is set in the task's menu once the task is written." },
+        fullScreen: { absent: IN_THE_MENU }
+      }
+    },
+    rename: {
+      name: "Rename",
+      places: {
+        taskMenu: { group: "edit", order: 0, offer: always },
+        bulkMenu: { absent: ONE_TASK },
+        field: { absent: "The field is the title itself: typing in it is the rename." },
+        fullScreen: { absent: IN_THE_MENU }
+      }
+    },
+    description: {
+      name: "Description",
+      places: {
+        taskMenu: { group: "edit", order: 1, offer: (ctx) => shown2(ctx.items.every((item) => item.can.addDescription)) },
+        bulkMenu: { absent: ONE_TASK },
+        field: { group: "marks", order: 2, offer: (ctx) => shown2(ctx.task && (ctx.renaming?.can.addDescription ?? true)) },
+        fullScreen: { group: "description", order: 0, offer: always }
+      }
+    },
+    project: {
+      name: "Project",
+      places: {
+        taskMenu: { group: "edit", order: 2, offer: (ctx) => ctx.project.disabled ? "disabled" : "shown" },
+        bulkMenu: { group: "edit", order: 2, offer: (ctx) => ctx.project.disabled ? "disabled" : "shown" },
+        field: { group: "marks", order: 0, offer: (ctx) => shown2(ctx.task && ctx.topLevel) },
+        fullScreen: { absent: IN_THE_MENU }
+      }
+    },
+    section: {
+      name: "Section",
+      places: {
+        taskMenu: { group: "edit", order: 3, offer: (ctx) => shown2(ctx.sections !== null) },
+        bulkMenu: { group: "edit", order: 3, offer: (ctx) => shown2(ctx.sections !== null) },
+        field: { absent: "The field stands in the section it is typed in; a drag or the task's menu moves the task to another." },
+        fullScreen: { absent: IN_THE_MENU }
+      }
+    },
+    subtask: {
+      name: "Subtask",
+      places: {
+        taskMenu: { group: "edit", order: 4, offer: (ctx) => shown2(fromOf(ctx) !== "stack") },
+        bulkMenu: { absent: ONE_TASK },
+        field: { absent: "Enter, then Tab, types a subtask under the task just typed." },
+        fullScreen: { group: "subtasks", order: 0, offer: always }
+      }
+    },
+    newSection: {
+      name: "New section",
+      places: {
+        taskMenu: { absent: "The Section page offers «New section…» for the task." },
+        bulkMenu: { absent: "A new section is named for one task, from its Section page or the field." },
+        field: { group: "mode", order: 0, offer: (ctx) => shown2(ctx.maySection) },
+        fullScreen: { absent: "The full screen shows one task's subtasks, which have no sections." }
+      }
+    },
+    indent: {
+      name: "Move in",
+      places: {
+        taskMenu: { absent: "A written task is moved in by dragging it onto another." },
+        bulkMenu: { absent: "Picked tasks are moved by dragging them." },
+        field: { group: "shifts", order: 1, offer: (ctx) => !ctx.indents ? "hidden" : ctx.canIndent ? "shown" : "disabled" },
+        fullScreen: { absent: "Subtasks on the full screen are moved by dragging them." }
+      }
+    },
+    outdent: {
+      name: "Move out",
+      places: {
+        taskMenu: { absent: "A written task is moved out by dragging it." },
+        bulkMenu: { absent: "Picked tasks are moved by dragging them." },
+        field: { group: "shifts", order: 0, offer: (ctx) => !ctx.indents ? "hidden" : ctx.canOutdent ? "shown" : "disabled" },
+        fullScreen: { absent: "Subtasks on the full screen are moved by dragging them." }
+      }
+    },
+    firstStep: {
+      name: "First step",
+      places: {
+        taskMenu: { group: "rows", order: 0, offer: (ctx) => shown2(ctx.items.every((item) => item.can.firstStep) && FIRST_STEP_FROM.has(fromOf(ctx) ?? "full")) },
+        bulkMenu: { absent: ONE_TASK },
+        field: { absent: NOT_WRITTEN },
+        fullScreen: { absent: "The full screen's plus types the task's subtasks, its first step among them." }
+      }
+    },
+    openFull: {
+      name: "Open full screen",
+      places: {
+        taskMenu: { group: "rows", order: 1, offer: (ctx) => shown2(fromOf(ctx) !== "full") },
+        bulkMenu: { absent: ONE_TASK },
+        field: { absent: NOT_WRITTEN },
+        fullScreen: { absent: "The full screen already shows the task." }
+      }
+    },
+    openInObsidian: {
+      name: "Open in Obsidian",
+      places: {
+        taskMenu: { group: "rows", order: 2, offer: always },
+        bulkMenu: { absent: ONE_TASK },
+        field: { absent: NOT_WRITTEN },
+        fullScreen: { absent: IN_THE_MENU }
+      }
+    },
+    delete: {
+      name: "Delete",
+      places: {
+        taskMenu: { group: "remove", order: 0, offer: always, asks: one },
+        bulkMenu: { group: "remove", order: 0, offer: always },
+        field: { absent: NOT_WRITTEN },
+        fullScreen: { absent: IN_THE_MENU }
+      }
+    }
+  };
+  var TASK_ACTION_IDS = Object.keys(TASK_ACTIONS);
+  var TASK_MENU_GROUPS = ["statuses", "levels", "labels", "copy", "when", "edit", "rows", "remove"];
+  function placementOf(id, surface) {
+    return TASK_ACTIONS[id].places[surface];
+  }
+  function arrange(surface, order, ctx) {
+    const offered2 = TASK_ACTION_IDS.flatMap((id) => {
+      const cell = placementOf(id, surface);
+      if ("absent" in cell) return [];
+      const offer = cell.offer(ctx);
+      if (offer === "hidden") return [];
+      return [{ id, group: cell.group, order: cell.order, disabled: offer === "disabled", asks: cell.asks?.(ctx) ?? false }];
+    });
+    return order.flatMap((group) => {
+      const actions = offered2.filter((action) => action.group === group).sort((a, b) => a.order - b.order).map(({ id, disabled, asks }) => ({ id, disabled, asks }));
+      return actions.length > 0 ? [{ group, actions }] : [];
+    });
+  }
+  function menuActions(ctx) {
+    return arrange(ctx.of.kind === "task" ? "taskMenu" : "bulkMenu", TASK_MENU_GROUPS, ctx);
+  }
+  function statusOf2(id, progress) {
+    const statuses = { done: "done", progress, wontDo: "wontDo", stop: "stop" };
+    return statuses[id] ?? null;
+  }
+
   // core/application/sections.ts
   function rowsOf(items, level = 0) {
     return items.flatMap((item) => [{ item, level }, ...item.collapsed ? [] : rowsOf(item.subtasks, level + 1)]);
@@ -4567,8 +4839,8 @@ ${key.title}`.toLowerCase();
     return drawn;
   }
   function shownSections(groups, sections) {
-    const shown2 = groups.reduce((all, name) => all.some((g) => g.name === name) ? all : [...all, groupOf(name, [])], []);
-    return withEmptySections(shown2, sections).map((g) => g.name);
+    const shown3 = groups.reduce((all, name) => all.some((g) => g.name === name) ? all : [...all, groupOf(name, [])], []);
+    return withEmptySections(shown3, sections).map((g) => g.name);
   }
   function offeredNames(groups, presets, ungrouped) {
     const names = [...groups.flatMap((group) => group === null ? [] : [group]), ...presets.map((preset) => preset.trim())];
@@ -4627,14 +4899,13 @@ ${key.title}`.toLowerCase();
     return items.every((item) => item.dueDate === first) ? first : null;
   }
   var A_LIST_CARD = { kind: "task", from: "day" };
-  var COLUMNS = /* @__PURE__ */ new Set(["day", "soon", "inbox", "backlog"]);
-  var FIRST_STEP_FROM = /* @__PURE__ */ new Set([...COLUMNS, "timeline"]);
+  var COLUMNS2 = /* @__PURE__ */ new Set(["day", "soon", "inbox", "backlog"]);
   function canPick(from) {
-    return COLUMNS.has(from);
+    return COLUMNS2.has(from);
   }
   function menuOffer(froms, screen, columnSections) {
-    const shown2 = froms.every((from) => COLUMNS.has(from) && columnSections(from, screen.day) !== null);
-    return shown2 ? screen.offer : null;
+    const shown3 = froms.every((from) => COLUMNS2.has(from) && columnSections(from, screen.day) !== null);
+    return shown3 ? screen.offer : null;
   }
   function tileStatus(id) {
     const statuses = { done: "done", inProgress: "inProgress", stopProgress: "todo", wontDo: "cancelled", stop: null };
@@ -4642,36 +4913,30 @@ ${key.title}`.toLowerCase();
   }
   function statusTask(item, from) {
     if (from === "timeline") return item.block.step ?? item;
-    return COLUMNS.has(from) ? item.card.step ?? item : item;
+    return COLUMNS2.has(from) ? item.card.step ?? item : item;
   }
   function statusTasks(items, of, froms) {
     return items.map((item, i) => statusTask(item, of.kind === "task" ? of.from : froms[i] ?? "full"));
   }
-  function menuStatuses(items, of) {
-    const one = of.kind === "task";
-    const progress = nextProgress(items.map((item) => item.status)) === "todo" ? "stopProgress" : "inProgress";
-    return [
-      { id: "done", confirm: false },
-      { id: progress, confirm: false },
-      { id: "wontDo", confirm: one },
-      ...one && items.every((item) => item.can.stop) ? [{ id: "stop", confirm: true }] : []
-    ];
+  var OLD_EDITS = ["rename", "reminder", "description", "repeat", "section", "project", "subtask", "firstStep"];
+  var OLD_OPENS = ["openFull", "openInObsidian"];
+  function progressOf(items) {
+    return nextProgress(items.map((item) => item.status)) === "todo" ? "stopProgress" : "inProgress";
   }
-  function menuEdits(items, of, sections) {
-    const section = sections ? ["section"] : [];
-    if (of.kind === "bulk") return [...section, "project"];
-    const item = items[0];
-    const edits = [
-      ["rename", true],
-      ["reminder", item.can.remind],
-      ["description", item.can.addDescription],
-      ["repeat", item.repeatable],
-      ["section", sections !== null],
-      ["project", true],
-      ["subtask", of.from !== "stack"],
-      ["firstStep", item.can.firstStep && FIRST_STEP_FROM.has(of.from)]
-    ];
-    return edits.flatMap(([id, offered2]) => offered2 ? [id] : []);
+  function menuLayout(ctx, statusFor, moves) {
+    const progress = progressOf(statusFor);
+    const dayOf2 = (id) => moves.find((move) => move.id === id)?.date ?? (id === "today" ? ctx.today : id === "tomorrow" ? addDays(ctx.today, 1) : null);
+    const groups = menuActions(ctx).map(({ group, actions }) => ({ group, actions: actions.map((action) => ({ ...action, status: statusOf2(action.id, progress), date: dayOf2(action.id) })) }));
+    if (ctx.of.kind === "bulk") return groups;
+    const copyAt = TASK_MENU_GROUPS.indexOf("copy");
+    const before = groups.filter((g) => TASK_MENU_GROUPS.indexOf(g.group) < copyAt);
+    return [...before, { group: "copy", actions: [] }, ...groups.slice(before.length)];
+  }
+  function offeredIds(layout) {
+    return new Set(layout.flatMap((group) => group.actions.map((action) => action.id)));
+  }
+  function menuStatuses(layout) {
+    return layout.flatMap((group) => group.actions.flatMap((action) => action.status ? [{ id: action.status, confirm: action.asks }] : []));
   }
   function menuSections(items, offer, of) {
     const choice = offer ? sectionChoice(items, offer) : null;
@@ -4711,27 +4976,50 @@ ${key.title}`.toLowerCase();
     };
   }
   var MENU_GROUPS = ["statuses", "levels", "labels", "moves", "edits", "opens", "remove"];
-  function taskMenu(items, today, levels, labels, offer, of = A_LIST_CARD, projects = [], froms = []) {
+  function sharedRule(items) {
+    const first = items[0]?.repeat ?? null;
+    return items.every((item) => sameRule(item.repeat, first)) ? first : null;
+  }
+  function repeatOf(items, today) {
+    const holder = items.find((item) => item.repeatable) ?? items[0];
+    return { repeat: sharedRule(items), repeatDay: holder?.repeatDay ?? today };
+  }
+  function taskMenu(items, today, levels, labels, offer, of = A_LIST_CARD, projects = [], froms = [], placements = []) {
     const sections = menuSections(items, offer, of);
-    const edits = menuEdits(items, of, sections);
     const statusFor = statusTasks(items, of, froms);
+    const project = menuProject(items, projects);
+    const moves = sharedMoves(items, today);
+    const ctx = { items, statusTasks: statusFor, of, today, sections, project, levels: levels.length, labels: labels.length };
+    const layout = menuLayout(ctx, statusFor, moves);
+    const offered2 = offeredIds(layout);
+    const edits = OLD_EDITS.filter((id) => offered2.has(id));
     return {
+      layout,
       groups: MENU_GROUPS,
-      statuses: menuStatuses(statusFor, of),
+      opens: OLD_OPENS.filter((id) => offered2.has(id)),
+      places: placeable(items) && offered2.has("pickDate") ? listChoices(placements) : [],
+      repeatOf: repeatOf(items, today),
+      statuses: menuStatuses(layout),
       statusTasks: statusFor,
       peek: of.kind === "task" && statusFor[0]?.description != null ? statusFor[0] : null,
       levels: { tiles: levels.map((level) => ({ level, on: levelOn(items, level.prefix) })), disabled: priorityHolders(items).length === 0 },
       labels: { tiles: labels.map((label) => ({ label, on: labelOn(items, label.name) })), disabled: labelHolders(items).length === 0 },
-      moves: sharedMoves(items, today),
+      moves,
       removeDue: items.some((item) => item.can.removeDue),
       dueDate: sharedDueDate(items),
       sections,
-      project: menuProject(items, projects),
+      project,
       edits,
       reminders: edits.includes("reminder") ? REMINDER_KINDS.map((kind) => ({ kind, checked: kind === items[0].reminder })) : [],
-      repeat: repeatRow(of.kind === "task" ? items[0]?.repeat ?? null : null),
-      remove: { confirm: of.kind === "task" }
+      repeat: repeatRow(sharedRule(items)),
+      remove: offered2.has("delete") ? { confirm: layout.some((g) => g.actions.some((a) => a.id === "delete" && a.asks)) } : null
     };
+  }
+  function oneTaskMenu(item, today, levels, labels, offer, from, projects = [], placement) {
+    return taskMenu([item], today, levels, labels, offer, { kind: "task", from }, projects, [], placement ? [placement] : []);
+  }
+  function bulkMenuOf(items, today, levels, labels, offer, projects = [], froms = [], placements = []) {
+    return taskMenu(items, today, levels, labels, offer, { kind: "bulk" }, projects, froms, placements);
   }
   function carriedWith(lifted2, picked2) {
     const id = keyId(lifted2);
@@ -4749,7 +5037,7 @@ ${key.title}`.toLowerCase();
   }
 
   // core/application/taskItems.ts
-  function progressOf(entry) {
+  function progressOf2(entry) {
     if (entry.subtasks.length === 0) return null;
     const counted = entry.subtasks.filter((s) => s.task.status !== "cancelled");
     return { done: counted.filter((s) => s.task.status === "done").length, total: counted.length };
@@ -4786,11 +5074,11 @@ ${key.title}`.toLowerCase();
     const labels = levels.labelsOf(marks.labels);
     const open = isOpen(entry.task.status);
     const collapsed = entry.task.collapsed && hasOpenSubtask(entry);
-    const shown2 = collapsed && open ? nextStep(entry) : null;
-    const drawnBelow = shown2 ? { id: shown2.id, on: entry } : drawn;
+    const shown3 = collapsed && open ? nextStep(entry) : null;
+    const drawnBelow = shown3 ? { id: shown3.id, on: entry } : drawn;
     const allSubtasks = entry.subtasks.map((sub) => toItem(sub, today, levels, entry, boundary, drawnBelow));
     const description = descriptionMarkdown(entry);
-    const step = shown2 && itemWithId(allSubtasks, shown2.id);
+    const step = shown3 && itemWithId(allSubtasks, shown3.id);
     const own = { text: entry.task.text, title: plainText(entry.task.text) };
     const projects = levels.projectsOf(entry.projects);
     return {
@@ -4835,7 +5123,7 @@ ${key.title}`.toLowerCase();
       drawnOn: drawn?.id === entry.id ? { key: keyOf(drawn.on), slot: drawn.on.task.slot } : null,
       subtasks: allSubtasks.filter((sub) => sub.open),
       allSubtasks,
-      progress: progressOf(entry),
+      progress: progressOf2(entry),
       collapsed,
       description,
       parentText: parent?.task.text ?? null,
@@ -4892,7 +5180,6 @@ ${key.title}`.toLowerCase();
     if (!place) return null;
     return { at: { kind: "new", index: place.index, level: place.level }, pending: state.pending.map(({ text }) => ({ text, level: place.level })) };
   }
-  var ENTRY_PLACES = ["inbox", "backlog", "soon", "now"];
   function emptySession() {
     return { field: null, runs: {}, jobs: [], next: 0 };
   }
@@ -5001,13 +5288,13 @@ ${key.title}`.toLowerCase();
       return this.plusSpot() !== null;
     }
     plusSpot() {
-      const shown2 = this.look.shown();
-      for (const column of shown2) {
+      const shown3 = this.look.shown();
+      for (const column of shown3) {
         const part2 = this.parts(column).find((p) => p.plus);
         if (part2) return this.spotIn(column, { kind: "task", group: part2.group, before: null });
       }
-      if (shown2.some(keepsField)) return null;
-      return this.endOf(shown2.includes("day") ? "day" : "inbox");
+      if (shown3.some(keepsField)) return null;
+      return this.endOf(shown3.includes("day") ? "day" : "inbox");
     }
     /** The No tasks plate of empty section `group` tapped: the field of a new task in it. */
     openIn(column, group) {
@@ -5189,8 +5476,8 @@ ${key.title}`.toLowerCase();
     choosePlace(placement) {
       const field = this.session.field;
       if (!field) return null;
-      const shown2 = this.shownPlace(field);
-      if (shown2 && samePlacement(shown2, placement)) return null;
+      const shown3 = this.shownPlace(field);
+      if (shown3 && samePlacement(shown3, placement)) return null;
       const rename2 = field.rename && { ...field.rename, moved: true };
       const list = listSpot(this.run(field.run).spot);
       if (list && keepsField(list.column)) {
@@ -5398,8 +5685,8 @@ ${key.title}`.toLowerCase();
     }
     /** The lists a task is looked for in: the shown ones first, then every other the entry knows. */
     lookOrder() {
-      const shown2 = this.look.shown();
-      return [...shown2, ...ENTRY_LISTS.filter((c) => !shown2.includes(c))];
+      const shown3 = this.look.shown();
+      return [...shown3, ...ENTRY_LISTS.filter((c) => !shown3.includes(c))];
     }
     /** After the last card, in the last section, at the top level; with `project`, of that project's part where the list draws one. */
     endOf(column) {
@@ -5514,8 +5801,8 @@ ${key.title}`.toLowerCase();
     /** Right under a renamed task at its level, or its first subtask when it shows some: nothing may stand between a task and them. */
     under(spot, item) {
       const { place } = spot;
-      const shown2 = item.subtasks.length > 0 && !item.collapsed;
-      return { ...spot, place: { ...place, index: place.index + 1, level: place.level + (shown2 ? 1 : 0) } };
+      const shown3 = item.subtasks.length > 0 && !item.collapsed;
+      return { ...spot, place: { ...place, index: place.index + 1, level: place.level + (shown3 ? 1 : 0) } };
     }
     /** The field's place a level deeper or shallower; null when the cards around forbid it, or the field does not move (a rename, a slot, a stack). */
     shifted(delta) {
@@ -5531,8 +5818,8 @@ ${key.title}`.toLowerCase();
       if (!list) return null;
       const { place } = list;
       const unwritten = run.pending.map((line) => ({ level: line.level, group: place.group }));
-      const shown2 = [...cards.slice(0, place.index), ...unwritten, ...cards.slice(place.index)];
-      const shifted = shiftLevel(shown2, { ...place, index: place.index + unwritten.length }, delta);
+      const shown3 = [...cards.slice(0, place.index), ...unwritten, ...cards.slice(place.index)];
+      const shifted = shiftLevel(shown3, { ...place, index: place.index + unwritten.length }, delta);
       return shifted && { ...place, level: shifted.level };
     }
     blank(text) {
@@ -5555,10 +5842,6 @@ ${key.title}`.toLowerCase();
       default:
         return null;
     }
-  }
-  function placeChoices(place) {
-    const lists = ENTRY_PLACES.map((kind) => ({ kind, on: place?.kind === kind }));
-    return [...lists, { kind: "date", on: place?.kind === "date", date: place?.kind === "date" ? place.date : null }];
   }
   function entryProject(link, known) {
     const ref = refOf(link, known);
@@ -6438,9 +6721,9 @@ ${key.title}`.toLowerCase();
      * than the day nor past the end, and on a task without a duration no later than its start, which becomes the end.
      */
     stretched(task, day, edge, minute) {
-      const shown2 = this.shown(task, day);
-      if (edge === "end") return { start: shown2.start, end: Math.min(MINUTES_PER_DAY, Math.max(shown2.start, minute)) };
-      const end = shown2.end ?? shown2.start;
+      const shown3 = this.shown(task, day);
+      if (edge === "end") return { start: shown3.start, end: Math.min(MINUTES_PER_DAY, Math.max(shown3.start, minute)) };
+      const end = shown3.end ?? shown3.start;
       return { start: Math.max(0, Math.min(minute, end)), end };
     }
     /**
@@ -6450,12 +6733,12 @@ ${key.title}`.toLowerCase();
      * its own start; the top dot is a new start and writes it.
      */
     resized(task, day, edge, minute, minDurationMin) {
-      const shown2 = this.shown(task, day);
+      const shown3 = this.shown(task, day);
       const held = this.stretched(task, day, edge, minute);
       const keepsDuration = held.end - held.start > minDurationMin;
-      const unmoved = edge === "start" && shown2.end === null;
-      const next = keepsDuration ? held : { start: unmoved ? shown2.start : held.start, end: null };
-      if (next.start === shown2.start && next.end === shown2.end) return null;
+      const unmoved = edge === "start" && shown3.end === null;
+      const next = keepsDuration ? held : { start: unmoved ? shown3.start : held.start, end: null };
+      if (next.start === shown3.start && next.end === shown3.end) return null;
       if (edge === "start") return this.boundary.slotAt(day, next.start, next.end);
       const start = this.boundary.spanOf(task.slot, day).start;
       return this.boundary.slotAt(day, start, next.end === null ? null : start + next.end - next.start);
@@ -6662,14 +6945,14 @@ ${key.title}`.toLowerCase();
       const node = filterNode(filter, tree);
       const shows = node === null ? () => true : filterTest(node, tree, doc, this.subprojects());
       const item = this.itemOf(today, doc, node === null || projectOfNode(node) === null);
-      const shown2 = (entries) => entries.filter(shows).map(item);
-      const day = { date, list: shown2(dayList(doc, date, today, boundary)), slotted: shown2(slottedOn(doc, date, boundary)) };
+      const shown3 = (entries) => entries.filter(shows).map(item);
+      const day = { date, list: shown3(dayList(doc, date, today, boundary)), slotted: shown3(slottedOn(doc, date, boundary)) };
       const sections = this.listSections(s);
-      const view = { soon: shown2(soonWithoutDate(doc)), inbox: shown2(inboxList(doc)), backlog: shown2(backlogList(doc)) };
+      const view = { soon: shown3(soonWithoutDate(doc)), inbox: shown3(inboxList(doc)), backlog: shown3(backlogList(doc)) };
       return {
         day,
         ...view,
-        done: shown2(doc.tasks("done")),
+        done: shown3(doc.tasks("done")),
         sections,
         offer: this.offerOf(s, date, sections),
         missing: false,
@@ -6743,8 +7026,8 @@ ${key.title}`.toLowerCase();
     /** The sections the menus offer on the screen. */
     offerOf({ doc, today, boundary }, date, sections) {
       const { presets, ungrouped } = this.settings.get().groups;
-      const shown2 = [...dayList(doc, date, today, boundary), ...soonWithoutDate(doc), ...inboxList(doc), ...backlogList(doc)];
-      const names = (list) => offeredNames(shownSections(shown2.filter((entry) => entry.section === list).map((entry) => entry.group), sections[list]), presets, ungrouped);
+      const shown3 = [...dayList(doc, date, today, boundary), ...soonWithoutDate(doc), ...inboxList(doc), ...backlogList(doc)];
+      const names = (list) => offeredNames(shownSections(shown3.filter((entry) => entry.section === list).map((entry) => entry.group), sections[list]), presets, ungrouped);
       return { lists: { now: names("now"), soon: names("soon"), inbox: names("inbox"), backlog: names("backlog") }, ungrouped };
     }
     listSections({ doc }) {
@@ -6865,11 +7148,11 @@ ${key.title}`.toLowerCase();
     }
     menu(item, from, screen) {
       const offer = menuOffer([from], screen, (column, date) => this.columnSections(column, date));
-      return taskMenu([item], screen.today, this.priorityLevels(), this.labelLevels(), offer, { kind: "task", from }, this.projectChoices(screen));
+      return oneTaskMenu(item, screen.today, this.priorityLevels(), this.labelLevels(), offer, from, this.projectChoices(screen), this.placementOf(item));
     }
     bulkMenu(picked2, screen) {
       const offer = menuOffer(picked2.map((p) => p.from), screen, (column, date) => this.columnSections(column, date));
-      return taskMenu(picked2.map((p) => p.item), screen.today, this.priorityLevels(), this.labelLevels(), offer, { kind: "bulk" }, this.projectChoices(screen), picked2.map((p) => p.from));
+      return bulkMenuOf(picked2.map((p) => p.item), screen.today, this.priorityLevels(), this.labelLevels(), offer, this.projectChoices(screen), picked2.map((p) => p.from), picked2.map((p) => this.placementOf(p.item)));
     }
     carried(lifted2, picked2) {
       return carriedWith(lifted2, picked2);
@@ -6965,7 +7248,7 @@ ${key.title}`.toLowerCase();
   }
 
   // core/application/TaskRules.ts
-  var MOVES = /* @__PURE__ */ new Set(["postpone", "moveBefore", "moveToList", "moveToSoon", "moveToEnd", "moveToGroup", "createGroup", "nest", "reorder"]);
+  var MOVES = /* @__PURE__ */ new Set(["place", "postpone", "moveBefore", "moveToList", "moveToSoon", "moveToEnd", "moveToGroup", "createGroup", "nest", "reorder"]);
   function refsOf(change) {
     if (change.kind === "moveBefore" || change.kind === "moveToGroup" || change.kind === "reorder") return [change.before];
     if (change.kind === "nest") return [change.parent, change.before];
@@ -7412,8 +7695,8 @@ ${key.title}`.toLowerCase();
       const operation = (doc, today2, settings, boundary) => {
         this.groupOf(doc, list, place.group);
         const before = place.before ? this.entryOf(doc, place.before) : null;
-        const shown2 = columnGroups(doc, column, today2, boundary).find((g) => g.name === place.group)?.entries ?? [];
-        if (before && !shown2.some((e) => e.section === before.section && e.index === before.index && e.path.length === 0)) throw new StaleTaskError();
+        const shown3 = columnGroups(doc, column, today2, boundary).find((g) => g.name === place.group)?.entries ?? [];
+        if (before && !shown3.some((e) => e.section === before.section && e.index === before.index && e.path.length === 0)) throw new StaleTaskError();
         return createSection(doc, column, place.group, before, group, settings.groups, today2, boundary);
       };
       return { operation, list, group };
@@ -7483,6 +7766,10 @@ ${key.title}`.toLowerCase();
           return blankName(change.name) ? doc : createGroup(doc, entry, change.list, change.name, settings.groups, today, change.date ?? null);
         case "nest":
           return first ? nest(doc, entry, first, second) : doc;
+        case "place":
+          return sendTo(doc, entry, change.placement, today);
+        case "repeat":
+          return setRepeat(doc, entry, change.rule, today, boundary);
       }
     }
     resolve(doc, place, today) {
@@ -7583,8 +7870,8 @@ ${key.title}`.toLowerCase();
     const block = screen.day.slotted.find((item) => item.id === id);
     if (block) {
       const own = timeline.shown({ slot: block.slot, open: false }, day);
-      const shown2 = span(block);
-      return { kind: "timeline", id, item: block, span: shown2, ridesNow: shown2.start !== own.start, slotted: screen.day.slotted.map((item) => ({ id: item.id, span: span(item) })) };
+      const shown3 = span(block);
+      return { kind: "timeline", id, item: block, span: shown3, ridesNow: shown3.start !== own.start, slotted: screen.day.slotted.map((item) => ({ id: item.id, span: span(item) })) };
     }
     const columns = [["day", screen.day.list], ["soon", screen.soon], ["inbox", screen.inbox], ["backlog", screen.backlog], ["done", screen.done]];
     for (const [column, items] of columns) {
@@ -7803,6 +8090,16 @@ ${key.title}`.toLowerCase();
       const steps = this.reads.itemsAt(s, keys).flatMap((item) => item.can.postpone ? [{ key: item.key, change: { kind: "postpone", date } }] : []);
       if (steps.length === 0) return nothing(null);
       if (keys.length === 1) return this.postpone(steps[0].key, date);
+      return this.applyAll(steps);
+    }
+    sendTo(s, keys, placement) {
+      const steps = this.reads.itemsAt(s, keys).flatMap((item) => item.can.postpone && !item.isSubtask ? [{ key: item.key, change: { kind: "place", placement } }] : []);
+      return steps.length === 0 ? nothing(null) : this.applyAll(steps);
+    }
+    setRepeatAll(s, keys, rule) {
+      const steps = this.reads.itemsAt(s, keys).flatMap((item) => item.repeatable ? [{ key: item.key, change: { kind: "repeat", rule } }] : []);
+      if (steps.length === 0) return nothing(null);
+      if (keys.length === 1) return this.setRepeat(steps[0].key, rule);
       return this.applyAll(steps);
     }
     removeAll(keys) {
@@ -8503,6 +8800,8 @@ ${key.title}`.toLowerCase();
     bulkMenu: (c, [picked2, screen]) => c.reads.bulkMenu(picked2, screen),
     pickStatus: (c, [keys, id]) => c.run(c.writes.pickStatus(keys, id)),
     postponeAll: (c, [keys, date]) => c.run(c.writes.postponeAll(KEPT(c), keys, date)),
+    sendTo: (c, [keys, placement]) => c.run(c.writes.sendTo(KEPT(c), keys, placement)),
+    setRepeatAll: (c, [keys, rule]) => c.run(c.writes.setRepeatAll(KEPT(c), keys, rule ?? null)),
     removeAll: (c, [keys]) => c.run(c.writes.removeAll(keys)),
     carried: (c, [lifted2, picked2]) => c.reads.carried(lifted2, picked2),
     setCollapsed: (c, [key, collapsed]) => c.run(c.writes.setCollapsed(key, collapsed)),
@@ -8641,8 +8940,8 @@ ${key.title}`.toLowerCase();
     },
     isPast: (c, [event]) => new CalendarDay(readingOf(c), c.settings, c.now).isPast({ end: new Date(event.endMs) }),
     known: (c) => calendarDay(c).known(),
-    setShown: (c, [account, title, shown2]) => {
-      c.saveSettings(calendarDay(c).shownChange(account, title, shown2));
+    setShown: (c, [account, title, shown3]) => {
+      c.saveSettings(calendarDay(c).shownChange(account, title, shown3));
     },
     files: (c) => calendarFiles(c),
     sources: (c) => CALENDAR_SOURCES.map((source) => ({ source, path: calendarPath(source, c.settings) })),

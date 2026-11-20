@@ -47,6 +47,8 @@ import {
 	type TaskItem,
 	type TaskKey,
 	type TaskMenuModel,
+	type TaskMenuActionId,
+	type BulkActionId,
 	type MenuFrom,
 	type MenuScreen,
 	type MenuStatusId,
@@ -476,16 +478,24 @@ export class TaskServiceImpl implements TaskService {
 		return this.run(this.writes.removeDue(await this.snapshot(), keys));
 	}
 
-	menu(item: TaskItem, from: MenuFrom, screen: MenuScreen): TaskMenuModel {
+	menu(item: TaskItem, from: MenuFrom, screen: MenuScreen): TaskMenuModel<TaskMenuActionId> {
 		return this.reads.menu(item, from, screen);
 	}
 
-	bulkMenu(picked: readonly PickedTask[], screen: MenuScreen): TaskMenuModel {
+	bulkMenu(picked: readonly PickedTask[], screen: MenuScreen): TaskMenuModel<BulkActionId> {
 		return this.reads.bulkMenu(picked, screen);
 	}
 
 	pickStatus(keys: readonly TaskKey[], id: MenuStatusId): Promise<void> {
 		return this.run(this.writes.pickStatus(keys, id));
+	}
+
+	async sendTo(keys: readonly TaskKey[], placement: Placement): Promise<void> {
+		return this.run(this.writes.sendTo(await this.snapshot(), keys, placement));
+	}
+
+	async setRepeatAll(keys: readonly TaskKey[], rule: RepeatRule | null): Promise<void> {
+		return this.run(this.writes.setRepeatAll(await this.snapshot(), keys, rule));
 	}
 
 	async postponeAll(keys: readonly TaskKey[], date: LocalDate): Promise<void> {

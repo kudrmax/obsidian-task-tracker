@@ -1,4 +1,5 @@
-import type { GroupName, MenuStatusId, TaskItem, TaskMenuModel } from "../../../core/application/contracts";
+import { type BulkActionId, type GroupName, type MenuStatusId, RepeatPage, type RepeatRule, type TaskItem, type TaskMenuModel } from "../../../core/application/contracts";
+import { repeatPanel } from "../repeat/RepeatPanel";
 import { tokenPx } from "../design";
 import { el } from "../dom";
 import { LiftedCopy } from "../kit/LiftedCopy";
@@ -11,7 +12,7 @@ import { datePage } from "./DatePage";
 import { projectChooser, projectNamePage, sectionChooser } from "./SectionChooser";
 import { Overlay } from "./Overlay";
 import { moveTiles } from "./quickMoves";
-import { type Asking, askLooks, type EditRowId, labelTiles, priorityTiles, statusTiles } from "./TaskMenu";
+import { type Asking, askLooks, labelTiles, priorityTiles, statusTiles } from "./TaskMenu";
 
 /** "3 tasks". */
 export function countLabel(count: number): string {
@@ -34,6 +35,8 @@ export interface BulkActions {
 	toggleProject(name: string): Promise<readonly TaskItem[] | null>;
 	/** «New project…» named `name` (`TaskService.newProject`): a project at the tree's top, and every picked task gets it. */
 	newProject(name: string): Promise<void>;
+	/** The Repeat page's rule on every picked task that may repeat (`TaskService.setRepeatAll`), written as the menu closes; null takes it off. */
+	setRepeat(rule: RepeatRule | null): Promise<void>;
 	remove(): Promise<void>;
 }
 
@@ -47,7 +50,7 @@ export interface BulkMenuContext {
 	readonly today: LocalDate;
 	readonly day: LocalDate;
 	/** The menu's groups for the tasks as they stand (`TaskService.menu`): asked again once a label changed them. */
-	readonly menu: (items: readonly TaskItem[]) => TaskMenuModel;
+	readonly menu: (items: readonly TaskItem[]) => TaskMenuModel<BulkActionId>;
 	readonly actions: BulkActions;
 	onClose(): void;
 }
@@ -70,6 +73,8 @@ export class BulkMenu {
 	private labelling = false;
 	/** What the menu asks about now, if the model says a pick asks first. */
 	private asking: Asking | null = null;
+	/** The Repeat page, once opened: what it holds is written as the menu closes. */
+	private repeatPage: RepeatPage | null = null;
 
 	private constructor(private context: BulkMenuContext) {
 		this.overlay = new Overlay(() => this.close(), context.source);
@@ -130,11 +135,24 @@ export class BulkMenu {
 		if (labels.length > 0) tileGroup(panel, "is-labels", tileRows(labels));
 		const moves = moveTiles(model.moves).map(({ label, icon, date }): MenuTileSpec => ({ label, icon, onPick: date === null ? () => this.showPicker() : this.pick(() => actions.postpone(date)) }));
 		if (moves.length > 0) tileGroup(panel, "is-move", [moves]);
-		const rows: Partial<Record<EditRowId, MenuRowSpec>> = {
-			section: { label: "Section", icon: "section", onPick: () => this.showSections() },
+		const rows: Record<BulkActionId, MenuRowSpec | "drawn above" | "drawn below"> = {
+			done: "drawn above",
+			progress: "drawn above",
+			wontDo: "drawn above",
+			level: "drawn above",
+			label: "drawn above",
+			today: "drawn above",
+			tomorrow: "drawn above",
+			pickDate: "drawn above",
+			repeat: { label: "Repeat", value: model.repeat.value, days: model.repeat.days, icon: "repeat", onPick: () => this.showRepeat() },
 			project: { label: "Project", value: model.project.value, icon: "project", disabled: model.project.disabled, onPick: () => this.showProjects() },
+			section: { label: "Section", icon: "section", onPick: () => this.showSections() },
+			delete: "drawn below",
 		};
-		menuGroup(panel, model.edits.flatMap((id) => rows[id] ?? []));
+		menuGroup(panel, model.layout.flatMap((group) => group.actions.flatMap((action) => {
+			const row = rows[action.id];
+			return typeof row === "string" ? [] : [row];
+		})));
 		const remove = model.remove;
 		if (this.asking === "delete") this.askGroup(panel, "delete", items);
 		else if (remove) menuRow(panel, { label: `Delete ${countLabel(items.length)}`, icon: "delete", danger: true, apart: true, onPick: remove.confirm ? () => this.askFor("delete") : this.pick(() => actions.remove()) });
@@ -237,6 +255,30 @@ export class BulkMenu {
 		);
 	}
 
+	/** The Repeat page: a change shows at once and is written as the menu closes; Remove repeat writes and closes at once. */
+	private showRepeat(): void {
+		const { items, actions } = this.context;
+		const page = (this.repeatPage ??= new RepeatPage(this.context.menu(items).repeatOf, (rule) => void actions.setRepeat(rule)));
+		this.asking = null;
+		const draw = () =>
+			this.panel.replace(
+				(panel) =>
+					repeatPanel(panel, {
+						draft: page.draft,
+						onChange: (rule) => {
+							page.change(rule);
+							draw();
+						},
+						onRemove: () => {
+							page.remove();
+							this.close();
+						},
+					}),
+				"repeat",
+			);
+		draw();
+	}
+
 	private showPicker(): void {
 		const { items, actions, today } = this.context;
 		const model = this.context.menu(items);
@@ -254,6 +296,8 @@ export class BulkMenu {
 
 	close(): void {
 		if (this.overlay.isClosed) return;
+		this.repeatPage?.close();
+		this.repeatPage = null;
 		void this.overlay.close();
 		this.context.onClose();
 	}

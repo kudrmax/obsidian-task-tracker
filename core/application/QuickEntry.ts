@@ -2,7 +2,6 @@ import type { GroupName, LocalDate, Slot } from "../domain/Task";
 import type { RepeatRule } from "../domain/Repeat";
 import { sameRule } from "../domain/Repeat";
 import { repeatDay } from "../domain/RepeatDraft";
-import type { GroupedList } from "../domain/Lists";
 import type { Placement, TaskDraft } from "../domain/Placement";
 import { samePlacement } from "../domain/operations";
 import type { CreatedTask, DraftMarks, DropColumn, DropTo, MenuProject, NewTaskPlace, ProjectRef, ProjectsNodeId, TaskItem, TaskKey, TaskService } from "./contracts";
@@ -14,6 +13,7 @@ import { fullTree } from "./fullTree";
 import { plainText } from "../domain/TaskText";
 import { ENTRY_LISTS, type EntryList } from "./screenPlaces";
 import { type EntryPart, placementOfNewTask } from "./projectsEntry";
+import { type PlaceChoice, placeChoices } from "./placeChoices";
 
 /** Where the field stands: a gap of a list, a slot on the calendar, or the end of a task's subtasks in the calendar menu. */
 /**
@@ -112,8 +112,7 @@ export interface PendingText {
 	readonly level: number;
 }
 
-/** The places the bar offers a task, before the date: the lists, in this order. */
-export const ENTRY_PLACES: readonly GroupedList[] = ["inbox", "backlog", "soon", "now"];
+export { ENTRY_PLACES, type PlaceChoice } from "./placeChoices";
 
 /**
  * The bar's Project button, right after the priority's flag: its page, the task menu's Project page for the field's own
@@ -125,8 +124,6 @@ export interface EntryProject {
 	readonly lit: boolean;
 }
 
-/** A tile of the place button's panel: a list, or Date last, which opens the month picker on the field's day if it has one. */
-export type PlaceChoice = { readonly kind: GroupedList; readonly on: boolean } | { readonly kind: "date"; readonly on: boolean; readonly date: LocalDate | null };
 
 export interface EntryState {
 	readonly spot: EntrySpot;
@@ -1073,12 +1070,6 @@ function placeOfDrop(result: DropTo): ListPlace | null {
 		default:
 			return null;
 	}
-}
-
-/** The place button's tiles for a task going to `place`: the lists, then Date, the one it goes to on. */
-function placeChoices(place: Placement | null): readonly PlaceChoice[] {
-	const lists = ENTRY_PLACES.map((kind): PlaceChoice => ({ kind, on: place?.kind === kind }));
-	return [...lists, { kind: "date", on: place?.kind === "date", date: place?.kind === "date" ? place.date : null }];
 }
 
 /** The Project button for a field (or the New Task sheet) whose project is `link`, null for none, among the `known` project notes. */

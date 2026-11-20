@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { TaskItem, TaskMenuModel } from "../../core/application/contracts";
-import { taskMenu } from "../../core/application/menus";
+import type { BulkActionId, SectionOffer, TaskItem, TaskMenuModel } from "../../core/application/contracts";
+import { bulkMenuOf } from "../../core/application/menus";
 import { BulkMenu, type BulkActions } from "../../obsidian/ui/menu/BulkMenu";
 import { onDay } from "../fakes/itemOnDay";
 
@@ -44,8 +44,8 @@ describe("BulkMenu (block 3)", () => {
 			return card;
 		});
 		const done = async () => undefined;
-		const actions: BulkActions = { pickStatus: done, togglePriority: done, postpone: done, removeDue: done, toSection: done, setProject: done, newProject: done, toggleProject: async () => null, remove: done, toggleLabel: async () => null };
-		BulkMenu.open({ items: cards.map((_, i) => item(i)), cards, source: cards[0], at: "beside", today: "2026-11-04", day: "2026-11-04", menu: (items) => taskMenu(items, "2026-11-04", [], [], null, { kind: "bulk" }), actions, onClose: () => {} });
+		const actions: BulkActions = { pickStatus: done, togglePriority: done, postpone: done, removeDue: done, toSection: done, setProject: done, newProject: done, toggleProject: async () => null, setRepeat: done, remove: done, toggleLabel: async () => null };
+		BulkMenu.open({ items: cards.map((_, i) => item(i)), cards, source: cards[0], at: "beside", today: "2026-11-04", day: "2026-11-04", menu: (items) => bulkMenuOf(items, "2026-11-04", [], [], null), actions, onClose: () => {} });
 		expect(lifted.length).toBeGreaterThanOrEqual(5);
 		expect(lifted.every((count) => count === 0)).toBe(true);
 		expect(document.querySelectorAll(".tc-lifted").length).toBe(5);
@@ -58,10 +58,10 @@ describe("the bulk menu draws its model", () => {
 	const P1 = { prefix: "p1", color: "red" } as const;
 	afterEach(() => document.body.replaceChildren());
 
-	const open = (model: Partial<TaskMenuModel>, items = [item(0), item(1)]) => {
+	const open = (model: Partial<TaskMenuModel<BulkActionId>>, items = [item(0), item(1)], offer: SectionOffer | null = null) => {
 		const cards = items.map(() => document.body.appendChild(document.createElement("div")));
-		const actions = { pickStatus: vi.fn(async () => {}), togglePriority: vi.fn(async () => {}), postpone: vi.fn(async () => {}), removeDue: vi.fn(async () => {}), toSection: vi.fn(async () => {}), setProject: vi.fn(async () => {}), newProject: vi.fn(async () => {}), toggleProject: vi.fn(async () => null), remove: vi.fn(async () => {}), toggleLabel: vi.fn(async () => items) };
-		const base = taskMenu(items, "2026-11-04", [P1], [RED, BLUE], null, { kind: "bulk" });
+		const actions = { pickStatus: vi.fn(async () => {}), togglePriority: vi.fn(async () => {}), postpone: vi.fn(async () => {}), removeDue: vi.fn(async () => {}), toSection: vi.fn(async () => {}), setProject: vi.fn(async () => {}), newProject: vi.fn(async () => {}), toggleProject: vi.fn(async () => null), setRepeat: vi.fn(async () => {}), remove: vi.fn(async () => {}), toggleLabel: vi.fn(async () => items) };
+		const base = bulkMenuOf(items, "2026-11-04", [P1], [RED, BLUE], offer);
 		BulkMenu.open({ items, cards, source: cards[0], at: "beside", today: "2026-11-04", day: "2026-11-04", menu: () => ({ ...base, ...model }), actions, onClose: () => {} });
 		return actions;
 	};
@@ -114,12 +114,11 @@ describe("the bulk menu draws its model", () => {
 		expect(document.querySelector(".tc-menu-tiles.is-move")).toBeNull();
 	});
 
-	it("offers Section where the model's edits have it", () => {
+	it("offers Section where the model's layout has it", () => {
 		open({});
 		expect(document.body.textContent).not.toContain("Section");
 		document.body.replaceChildren();
-		const choice = { names: ["Work"], current: "Work", ungrouped: "No section" };
-		open({ edits: ["section"], sections: { choice, options: [{ name: "Work", checked: true }, { name: null, checked: false }], create: false } });
+		open({}, [item(0), item(1)], { lists: { now: ["Work"], soon: [], inbox: [], backlog: [] }, ungrouped: "No section" });
 		[...document.querySelectorAll<HTMLButtonElement>(".tc-menu-row")].find((row) => row.textContent?.includes("Section"))!.click();
 		expect([...document.querySelectorAll(".tc-menu-group .tc-menu-label")].map((l) => l.textContent)).toEqual(["Work", "No section"]);
 		expect(document.body.textContent).not.toContain("New section");
@@ -131,5 +130,15 @@ describe("the bulk menu draws its model", () => {
 		await vi.waitFor(() => expect(actions.toggleLabel).toHaveBeenCalledWith("Срочное"));
 		tiles("is-priority")[0].click();
 		expect(actions.togglePriority).toHaveBeenCalledWith("p1");
+	});
+
+	it("draws Repeat for the picked tasks, and writes the rule set on its page once, as the menu closes", () => {
+		const actions = open({});
+		[...document.querySelectorAll<HTMLButtonElement>(".tc-menu-row")].find((row) => row.textContent?.includes("Repeat"))!.click();
+		document.querySelector<HTMLButtonElement>(".tc-repeat-step:last-child")!.click();
+		expect(actions.setRepeat).not.toHaveBeenCalled();
+		document.querySelector(".tc-backdrop")!.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+		expect(actions.setRepeat).toHaveBeenCalledTimes(1);
+		expect(actions.setRepeat).toHaveBeenCalledWith(expect.objectContaining({ every: 2 }));
 	});
 });

@@ -502,6 +502,26 @@ quick entry renames it.
 off the lines). So did grouping by project in the lists, a project's own view and the project parts of places, the
 Project tag and Result mark settings, and the notes «New project…» once wrote (`notes.newProject`, `notes.projectText`).
 
+#### Task actions: one table (2026-11-20)
+
+Every task action (`TaskActionId`) has one row in `core/application/taskActions.ts`, with a place or a reason it is
+absent on each surface: one task's menu, the bulk menu, the field, the full screen. Added, nothing renamed or removed:
+
+- `tasks.menu` and `tasks.bulkMenu` answer `TaskMenuModel.layout`: the menu's groups top to bottom (`statuses`,
+  `levels`, `labels`, `copy` (the task's copy; one task's menu only, no actions), `when`, `edit`, `rows`, `remove`), each
+  `{ group, actions: [{ id, disabled, asks, status, date }] }`: `status` the tile `pickStatus` writes, `date` the day
+  Today or Tomorrow writes. Example: `tasks.menu(item, "day", screen)` → `layout[4]` `{ group: "when", actions: [{ id:
+  "tomorrow", date: "2026-11-21", … }, { id: "pickDate", … }, { id: "repeat", … }] }`. `groups`, `statuses`, `moves`,
+  `edits` and `remove` keep their meaning; `edits` of the bulk menu now carries `"repeat"`.
+- `TaskMenuModel.opens`: `["openFull", "openInObsidian"]`, without `openFull` for the task the full screen shows
+  (`from: "full"`). `MenuFrom` gains `"fullSubtask"`: a subtask's card on the full screen, whose menu offers it.
+- `TaskMenuModel.places`: Pick a date's list tiles, the field's place panel's own (Inbox, Backlog, Soon, Now), each `on`
+  while every task goes there; none for subtasks. A tap: `tasks.sendTo(keys, placement)`, e.g. `tasks.sendTo([key], {
+  kind: "backlog" })`: each task that may be put off, of the top level, goes there as it is, its marks kept. One write.
+- `TaskMenuModel.repeatOf` `{ repeat, repeatDay }`: what the Repeat page starts from (the shared rule, else none). The
+  bulk menu's page writes `tasks.setRepeatAll(keys, rule)`, e.g. `tasks.setRepeatAll([a, b], { kind: "schedule",
+  every: 1, unit: "day", days: [], dayOfMonth: null, from: null })`: on each task that may repeat. One write.
+
 #### Ids: who a task or a section is
 
 - `TaskItem.id` (every task and subtask, wherever it is shown: `tasks.screen`'s lists, the timeline, `tasks.search`'s

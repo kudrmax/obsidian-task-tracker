@@ -33,8 +33,9 @@ import type {
 	TaskKey,
 	TaskMenuModel,
 } from "./contracts";
+import type { BulkActionId, TaskMenuActionId } from "./taskActions";
 import { draftMarksOf } from "./marks";
-import { carriedWith, menuOffer, taskMenu } from "./menus";
+import { bulkMenuOf, carriedWith, menuOffer, oneTaskMenu } from "./menus";
 import { NO_SECTION_ID, offeredNames, type SectionOffer, shownSections } from "./sections";
 import { samePlace } from "./taskKeys";
 import { fullTree } from "./fullTree";
@@ -495,14 +496,14 @@ export class TaskReads {
 		return dayOfPlacement(placement, this.today());
 	}
 
-	menu(item: TaskItem, from: MenuFrom, screen: MenuScreen): TaskMenuModel {
+	menu(item: TaskItem, from: MenuFrom, screen: MenuScreen): TaskMenuModel<TaskMenuActionId> {
 		const offer = menuOffer([from], screen, (column, date) => this.columnSections(column, date));
-		return taskMenu([item], screen.today, this.priorityLevels(), this.labelLevels(), offer, { kind: "task", from }, this.projectChoices(screen));
+		return oneTaskMenu(item, screen.today, this.priorityLevels(), this.labelLevels(), offer, from, this.projectChoices(screen), this.placementOf(item));
 	}
 
-	bulkMenu(picked: readonly PickedTask[], screen: MenuScreen): TaskMenuModel {
+	bulkMenu(picked: readonly PickedTask[], screen: MenuScreen): TaskMenuModel<BulkActionId> {
 		const offer = menuOffer(picked.map((p) => p.from), screen, (column, date) => this.columnSections(column, date));
-		return taskMenu(picked.map((p) => p.item), screen.today, this.priorityLevels(), this.labelLevels(), offer, { kind: "bulk" }, this.projectChoices(screen), picked.map((p) => p.from));
+		return bulkMenuOf(picked.map((p) => p.item), screen.today, this.priorityLevels(), this.labelLevels(), offer, this.projectChoices(screen), picked.map((p) => p.from), picked.map((p) => this.placementOf(p.item)));
 	}
 
 	carried(lifted: TaskKey, picked: readonly TaskKey[]): readonly TaskKey[] {

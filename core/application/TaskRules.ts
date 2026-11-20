@@ -65,7 +65,7 @@ export interface TextChange {
 }
 
 /** The changes that take a task elsewhere: its subtasks go along with it. */
-const MOVES: ReadonlySet<TaskChange["kind"]> = new Set(["postpone", "moveBefore", "moveToList", "moveToSoon", "moveToEnd", "moveToGroup", "createGroup", "nest", "reorder"]);
+const MOVES: ReadonlySet<TaskChange["kind"]> = new Set(["place", "postpone", "moveBefore", "moveToList", "moveToSoon", "moveToEnd", "moveToGroup", "createGroup", "nest", "reorder"]);
 
 /** The other tasks a change names: the task to stand before, or the parent and the subtask to stand before. */
 function refsOf(change: TaskChange): readonly (TaskKey | null)[] {
@@ -678,6 +678,10 @@ export class TaskRules {
 				return blankName(change.name) ? doc : ops.createGroup(doc, entry, change.list, change.name, settings.groups, today, change.date ?? null);
 			case "nest":
 				return first ? ops.nest(doc, entry, first, second) : doc;
+			case "place":
+				return ops.sendTo(doc, entry, change.placement, today);
+			case "repeat":
+				return ops.setRepeat(doc, entry, change.rule, today, boundary);
 		}
 	}
 

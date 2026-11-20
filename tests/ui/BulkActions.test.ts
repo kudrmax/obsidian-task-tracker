@@ -1,8 +1,8 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi } from "vitest";
-import type { PickedTask, TaskItem } from "../../core/application/contracts";
+import type { PickedTask, SectionOffer, TaskItem } from "../../core/application/contracts";
 import { BulkController, type BulkDeps } from "../../obsidian/ui/BulkController";
-import { carriedWith, taskMenu } from "../../core/application/menus";
+import { bulkMenuOf, carriedWith } from "../../core/application/menus";
 import { countLabel } from "../../obsidian/ui/menu/BulkMenu";
 import { type PickedCard, TaskSelection } from "../../obsidian/ui/TaskSelection";
 import type { TaskDragPayload } from "../../obsidian/ui/drag/DropTarget";
@@ -77,7 +77,7 @@ function controller(extra: Partial<BulkDeps> = {}): BulkController {
 		pickStatus: async () => {},
 		postpone: async () => {},
 		remove: async () => {},
-		menu: (picked) => taskMenu(picked.map((p) => p.item), T, LEVELS, [], null, { kind: "bulk" }),
+		menu: (picked) => bulkMenuOf(picked.map((p) => p.item), T, LEVELS, [], null),
 		togglePriority: async () => {},
 		toggleLabel: async (keys) => keys.map(() => null),
 		removeDue: async () => {},
@@ -89,6 +89,7 @@ function controller(extra: Partial<BulkDeps> = {}): BulkController {
 		setProject: async () => {},
 		newProject: async () => {},
 		toggleProject: async (items) => items,
+		setRepeatAll: async () => {},
 		desktop: () => true,
 		isMod: (e) => e.metaKey,
 		...extra,
@@ -128,7 +129,8 @@ describe("bulk actions", () => {
 
 	it("sends the picked tasks to a section in one call and lets them go", async () => {
 		const toSection = vi.fn(async () => {});
-		const menu = vi.fn((picked: readonly PickedTask[]) => ({ ...taskMenu(picked.map((p) => p.item), T, LEVELS, [], null, { kind: "bulk" }), edits: ["section" as const], sections: { choice: { names: ["Work"], current: null, ungrouped: "No section" }, options: [{ name: "Work", checked: false }, { name: null, checked: true }], create: false } }));
+		const offer: SectionOffer = { lists: { now: ["Work"], soon: [], inbox: [], backlog: [] }, ungrouped: "No section" };
+		const menu = vi.fn((picked: readonly PickedTask[]) => bulkMenuOf(picked.map((p) => p.item), T, LEVELS, [], offer));
 		const bulk = controller({ menu, toSection });
 		const [a, b] = cards([item(), item()]);
 		for (const card of [a, b]) document.body.append(card.card);

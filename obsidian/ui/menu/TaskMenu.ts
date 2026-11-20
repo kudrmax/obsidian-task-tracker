@@ -1,4 +1,4 @@
-import { type GroupName, type LabelLevel, labelTitle, type MenuEditId, type MenuGroupId, type MenuStatus, type MenuStatusId, type PriorityLevel, type ReminderKind, RepeatPage, type RepeatRule, type TaskItem, type TaskMenuModel, type Weekday } from "../../../core/application/contracts";
+import { type GroupName, type LabelLevel, labelTitle, type MenuEditId, type MenuGroupId, type MenuOpenId, type MenuStatus, type MenuStatusId, type PriorityLevel, type ReminderKind, RepeatPage, type RepeatRule, type TaskItem, type TaskMenuModel, type Weekday } from "../../../core/application/contracts";
 import { LAYOUT } from "../design";
 import { clear, el, pinTo, px } from "../dom";
 import { fillCard, markColours, renderTaskCard, renderUnwrittenCard, showMeta, showProgressDot } from "../TaskCard";
@@ -127,7 +127,7 @@ export interface MenuActions {
 	/** The task, or `task` the description by the menu is of (`TaskMenuModel.peek`), on the whole screen: to read its description, or with the caret straight in it. */
 	openDescription(editing: boolean, task?: TaskItem): void;
 	/** The task on the whole screen; none where it already is. */
-	openFull?(): void;
+	openFull(): void;
 	/** A timeline card's menu stays open for it, its stack may take the field (`openStack`); any other has closed. */
 	addSubtask(menu: TaskMenu): void;
 	/** The menu has closed in this same tap: the tapped card becomes the folded card whose step line is the field (`TaskItem.firstStepCard`). */
@@ -389,11 +389,11 @@ export class TaskMenu extends LiftedMenu {
 					menuGroup(this.panel, rows.map((row): MenuRowSpec => ({ label: row.label, value: row.value, days: row.days, icon: row.icon, disabled: row.disabled, onPick: edits[row.id] })));
 				},
 				opens: () => {
-					const openFull = actions.openFull;
-					menuGroup(this.panel, [
-						...(openFull ? [{ label: "Open full screen", icon: "fullScreen", onPick: this.pick(() => openFull()) } as const] : []),
-						{ label: "Open in Obsidian", icon: "openFile", onPick: this.pick(() => actions.openInObsidian()) },
-					]);
+					const opens: Record<MenuOpenId, MenuRowSpec> = {
+						openFull: { label: "Open full screen", icon: "fullScreen", onPick: this.pick(() => actions.openFull()) },
+						openInObsidian: { label: "Open in Obsidian", icon: "openFile", onPick: this.pick(() => actions.openInObsidian()) },
+					};
+					if (model.opens.length > 0) menuGroup(this.panel, model.opens.map((id) => opens[id]));
 				},
 				remove: () => {
 					const remove = model.remove;

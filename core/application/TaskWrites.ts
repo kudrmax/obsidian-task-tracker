@@ -17,6 +17,7 @@ import type {
 	GroupPlace,
 	MenuStatusId,
 	NewTaskPlace,
+	Placement,
 	RepeatRule,
 	SectionPlace,
 	TaskDraft,
@@ -296,6 +297,18 @@ export class TaskWrites {
 		const steps = this.reads.itemsAt(s, keys).flatMap((item): TaskStep[] => (item.can.postpone ? [{ key: item.key, change: { kind: "postpone", date } }] : []));
 		if (steps.length === 0) return nothing(null);
 		if (keys.length === 1) return this.postpone(steps[0].key, date);
+		return this.applyAll(steps);
+	}
+
+	sendTo(s: Snapshot, keys: readonly TaskKey[], placement: Placement): Write<void> {
+		const steps = this.reads.itemsAt(s, keys).flatMap((item): TaskStep[] => (item.can.postpone && !item.isSubtask ? [{ key: item.key, change: { kind: "place", placement } }] : []));
+		return steps.length === 0 ? nothing(null) : this.applyAll(steps);
+	}
+
+	setRepeatAll(s: Snapshot, keys: readonly TaskKey[], rule: RepeatRule | null): Write<void> {
+		const steps = this.reads.itemsAt(s, keys).flatMap((item): TaskStep[] => (item.repeatable ? [{ key: item.key, change: { kind: "repeat", rule } }] : []));
+		if (steps.length === 0) return nothing(null);
+		if (keys.length === 1) return this.setRepeat(steps[0].key, rule);
 		return this.applyAll(steps);
 	}
 

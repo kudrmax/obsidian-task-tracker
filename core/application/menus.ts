@@ -5,7 +5,11 @@ import type { PriorityLevel } from "../domain/Priority";
 import { type LocalDate, nextProgress, REMINDER_KINDS, type SectionKey, type TaskStatus } from "../domain/Task";
 import { projectKey } from "../domain/Project";
 import { NO_PROJECT } from "./projects";
-import type { ColumnSections, DropColumn, MenuEditId, MenuGroupId, MenuFrom, MenuProject, ProjectRef, MenuScreen, MenuSections, MenuStatus, MenuStatusId, QuickMove, QuickMoveId, TaskItem, TaskKey, TaskMenuModel } from "./contracts";
+import type { ColumnSections, DropColumn, MenuAction, MenuActionGroup, MenuEditId, MenuGroupId, MenuFrom, MenuOpenId, MenuProject, MenuRepeatOf, ProjectRef, MenuScreen, MenuSections, MenuStatus, MenuStatusId, QuickMove, QuickMoveId, TaskItem, TaskKey, TaskMenuModel } from "./contracts";
+import type { Placement } from "../domain/Placement";
+import { type RepeatRule, sameRule } from "../domain/Repeat";
+import { listChoices, placeable } from "./placeChoices";
+import { type BulkActionId, type MenuContext, type MenuOf, menuActions, statusOf, TASK_MENU_GROUPS, type TaskActionId, type TaskMenuActionId } from "./taskActions";
 import { type SectionOffer, sectionChoice } from "./sections";
 import { isUnder, keyId } from "./taskKeys";
 
@@ -72,15 +76,12 @@ function sharedDueDate(items: readonly TaskItem[]): LocalDate | null {
 	return items.every((item) => item.dueDate === first) ? first : null;
 }
 
-/** Which menu: one task's, opened from `from`, or the bulk menu of the picked tasks. */
-export type MenuOf = { readonly kind: "task"; readonly from: MenuFrom } | { readonly kind: "bulk" };
+export type { MenuOf } from "./taskActions";
 
 const A_LIST_CARD: MenuOf = { kind: "task", from: "day" };
 
 const COLUMNS: ReadonlySet<MenuFrom> = new Set<DropColumn>(["day", "soon", "inbox", "backlog"]);
 
-/** Where First step is offered: a card of a list column or of the timeline, the cards a folded task is drawn on. */
-const FIRST_STEP_FROM: ReadonlySet<MenuFrom> = new Set<MenuFrom>([...COLUMNS, "timeline"]);
 
 const LIST_CARD_MENU: Readonly<Record<SectionKey, MenuFrom>> = { now: "day", soon: "soon", inbox: "inbox", backlog: "backlog", done: "done" };
 
@@ -124,33 +125,34 @@ function statusTasks(items: readonly TaskItem[], of: MenuOf, froms: readonly Men
 	return items.map((item, i) => statusTask(item, of.kind === "task" ? of.from : (froms[i] ?? "full")));
 }
 
-/** Done, the progress tile named for what it sets, Won't do, and Stop for one task that may be stopped; one task's menu asks before Won't do and Stop. */
-function menuStatuses(items: readonly TaskItem[], of: MenuOf): readonly MenuStatus[] {
-	const one = of.kind === "task";
-	const progress: MenuStatusId = nextProgress(items.map((item) => item.status)) === "todo" ? "stopProgress" : "inProgress";
-	return [
-		{ id: "done", confirm: false },
-		{ id: progress, confirm: false },
-		{ id: "wontDo", confirm: one },
-		...(one && items.every((item) => item.can.stop) ? [{ id: "stop", confirm: true } as const] : []),
-	];
+/** The older menu's edit rows, in its order: each one the table offers. */
+const OLD_EDITS: readonly MenuEditId[] = ["rename", "reminder", "description", "repeat", "section", "project", "subtask", "firstStep"];
+const OLD_OPENS: readonly MenuOpenId[] = ["openFull", "openInObsidian"];
+
+/** The progress tile is named for what it sets: In progress, or Stop progress once every task is in progress. */
+function progressOf(items: readonly TaskItem[]): Extract<MenuStatusId, "inProgress" | "stopProgress"> {
+	return nextProgress(items.map((item) => item.status)) === "todo" ? "stopProgress" : "inProgress";
 }
 
-function menuEdits(items: readonly TaskItem[], of: MenuOf, sections: MenuSections | null): readonly MenuEditId[] {
-	const section: MenuEditId[] = sections ? ["section"] : [];
-	if (of.kind === "bulk") return [...section, "project"];
-	const item = items[0];
-	const edits: [MenuEditId, boolean][] = [
-		["rename", true],
-		["reminder", item.can.remind],
-		["description", item.can.addDescription],
-		["repeat", item.repeatable],
-		["section", sections !== null],
-		["project", true],
-		["subtask", of.from !== "stack"],
-		["firstStep", item.can.firstStep && FIRST_STEP_FROM.has(of.from)],
-	];
-	return edits.flatMap(([id, offered]) => (offered ? [id] : []));
+/** The table's groups for these tasks, each action with what it writes: a status tile its status, Today or Tomorrow its day. */
+function menuLayout(ctx: MenuContext, statusFor: readonly TaskItem[], moves: readonly QuickMove[]): readonly MenuActionGroup[] {
+	const progress = progressOf(statusFor);
+	const dayOf = (id: TaskActionId): LocalDate | null => moves.find((move) => move.id === id)?.date ?? (id === "today" ? ctx.today : id === "tomorrow" ? addDays(ctx.today, 1) : null);
+	const groups = menuActions(ctx).map(({ group, actions }) => ({ group, actions: actions.map((action): MenuAction => ({ ...action, status: statusOf(action.id, progress), date: dayOf(action.id) })) }));
+	if (ctx.of.kind === "bulk") return groups;
+	const copyAt = TASK_MENU_GROUPS.indexOf("copy");
+	const before = groups.filter((g) => TASK_MENU_GROUPS.indexOf(g.group) < copyAt);
+	return [...before, { group: "copy", actions: [] }, ...groups.slice(before.length)];
+}
+
+/** The ids the layout offers. */
+function offeredIds(layout: readonly MenuActionGroup[]): ReadonlySet<TaskActionId> {
+	return new Set(layout.flatMap((group) => group.actions.map((action) => action.id)));
+}
+
+/** The status tiles as the layout offers them, each with whether it asks. */
+function menuStatuses(layout: readonly MenuActionGroup[]): readonly MenuStatus[] {
+	return layout.flatMap((group) => group.actions.flatMap((action) => (action.status ? [{ id: action.status, confirm: action.asks }] : [])));
 }
 
 function menuSections(items: readonly TaskItem[], offer: SectionOffer | null, of: MenuOf): MenuSections | null {
@@ -209,28 +211,63 @@ export function projectPage(chosen: readonly (readonly ProjectRef[])[], known: r
 /** The menu's groups top to bottom, the same in every frontend. */
 export const MENU_GROUPS: readonly MenuGroupId[] = ["statuses", "levels", "labels", "moves", "edits", "opens", "remove"];
 
-/** The menu of one task or of several picked at once: what each group offers, what is on, what can't be pressed, what asks first. */
-export function taskMenu(items: readonly TaskItem[], today: LocalDate, levels: readonly PriorityLevel[], labels: readonly LabelLevel[], offer: SectionOffer | null, of: MenuOf = A_LIST_CARD, projects: readonly ProjectChoice[] = [], froms: readonly MenuFrom[] = []): TaskMenuModel {
+/** The rule every task shares, none when they differ. */
+function sharedRule(items: readonly TaskItem[]): RepeatRule | null {
+	const first = items[0]?.repeat ?? null;
+	return items.every((item) => sameRule(item.repeat, first)) ? first : null;
+}
+
+/** What the Repeat page starts from: the shared rule, and the first task's day that may repeat (else the first's, else today). */
+function repeatOf(items: readonly TaskItem[], today: LocalDate): MenuRepeatOf {
+	const holder = items.find((item) => item.repeatable) ?? items[0];
+	return { repeat: sharedRule(items), repeatDay: holder?.repeatDay ?? today };
+}
+
+/**
+ * The menu of one task or of several picked at once: what each group offers, what is on, what can't be pressed, what
+ * asks first. Which actions stand where is the table's (`TASK_ACTIONS`); `placements`, each task's place, light Pick a
+ * date's list tiles.
+ */
+export function taskMenu(items: readonly TaskItem[], today: LocalDate, levels: readonly PriorityLevel[], labels: readonly LabelLevel[], offer: SectionOffer | null, of: MenuOf = A_LIST_CARD, projects: readonly ProjectChoice[] = [], froms: readonly MenuFrom[] = [], placements: readonly Placement[] = []): TaskMenuModel {
 	const sections = menuSections(items, offer, of);
-	const edits = menuEdits(items, of, sections);
 	const statusFor = statusTasks(items, of, froms);
+	const project = menuProject(items, projects);
+	const moves = sharedMoves(items, today);
+	const ctx: MenuContext = { items, statusTasks: statusFor, of, today, sections, project, levels: levels.length, labels: labels.length };
+	const layout = menuLayout(ctx, statusFor, moves);
+	const offered = offeredIds(layout);
+	const edits = OLD_EDITS.filter((id) => offered.has(id));
 	return {
+		layout,
 		groups: MENU_GROUPS,
-		statuses: menuStatuses(statusFor, of),
+		opens: OLD_OPENS.filter((id) => offered.has(id)),
+		places: placeable(items) && offered.has("pickDate") ? listChoices(placements) : [],
+		repeatOf: repeatOf(items, today),
+		statuses: menuStatuses(layout),
 		statusTasks: statusFor,
 		peek: of.kind === "task" && statusFor[0]?.description != null ? statusFor[0] : null,
 		levels: { tiles: levels.map((level) => ({ level, on: levelOn(items, level.prefix) })), disabled: priorityHolders(items).length === 0 },
 		labels: { tiles: labels.map((label) => ({ label, on: labelOn(items, label.name) })), disabled: labelHolders(items).length === 0 },
-		moves: sharedMoves(items, today),
+		moves,
 		removeDue: items.some((item) => item.can.removeDue),
 		dueDate: sharedDueDate(items),
 		sections,
-		project: menuProject(items, projects),
+		project,
 		edits,
 		reminders: edits.includes("reminder") ? REMINDER_KINDS.map((kind) => ({ kind, checked: kind === items[0].reminder })) : [],
-		repeat: repeatRow(of.kind === "task" ? (items[0]?.repeat ?? null) : null),
-		remove: { confirm: of.kind === "task" },
+		repeat: repeatRow(sharedRule(items)),
+		remove: offered.has("delete") ? { confirm: layout.some((g) => g.actions.some((a) => a.id === "delete" && a.asks)) } : null,
 	};
+}
+
+/** One task's menu: the table offers it only its own actions (`TaskMenuActionId`). */
+export function oneTaskMenu(item: TaskItem, today: LocalDate, levels: readonly PriorityLevel[], labels: readonly LabelLevel[], offer: SectionOffer | null, from: MenuFrom, projects: readonly ProjectChoice[] = [], placement?: Placement): TaskMenuModel<TaskMenuActionId> {
+	return taskMenu([item], today, levels, labels, offer, { kind: "task", from }, projects, [], placement ? [placement] : []) as TaskMenuModel<TaskMenuActionId>;
+}
+
+/** The bulk menu: the table offers it only its own actions (`BulkActionId`). */
+export function bulkMenuOf(items: readonly TaskItem[], today: LocalDate, levels: readonly PriorityLevel[], labels: readonly LabelLevel[], offer: SectionOffer | null, projects: readonly ProjectChoice[] = [], froms: readonly MenuFrom[] = [], placements: readonly Placement[] = []): TaskMenuModel<BulkActionId> {
+	return taskMenu(items, today, levels, labels, offer, { kind: "bulk" }, projects, froms, placements) as TaskMenuModel<BulkActionId>;
 }
 
 /** The picked tasks a lifted one carries along: all but itself and those under another picked one, which go with it. */

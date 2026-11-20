@@ -332,6 +332,17 @@ export function placeTask(doc: TaskDocument, entry: TaskEntry | null, draft: Tas
 	return edited.moveEntry(sameEntryIn(edited, entry), section, "end");
 }
 
+/**
+ * The task sent to `placement` as it is, its marks kept, as the field's place button sends a renamed one: a list's end, its
+ * due date and slot gone into Inbox and Backlog; Now or a day by its due date. A subtask stands under its task: it stays.
+ */
+export function sendTo(doc: TaskDocument, entry: TaskEntry, placement: Placement, today: LocalDate): TaskDocument {
+	if (entry.path.length > 0 || samePlacement(placementOfEntry(entry, today), placement)) return doc;
+	const { section, dueDate } = placementTarget(placement, today);
+	const edited = doc.replace(entry, { ...entry.task, dueDate, ...(isUndated(section) ? { slot: null } : {}) });
+	return entry.section === section ? edited : edited.moveEntry(sameEntryIn(edited, entry), section, "end");
+}
+
 /** A subtask stays under its task: another placement only gives it a due date of its own, or takes it away. */
 function placeSubtask(doc: TaskDocument, entry: TaskEntry, draft: TaskDraft, today: LocalDate, boundary: DayBoundary): TaskDocument {
 	const current = placementOfEntry(entry, today);

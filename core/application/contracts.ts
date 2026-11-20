@@ -457,7 +457,11 @@ export type TaskChange =
 	/** The project `from` gives way to `to` in `from`'s place in the line's order (null `to`: `from` taken off; null `from`: `to` added last), the others kept, as a drop on the tree's row; a subtask's names its top task. */
 	| { readonly kind: "swapProject"; readonly from: string | null; readonly to: string | null }
 	| { readonly kind: "createGroup"; readonly list: GroupedList; readonly name: string; readonly date?: LocalDate }
-	| { readonly kind: "nest"; readonly parent: TaskKey; readonly before: TaskKey | null };
+	| { readonly kind: "nest"; readonly parent: TaskKey; readonly before: TaskKey | null }
+	/** The task sent to a place as it is, its marks kept (Pick a date's list tiles); a subtask stays. */
+	| { readonly kind: "place"; readonly placement: Placement }
+	/** The rule the task repeats by, set as `setRepeat` sets it; null takes it off. */
+	| { readonly kind: "repeat"; readonly rule: RepeatRule | null };
 
 export interface TaskStep {
 	readonly key: TaskKey;
@@ -585,9 +589,9 @@ export interface MenuSections {
 
 /**
  * Where a task's menu was opened: a card of a list column (`DropColumn`), of the timeline, of Done, a subtask in the stack
- * under a timeline card's menu, or the task on the whole screen.
+ * under a timeline card's menu, the task the whole screen shows (`full`), or a subtask's card on it (`fullSubtask`).
  */
-export type MenuFrom = DropColumn | "timeline" | "done" | "stack" | "full";
+export type MenuFrom = DropColumn | "timeline" | "done" | "stack" | "full" | "fullSubtask";
 /** Whether Select tasks picks a card drawn at a `MenuFrom`: a list column's alone. */
 export { canPick } from "./menus";
 
@@ -676,12 +680,52 @@ export interface MenuProject {
  * other pick closes it and lets the picked tasks go.
  */
 /**
- * What a task's menu or the bulk menu offers, every row but the frontend's own navigation: the Obsidian plugin's Open
- * full screen and Open in Obsidian are its own ways out of the menu, drawn above Delete, and no part of the model.
+ * The task actions (`core/application/taskActions.ts`): one table, one row per action, one cell per surface (`Surface`),
+ * each a place or the reason it is absent. A frontend keeps only the look and the handler of each action, as an exhaustive
+ * `Record` over the ids its surface offers (`TaskMenuActionId`, `BulkActionId`, `FieldActionId`).
  */
-export interface TaskMenuModel {
-	/** The order every frontend draws the groups in, top to bottom; a group with nothing to offer is skipped. */
+export type { ActionOn, BulkActionId, FieldActionId, FieldGroup, FullScreenActionId, FullScreenGroup, OfferedAction, Surface, TaskActionId, TaskMenuActionId, TaskMenuGroup } from "./taskActions";
+import type { BulkActionId, OfferedAction, TaskActionId, TaskMenuActionId, TaskMenuGroup } from "./taskActions";
+import type { PlaceChoice } from "./placeChoices";
+
+/** An action of a menu as it is offered now: a status tile with the status it writes (`pickStatus`), Today or Tomorrow with its day (`postpone`). */
+export interface MenuAction<Id extends TaskActionId = TaskActionId> extends OfferedAction<Id> {
+	readonly status: MenuStatusId | null;
+	readonly date: LocalDate | null;
+}
+
+/**
+ * A group of the menu, top to bottom (Max, 2026-11-20): the statuses; the levels; the labels; `copy`, where the task's
+ * copy stands (one task's menu only, no actions); `when`, a strip of tiles (Tomorrow or Today, Pick a date, Repeat,
+ * Reminder); `edit`, a strip of smaller tiles (Rename, Description, Project, Section, Subtask); `rows` (First step, Open
+ * full screen, Open in Obsidian); `remove` (Delete).
+ */
+export interface MenuActionGroup<Id extends TaskActionId = TaskActionId> {
+	readonly group: TaskMenuGroup;
+	readonly actions: readonly MenuAction<Id>[];
+}
+
+/** Open full screen and Open in Obsidian, the rows that leave the menu for the task elsewhere. */
+export type MenuOpenId = Extract<TaskActionId, "openFull" | "openInObsidian">;
+
+/** What the bulk menu's or one task's Repeat page starts from: the rule the tasks share (none when they differ), and the day a new one is drawn from. */
+export interface MenuRepeatOf {
+	readonly repeat: RepeatRule | null;
+	readonly repeatDay: LocalDate;
+}
+
+/** What a task's menu or the bulk menu offers, every row of it; `Id`, the actions its surface may offer. */
+export interface TaskMenuModel<Id extends TaskActionId = TaskActionId> {
+	/** The task actions, group by group, as the table places them: the menu every frontend draws. */
+	readonly layout: readonly MenuActionGroup<Id>[];
+	/** The order the older menu draws its groups in, top to bottom; a group with nothing to offer is skipped. */
 	readonly groups: readonly MenuGroupId[];
+	/** The older menu's opens group: Open full screen (not for the task the full screen shows), then Open in Obsidian; none in the bulk menu. */
+	readonly opens: readonly MenuOpenId[];
+	/** Pick a date's page: the lists above the calendar, the field's place panel's own (`ENTRY_PLACES`); a tap sends the tasks there (`TaskService.sendTo`). None for subtasks. */
+	readonly places: readonly PlaceChoice[];
+	/** What the Repeat page starts from; its rule is written by `setRepeat` for one task, `setRepeatAll` for the picked ones. */
+	readonly repeatOf: MenuRepeatOf;
 	/** Done, the progress tile, Won't do, in this order; Stop last on one task that may be stopped. A task done or given up has them all too. */
 	readonly statuses: readonly MenuStatus[];
 	/**
@@ -1546,12 +1590,19 @@ export interface TaskService {
 	/** Remove due date in a menu of these tasks: the due date goes from each that can lose it (not today's); the rest stay as they are. One write. */
 	removeDue(keys: readonly TaskKey[]): Promise<void>;
 	/**
+	 * A list tile of Pick a date's page (`TaskMenuModel.places`): each task that may be put off, of the top level, goes
+	 * there as it is, its marks kept: to the end of Inbox, Backlog or Soon, or Now. One write.
+	 */
+	sendTo(keys: readonly TaskKey[], placement: Placement): Promise<void>;
+	/** The bulk menu's Repeat page: the rule on each task that may repeat (null takes it off), as `setRepeat` sets it; the rest stay. One write. */
+	setRepeatAll(keys: readonly TaskKey[], rule: RepeatRule | null): Promise<void>;
+	/**
 	 * The menu of one task, opened `from` a place of `screen` (see `TaskMenuModel`): a card of a column that shows its
 	 * list's sections offers them (`sectionChoice`); a timeline card, Done, a stack's subtask and the whole screen none.
 	 */
-	menu(item: TaskItem, from: MenuFrom, screen: MenuScreen): TaskMenuModel;
+	menu(item: TaskItem, from: MenuFrom, screen: MenuScreen): TaskMenuModel<TaskMenuActionId>;
 	/** The bulk menu of the picked tasks: sections only when every card stands in a column that shows its list's. */
-	bulkMenu(picked: readonly PickedTask[], screen: MenuScreen): TaskMenuModel;
+	bulkMenu(picked: readonly PickedTask[], screen: MenuScreen): TaskMenuModel<BulkActionId>;
 	/** A status tile of a menu of these tasks (`MenuStatusId`): Won't do gives them up, Stop stops them as `stop` does. One write. */
 	pickStatus(keys: readonly TaskKey[], id: MenuStatusId): Promise<void>;
 	/** A move of a menu of these tasks: each that may be put off is, as `postpone` does; the rest stay as they are. One write. */

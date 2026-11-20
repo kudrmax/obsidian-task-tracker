@@ -134,7 +134,7 @@ describe("the menu's model", () => {
 		const [a, b] = (await svc.dayView(T)).list;
 		const screen = await screenOf(svc);
 		expect(svc.bulkMenu([{ item: a, from: "day" }, { item: b, from: "day" }], screen).sections?.options[0]).toEqual({ name: "Work", checked: true });
-		expect(svc.bulkMenu([{ item: a, from: "day" }, { item: b, from: "day" }], screen).edits).toEqual(["section", "project"]);
+		expect(svc.bulkMenu([{ item: a, from: "day" }, { item: b, from: "day" }], screen).edits).toEqual(["repeat", "section", "project"]);
 		expect(svc.bulkMenu([{ item: a, from: "day" }, { item: b, from: "timeline" }], screen).sections).toBeNull();
 	});
 });
@@ -254,5 +254,31 @@ describe("the status tiles of a folded card's menu", () => {
 		const { svc } = setup("## Now\n\n- [ ] Порядок\n  - [ ] Проверить\n");
 		const [open] = (await svc.dayView(T)).list;
 		expect(svc.menu(open, "day", await screenOf(svc)).statusTasks.map((task) => task.text)).toEqual(["Порядок"]);
+	});
+});
+
+describe("Pick a date's list tiles", () => {
+	it("send each task there as it is, its marks kept", async () => {
+		const { store, svc } = setup("## Now\n\n- [ ] A p1\n- [ ] B\n\n## Inbox\n\n- [ ] C\n");
+		const [a, b] = (await svc.dayView(T)).list;
+		await svc.sendTo([a.key, b.key], { kind: "backlog" });
+		expect(store.text).toContain("## Backlog\n\n- [ ] A p1\n- [ ] B");
+		expect(store.text).not.toMatch(/## Now\n\n- \[ \]/);
+	});
+
+	it("leave a task where it already goes", async () => {
+		const { svc } = setup("## Inbox\n\n- [ ] C\n");
+		const [c] = await svc.inboxView();
+		await svc.sendTo([c.key], { kind: "inbox" });
+		expect(await svc.inboxView()).toEqual([c]);
+	});
+});
+
+describe("the bulk menu's Repeat", () => {
+	it("sets the rule on every picked task that may repeat", async () => {
+		const { store, svc } = setup("## Now\n\n- [ ] A\n- [ ] B\n");
+		const [a, b] = (await svc.dayView(T)).list;
+		await svc.setRepeatAll([a.key, b.key], { kind: "schedule", every: 1, unit: "day", days: [], dayOfMonth: null, from: null });
+		expect(store.text?.match(/🔁 every day/g)?.length).toBe(2);
 	});
 });

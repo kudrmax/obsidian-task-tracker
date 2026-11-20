@@ -1,4 +1,4 @@
-import { type GroupName, keyId, type MenuStatusId, type PickedTask, type TaskItem, type TaskKey, type TaskMenuModel } from "../../core/application/contracts";
+import { type BulkActionId, type GroupName, keyId, type RepeatRule, type MenuStatusId, type PickedTask, type TaskItem, type TaskKey, type TaskMenuModel } from "../../core/application/contracts";
 import { carriesMany, type DropTarget, type TaskDragPayload } from "./drag/DropTarget";
 import { BulkMenu } from "./menu/BulkMenu";
 import { el } from "./dom";
@@ -20,7 +20,9 @@ export interface BulkDeps {
 	/** The day the day column shows. */
 	day(): LocalDate;
 	/** The bulk menu of the picked tasks as they now stand, each with the column its card stands in (`TaskService.bulkMenu`). */
-	menu(picked: readonly PickedTask[]): TaskMenuModel;
+	menu(picked: readonly PickedTask[]): TaskMenuModel<BulkActionId>;
+	/** The bulk menu's Repeat (`TaskService.setRepeatAll`), and resolves once the screen shows it. */
+	setRepeatAll(keys: readonly TaskKey[], rule: RepeatRule | null): Promise<void>;
 	/** A level tapped (`TaskService.togglePriority`); resolves once the screen shows it. */
 	togglePriority(keys: readonly TaskKey[], prefix: string): Promise<void>;
 	/** A label tapped (`TaskService.toggleLabel`): the screen shows it, and it resolves with the tasks as they then stand, null for one gone. */
@@ -208,6 +210,7 @@ export class BulkController {
 					items = written as TaskItem[];
 					return items;
 				},
+				setRepeat: (rule) => done((picked) => this.deps.setRepeatAll(picked, rule)),
 				remove: () => done((picked) => this.deps.remove(picked)),
 			},
 			onClose: () => (this.menu = null),

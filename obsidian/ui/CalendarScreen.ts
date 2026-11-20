@@ -242,6 +242,7 @@ export class CalendarScreen extends Component {
 			root: this.contentEl,
 			pickStatus: (keys, id) => this.act(() => this.deps.tasks.pickStatus(keys, id)),
 			postpone: (keys, date) => this.act(() => this.deps.tasks.postponeAll(keys, date)),
+			setRepeatAll: (keys, rule) => this.act(() => this.deps.tasks.setRepeatAll(keys, rule)),
 			remove: (keys) => this.act(() => this.deps.tasks.removeAll(keys)),
 			today: () => this.today(),
 			day: () => this.selectedDate,
@@ -1304,11 +1305,11 @@ export class CalendarScreen extends Component {
 	}
 
 	/** Where a card pressed for its menu stands: a timeline card's stack, the whole screen, the timeline, a list column, else Done. */
-	private menuFrom(source: HTMLElement, full: FullScreen | undefined): MenuFrom {
+	private menuFrom(source: HTMLElement, full: FullScreen | undefined, item: TaskItem): MenuFrom {
 		if (source.closest(".tc-menu-subtasks")) return "stack";
 		const projectsFrom = source.closest(".tc-projects-list") ? source.dataset.menuFrom : undefined;
 		if (projectsFrom) return projectsFrom as MenuFrom;
-		if (full) return "full";
+		if (full) return full.holds(item) ? "full" : "fullSubtask";
 		if (source.classList.contains("tc-block")) return "timeline";
 		return this.columnOf(source) ?? "done";
 	}
@@ -1381,7 +1382,7 @@ export class CalendarScreen extends Component {
 	 */
 	private showMenu(item: TaskItem, source: HTMLElement, lifted?: (copy: HTMLElement, close: () => void) => void, full?: FullScreen, held?: boolean, sheet?: Sheet): TaskMenu {
 		const tasks = this.deps.tasks;
-		const from = this.menuFrom(source, full);
+		const from = this.menuFrom(source, full, item);
 		const column = this.columnOf(source);
 		const screen = this.menuScreen();
 		const today = screen.today;
@@ -1426,7 +1427,7 @@ export class CalendarScreen extends Component {
 				setRepeat: (rule) => this.act(() => tasks.setRepeat(current.key, rule)),
 				rename: (menu) => (full ? full.rename(current) : this.quick?.rename(current, menu)),
 				openDescription: (editing, task) => this.openFull(task ?? current, editing),
-				openFull: full?.holds(current) ? undefined : () => this.openFull(current, false),
+				openFull: () => this.openFull(current, false),
 				addSubtask: (menu) => (full ? full.addSubtask(current) : this.quick?.addSubtask(current, menu)),
 				firstStep: () => this.firstStep.open(current, source),
 				remove: () => this.act(() => tasks.remove(current.key)),

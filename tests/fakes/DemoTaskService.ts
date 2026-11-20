@@ -1,5 +1,5 @@
-import { type ColumnSections, DESCRIPTION_TEMPLATE, type DropColumn, type DaySpan, type DayView, type DraftMarks, type ResizeEdge, type StretchSpan, type CreatedTask, type DroppedTask, type DropFrom, type DropLanding, type DropOrigin, type DropPreview, type DropTo, type EndList, type FullTree, type GroupedList, type ListSection, type NewTaskPlace, type Placement, type RepeatRule, type ScreenView, type SearchGroup, type SectionKey, type SectionOffer, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type TaskMenuModel, type TaskService, type MenuFrom, type MenuScreen, type MenuStatusId, type PickedTask, type ProjectsView, type ProjectsDropPreview, type FunnelView, type ViewChoice } from "../../core/application/contracts";
-import { carriedWith, menuOffer, taskMenu, tileStatus, toggledPriority } from "../../core/application/menus";
+import { type ColumnSections, DESCRIPTION_TEMPLATE, type DropColumn, type DaySpan, type DayView, type DraftMarks, type ResizeEdge, type StretchSpan, type CreatedTask, type DroppedTask, type DropFrom, type DropLanding, type DropOrigin, type DropPreview, type DropTo, type EndList, type FullTree, type GroupedList, type ListSection, type NewTaskPlace, type Placement, type RepeatRule, type ScreenView, type SearchGroup, type SectionKey, type SectionOffer, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type TaskMenuModel, type TaskMenuActionId, type BulkActionId, type TaskService, type MenuFrom, type MenuScreen, type MenuStatusId, type PickedTask, type ProjectsView, type ProjectsDropPreview, type FunnelView, type ViewChoice } from "../../core/application/contracts";
+import { bulkMenuOf, carriedWith, menuOffer, oneTaskMenu, tileStatus, toggledPriority } from "../../core/application/menus";
 import type { Clock } from "../../core/application/ports";
 import { dropMoves, readDrop } from "../../core/application/drops";
 import { snapMinute } from "../../core/application/snapGrid";
@@ -561,14 +561,14 @@ export class DemoTaskService implements TaskService {
 		this.changed();
 	}
 
-	menu(item: TaskItem, from: MenuFrom, screen: MenuScreen): TaskMenuModel {
+	menu(item: TaskItem, from: MenuFrom, screen: MenuScreen): TaskMenuModel<TaskMenuActionId> {
 		const offer = menuOffer([from], screen, (column, date) => this.columnSections(column, date));
-		return taskMenu([item], screen.today, this.priorityLevels(), this.labelLevels(), offer, { kind: "task", from });
+		return oneTaskMenu(item, screen.today, this.priorityLevels(), this.labelLevels(), offer, from, [], this.placementOf(item));
 	}
 
-	bulkMenu(picked: readonly PickedTask[], screen: MenuScreen): TaskMenuModel {
+	bulkMenu(picked: readonly PickedTask[], screen: MenuScreen): TaskMenuModel<BulkActionId> {
 		const offer = menuOffer(picked.map((p) => p.from), screen, (column, date) => this.columnSections(column, date));
-		return taskMenu(picked.map((p) => p.item), screen.today, this.priorityLevels(), this.labelLevels(), offer, { kind: "bulk" });
+		return bulkMenuOf(picked.map((p) => p.item), screen.today, this.priorityLevels(), this.labelLevels(), offer, [], picked.map((p) => p.from), picked.map((p) => this.placementOf(p.item)));
 	}
 
 	/** Last in the file first, so a task taken out moves none still to come. */
@@ -584,6 +584,20 @@ export class DemoTaskService implements TaskService {
 	async postponeAll(keys: readonly TaskKey[], date: LocalDate): Promise<void> {
 		const can = keys.filter((key) => this.item(key.section, key.index).can.postpone);
 		await this.eachKey(can, (key) => this.postpone(key, date));
+	}
+
+	async sendTo(keys: readonly TaskKey[], placement: Placement): Promise<void> {
+		const can = keys.filter((key) => this.item(key.section, key.index).can.postpone && key.path.length === 0);
+		await this.eachKey(can, async (key) => {
+			const t = this.take(key);
+			this.place(t, placement);
+			this.changed();
+		});
+	}
+
+	async setRepeatAll(keys: readonly TaskKey[], rule: RepeatRule | null): Promise<void> {
+		const can = keys.filter((key) => this.item(key.section, key.index).repeatable);
+		await this.eachKey(can, (key) => this.setRepeat(key, rule));
 	}
 
 	async removeAll(keys: readonly TaskKey[]): Promise<void> {

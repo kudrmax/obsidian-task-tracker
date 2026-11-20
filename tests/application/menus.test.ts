@@ -206,16 +206,18 @@ describe("the edit group", () => {
 		expect(edits(sub, { kind: "task", from: "full" })).toContain("subtask");
 	});
 
-	it("words the task's rule on the Repeat row, and none for the picked tasks", () => {
-		const every3 = item({ repeat: { kind: "schedule", every: 3, unit: "day", days: [], dayOfMonth: null, from: T } });
-		expect(taskMenu([every3], T, [], [], null, { kind: "task", from: "day" }).repeat).toEqual({ value: "Every 3 days", days: null });
+	it("words the task's rule on the Repeat row, and the picked tasks' rule only while they share it", () => {
+		const every3 = () => item({ repeat: { kind: "schedule", every: 3, unit: "day", days: [], dayOfMonth: null, from: T } });
+		expect(taskMenu([every3()], T, [], [], null, { kind: "task", from: "day" }).repeat).toEqual({ value: "Every 3 days", days: null });
 		expect(taskMenu([item()], T, [], [], null, { kind: "task", from: "day" }).repeat).toEqual({ value: "", days: null });
-		expect(taskMenu([every3], T, [], [], null, { kind: "bulk" }).repeat).toEqual({ value: "", days: null });
+		expect(taskMenu([every3(), every3()], T, [], [], null, { kind: "bulk" }).repeat).toEqual({ value: "Every 3 days", days: null });
+		expect(taskMenu([every3(), item()], T, [], [], null, { kind: "bulk" }).repeat).toEqual({ value: "", days: null });
 	});
 
-	it("gives the picked tasks Section, where it is offered, and Project", () => {
-		expect(edits(item(), { kind: "bulk" })).toEqual(["project"]);
-		expect(edits(item(), { kind: "bulk" }, offer)).toEqual(["section", "project"]);
+	it("gives the picked tasks Repeat while one of them may repeat, Section where it is offered, and Project", () => {
+		expect(edits(item(), { kind: "bulk" })).toEqual(["repeat", "project"]);
+		expect(edits(item(), { kind: "bulk" }, offer)).toEqual(["repeat", "section", "project"]);
+		expect(edits(item({ repeatable: false }), { kind: "bulk" })).toEqual(["project"]);
 	});
 });
 
