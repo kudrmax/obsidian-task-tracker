@@ -94,12 +94,6 @@ export class EmbeddedEditor {
 		cm.dispatch({ changes: { from: 0, to: cm.state.doc.length, insert: text }, selection: { anchor: text.length } });
 	}
 
-	/** A plain line break where the caret is, the selection replaced: no list marker continued, no indent carried over. */
-	insertLineBreak(): void {
-		const { cm } = this.editor;
-		cm.dispatch(cm.state.replaceSelection("\n"));
-	}
-
 	focusEnd(): void {
 		const end = this.editor.cm.state.doc.length;
 		this.editor.cm.dispatch({ selection: { anchor: end } });

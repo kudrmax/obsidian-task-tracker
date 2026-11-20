@@ -100,9 +100,9 @@ export function openingFaults(frames, card, { rise = 8, scaleGap = 0.06 } = {}) 
 			if (!end || p.o < 0.005) return;
 			const slack = end.width * scaleGap;
 			if (p.left < end.left - 1 || p.left > end.left + 1) faults.push(`t=${f.t} panel ${i} drawn sideways of its place: left ${p.left} vs ${end.left}`);
-			/** The panel rides with the copy, growing from the copy's edge: its top off its place under the copy by the rise at most. */
-			const under = f.copy ? p.top - f.copy.top : p.top;
-			const endUnder = end.top - endCopy.top;
+			/** The panel rides with the copy, growing from the copy's bottom edge (a task's notes unfolding in the copy push it down): its top off its place under the copy by the rise at most. */
+			const under = f.copy ? p.top - (f.copy.top + f.copy.height) : p.top;
+			const endUnder = end.top - (endCopy.top + endCopy.height);
 			if (Math.abs(under - endUnder) > rise + 1) faults.push(`t=${f.t} panel ${i} drawn ${(under - endUnder).toFixed(1)}px off its place under the copy (rise ${rise})`);
 			if (p.width < end.width - slack - 1) faults.push(`t=${f.t} panel ${i} narrower than the design's scale: ${p.width} of ${end.width}`);
 		});

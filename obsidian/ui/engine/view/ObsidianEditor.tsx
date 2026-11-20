@@ -24,16 +24,17 @@ export interface ObsidianEditorProps {
 	readonly placeholder?: string;
 	/** The colour its task's level paints the field in (`data-priority`). */
 	readonly priority?: string | null;
-	/** Enter: the text as typed. */
-	readonly onEnter: (text: string) => void;
+	/** Enter: the text as typed. Without it (notes), Enter is the editor's own: a new line, a list's next item. */
+	readonly onEnter?: (text: string) => void;
 	readonly onEscape: () => void;
 	/** Tab, and Shift+Tab (`shift`): when given, the field takes them. */
 	readonly onTab?: (shift: boolean) => void;
 	/** The text changed as typed. */
 	readonly onChange?: (text: string) => void;
 	/**
-	 * Notes take several lines (Max, 2026-11-20): Shift+Enter breaks the line, plainly, and a pasted break stays. Without
-	 * it the text is a title, one line: a break typed or pasted becomes a space.
+	 * Notes take several lines (Max, 2026-11-20, Decision 124): a pasted break stays, and Enter (with no `onEnter`) breaks
+	 * the line as Obsidian does, a list going on with its next item. Without it the text is a title, one line: a break
+	 * typed or pasted becomes a space.
 	 */
 	readonly lines?: boolean;
 	/** The focus left the field: the event, and the text as typed then. */
@@ -57,14 +58,14 @@ export function ObsidianEditor({ text, className, placeholder, priority = null, 
 			extensions: [...(lines ? [] : [EditorState.transactionFilter.of(oneLine)]), ...(placeholder ? [hint(placeholder)] : [])],
 			onChange: () => handlers.current.onChange?.(editor.value),
 			keys: [
-				{ key: "Enter", run: () => handlers.current.onEnter(editor.value), ...(lines ? { shift: () => editor.insertLineBreak() } : {}) },
+				...(handlers.current.onEnter ? [{ key: "Enter", run: () => handlers.current.onEnter?.(editor.value) }] : []),
 				{ key: "Escape", run: () => handlers.current.onEscape() },
 				...(onTab ? [{ key: "Tab", run: () => handlers.current.onTab?.(false), shift: () => handlers.current.onTab?.(true) }] : []),
 			],
 		});
 		editorRef.current = editor;
 		/** The phone's keyboard offers «next»: Enter opens the next field (the plugin's `enterkeyhint`). */
-		editor.contentDOM.setAttribute("enterkeyhint", "next");
+		editor.contentDOM.setAttribute("enterkeyhint", handlers.current.onEnter ? "next" : "enter");
 		editor.focusEnd();
 		return () => {
 			editorRef.current = null;

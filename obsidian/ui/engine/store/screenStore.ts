@@ -154,6 +154,8 @@ export interface ScreenActions {
 	 * the field, the new task's field with its bar; a card of a calendar menu's stack becomes it in the menu, which stays.
 	 */
 	startRename(): void;
+	/** Notes from the menu (Decision 124): the task becomes its field as Rename makes it, its notes' line open under the title with the caret in it. */
+	startNotes(): void;
 	/**
 	 * Add subtask from the menu (F124, F108): a list's card opens the new task's field under its last subtask, the menu
 	 * closed in the same tap; a calendar's task types it at the end of its stack in the menu, which stays.
@@ -426,6 +428,10 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 				if (!layer) return;
 				const { field, draft, text } = port.rename(layer.id, layer.from, get().dayOffset);
 				set({ entry: field, draft, entryText: text, entrySeq: get().entrySeq + 1, entryPanel: null, layer: field.stack ? { ...layer, asking: null } : null });
+			},
+			startNotes() {
+				get().startRename();
+				get().openDescription();
 			},
 			startSubtask() {
 				const layer = get().layer;

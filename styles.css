@@ -412,6 +412,9 @@ body {
 	--tc-menu-gap: var(--tc-space-12);
 	/* The start of a task's description over its copy in the menu: Obsidian draws the text, the plugin only its size and the panel. */
 	--tc-desc-peek-max: 214px;
+	/* A task's notes in the menu's copy and the field (Decision 124): the gap under the title, the room under the notes. */
+	--tc-notes-gap: var(--tc-space-4);
+	--tc-notes-pad-bottom: 9px;
 	--tc-desc-peek-pad: 10px 14px 10px 6px;
 	--tc-desc-peek-pad-cut: 10px 14px 0 6px;
 	--tc-desc-fade: 18px;
@@ -1130,7 +1133,7 @@ body.is-phone .tc-quick-field.tc-title-field .markdown-source-view.mod-cm6 > .cm
 :is(.task-calendar, .tc-menu-subtasks) .tc-entry[data-priority]:has(> .tc-desc-field) { background: var(--tc-priority-fill); }
 :is(.task-calendar, .tc-menu-subtasks) .tc-entry:has(> .tc-desc-field) > .tc-quick-field { background: none; box-shadow: none; }
 :is(.task-calendar, .tc-menu-subtasks) .tc-entry:has(> .tc-desc-field) > .tc-quick-field:not(.tc-desc-field) { min-height: 0; padding-bottom: var(--tc-space-2); }
-:is(.task-calendar, .tc-menu-subtasks) .tc-entry > .tc-quick-field.tc-desc-field { min-height: 0; padding-top: 0; font-size: var(--tc-font-sub); color: var(--tc-muted); }
+:is(.task-calendar, .tc-menu-subtasks) .tc-entry > .tc-quick-field.tc-desc-field { min-height: 0; padding-top: var(--tc-notes-gap); padding-bottom: var(--tc-notes-pad-bottom); font-family: var(--tc-font-desc); font-size: var(--tc-font-desc-peek); line-height: var(--tc-desc-leading); color: var(--tc-desc-ink); }
 body:has(> .tc-backdrop.is-shown) > .suggestion-container, body:has(> .tc-backdrop.is-shown) .mobile-toolbar { z-index: var(--tc-layer-editor); }
 .tc-quick-field.tc-title-field .cm-placeholder { color: var(--tc-muted); }
 .tc-quick-field.tc-title-field .cm-cursor { border-left-color: var(--tc-accent); }
@@ -1942,6 +1945,20 @@ body:not(.is-mobile) .tc-drag-source:focus-visible > :is(.tc-card, .tc-block-car
 .tc-menu-block > .tc-panel.is-menu { position: relative; top: auto; flex-shrink: 0; outline: none; }
 .tc-menu-block > .tc-panel.is-menu.is-shown { animation: tc-menu-panel-in var(--tc-duration-menu) var(--tc-ease-out) backwards; transition: height var(--tc-duration-slide) var(--tc-ease-fly); }
 .tc-menu-block > .tc-panel.is-empty { display: none; }
+/*
+ * A task's notes in the menu's copy (Decision 124, Max's variant 2): under the title, in Obsidian's markdown as on the full
+ * screen, the copy as wide as the menu (it fades in at that width, its title not reflowing); a long note fades at its foot.
+ * Opening, the notes unfold under the title as the block lifts.
+ */
+@keyframes tc-notes-unfold { from { grid-template-rows: 0fr; opacity: 0; } }
+.tc-menu-over { min-width: var(--tc-cover-w); }
+.tc-menu-over:has(> .tc-lifted.has-notes) { width: max(var(--tc-cover-w), var(--tc-menu-w)); }
+.tc-menu-over > .tc-lifted.has-notes { flex-wrap: wrap; padding-bottom: var(--tc-notes-pad-bottom); }
+.tc-menu-over > .tc-lifted.has-notes .tc-block-card { flex-wrap: wrap; padding-bottom: var(--tc-notes-pad-bottom); }
+.tc-copy-notes { flex: 0 0 100%; min-width: 0; display: grid; grid-template-rows: 1fr; margin-top: var(--tc-notes-gap); }
+.tc-level.tc-menu-layer.is-shown .tc-copy-notes { animation: tc-notes-unfold var(--tc-duration-slide) var(--tc-ease-fly) backwards; }
+.tc-copy-notes > .tc-notes { min-height: 0; max-height: var(--tc-desc-peek-max); overflow: hidden; pointer-events: auto; animation-name: tc-cut-peek; animation-fill-mode: both; animation-timeline: scroll(self block); }
+.tc-notes { --font-text-size: var(--tc-font-desc-peek); font-size: var(--tc-font-desc-peek); }
 .tc-menu-over > .tc-lifted { position: relative; flex: 1 0 auto; opacity: 1; transition: none; }
 .tc-menu-over > .tc-lifted.is-whole { max-width: none; }
 .tc-menu-over > .tc-lifted.is-block { align-items: stretch; }
@@ -1974,7 +1991,6 @@ body.theme-light .tc-menu-over .tc-event { --tc-event-bg: var(--tc-event-bg-ligh
 .tc-panel .tc-menu-tiles.is-edit button.tc-menu-tile { height: var(--tc-menu-tile-h-small); gap: var(--tc-space-4); }
 .tc-menu-tiles.is-edit .tc-menu-tile > svg { width: var(--tc-menu-tile-icon-small); height: var(--tc-menu-tile-icon-small); }
 @keyframes tc-cut-peek { from, to { -webkit-mask-image: var(--tc-fade-peek-bottom); mask-image: var(--tc-fade-peek-bottom); } }
-.tc-level.tc-menu-layer > .tc-desc-peek .tc-desc-text { animation-name: tc-cut-peek; animation-fill-mode: both; animation-timeline: scroll(self block); }
 /* The calendar's task renamed (F108): the field over the block's place, from its top, growing down for a long name; the block's own card hidden under it. */
 .task-calendar.is-engine .tc-block > .tc-quick-row.tc-block-rename { position: absolute; top: 0; left: 0; right: 0; min-height: 100%; z-index: var(--tc-layer-selected); }
 .task-calendar.is-engine .tc-block > .tc-quick-row.tc-block-rename > .tc-quick-field { min-height: 100%; }

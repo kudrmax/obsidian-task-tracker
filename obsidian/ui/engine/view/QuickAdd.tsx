@@ -82,11 +82,10 @@ function DescriptionLine({ onLeave }: { readonly onLeave: (event: FocusEvent<HTM
 	return (
 		<ObsidianEditor
 			text={text}
-			className="tc-quick-field tc-title-field tc-desc-field"
+			className="tc-quick-field tc-title-field tc-desc-field tc-notes"
 			lines
 			placeholder="Notes"
 			onChange={(typed) => api.getState().typeDescription(typed)}
-			onEnter={() => api.getState().commitEntry(title(), true)}
 			onEscape={() => api.getState().escapeEntry()}
 			onLeave={(event) => onLeave(event, title)}
 		/>

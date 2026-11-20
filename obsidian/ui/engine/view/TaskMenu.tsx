@@ -30,6 +30,7 @@ interface MenuSteps {
 	ask(what: Asking | null): void;
 	startRename(): void;
 	startSubtask(): void;
+	startNotes(): void;
 	pick(action: MenuAction): void;
 }
 
@@ -66,7 +67,7 @@ const MENU_ACTIONS: Readonly<Record<TaskMenuActionId, ActionLook | { readonly ti
 	repeat: { label: "Repeat", icon: "repeat", onPick: leave },
 	reminder: { label: "Reminder", icon: "reminder", onPick: (_, steps) => steps.menuPage("reminders") },
 	rename: { label: "Rename", icon: "rename", onPick: (_, steps) => steps.startRename() },
-	description: { label: "Notes", icon: "description", onPick: leave },
+	description: { label: "Notes", icon: "description", onPick: (_, steps) => steps.startNotes() },
 	project: { label: "Project", icon: "project", onPick: leave },
 	section: { label: "Section", icon: "section", onPick: leave },
 	subtask: { label: "Subtask", icon: "subtask", onPick: (_, steps) => steps.startSubtask(), tile: "steps" },
@@ -142,7 +143,7 @@ export const TaskMenu = memo(function TaskMenu() {
 			label={model.kind === "event" ? "Event menu" : "Task menu"}
 			over={
 				<>
-					<MenuCopy id={shown.layer.stack?.of ?? shown.layer.id} look={shown.look} />
+					<MenuCopy id={shown.layer.stack?.of ?? shown.layer.id} look={shown.look} notes={model.kind === "task" && !shown.layer.stack && typing === null ? model.peek : null} />
 					{shown.layer.stack ? (
 						<Stack ids={shown.layer.stack.ids} typing={false} renaming={typing === "rename" ? shown.layer.id : null} pressed={shown.layer.id} />
 					) : model.kind === "task" && (model.subtasks.length > 0 || typing === "subtask") ? (
@@ -154,7 +155,6 @@ export const TaskMenu = memo(function TaskMenu() {
 			panelClass={model.kind === "event" ? "is-event" : shown.layer.page === "picker" ? "is-task is-picker" : "is-task"}
 			page={`${shown.layer.id}:${shown.layer.page}`}
 			keepWidth={model.kind === "event"}
-			peek={model.kind === "task" && model.peek !== null && typing === null ? { content: <PeekText text={model.peek} />, onPress: () => pick({ kind: "row", id: "openFull" }) } : undefined}
 		/>
 	);
 });
@@ -383,9 +383,10 @@ export function MonthGrid({ today, picked, onPick }: { readonly today: string; r
 
 /**
  * The copy of what was pressed over the backdrop, unchanged but for its whole title (the design's «Полная карточка»): a
- * list's card, a calendar's block in its look there, or an event (F90).
+ * list's card, a calendar's block in its look there, or an event (F90). A task's notes stand in it under the title, in
+ * Obsidian's own markdown as on the full screen, the copy as wide as the menu (Decision 124, Max's variant 2).
  */
-function MenuCopy({ id, look }: { readonly id: string; readonly look: BlockLook | null }) {
+function MenuCopy({ id, look, notes }: { readonly id: string; readonly look: BlockLook | null; readonly notes: string | null }) {
 	const face = useScreen((s) => s.shown.cards[id]);
 	const block = useScreen((s) => s.shown.day.blocks.find((b) => b.id === id));
 	const event = useScreen((s) => s.shown.day.events.find((e) => e.id === id) ?? s.shown.day.allDay.find((e) => e.id === id));
@@ -404,25 +405,35 @@ function MenuCopy({ id, look }: { readonly id: string; readonly look: BlockLook 
 	if (!face) return null;
 	if (block)
 		return (
-			<div className="tc-lifted is-block is-whole" data-lifted={id}>
+			<div className={`tc-lifted is-block is-whole${notes ? " has-notes" : ""}`} data-lifted={id}>
 				<div className={`tc-block-card${selected ? " is-selected" : ""}`} data-status={face.inProgress ? "inProgress" : "open"} data-priority={face.color ?? undefined}>
 					<CardInsides face={face} block={look ?? { corner: null, pill: null, clock: block.clock }} />
+					{notes ? <CopyNotes text={notes} /> : null}
 				</div>
 			</div>
 		);
 	return (
-		<div className={`tc-lifted is-whole${face.step !== null ? " is-two-line" : ""}`} data-lifted={id} data-status={face.inProgress ? "inProgress" : "open"} data-priority={face.color ?? undefined}>
+		<div className={`tc-lifted is-whole${face.step !== null ? " is-two-line" : ""}${notes ? " has-notes" : ""}`} data-lifted={id} data-status={face.inProgress ? "inProgress" : "open"} data-priority={face.color ?? undefined}>
 			<CardInsides face={face} />
+			{notes ? <CopyNotes text={notes} /> : null}
 		</div>
 	);
 }
 
-/** The start of a task's description, drawn by Obsidian (the design's «Описание задачи»: the panel's text is Obsidian's markdown). */
-function PeekText({ text }: { readonly text: string }) {
+/**
+ * A task's notes under its title in the menu's copy, drawn by Obsidian as on the full screen (`tc-desc-text`, the one
+ * look of notes, read here and typed in the field's notes line); a long one fades at its foot. They unfold as the menu
+ * opens.
+ */
+function CopyNotes({ text }: { readonly text: string }) {
 	const { markdown, sourcePath } = useHost();
 	const el = useRef<HTMLDivElement>(null);
 	useEffect(() => (el.current ? markdown(text, el.current, sourcePath) : undefined), [markdown, text, sourcePath]);
-	return <div ref={el} className="tc-desc-text markdown-rendered" />;
+	return (
+		<div className="tc-copy-notes">
+			<div ref={el} className="tc-desc-text tc-notes markdown-rendered" />
+		</div>
+	);
 }
 
 /**
