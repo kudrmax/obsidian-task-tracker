@@ -346,6 +346,8 @@ const BlockItem = memo(function BlockItem({ block, box, shades, order, z, top, s
 	const selected = useScreen((s) => s.selected === block.id);
 	const resizing = useScreen((s) => (s.resizing?.id === block.id ? s.resizing.edge : null));
 	const renaming = useScreen((s) => s.entry !== null && s.entry.renaming === block.id && !s.entry.stack && s.entry.at.at !== undefined);
+	/** Its menu open: its copy stands in the menu's block, lifted away from it (Decision 120), so its dots, pinned over the menu's level, go too. */
+	const menuOver = useScreen((s) => s.layer?.id === block.id);
 	const api = useScreenApi();
 	const anchor = useAnchor();
 	const pressed = useContext(PressedLook);
@@ -376,7 +378,7 @@ const BlockItem = memo(function BlockItem({ block, box, shades, order, z, top, s
 					))}
 				</div>
 			) : null}
-			{(selected || resizing) && !lifted && !renaming && element ? <Grips block={block} reference={element} scale={scale} /> : null}
+			{(selected || resizing) && !lifted && !renaming && !menuOver && element ? <Grips block={block} reference={element} scale={scale} /> : null}
 		</MovingRow>
 	);
 });

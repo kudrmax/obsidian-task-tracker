@@ -1329,7 +1329,7 @@ body.tc-cancelling .tc-float, body.tc-cancelling .tc-float-under, body.tc-cancel
 .tc-desc-text > :first-child { margin-top: 0; }
 .tc-desc-text > :last-child { margin-bottom: 0; }
 .tc-panel { position: fixed; z-index: var(--tc-layer-panel); width: var(--tc-panel-w); top: calc(var(--tc-panel-y) + var(--tc-menu-gap)); -webkit-user-select: none; user-select: none; opacity: 0; transform-origin: 0 0; transform: translate3d(0, calc(-1 * var(--tc-menu-rise)), 0) scale(var(--tc-menu-scale)); transition: opacity var(--tc-duration-menu) var(--tc-ease-out), transform var(--tc-duration-menu) var(--tc-ease-out); }
-.tc-level > .tc-panel, .tc-level > .tc-desc-peek { box-shadow: var(--tc-level-ring); }
+.tc-level > .tc-panel, .tc-level > .tc-menu-block > .tc-panel, .tc-level > .tc-desc-peek { box-shadow: var(--tc-level-ring); }
 .tc-panel.is-above { top: auto; bottom: calc(var(--tc-panel-y) + var(--tc-menu-gap)); transform-origin: 0 100%; transform: translate3d(0, var(--tc-menu-rise), 0) scale(var(--tc-menu-scale)); }
 .tc-panel.is-shown { opacity: 1; transform: none; }
 .tc-panel.is-scrolled { overflow-y: auto; overscroll-behavior: contain; }
@@ -1924,8 +1924,24 @@ body:not(.is-mobile) .tc-drag-source:focus-visible > :is(.tc-card, .tc-block-car
 
 /* The engine's task menu (E4). Floating UI places each part (its left and top inline, measured before it shows); the design's classes run the motion: the backdrop, the copy over it and the panel fade in together in --tc-duration-menu, the panel growing out from the copy, and fade out together in --tc-duration-collapse. */
 .tc-menu-over { position: fixed; z-index: var(--tc-layer-panel); width: max-content; max-width: calc(100% - 2 * var(--tc-whole-margin)); display: flex; flex-direction: column; pointer-events: none; opacity: 0; transition: opacity var(--tc-duration-menu) var(--tc-ease-out); }
-.tc-level.is-shown > .tc-menu-over { opacity: 1; }
-.tc-level.is-closing > .tc-menu-over { opacity: 0; transition-duration: var(--tc-duration-collapse); }
+.tc-level.is-shown > .tc-menu-over, .tc-level.is-shown > .tc-menu-block > .tc-menu-over { opacity: 1; }
+.tc-level.is-closing > .tc-menu-over, .tc-level.is-closing > .tc-menu-block > .tc-menu-over { opacity: 0; transition-duration: var(--tc-duration-collapse); }
+/*
+ * The menu's block (Decision 120, iOS's context menu): the copy of the task and the panel right under it, one element.
+ * Unshown it stands lowered by --tc-menu-lift, its copy right over the task it opened from; shown, it lifts to its place
+ * in one move while the panel grows from the copy's edge; closing, it goes back down into the task. Shown, another page
+ * grows or shrinks the panel in place, the block moving with it.
+ */
+@keyframes tc-menu-lift-in { from { transform: translate3d(0, var(--tc-menu-lift), 0); } }
+@keyframes tc-menu-panel-in { from { opacity: 0; transform: translate3d(0, calc(-1 * var(--tc-menu-rise)), 0) scale(var(--tc-menu-scale)); } }
+.tc-menu-block { position: fixed; z-index: var(--tc-layer-panel); width: max-content; max-width: calc(100% - 2 * var(--tc-whole-margin)); display: flex; flex-direction: column; align-items: flex-start; gap: var(--tc-menu-gap); outline: none; transform: translate3d(0, var(--tc-menu-lift), 0); transition: transform var(--tc-duration-collapse) var(--tc-ease-out); }
+/* Opening runs from the lowered state whatever stood before (a keyframe, not a transition: the block is placed and shown in one frame). */
+/* The lift is the long way of the two (up to a screen): the slide's time and the fly's curve, easing in and settling softly. */
+.tc-level.tc-menu-layer.is-shown .tc-menu-block { transform: none; animation: tc-menu-lift-in var(--tc-duration-slide) var(--tc-ease-fly) backwards; transition: top var(--tc-duration-slide) var(--tc-ease-fly); }
+.tc-menu-block > .tc-menu-over { position: relative; max-width: 100%; }
+.tc-menu-block > .tc-panel.is-menu { position: relative; top: auto; flex-shrink: 0; outline: none; }
+.tc-menu-block > .tc-panel.is-menu.is-shown { animation: tc-menu-panel-in var(--tc-duration-menu) var(--tc-ease-out) backwards; transition: height var(--tc-duration-slide) var(--tc-ease-fly); }
+.tc-menu-block > .tc-panel.is-empty { display: none; }
 .tc-menu-over > .tc-lifted { position: relative; flex: 1 0 auto; opacity: 1; transition: none; pointer-events: auto; }
 .tc-menu-over > .tc-lifted.is-whole { max-width: none; }
 .tc-menu-over > .tc-lifted.is-block { align-items: stretch; }
@@ -1935,7 +1951,6 @@ body:not(.is-mobile) .tc-drag-source:focus-visible > :is(.tc-card, .tc-block-car
 body.theme-light .tc-menu-over .tc-event { --tc-event-bg: var(--tc-event-bg-light); --tc-event-bar: var(--tc-event-bar-light); --tc-event-text: var(--tc-event-text-light); }
 .tc-level.tc-menu-layer .tc-panel { bottom: auto; overflow-y: auto; overscroll-behavior: contain; }
 .tc-level.tc-menu-layer { --tc-band: var(--tc-band-quiet); }
-.tc-menu-measure { position: fixed; width: 0; height: 0; pointer-events: none; }
 /* A label, a task's name in a question or a row's value too long for its room fades out at the right, as the plugin marks it: the box scrolls only when its text is cut, and only then its scroll timeline runs the fade. */
 @keyframes tc-cut-tile { from, to { text-align: left; -webkit-mask-image: var(--tc-fade-tile-end); mask-image: var(--tc-fade-tile-end); } }
 @keyframes tc-cut-value { from, to { -webkit-mask-image: var(--tc-fade-card-end); mask-image: var(--tc-fade-card-end); } }

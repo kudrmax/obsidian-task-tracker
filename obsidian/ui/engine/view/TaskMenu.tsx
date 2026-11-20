@@ -116,21 +116,20 @@ export const TaskMenu = memo(function TaskMenu() {
 	const layer = useScreen((s) => s.layer);
 	/** A field typed in the menu itself: a stack's card renamed in its place, or a new subtask at the stack's end (F108). */
 	const typing = useScreen((s) => (s.entry?.stack ? (s.entry.renaming === null ? "subtask" : "rename") : null));
-	const last = useRef<{ layer: Layer; reference: Element | null; look: BlockLook | null; seq: number; panelBy: Element | null } | null>(null);
+	const last = useRef<{ layer: Layer; reference: Element | null; look: BlockLook | null; seq: number } | null>(null);
 	const was = useRef<Layer | null>(null);
 	/** Opened afresh: from the element pressed now; another page or a question of the same menu keeps it. */
 	if (layer && layer !== was.current) {
 		const fresh = was.current === null || !last.current;
-		/** A subtask's menu over its task's (F107) takes the sheet as it stands: the copy and the stack stay, the panel goes by the card pressed in the stack. */
-		const other = !fresh && was.current !== null && was.current.id !== layer.id;
-		last.current = fresh ? { layer, reference: anchor.current, look: look.current, seq: (last.current?.seq ?? 0) + 1, panelBy: null } : other && last.current ? { ...last.current, layer, panelBy: anchor.current } : { ...last.current!, layer };
+		/** A subtask's menu over its task's (F107) takes the sheet as it stands: the copy and the stack stay, the panel under them. */
+		last.current = fresh ? { layer, reference: anchor.current, look: look.current, seq: (last.current?.seq ?? 0) + 1 } : { ...last.current!, layer };
 	}
 	was.current = layer;
 	const shown = last.current;
 	if (!shown) return null;
 	const { model } = shown.layer;
 	const pick = (action: MenuAction) => api.getState().pick(action);
-	const { groups, copyAt } = model.kind === "event" ? { groups: [<RowGroup key="open" rows={[{ label: "Open in Calendar", icon: "calendar", onPick: () => pick({ kind: "row", id: "calendar" }) }]} />], copyAt: undefined } : taskGroups(shown.layer, typing !== null, model, { ...api.getState(), pick });
+	const groups = model.kind === "event" ? [<RowGroup key="open" rows={[{ label: "Open in Calendar", icon: "calendar", onPick: () => pick({ kind: "row", id: "calendar" }) }]} />] : taskGroups(shown.layer, typing !== null, model, { ...api.getState(), pick });
 	return (
 		<MenuLayer
 			key={shown.seq}
@@ -140,7 +139,6 @@ export const TaskMenu = memo(function TaskMenu() {
 			escapes={typing === null}
 			root={layerRoot}
 			reference={shown.reference}
-			panelBy={shown.layer.stack ? shown.panelBy : null}
 			label={model.kind === "event" ? "Event menu" : "Task menu"}
 			over={
 				<>
@@ -153,41 +151,32 @@ export const TaskMenu = memo(function TaskMenu() {
 				</>
 			}
 			groups={groups}
-			copyAt={copyAt}
 			panelClass={model.kind === "event" ? "is-event" : shown.layer.page === "picker" ? "is-task is-picker" : "is-task"}
 			page={`${shown.layer.id}:${shown.layer.page}`}
 			keepWidth={model.kind === "event"}
-			holdSplit={shown.layer.asking !== null}
 			peek={model.kind === "task" && model.peek !== null && typing === null ? { content: <PeekText text={model.peek} />, onPress: () => pick({ kind: "row", id: "openFull" }) } : undefined}
 		/>
 	);
 });
 
-/** The groups of a task's menu on its page (the menu itself, Pick a date, the Reminder kinds), and how many stand before the copy. */
-function taskGroups(layer: Layer, typing: boolean, model: TaskMenuModel, steps: MenuSteps): { readonly groups: readonly ReactNode[]; readonly copyAt: number | undefined } {
+/** The groups of a task's menu on its page (the menu itself, Pick a date, the Reminder kinds), all under its copy. */
+function taskGroups(layer: Layer, typing: boolean, model: TaskMenuModel, steps: MenuSteps): readonly ReactNode[] {
 	const { pick } = steps;
 	/** Typing in the menu: the panel gives its room to the field (the plugin's `giveToField`). */
-	if (typing) return { groups: [], copyAt: undefined };
+	if (typing) return [];
 	if (layer.page === "picker")
-		return {
-			groups: [
-				...(model.places.length > 0 ? [<TileGroup key="places" kind="is-place" rows={[model.places.map((list) => ({ label: list.title, icon: PLACE_ICONS[list.id], on: list.on, onPick: () => pick({ kind: "sendTo", list: list.id }) }))]} />] : []),
-				<MonthPage key={`month-${layer.id}`} model={model} pick={pick} />,
-				...(model.date.removable ? [<Row key="remove" label="Remove due date" icon="removeDue" className="tc-picker-remove" onPick={() => pick({ kind: "date", date: null })} />] : []),
-			],
-			copyAt: undefined,
-		};
+		return [
+			...(model.places.length > 0 ? [<TileGroup key="places" kind="is-place" rows={[model.places.map((list) => ({ label: list.title, icon: PLACE_ICONS[list.id], on: list.on, onPick: () => pick({ kind: "sendTo", list: list.id }) }))]} />] : []),
+			<MonthPage key={`month-${layer.id}`} model={model} pick={pick} />,
+			...(model.date.removable ? [<Row key="remove" label="Remove due date" icon="removeDue" className="tc-picker-remove" onPick={() => pick({ kind: "date", date: null })} />] : []),
+		];
 	if (layer.page === "reminders")
-		return {
-			groups: [
-				<Row key="back" label="Reminder" icon="chevronLeft" className="tc-menu-back" lead onPick={() => steps.menuPage("menu")} />,
-				<RowGroup key="kinds" rows={model.reminders.map((r) => ({ label: REMINDER_NAMES[r.kind], icon: r.checked ? "check" : undefined, choice: true, quiet: r.kind === "none", onPick: () => pick({ kind: "reminder", reminder: r.kind }) }))} />,
-			],
-			copyAt: undefined,
-		};
+		return [
+			<Row key="back" label="Reminder" icon="chevronLeft" className="tc-menu-back" lead onPick={() => steps.menuPage("menu")} />,
+			<RowGroup key="kinds" rows={model.reminders.map((r) => ({ label: REMINDER_NAMES[r.kind], icon: r.checked ? "check" : undefined, choice: true, quiet: r.kind === "none", onPick: () => pick({ kind: "reminder", reminder: r.kind }) }))} />,
+		];
 	const asking = layer.asking;
 	const groups: ReactNode[] = [];
-	let copyAt: number | undefined;
 	const tile = (action: Offered) => {
 		const look = lookOf(action);
 		return look ? [{ label: look.label, icon: look.icon, disabled: action.disabled, focus: layer.asked !== null && layer.asked === (action.status ?? (action.id === "delete" ? "delete" : null)), onPick: () => look.onPick(action, steps) }] : [];
@@ -205,7 +194,7 @@ function taskGroups(layer: Layer, typing: boolean, model: TaskMenuModel, steps: 
 				groups.push(<TileGroup key={group} kind="is-priority is-label" rows={tileRows(model.labels.map((label) => ({ label: label.name, icon: "label" as const, color: label.color, on: label.on, disabled: actions[0]?.disabled, onPick: () => pick({ kind: "label", name: label.name }) })))} />);
 				break;
 			case "copy":
-				copyAt = groups.length;
+				/** The copy stands over the whole panel (Decision 120): its place among the groups draws nothing. */
 				break;
 			case "when":
 				groups.push(<TileGroup key={group} kind="is-move is-when" rows={tileRows(actions.flatMap(tile))} />);
@@ -231,7 +220,7 @@ function taskGroups(layer: Layer, typing: boolean, model: TaskMenuModel, steps: 
 				break;
 		}
 	}
-	return { groups, copyAt };
+	return groups;
 }
 
 /**

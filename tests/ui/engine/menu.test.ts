@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { MockPort } from "../../../obsidian/stand/MockPort";
 import { calendarFile, mockFile } from "../../../obsidian/stand/mockData";
 import { LAYER_MS } from "../../../obsidian/ui/engine/layers/motion";
-import { groupsAbove } from "../../../obsidian/ui/engine/layers/split";
+import { blockTop } from "../../../obsidian/ui/engine/layers/block";
 import { monthGrid, monthOf, monthTitle } from "../../../obsidian/ui/engine/layout/month";
 import type { EntryBar, TaskMenuModel } from "../../../obsidian/ui/engine/port";
 import { createScreenStore } from "../../../obsidian/ui/engine/store";
@@ -129,17 +129,13 @@ describe("the stand's task menu, read from the core's table (task actions spec)"
 });
 
 describe("the menu's layout", () => {
-	it("splits a panel too tall for either side: as many first groups over the copy as fit there whole", () => {
-		expect(groupsAbove([100, 200, 300], 400, 500, 500, true)).toBe(0);
-		expect(groupsAbove([100, 200, 300], 400, 500, 100, true)).toBe(4);
-		expect(groupsAbove([100, 200, 300], 400, 250, 250, true)).toBe(2);
-		expect(groupsAbove([100, 200, 300], 400, 150, 150, true)).toBe(1);
-		expect(groupsAbove([100], 400, 150, 300, false)).toBe(0);
-		/** The test Obsidian, 2026-11-20: a calendar task's copy at the window's bottom left its Delete in a part of no height. */
-		expect(groupsAbove([82, 164, 246, 600, 688], 732, 674, 10, true, 44)).toBe(6);
-		expect(groupsAbove([82, 164, 246, 600, 688], 732, 674, 100, true, 44)).toBe(4);
-		/** Room for a few rows under the copy: the split stands, the part under it scrolling. */
-		expect(groupsAbove([82, 164, 246, 600, 688], 900, 472, 218, true, 44)).toBe(3);
+	/** Max, 2026-11-20: the menu is one piece under its task's copy, as iOS's context menu; never split around the copy. */
+	it("stands the block over its task; higher where the room under it can't take the panel; the copy no higher than the window's top", () => {
+		const room = { top: 0, bottom: 800 };
+		expect(blockTop(100, 35, 400, 12, room, 10)).toBe(100);
+		expect(blockTop(600, 35, 400, 12, room, 10)).toBe(800 - 10 - 400 - 12 - 35);
+		expect(blockTop(600, 35, 900, 12, room, 10)).toBe(10);
+		expect(blockTop(600, 35, 0, 12, room, 10)).toBe(600);
 	});
 
 	it("lays tiles in rows of at most three, as even as they go", () => {

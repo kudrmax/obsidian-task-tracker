@@ -100,6 +100,8 @@ export const DESIGN_TOKENS: Readonly<Record<DesignMeasure, string>> = {
 
 /** The custom properties the code sets on elements; styles.css does the arithmetic with them. */
 export const PROPERTY = {
+	/** How far the menu's block stands above the task it opened from: it lifts from the task by that much as it opens. */
+	menuLift: "--tc-menu-lift",
 	listWidth: "--tc-list-width",
 	/** Where the pointer took a carried card, from its left edge: the compact carried plate is drawn around it. */
 	grabX: "--tc-grab-x",

@@ -1,8 +1,8 @@
-import { autoUpdate, flip, FloatingFocusManager, FloatingOverlay, FloatingPortal, hide, type Middleware, type MiddlewareState, offset, type Placement, shift, size, useDismiss, useFloating, useInteractions, useRole, useTransitionStatus } from "@floating-ui/react";
+import { autoUpdate, flip, FloatingFocusManager, FloatingOverlay, FloatingPortal, hide, type Middleware, type MiddlewareState, offset, type Placement, useDismiss, useFloating, useInteractions, useRole, useTransitionStatus } from "@floating-ui/react";
 import { type CSSProperties, createContext, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type MutableRefObject, type ReactNode, useContext, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { DESIGN, LAYOUT } from "../../design";
+import { DESIGN, LAYOUT, PROPERTY } from "../../design";
+import { blockTop } from "./block";
 import { LAYER_MS } from "./motion";
-import { groupsAbove } from "./split";
 
 /**
  * Layers and focus (spec, «The owners»): every menu, popover and sheet is a Floating UI element. It is placed against the
@@ -77,58 +77,40 @@ export interface MenuLayerProps {
 	readonly page: string;
 	/** The start of a description by the copy (F129, F130), and what a tap on it does. */
 	readonly peek?: { readonly content: ReactNode; readonly onPress: () => void };
-	/** A question stands in a group's place: the groups keep the side of the copy they stood on (the plugin's `keepAbove`). */
-	readonly holdSplit?: boolean;
-	/** How many first groups stand over the copy where they fit there (the task menu's `copy` group, Max's order); the rest under it. */
-	readonly copyAt?: number;
 	/** The copy keeps the pressed thing's width (an event wraps its title inside it); otherwise it grows right for its title. */
 	readonly keepWidth?: boolean;
 }
 
-/** A panel keeps its left edge on the copy's unless that would take it closer than the menu's gap to the window's right (the plugin's `placePanel`). */
-const EDGES = { left: 0, right: DESIGN.menuGap, top: DESIGN.wholeMargin, bottom: DESIGN.wholeMargin };
 
 /** How a part of the menu stands while it opens, is open and closes: the design's classes, which its CSS transitions run between. */
 const motionClass = (status: string, ready: boolean) => (status === "open" && ready ? " is-shown" : status === "close" ? " is-closing" : "");
 
 /**
- * The menu over a pressed card, block or event (the plugin's `LiftedMenu`, F110, F297), as Floating UI builds a menu:
- * the backdrop (`FloatingOverlay`), a copy of what was pressed standing exactly over it (its whole title showing, kept
- * inside the window by `shift`), and the panel under the copy, its left edge on the copy's. A panel taller than the room
- * under the copy and over it splits: its first groups, as many as fit whole, stand over the copy and the rest under it,
- * each part scrolling within its room (`groupsAbove`, the plugin's `placePanel`). Escape and a press on the backdrop
- * close it (`useDismiss`).
+ * The menu over a pressed card, block or event (the plugin's `LiftedMenu`, F110, F297), as Floating UI builds a menu, and
+ * as iOS's context menu stands (Max, 2026-11-20, Decision 120): one block, the copy of what was pressed on top (its whole
+ * title showing) and the panel right under it, its left edge on the copy's, never split around the copy. The block stands
+ * over the task; where the room under the task can't take the panel, the whole block stands higher, the copy no higher
+ * than the window's top, and a panel still too tall scrolls within its room. Escape and a press on the backdrop close it
+ * (`useDismiss`).
  *
- * Every part is placed before it is shown (`isPositioned`): it mounts in its closed state at its place, and only then
- * takes `is-shown`, so its CSS transition grows it from the copy (`--tc-menu-rise`, `--tc-menu-scale`) and never slides it
- * in from where it stood unplaced. The parts open together and close together (Floating UI's transition status keeps
- * them mounted while they fade, `LAYER_MS`).
+ * Every part is placed before it is shown (`isPositioned`): it mounts in its closed state at its place, lowered by
+ * `--tc-menu-lift` onto the task, and only then takes `is-shown`, so its CSS transition lifts the block from the task to
+ * its place in one move while the panel grows from the copy's edge (`--tc-menu-rise`, `--tc-menu-scale`); closing, it
+ * goes back down into the task. Another page grows or shrinks the panel in place (`scrollWithin`). The parts open and
+ * close together (Floating UI's transition status keeps them mounted while they fade, `LAYER_MS`).
  */
-export function MenuLayer({ open, onClose, onPressAgain, escapes = true, root, reference, panelBy = null, label, over, groups, panelClass, page, peek, keepWidth = false, holdSplit = false, copyAt }: MenuLayerProps) {
-	const [above, setAbove] = useState(0);
-	const prefer = useRef<number | undefined>(copyAt);
-	prefer.current = copyAt;
-
+export function MenuLayer({ open, onClose, onPressAgain, escapes = true, root, reference, label, over, groups, panelClass, page, peek, keepWidth = false }: MenuLayerProps) {
 	const [overEl, setOverEl] = useState<HTMLElement | null>(null);
 	const parts = useRef<{ upper: HTMLElement | null; lower: HTMLElement | null }>({ upper: null, lower: null });
 	/** The window less the phone's safe areas (`env(safe-area-inset-*)`, the plugin's `menuRoom`): every part stays inside it. */
 	const safe = useRef<HTMLElement | null>(null);
-	const [safeEl, setSafeEl] = useState<HTMLElement | null>(null);
 	const holdSafe = useCallback((el: HTMLDivElement | null) => {
 		safe.current = el;
-		setSafeEl(el);
 	}, []);
-	const within = safeEl ? { boundary: safeEl } : {};
-	const copy = useFloating({
-		open,
-		placement: "bottom-start",
-		strategy: "fixed",
-		transform: false,
-		middleware: [size({ apply: ({ rects, elements }) => void Object.assign(elements.floating.style, { minWidth: `${rects.reference.width}px`, maxWidth: keepWidth ? `${rects.reference.width}px` : "", minHeight: `${rects.reference.height}px` }) }), coverIn(safe)],
-		whileElementsMounted: autoUpdate,
-		elements: { reference },
-	});
-	const lower = useFloating({
+	/** Where the block stood with its panel: typing in the menu (its panel gone, a stack's card the field) keeps it there. */
+	const held = useRef<number | null>(null);
+	/** The block: the copy and the panel under it, one element Floating UI places against the pressed thing. */
+	const block = useFloating({
 		open,
 		onOpenChange: (next) => {
 			if (!next) onClose();
@@ -136,23 +118,21 @@ export function MenuLayer({ open, onClose, onPressAgain, escapes = true, root, r
 		placement: "bottom-start",
 		strategy: "fixed",
 		transform: false,
-		middleware: [offset(DESIGN.menuGap), splitBy(parts, safe, prefer), shift({ padding: EDGES, ...within }), size({ padding: DESIGN.wholeMargin, apply: scrollWithin, ...within })],
+		middleware: [blockIn(safe, parts, keepWidth, held)],
 		whileElementsMounted: autoUpdate,
-		elements: { reference: panelBy ?? overEl },
+		elements: { reference },
 	});
-	const upper = useFloating({
-		open,
-		placement: "top-start",
-		strategy: "fixed",
-		transform: false,
-		middleware: [offset(DESIGN.menuGap), shift({ padding: EDGES, ...within }), size({ padding: DESIGN.wholeMargin, apply: scrollWithin, ...within })],
-		whileElementsMounted: autoUpdate,
-		elements: { reference: panelBy ?? overEl },
-	});
-	const count = Math.min(above, groups.length);
+	const placed = block.middlewareData.block as BlockPlace | undefined;
+	/** Another page measures and places the block again (its panel's own height is set from the page, which the size observer misses). */
+	const placeBlock = block.update;
+	useLayoutEffect(() => placeBlock(), [page, groups.length, placeBlock]);
+	/** Where the block last stood while open: closing, it goes back down into the task from there, though the card under it is gone meanwhile (Rename turns the card into the field in the same tap, F132). */
+	const stood = useRef<{ styles: CSSProperties; spot: BlockPlace | undefined }>({ styles: {}, spot: undefined });
+	if (open && block.isPositioned) stood.current = { styles: block.floatingStyles, spot: placed };
+	const shown = open ? { styles: block.floatingStyles, spot: placed } : stood.current;
 	/** Floating UI keeps a middleware whose code reads the same, so what changes between renders is read through a ref. */
-	const split = useRef({ count, total: groups.length });
-	split.current = { count, total: groups.length };
+	const split = useRef({ count: 0, total: groups.length });
+	split.current = { count: 0, total: groups.length };
 	const peeking = useFloating({
 		open,
 		placement: "top-start",
@@ -163,30 +143,18 @@ export function MenuLayer({ open, onClose, onPressAgain, escapes = true, root, r
 		elements: { reference: overEl },
 	});
 	const placePeek = peeking.update;
-	/** The panel split or joined: the description goes by it again. */
-	useLayoutEffect(() => placePeek(), [count, placePeek]);
+	/** The block placed again: the description goes by it again. */
+	useLayoutEffect(() => placePeek(), [placed?.y, placePeek]);
 	const peekSide = peeking.middlewareData.peek as { under: boolean; away: boolean } | undefined;
-	const wanted = (lower.middlewareData.split as { above?: number } | undefined)?.above;
-	/** A new page is laid out afresh: until its split is measured, nothing of it shows. */
-	useLayoutEffect(() => setAbove(0), [page]);
 	/** Another page (a subtask's menu in the same sheet too) takes the focus as the first did: a press on a stack's card gave it to nothing. */
 	const firstPage = useRef(page);
 	useEffect(() => {
-		if (page !== firstPage.current) lower.refs.floating.current?.focus({ preventScroll: true });
-	}, [page, lower.refs.floating]);
-	useLayoutEffect(() => {
-		if (!holdSplit && wanted !== undefined && wanted !== above) setAbove(wanted);
-	}, [wanted, above, holdSplit]);
-	const { isMounted, status } = useTransitionStatus(lower.context, { duration: { open: LAYER_MS.open, close: LAYER_MS.close } });
-	/**
-	 * Each part follows what it stands by while the menu is open; closing, it stays where it last stood as it fades out,
-	 * though the card under it is gone meanwhile (Rename turns the card into the field in the same tap, F132).
-	 */
-	const stood = useRef<Record<string, CSSProperties>>({});
-	const at = (part: string, styles: CSSProperties, placed: boolean): CSSProperties => {
-		if (open && placed) stood.current[part] = styles;
-		return open ? styles : (stood.current[part] ?? styles);
-	};
+		if (page !== firstPage.current) parts.current.lower?.focus({ preventScroll: true });
+	}, [page]);
+	const { isMounted, status } = useTransitionStatus(block.context, { duration: { open: LAYER_MS.open, close: LAYER_MS.close } });
+	const peekStood = useRef<CSSProperties>({});
+	const shownOnce = useRef(false);
+	if (open && peeking.isPositioned) peekStood.current = peeking.floatingStyles;
 	/**
 	 * A mouse's second press soon after the click that opened the menu is a double click (the plugin's `onClickedAgain`):
 	 * the press selects no word of the copy and its click reaches nothing, the backdrop's closing too.
@@ -206,51 +174,40 @@ export function MenuLayer({ open, onClose, onPressAgain, escapes = true, root, r
 		},
 	};
 	/** Closed by the click, not the press: the finger's tap ends on the backdrop, never on a card under the fading menu. */
-	const dismiss = useDismiss(lower.context, { escapeKey: escapes, outsidePressEvent: "click", outsidePress: (event) => !taken.current && !(event.target instanceof Element && ([overEl, parts.current.upper, parts.current.lower].some((part) => part?.contains(event.target as Node)) || event.target.closest(".tc-quick-bar, .tc-quick-panel"))) });
-	const { getFloatingProps } = useInteractions([dismiss, useRole(lower.context, { role: "menu" })]);
+	const dismiss = useDismiss(block.context, { escapeKey: escapes, outsidePressEvent: "click", outsidePress: (event) => !taken.current && !(event.target instanceof Element && (block.refs.floating.current?.contains(event.target) || event.target.closest(".tc-quick-bar, .tc-quick-panel"))) });
+	const { getFloatingProps } = useInteractions([dismiss, useRole(block.context, { role: "menu" })]);
 	if (!isMounted) return null;
-	const settled = holdSplit || wanted === count || (wanted !== undefined && wanted >= groups.length && count === groups.length);
-	const ready = copy.isPositioned && (count === groups.length || lower.isPositioned) && (count === 0 || upper.isPositioned) && (!peek || peeking.isPositioned) && settled;
-	const motion = motionClass(status, ready);
-	const panel = `tc-panel is-menu ${panelClass}`;
+	/** Shown once it stands where its page measured it: the panel's groups counted in the block's place (none while typing in the menu). */
+	const ready = block.isPositioned && placed !== undefined && placed.groups === groups.length && (!peek || peeking.isPositioned);
+	/** Shown once, the menu stays shown while its pages change: only its first showing waits to be placed. */
+	if (status === "open" && ready) shownOnce.current = true;
+	const motion = motionClass(status, ready || (status === "open" && shownOnce.current));
+	const look = shown.spot;
 	return (
 		<FloatingPortal root={root}>
 			<FloatingOverlay className={`tc-backdrop tc-menu-layer${motion}`} {...pressed} />
-			<div className={`tc-level tc-menu-layer${motion}`} {...pressed}>
+			<div className={`tc-level tc-menu-layer${motion}`} style={{ [PROPERTY.menuLift]: `${look?.lift ?? 0}px` } as CSSProperties} {...pressed}>
 				<div ref={holdSafe} className="tc-safe-room" aria-hidden="true" />
-				<div ref={(el) => {
-					copy.refs.setFloating(el);
-					setOverEl(el);
-				}} style={at("copy", copy.floatingStyles, copy.isPositioned)} className="tc-menu-over">
-					{over}
-				</div>
-				<FloatingFocusManager context={lower.context} modal={false} initialFocus={-1}>
-					<div>
-						{count > 0 ? (
-							<div ref={(el) => {
-								upper.refs.setFloating(el);
-								parts.current.upper = el;
-							}} style={at("upper", upper.floatingStyles, upper.isPositioned)} className={`${panel} is-above${motion}`} aria-label={label} role="menu">
-								{groups.slice(0, count)}
-							</div>
-						) : null}
-						{count < groups.length ? (
-							<div ref={(el) => {
-								lower.refs.setFloating(el);
+				<FloatingFocusManager context={block.context} modal={false} initialFocus={-1}>
+					<div ref={block.refs.setFloating} style={shown.styles} className="tc-menu-block" aria-label={label} {...getFloatingProps()}>
+						<div ref={setOverEl} className="tc-menu-over" style={look ? { minWidth: `${look.coverWidth}px`, maxWidth: keepWidth ? `${look.coverWidth}px` : undefined, minHeight: `${look.coverHeight}px` } : undefined}>
+							{over}
+						</div>
+						<div
+							ref={(el) => {
 								parts.current.lower = el;
-							}} style={at("lower", lower.floatingStyles, lower.isPositioned)} className={`${panel}${motion}`} aria-label={label} {...getFloatingProps()}>
-								{groups.slice(count)}
-							</div>
-						) : (
-							<div ref={(el) => {
-								lower.refs.setFloating(el);
-								parts.current.lower = el;
-							}} style={lower.floatingStyles} className="tc-menu-measure" {...getFloatingProps()} />
-						)}
+							}}
+							tabIndex={-1}
+							role="menu"
+							className={`tc-panel is-menu ${panelClass}${motion}${groups.length === 0 ? " is-empty" : ""}`}
+							style={look ? { marginLeft: `${look.panelShift}px`, height: `${look.panelHeight}px` } : undefined}
+						>
+							{groups}
+						</div>
 					</div>
 				</FloatingFocusManager>
 				{peek ? (
-					<div ref={peeking.refs.setFloating} style={at("peek", peeking.floatingStyles, peeking.isPositioned)} className={`tc-desc-peek${peekSide?.under ? " is-under" : ""}${peekSide?.away ? " is-away" : ""}${motion}`} onClick={peek.onPress}>
+					<div ref={peeking.refs.setFloating} style={open ? peeking.floatingStyles : peekStood.current} className={`tc-desc-peek${peekSide?.under ? " is-under" : ""}${peekSide?.away ? " is-away" : ""}${motion}`} onClick={peek.onPress}>
 						{peek.content}
 					</div>
 				) : null}
@@ -259,19 +216,51 @@ export function MenuLayer({ open, onClose, onPressAgain, escapes = true, root, r
 	);
 }
 
+/** Where the menu's block stands and how its parts are sized, as `blockIn` measures them. */
+interface BlockPlace {
+	readonly y: number;
+	/** How far above the task it opened from: it lifts from the task by that much as it opens. */
+	readonly lift: number;
+	/** The copy at least the pressed thing's size. */
+	readonly coverWidth: number;
+	readonly coverHeight: number;
+	/** The panel's shift left to stay inside the window, its room under the copy (where it scrolls) and its height. */
+	readonly panelShift: number;
+	readonly panelRoom: number;
+	readonly panelHeight: number;
+	/** How many groups its page had when measured. */
+	readonly groups: number;
+}
+
 /**
- * The copy stands exactly over what was pressed (its size the pressed thing's at least: `size`); grown for its title, it
- * moves left and up only as far as it must to stay inside the window less its margin, never past where the pressed thing
- * already reached (the core's `grownStart`).
+ * The block over the pressed thing (Decision 120): its copy right over it, at least its size, grown for its title only as
+ * far left and up as the window less its margin makes it (the core's `grownStart`); the panel under the copy as tall as
+ * its page, the whole block standing higher where the room under the task can't take it (`blockTop`), the panel keeping to
+ * what room is left, where it scrolls, and shifted left to stay inside the window.
  */
-function coverIn(safe: MutableRefObject<HTMLElement | null>): Middleware {
+function blockIn(safe: MutableRefObject<HTMLElement | null>, parts: MutableRefObject<{ upper: HTMLElement | null; lower: HTMLElement | null }>, keepWidth: boolean, held: MutableRefObject<number | null>): Middleware {
 	return {
-		name: "cover",
+		name: "block",
 		async fn(state) {
-			const { rects } = state;
+			const { rects, platform, elements } = state;
 			const room = await roomOf(state, safe);
+			const copyEl = elements.floating.firstElementChild;
+			const panelEl = parts.current.lower;
+			const copy = copyEl ? await platform.getDimensions(copyEl) : { width: rects.reference.width, height: rects.reference.height };
+			const copyWidth = keepWidth ? rects.reference.width : Math.max(copy.width, rects.reference.width);
+			const copyHeight = Math.max(copy.height, rects.reference.height);
 			const start = (at: number, size: number, grown: number, from: number, to: number) => Math.max(Math.min(at, from + DESIGN.wholeMargin), Math.min(at, Math.max(at + size, to - DESIGN.wholeMargin) - grown));
-			return { x: start(rects.reference.x, rects.reference.width, rects.floating.width, room.left, room.right), y: start(rects.reference.y, rects.reference.height, rects.floating.height, room.top, room.bottom) };
+			const x = start(rects.reference.x, rects.reference.width, copyWidth, room.left, room.right);
+			const over = start(rects.reference.y, rects.reference.height, copyHeight, room.top, room.bottom);
+			const groups = panelEl ? [...panelEl.children] : [];
+			const page = (await Promise.all(groups.map(async (group) => (await platform.getDimensions(group)).height))).reduce((a, b) => a + b, 0);
+			const panelWidth = panelEl ? (await platform.getDimensions(panelEl)).width : 0;
+			const y = groups.length === 0 && held.current !== null ? held.current : blockTop(over, copyHeight, page, DESIGN.menuGap, room, DESIGN.wholeMargin);
+			if (groups.length > 0) held.current = y;
+			const panelRoom = Math.max(0, room.bottom - DESIGN.wholeMargin - (y + copyHeight + DESIGN.menuGap));
+			const panelShift = Math.min(0, room.right - DESIGN.menuGap - (x + panelWidth));
+			const data: BlockPlace = { y, lift: rects.reference.y - y, coverWidth: rects.reference.width, coverHeight: rects.reference.height, panelShift, panelRoom, panelHeight: Math.min(panelRoom, page), groups: groups.length };
+			return { x, y, data };
 		},
 	};
 }
@@ -338,33 +327,6 @@ function peekPlace(parts: MutableRefObject<{ upper: HTMLElement | null; lower: H
 	};
 }
 
-/** A part taller than its room keeps to it and scrolls (the plugin's `keepWithin`). */
-function scrollWithin({ availableHeight, elements }: { availableHeight: number; elements: { floating: HTMLElement } }): void {
-	const floating = elements.floating;
-	floating.style.maxHeight = `${Math.max(0, availableHeight)}px`;
-}
-
-/**
- * How many of the panel's groups stand over the copy (the plugin's `groupsAbove` over its `placePanel`): measured by
- * Floating UI as the panel is placed, each group's height wherever it stands now, against the room over and under the copy.
- */
-function splitBy(parts: MutableRefObject<{ upper: HTMLElement | null; lower: HTMLElement | null }>, safe: MutableRefObject<HTMLElement | null>, prefer: MutableRefObject<number | undefined>): Middleware {
-	return {
-		name: "split",
-		async fn(state) {
-			const { rects, platform } = state;
-			const groups = [parts.current.upper, parts.current.lower].flatMap((part) => (part ? [...part.children] : []));
-			/** As one panel would stand: a group drawn first in its part has no band over it, every group but the panel's first has one. */
-			const heights = await Promise.all(groups.map(async (group, i) => (await platform.getDimensions(group)).height - (group.previousElementSibling ? DESIGN.menuBand : 0) + (i > 0 ? DESIGN.menuBand : 0)));
-			const cuts = heights.slice(0, -1).map((_, i) => heights.slice(0, i + 1).reduce((a, b) => a + b, 0));
-			const total = heights.reduce((a, b) => a + b, 0);
-			const bounds = await roomOf(state, safe);
-			const roomOver = rects.reference.y - DESIGN.menuGap - DESIGN.wholeMargin - bounds.top;
-			const roomUnder = bounds.bottom - (rects.reference.y + rects.reference.height) - DESIGN.menuGap - DESIGN.wholeMargin;
-			return { data: { above: groupsAbove(cuts, total, roomOver, roomUnder, groups.length > 1, DESIGN.menuRow, prefer.current) } };
-		},
-	};
-}
 
 export interface PinnedProps {
 	/** The element it stands on. */
