@@ -160,7 +160,7 @@ describe("overlapping events", () => {
 
 /** The review of E3: a dot's gesture is only an edge and a minute; the port says the rest. */
 describe("a dot's gesture", () => {
-	const block: Block = { id: "a", start: 600, length: null, clock: "15:00", endClock: null, startParts: ["15", "00"], lengthParts: null, step: null };
+	const block: Block = { id: "a", start: 600, length: null, clock: "15:00", endClock: null, startParts: ["15", "00"], lengthParts: null };
 	it("starts from where the dot stands: the top one at the start, the bottom one at the end (a task without a length: its start)", () => {
 		expect(edgeMinute(block, "start")).toBe(600);
 		expect(edgeMinute(block, "end")).toBe(600);

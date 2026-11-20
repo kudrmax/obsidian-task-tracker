@@ -29,6 +29,13 @@ export interface CardFace {
 	readonly description: boolean;
 	/** The corner: a due date's day over its month; null when none shows. */
 	readonly due: { readonly day: string; readonly month: string } | null;
+	/**
+	 * A folded task's next open step (F79, F94): in a list drawn under the task's own title, which goes small over it; on the
+	 * calendar it names the block alone. Null: no step shows, the task's own title is its name everywhere.
+	 */
+	readonly step: string | null;
+	/** Its subtasks are folded away under its card: a card peeks out under it in a list (F81). */
+	readonly folded: boolean;
 }
 
 /** A row of a list, top to bottom: a task's card at its depth (0 a task, 1 its subtask…), or a section's header. */
@@ -57,8 +64,6 @@ export interface Block {
 	/** What its corner writes: the start as hours over minutes (in a stack), the length as a number over its unit (shorter than a card). */
 	readonly startParts: readonly [string, string];
 	readonly lengthParts: readonly [string, string] | null;
-	/** A folded task's next open step, which names its block; null: the task's own title. */
-	readonly step: string | null;
 }
 
 /** How an event is painted in one theme: its ground, its bar and its title (CSS colours). */

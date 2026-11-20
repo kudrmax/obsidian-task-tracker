@@ -107,12 +107,29 @@ describe("the stand's port onto and off the calendar (spec, Decisions 25)", () =
 	});
 	it("a folded task's block is named by its next open step (F94); events: the one over is past", () => {
 		const { port } = calendar();
-		expect(blockOf(port, "Переезд")?.step).toBe("Упаковать книги");
+		expect(port.read(0).cards[blockOf(port, "Переезд")?.id ?? ""]?.step).toBe("Упаковать книги");
 		const events = port.read(0).day.events;
 		expect(events.find((e) => e.title === "Стендап")?.past).toBe(true);
 		expect(events.find((e) => e.title === "Звонок с клиентом")?.past).toBe(false);
 		expect(port.read(-1).day.events.every((e) => e.past)).toBe(true);
 		expect(port.read(0).day.allDay.map((e) => e.title)).toEqual(["День рождения Кости"]);
+	});
+	/**
+	 * Max, 2026-11-20 (the stand's review, #6): «Переезд» carried onto the calendar turned into «Упаковать книги». The block
+	 * is named by the folded task's next step (F94), while the list's card drew the task's own title alone; one card face
+	 * names both, so the list's card shows the same step under the task's title (F79), off the calendar and back.
+	 */
+	it("a folded task's card names its next step in a list as its block does on the calendar, carried both ways", async () => {
+		const { port } = calendar();
+		const id = blockOf(port, "Переезд")?.id ?? "";
+		await port.move(id, { list: "day", before: null, dayOffset: 0 });
+		const inList = port.read(0);
+		expect(inList.day.blocks.some((b) => b.id === id)).toBe(false);
+		expect(inList.lists.day.rows.some((row) => row.kind === "task" && row.id === id)).toBe(true);
+		expect(inList.cards[id]).toMatchObject({ title: "Переезд", step: "Упаковать книги", folded: true });
+		await port.move(id, { list: "day", before: null, dayOffset: 0, at: 600 });
+		expect(port.read(0).cards[id]).toMatchObject({ title: "Переезд", step: "Упаковать книги", folded: true });
+		expect(port.read(0).cards[idOf(port, "Разобрать почту")]).toMatchObject({ step: null, folded: false });
 	});
 	it("a preview counts a write not yet read back", async () => {
 		const { port } = calendar(300);
