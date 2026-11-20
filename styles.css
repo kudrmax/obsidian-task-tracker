@@ -423,6 +423,8 @@ body {
 	--tc-menu-title-h: 40px;
 	--tc-group-gap: var(--tc-space-8);
 	--tc-band: var(--tc-group-gap) solid var(--tc-gap-ink);
+	/* The engine's menu parts its groups by the panel's own ground alone (Max, 2026-11-20: one grey stripe, no black band). */
+	--tc-band-quiet: var(--tc-group-gap) solid transparent;
 	--tc-menu-icon: var(--tc-icon-l);
 	--tc-back-icon: var(--tc-icon-m);
 	/* The task menu's tiles: the statuses and the priority levels, the icon over the label. */
@@ -1932,6 +1934,7 @@ body:not(.is-mobile) .tc-drag-source:focus-visible > :is(.tc-card, .tc-block-car
 .tc-menu-over .tc-event { --tc-event-bg: var(--tc-event-bg-dark); --tc-event-bar: var(--tc-event-bar-dark); --tc-event-text: var(--tc-event-text-dark); }
 body.theme-light .tc-menu-over .tc-event { --tc-event-bg: var(--tc-event-bg-light); --tc-event-bar: var(--tc-event-bar-light); --tc-event-text: var(--tc-event-text-light); }
 .tc-level.tc-menu-layer .tc-panel { bottom: auto; overflow-y: auto; overscroll-behavior: contain; }
+.tc-level.tc-menu-layer { --tc-band: var(--tc-band-quiet); }
 .tc-menu-measure { position: fixed; width: 0; height: 0; pointer-events: none; }
 /* A label, a task's name in a question or a row's value too long for its room fades out at the right, as the plugin marks it: the box scrolls only when its text is cut, and only then its scroll timeline runs the fade. */
 @keyframes tc-cut-tile { from, to { text-align: left; -webkit-mask-image: var(--tc-fade-tile-end); mask-image: var(--tc-fade-tile-end); } }
