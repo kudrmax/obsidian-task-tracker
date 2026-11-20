@@ -79,6 +79,8 @@ export interface MenuLayerProps {
 	readonly peek?: { readonly content: ReactNode; readonly onPress: () => void };
 	/** The copy keeps the pressed thing's width (an event wraps its title inside it); otherwise it grows right for its title. */
 	readonly keepWidth?: boolean;
+	/** The block stands higher than what was pressed, or right over it: what is pinned on the pressed thing goes or stays. */
+	readonly onLift?: (lifted: boolean) => void;
 }
 
 
@@ -99,7 +101,7 @@ const motionClass = (status: string, ready: boolean) => (status === "open" && re
  * goes back down into the task. Another page grows or shrinks the panel in place (`scrollWithin`). The parts open and
  * close together (Floating UI's transition status keeps them mounted while they fade, `LAYER_MS`).
  */
-export function MenuLayer({ open, onClose, onPressAgain, escapes = true, root, reference, label, over, groups, panelClass, page, peek, keepWidth = false }: MenuLayerProps) {
+export function MenuLayer({ open, onClose, onPressAgain, escapes = true, root, reference, label, over, groups, panelClass, page, peek, keepWidth = false, onLift }: MenuLayerProps) {
 	const [overEl, setOverEl] = useState<HTMLElement | null>(null);
 	const parts = useRef<{ upper: HTMLElement | null; lower: HTMLElement | null }>({ upper: null, lower: null });
 	/** The window less the phone's safe areas (`env(safe-area-inset-*)`, the plugin's `menuRoom`): every part stays inside it. */
@@ -130,6 +132,8 @@ export function MenuLayer({ open, onClose, onPressAgain, escapes = true, root, r
 	const stood = useRef<{ styles: CSSProperties; spot: BlockPlace | undefined }>({ styles: {}, spot: undefined });
 	if (open && block.isPositioned) stood.current = { styles: block.floatingStyles, spot: placed };
 	const shown = open ? { styles: block.floatingStyles, spot: placed } : stood.current;
+	const isLifted = open && Math.abs(placed?.lift ?? 0) > 0.5;
+	useLayoutEffect(() => onLift?.(isLifted), [isLifted, onLift]);
 	/** Floating UI keeps a middleware whose code reads the same, so what changes between renders is read through a ref. */
 	const split = useRef({ count: 0, total: groups.length });
 	split.current = { count: 0, total: groups.length };

@@ -23,7 +23,8 @@ export default {
 			await t.cdp.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
 			await t.sleep(400);
 		};
-		const block = (title) => t.cdp.eval(`(() => { const el = [...document.querySelectorAll("[data-block]")].find((b) => b.textContent.includes(${JSON.stringify(title)})); el.scrollIntoView({ block: "center" }); const r = el.getBoundingClientRect(); return { x: r.left + 20, y: r.top + 12 }; })()`);
+		/** High on the calendar, so the menu's block stands right over it and its dots stay (Decision 120: a lifted block's dots go). */
+		const block = (title) => t.cdp.eval(`(() => { const el = [...document.querySelectorAll("[data-block]")].find((b) => b.textContent.includes(${JSON.stringify(title)})); el.scrollIntoView({ block: "start" }); const r = el.getBoundingClientRect(); return { x: r.left + 20, y: r.top + 12 }; })()`);
 		const grips = () => t.cdp.eval(`[...document.querySelectorAll(".tc-grip")].map((g) => g.dataset.grip)`);
 		const cutLabels = () => t.cdp.eval(`[...document.querySelectorAll(".tc-menu-tile-label")].filter((l) => l.scrollWidth > l.clientWidth + 1).map((l) => l.textContent)`);
 		const calendar = async () => {
@@ -41,7 +42,9 @@ export default {
 			await esc();
 			await tap(await block("Упаковать книги"));
 			await t.sleep(450);
-			t.expect(JSON.stringify(await grips()) === JSON.stringify(["start"]), `under a menu showing its subtasks the bottom dot lies under the stack, no card's title covered (the audit's 13): ${JSON.stringify(await grips())}`);
+			/** A menu with a stack is tall: where its block lifts from the task its dots go (Decision 120); where it stands over it, the bottom dot lies under the stack. */
+			const lifted = await t.cdp.eval(`Math.abs(parseFloat(document.querySelector(".tc-level.tc-menu-layer")?.style.getPropertyValue("--tc-menu-lift") || "0")) > 0.5`);
+			t.expect(JSON.stringify(await grips()) === JSON.stringify(lifted ? [] : ["start"]), `under a menu showing its subtasks no dot covers a card's title (the audit's 13): ${JSON.stringify(await grips())}, lifted ${lifted}`);
 		}
 		if (item === "folded block") {
 			await calendar();

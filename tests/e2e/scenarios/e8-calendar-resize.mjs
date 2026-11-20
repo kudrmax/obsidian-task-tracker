@@ -24,6 +24,9 @@ export default {
 		const menu = () => t.cdp.eval(`!!document.querySelector(".tc-menu-layer .tc-panel:not(.is-closing)")`);
 		/** Taps a task: its menu opens and its dots show. */
 		const open = async (title) => {
+			/** High on the calendar, so the menu's block stands right over the task and its dots stay (Decision 120: a lifted block's dots go). */
+			await t.cdp.eval(`(() => { const el = [...document.querySelectorAll("[data-block]")].find((b) => b.textContent.includes(${JSON.stringify(title)})); el.scrollIntoView({ block: "start" }); return 1; })()`);
+			await t.sleep(300);
 			const block = await cal.blockBy(title);
 			await cal.tap({ x: block.x, y: block.y });
 			await t.sleep(400);
@@ -100,7 +103,9 @@ export default {
 		await t.sleep(300);
 		t.expect((await grip("start")) === null, "a tap elsewhere lets the selection go");
 
-		/** F106: a long press on a task, let go unmoved, selects it with its menu. */
+		/** F106: a long press on a task, let go unmoved, selects it with its menu; high on the calendar, so the menu's block stands over it and its dots stay (Decision 120). */
+		await t.cdp.eval(`(() => { const el = [...document.querySelectorAll("[data-block]")].find((b) => b.textContent.includes("Ревью дизайна")); el.scrollIntoView({ block: "start" }); return 1; })()`);
+		await t.sleep(300);
 		const review = await cal.blockBy("Ревью дизайна");
 		if (t.platform === "phone") {
 			await t.cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: review.x, y: review.y, id: 0 }] });

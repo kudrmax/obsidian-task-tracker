@@ -98,6 +98,8 @@ export interface ScreenState {
 	readonly entryText: string;
 	/** The bar's panel open over it: one at a time; every new field, or the field moved, opens with none. */
 	readonly entryPanel: BarPanelKind | null;
+	/** The open menu's block stands higher than its task (Decision 120): its copy is not over the task, so the task's dots go. */
+	readonly menuLifted: boolean;
 	/** Counts the fields opened: each new one (after Enter) is a fresh, empty field. */
 	readonly entrySeq: number;
 	/** Tasks new in the last read: their rows come in; a row merely scrolled into sight does not. */
@@ -196,6 +198,8 @@ export interface ScreenActions {
 	entryBar(field: EntryField, draft: EntryDraft, text: string): EntryBar;
 	/** Opens a panel of the bar (null: closes it). */
 	showEntryPanel(panel: BarPanelKind | null): void;
+	/** The menu's block lifted from its task, or standing right over it. */
+	liftMenu(lifted: boolean): void;
 	/** Escape in the field: a panel open closes, and only it; else the field closes writing nothing (F181). */
 	escapeEntry(): void;
 	/** The field's text as typed. */
@@ -313,6 +317,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 			draft: NO_DRAFT,
 			entryText: "",
 			entryPanel: null,
+			menuLifted: false,
 			entrySeq: 0,
 			plusAt: null,
 			plusMinute: null,
@@ -522,6 +527,9 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 			},
 			entryBar(field, draft, text) {
 				return port.entryBar(field, draft, text);
+			},
+			liftMenu(menuLifted) {
+				if (get().menuLifted !== menuLifted) set({ menuLifted });
 			},
 			showEntryPanel(entryPanel) {
 				if (get().entryPanel !== entryPanel) set({ entryPanel });

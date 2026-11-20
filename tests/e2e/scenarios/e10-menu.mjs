@@ -96,6 +96,9 @@ export default {
 		if (item === "calendar") {
 			await t.setClock("12:00");
 			await t.cdp.eval(`(async () => { window.__tcStand.step("step-calendar"); await new Promise((r) => setTimeout(r, 700)); return 1; })()`);
+			/** High on the calendar, so the menu's block stands right over it and its dots stay (Decision 120). */
+			await t.cdp.eval(`(() => { const el = [...document.querySelectorAll("[data-block]")].find((b) => b.textContent.includes("Обед")); el.scrollIntoView({ block: "start" }); return 1; })()`);
+			await t.sleep(300);
 			const block = await t.cdp.eval(`(() => { const el = [...document.querySelectorAll("[data-block]")].find((b) => b.textContent.includes("Обед")); const r = el.getBoundingClientRect(); return { x: r.left + 20, y: r.top + 12, left: r.left, top: r.top, width: r.width, height: r.height }; })()`);
 			const opening = await menuFrames(t, () => tap(block), 900);
 			t.expect(openingFaults(opening, block).length === 0, `a block's menu opens from the block: ${JSON.stringify(openingFaults(opening, block).slice(0, 6))}`);
