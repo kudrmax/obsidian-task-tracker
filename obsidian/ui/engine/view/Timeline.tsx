@@ -13,7 +13,7 @@ import { Card, PressedLook } from "./Card";
 import { useHost } from "./host";
 import { MovingRow } from "./MovingRow";
 import { EntryField } from "./QuickAdd";
-import { DaySlide } from "./Slide";
+import { DayChange, DaySlide } from "./Slide";
 
 const px = (n: number) => `${n}px`;
 const at = (minute: number, scale: TimeScale) => ({ [PROPERTY.y]: px(scale.y(minute)) }) as CSSProperties;
@@ -90,17 +90,18 @@ export const Timeline = memo(function Timeline() {
 	const opens = useMemo(() => (measured && opened.isToday ? opening(scale.y(opened.minute), DESIGN.dayHours * scale.hourPx, measured.visible) : null), [measured, opened, scale]);
 	/** The browser's reveal of a mark: put at the top of the room, less its scroll margin. */
 	const reveal = useCallback((el: HTMLElement | null) => el?.scrollIntoView({ block: "start", inline: "nearest" }), []);
-	/** The days drawn: a turn's, or the one this calendar shows. */
-	const days = turn?.days ?? [own ?? dayOffset];
+	/** The day drawn: the one this calendar shows; as the days turn it changes as the list lands (`DayChange`). */
+	const shownDay = own ?? dayOffset;
+	const way = useWay(shownDay);
 	/** An hour's label gives way to the now line while today is drawn. */
-	const todayDrawn = turn ? days.includes(0) : day.isToday;
+	const todayDrawn = day.isToday;
 	const nearNow = (minute: number) => todayDrawn && Math.abs(scale.y(minute) - scale.y(now.minute)) < TimeScale.NEAR_NOW;
 	const marks = useMemo(() => scale.marks(), [scale]);
 	const canvas = { [PROPERTY.hour]: px(scale.hourPx), [PROPERTY.stackEnd]: px(end) } as CSSProperties;
-	const layers = days.map((d) => <DayItems key={d} day={d} turn={turn} scale={scale} shown={d === (own ?? dayOffset)} now={now} />);
+	const layers = <DayItems key={shownDay} day={shownDay} turn={turn} scale={scale} shown now={now} />;
 	return (
 		<CalendarBlocks ids={ids}>
-			<AllDayBand days={days} turn={turn} shownDay={own ?? dayOffset} />
+			<AllDayBand day={shownDay} way={way} turn={turn} />
 			<div className="tc-timeline" data-timeline="" data-hour-px={scale.hourPx} data-step={scale.step} style={{ [PROPERTY.allDayExtraRows]: String(Math.max(0, day.allDay.length - 1)) } as CSSProperties} ref={setRoom}>
 				<div className="tc-foot-probe" ref={foot} />
 				<div className={`tc-canvas${placedBy === "scale" ? " is-rescaled" : ""}`} style={canvas} ref={setCanvas} {...slot.listeners}>
@@ -127,7 +128,13 @@ export const Timeline = memo(function Timeline() {
 					) : (
 						<div key="opens" className="tc-reveal" style={{ ...at(opened.opensAt, scale), [PROPERTY.anchorOffset]: px(DESIGN.labelLift) } as CSSProperties} ref={reveal} />
 					)}
-					{turn ? layers : <DayContext.Provider value={own}>{layers}</DayContext.Provider>}
+					{turn ? (
+						<DayChange day={shownDay} way={way}>
+							{layers}
+						</DayChange>
+					) : (
+						<DayContext.Provider value={own}>{layers}</DayContext.Provider>
+					)}
 				</div>
 			</div>
 		</CalendarBlocks>
@@ -169,10 +176,10 @@ function DayItemsOf({ day: offset, turn, scale, shown, now }: { readonly day: nu
 	const order = useMemo(() => day.blocks.map((b) => `${b.id}@${b.start}+${b.length}`).join(" "), [day.blocks]);
 	const top = events.length + boxes.length;
 	const shades = useShades(boxes, day.blocks, events.length, top, plusMinute === null);
-	const turning = turn?.at ?? null;
+	const change = turn !== null;
 	return (
 		<>
-			<DaySlide day={offset} at={turning} window="own" className="tc-items">
+			<DaySlide day={offset} at={null} change={change} window="own" className="tc-items">
 				{day.events.map((event, i) => (
 					<EventItem key={event.id} event={event} box={events[i]} scale={scale} />
 				))}
@@ -182,7 +189,7 @@ function DayItemsOf({ day: offset, turn, scale, shown, now }: { readonly day: nu
 				{extra === null ? null : <NewPlace minute={extra} box={boxes[boxes.length - 1]} z={top} field={plusMinute === null} />}
 			</DaySlide>
 			{day.isToday ? (
-				<DaySlide day={offset} at={turning} window="now" className="tc-now-lane">
+				<DaySlide day={offset} at={null} change={change} window="now" className="tc-now-lane">
 					<div className="tc-now" style={at(now.minute, scale)}>
 						<span className="tc-now-pill">{now.label}</span>
 						<div className="tc-now-line" />
@@ -197,26 +204,26 @@ function DayItemsOf({ day: offset, turn, scale, shown, now }: { readonly day: nu
  * The all-day rows over the calendar: the band and its line stand; each day's rows slide with its items. The shown day's
  * rows hold the band's height (a shown day without any has no band); a day coming in lies over it.
  */
-function AllDayBand({ days, turn, shownDay }: { readonly days: readonly number[]; readonly turn: DayTurn | null; readonly shownDay: number }) {
+function AllDayBand({ day, way, turn }: { readonly day: number; readonly way: number; readonly turn: DayTurn | null }) {
 	const rows = useData((d) => d.day.allDay);
 	if (!turn || rows.length === 0) return <AllDayRows rows={rows} />;
 	return (
 		<div className="tc-allday-rows">
 			<div className="tc-allday-backing" />
-			{days.map((day) => (
-				<DayContext.Provider key={day} value={day}>
-					<AllDayOf day={day} turn={turn} lying={day !== shownDay} />
+			<DayChange day={day} way={way}>
+				<DayContext.Provider value={day}>
+					<AllDayOf day={day} />
 				</DayContext.Provider>
-			))}
+			</DayChange>
 		</div>
 	);
 }
 
-function AllDayOf({ day, turn, lying }: { readonly day: number; readonly turn: DayTurn; readonly lying: boolean }) {
+function AllDayOf({ day }: { readonly day: number }) {
 	const rows = useData((d) => d.day.allDay);
 	const open = useOpenMenu();
 	return (
-		<DaySlide day={day} at={turn.at} window="own" className={`tc-allday-day${lying ? " is-lying" : ""}`}>
+		<DaySlide day={day} at={null} change window="own" className="tc-allday-day">
 			{rows.map((row) => (
 				<AllDayRow key={row.id} row={row} open={open} />
 			))}
@@ -262,6 +269,17 @@ function usePlacedBy(hourPx: number, blocks: readonly Block[], events: readonly 
 		return by;
 	}
 	return placed.by;
+}
+
+/** Which way the shown day last changed: 1 to a later day, -1 to an earlier one, 0 before any change. */
+function useWay(day: number): number {
+	const [last, setLast] = useState({ day, way: 0 });
+	if (last.day !== day) {
+		const way = Math.sign(day - last.day);
+		setLast({ day, way });
+		return way;
+	}
+	return last.way;
 }
 
 /** The all-day events, a row each over the calendar (the design's «Строка событий на весь день»); a tap opens the event's menu. */

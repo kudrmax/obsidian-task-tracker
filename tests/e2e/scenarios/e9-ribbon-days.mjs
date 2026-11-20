@@ -1,9 +1,10 @@
 /**
- * Step 7, slice 2: past the calendar the days (docs/plugin/screen.md, «Свайп по экрану и дни»; spec 2026-11-18, Decision
- * 65). From the day and its calendar a stroke on turns to tomorrow, the next to the day after; strokes back return day by
- * day to today and then to Soon. The strip stands; in the day's list and in its calendar the day slides out as the next
- * comes in, each as one picture (every card of the list, every block of the calendar moving by the same pixels a frame,
- * none up or down), the header and the hours standing still; each stroke one day, on the trackpad and under a finger.
+ * Step 7, slice 2: past the calendar the days (docs/plugin/screen.md, «Свайп по экрану и дни»; spec 2026-11-18, Decisions
+ * 65 and 127). From the day and its calendar a stroke on turns to tomorrow, the next to the day after; strokes back return
+ * day by day to today and then to Soon. The strip stands; the day's list turns as a page with its header, the calendar
+ * changes day as the list lands (e9-ribbon-days-calendar), each as one picture (every card of the list, every block of the
+ * calendar moving by the same pixels a frame, none up or down), the hours standing still; each stroke one day, on the
+ * trackpad and under a finger.
  */
 /** Two fingers on the trackpad, uneven as fingers are, then macOS's momentum (as e9-ribbon-follow-frames). */
 const FINGERS = [

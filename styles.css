@@ -1842,7 +1842,9 @@ button.tc-btn.tc-folder-btn:disabled { opacity: var(--tc-tile-off-opacity); curs
 .tc-now-lane > .tc-now { left: calc(-1 * var(--tc-items-left)); right: calc(-1 * var(--tc-items-right)); }
 .tc-allday-day { position: relative; z-index: var(--tc-layer-allday); margin: 0 var(--tc-items-right) 0 var(--tc-items-left); }
 .tc-allday-day > .tc-allday { margin-left: 0; margin-right: 0; }
-.tc-allday-day.is-lying { position: absolute; top: 0; left: 0; right: 0; }
+/* As the days turn the calendar keeps its day, dimmed while the fingers hold the day's list off it (Decision 127). */
+.tc-ribbon-track > .tc-stage-col.is-timeline > .tc-stage-body { transition: opacity var(--tc-duration-fade) var(--tc-ease-out); }
+.tc-ribbon-track > .tc-stage-col.is-timeline.is-held > .tc-stage-body { opacity: var(--tc-pressed); }
 /* A long list mounts only the rows in sight (TanStack Virtual): its whole height, the rows in flow in one block placed at the first one's start; a row holds its gap, so its measure is its step. */
 .tc-list-items { position: relative; flex: none; }
 .tc-list-block { position: absolute; top: 0; left: 0; right: 0; }

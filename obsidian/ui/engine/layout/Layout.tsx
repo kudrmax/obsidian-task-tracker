@@ -1,5 +1,5 @@
 import { type CSSProperties, memo, type ReactNode, useContext, useRef } from "react";
-import { type DayTurn, DayTurnContext, useFollowRibbon, useNearerDay } from "../gestures/FollowRibbon";
+import { DayTurnContext, useFollowRibbon } from "../gestures/FollowRibbon";
 import { RibbonTrack, useRibbon } from "../gestures/Ribbon";
 import type { ListId } from "../port";
 import { DayContext, STOP_LISTS, useData, useScreen } from "../store";
@@ -97,9 +97,9 @@ function RibbonColumns() {
 
 /**
  * The stand's step of the ribbon as a gallery (stage0.md, «Round seven»): the four columns at their widths, the strip
- * standing at three stops; past the calendar the days, one place a day (docs/plugin/screen.md, «Свайп по экрану и дни»):
- * the strip stands and in the day's list and its calendar the day slides out as the next comes in, the headers and the
- * hours standing still.
+ * standing at three stops; past the calendar the days, one place a day (Max, 2026-11-21; Decision 127): the strip stands,
+ * the day's list turns under the fingers as a page with its header, and the calendar, dimmed while they hold it, changes
+ * to the new day as the list lands there.
  */
 function FollowColumns() {
 	const ribbon = useRef<HTMLDivElement>(null);
@@ -112,7 +112,7 @@ function FollowColumns() {
 					<ListColumn list="inbox" />
 					<ListColumn list="soon" />
 					<TurningDayColumn />
-					<ColumnBox className="is-timeline">
+					<ColumnBox className={`is-timeline${turn.held ? " is-held" : ""}`}>
 						<ColumnHead title={null} />
 						<div className="tc-stage-body">
 							<Timeline />
@@ -124,17 +124,17 @@ function FollowColumns() {
 	);
 }
 
-/** The day's list as the days turn: its header names the day nearer in sight and stands; below it each day drawn slides through the column. */
+/** The day's list as the days turn: a page a day, its header with it, the next day's page beside it past the column's own gap. */
 function TurningDayColumn() {
 	const turn = useContext(DayTurnContext);
 	if (!turn) return null;
 	return (
 		<ColumnBox className="is-day">
-			<ColumnHead title={<NearerDayTitle turn={turn} />} />
 			<div className="tc-day-lane">
 				{turn.days.map((day) => (
 					<DaySlide key={day} day={day} at={turn.at} window="lane" className="tc-slide">
 						<DayContext.Provider value={day}>
+							<ColumnHead title={<DayListTitle />} />
 							<div className="tc-stage-body">
 								<TaskList list="day" />
 							</div>
@@ -143,15 +143,6 @@ function TurningDayColumn() {
 				))}
 			</div>
 		</ColumnBox>
-	);
-}
-
-/** The day's title: the day that stands nearer in sight. */
-function NearerDayTitle({ turn }: { readonly turn: DayTurn }) {
-	return (
-		<DayContext.Provider value={useNearerDay(turn)}>
-			<DayListTitle />
-		</DayContext.Provider>
 	);
 }
 
