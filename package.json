@@ -10,6 +10,7 @@
 		"test": "vitest run",
 		"test:apple": "swift test --package-path apple/Core",
 		"build:stand": "node scripts/build-stand.mjs",
+		"build:trackpad": "node scripts/build-trackpad.mjs",
 		"e2e": "playwright test",
 		"release": "node scripts/release.mjs",
 		"build:e2e-page": "node scripts/build-e2e-page.mjs"

@@ -45,6 +45,8 @@ const context = await esbuild.context({
   outfile,
   logLevel: "info",
   plugins: [raw, eventsInWindow],
+  /** The trackpad's native module (obsidian/infrastructure/trackpad), embedded and written beside the plugin on load. */
+  loader: { ".node": "base64" },
   // The release checks it: a main.js left from an older build carries another version.
   banner: { js: `// task-calendar ${version}` },
 });

@@ -4,9 +4,18 @@
  * holding the stand, its note with the screen's block and only the stand turned on, to copy to a phone as a vault of its own.
  */
 import esbuild from "esbuild";
-import { copyFile, mkdir, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { builtinModules } from "node:module";
 import path from "node:path";
+
+/** `import text from "./file?raw"`: the file's text (the trackpad's main-process loader). */
+const raw = {
+	name: "raw",
+	setup(build) {
+		build.onResolve({ filter: /\?raw$/ }, (args) => ({ path: path.resolve(args.resolveDir, args.path.slice(0, -"?raw".length)), namespace: "raw" }));
+		build.onLoad({ filter: /.*/, namespace: "raw" }, async (args) => ({ contents: await readFile(args.path, "utf8"), loader: "text" }));
+	},
+};
 
 const out = path.resolve("build/stand");
 await mkdir(out, { recursive: true });
@@ -19,6 +28,9 @@ const result = await esbuild.build({
 	minify: true,
 	define: { "process.env.NODE_ENV": '"production"' },
 	external: ["obsidian", "electron", "@codemirror/state", "@codemirror/view", ...builtinModules, ...builtinModules.map((name) => `node:${name}`)],
+	plugins: [raw],
+	/** The trackpad's native module, embedded and written beside the plugin on load (Decision 125). */
+	loader: { ".node": "base64" },
 	outfile: path.join(out, "main.js"),
 	banner: { js: `// task-calendar-stand ${new Date().toISOString()}` },
 	logLevel: "info",
