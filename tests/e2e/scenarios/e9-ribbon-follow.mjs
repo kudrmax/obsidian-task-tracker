@@ -11,9 +11,10 @@ const SPANS = { "1/2": [0, 1_000_000], "2/2": [1_000_000, Infinity] };
  * Max's long sessions: the page takes the wheel's events a frame at a time, so a release near half-way may land the other
  * way than offline. Offline, his raw events against the same merged at 120 Hz (any phase) part at 1–5 of 89 and 132 landings
  * (r5, r6), each landing still within one place of its stroke's. Past the calendar the days are open (slice 2), so his
- * strokes at the calendar count too (r5's second part: 64 steps where the three stops alone gave 49), and headless
- * Chromium's frames part from the rule at 4–5 of them there (a lift read a frame later turns a fresh touch into the same
- * stroke going on): up to 8 %, at least two.
+ * strokes at the calendar count too (r5's second part: 64 steps where the three stops alone gave 49). The page is held to
+ * the rule run on the events as it received them (merged a frame at a time, some sent late under load), which r5's second
+ * part then meets exactly (0 of 64 in eight runs; against the raw events it parted at 2–6, past the allowance, under
+ * load); r6 still parts at 1–5 of 132: up to 8 %, at least two.
  */
 const LONG = new Set(["max-2026-11-17-r5.json", "max-2026-11-17-r6-pager.json"]);
 const LONG_ASTRAY = 0.08;
@@ -53,7 +54,17 @@ export default {
 			const swipes = JSON.parse(readFileSync(expectFile, "utf8")).swipes;
 			t.expect(JSON.stringify(atRow(steps)) === JSON.stringify(atRow(swipes)), `offline the rule lands as expected: ${JSON.stringify(steps)} against ${JSON.stringify(swipes)}`);
 		}
-		const result = await t.replay(file, { startPlace: 1, steps, tolerant: LONG.has(file) && LONG_ASTRAY, span });
+		/**
+		 * The page against the rule run on the events as the page received them: Chromium merges a frame's wheel events into
+		 * one, the replay loop sends some late under load, and a gap past @use-gesture's wheel end (by the page's clock) lets
+		 * the fingers go there, on the page as offline. Each landing is still at most one place from its stroke's start.
+		 */
+		const stepsFor = (received) => {
+			const asReceived = followSteps(received, rec.w / 2, { start: 1, last: Infinity, arrived: received.map((e) => e.at) });
+			t.expect(asReceived.furthest <= 1, `on the events as the page received them, a stroke's landing ${asReceived.furthest} places from where it began (one swipe, one place)`);
+			return asReceived.steps;
+		};
+		const result = await t.replay(file, { startPlace: 1, steps, stepsFor, tolerant: LONG.has(file) && LONG_ASTRAY, span });
 		t.expect(result.ok, `${file}: stops ${JSON.stringify(result.observed)} against ${JSON.stringify(result.expected)}, astray ${result.astray}, stalls ${result.stalls}, frame faults ${JSON.stringify(result.faults.slice(0, 3))}`);
 	},
 };

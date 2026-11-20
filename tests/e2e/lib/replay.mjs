@@ -19,7 +19,7 @@ const STALL_FRAMES = 60;
  * places the ribbon stood at, in order, against the recording's `.expect.json` (each stroke one place its way, clamped at
  * the row's ends); never two places at once; never a stall between places; and the shared frame checks.
  */
-export async function replay(cdp, file, { startPlace = 1, strokes = [], steps: given = null, last = Infinity, tolerant = false, span = null } = {}) {
+export async function replay(cdp, file, { startPlace = 1, strokes = [], steps: given = null, stepsFor = null, last = Infinity, tolerant = false, span = null } = {}) {
 	const rec = JSON.parse(readFileSync(file, "utf8"));
 	/** A part of a long session (`span`: from and to, ms from its start): the frames of two minutes at once overrun the page. */
 	if (span) rec.events = inSpan(rec.events, span);
@@ -37,7 +37,13 @@ export async function replay(cdp, file, { startPlace = 1, strokes = [], steps: g
 	 * `tolerant`: the steps are a rule run offline on a long session; the page may part from them at this share of the steps
 	 * (true: `ASTRAY_SHARE`, as the pager's rule), at least two.
 	 */
-	const expected = given ?? (existsSync(expectFile) ? JSON.parse(readFileSync(expectFile, "utf8")).swipes : null);
+	let expected = given ?? (existsSync(expectFile) ? JSON.parse(readFileSync(expectFile, "utf8")).swipes : null);
+	/**
+	 * The wheel's events as the page received them: Chromium merges the events of one frame into one (their deltas summed),
+	 * and under load this loop sends some late, while the page's wheel gesture ends by its own clock. Each with its deltas,
+	 * its time, and when it arrived by the page's clock.
+	 */
+	await cdp.eval(`(() => { window.__tcArrived = []; window.addEventListener("wheel", (e) => window.__tcArrived.push({ dx: e.deltaX, dy: e.deltaY, t: e.timeStamp, ctrl: e.ctrlKey, type: "wheel", at: performance.now() }), { capture: true, passive: true }); return 1; })()`);
 	const frames = new FrameRecorder(cdp);
 	await frames.start();
 	/**
@@ -57,6 +63,9 @@ export async function replay(cdp, file, { startPlace = 1, strokes = [], steps: g
 	}
 	await sleep(1200);
 	const shown = await frames.stop();
+	const arrived = await cdp.eval(`window.__tcArrived`);
+	/** The rule run again over the events as the page received them (`stepsFor`). */
+	if (stepsFor && arrived.length > 0) expected = stepsFor(arrived);
 	const places = shown.map((f) => f.place).filter((p) => p !== null);
 	/**
 	 * Where the screen went, as a position on the row of screens: the place (0 Inbox–Soon, 1 Soon–Now, 2 Now–calendar) and

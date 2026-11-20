@@ -8,7 +8,18 @@ import { WheelFollow } from "../../../obsidian/ui/engine/gestures/wheelFollow.ts
  * landing lay from the place its stroke began at, how many moves came between a lift and the next stroke, and each landing
  * (where it began, its place, its starting speed).
  */
-export function followSteps(wheels, width, { start = 1000, last = 2000 } = {}) {
+/**
+ * How long @use-gesture's wheel gesture waits, by the wall clock, before it ends (its default): the ribbon lets the fingers
+ * go then (`FollowRibbon`'s `onWheel` with `last`), whatever the events' own times say.
+ */
+const WHEEL_END_MS = 140;
+
+/**
+ * `arrived`: when each wheel event reached the page, by its clock (`performance.now()`), when known: a gap of more than
+ * @use-gesture's wheel end between two lets the fingers go in between, as the page does. Without it the events' own times
+ * are the only clock (a person's events reach the page as they are made).
+ */
+export function followSteps(wheels, width, { start = 1000, last = 2000, arrived = null } = {}) {
 	const fingers = new WheelFollow();
 	const pager = new FollowPager(start, last);
 	let at = start;
@@ -40,10 +51,11 @@ export function followSteps(wheels, width, { start = 1000, last = 2000 } = {}) {
 			}
 		}
 	};
-	for (const e of wheels) {
+	wheels.forEach((e, i) => {
+		if (arrived && i > 0 && arrived[i] - arrived[i - 1] > WHEEL_END_MS) apply(fingers.tick(Infinity));
 		apply(fingers.tick(e.t));
 		apply(fingers.feed(e));
-	}
+	});
 	apply(fingers.tick(Infinity));
 	return { steps, furthest, movedInMomentum, landings };
 }
