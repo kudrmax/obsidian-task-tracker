@@ -56,4 +56,4 @@ Screenshots in [`2026-11-20-review/`](2026-11-20-review/). Max's screenshots sti
 | 7 | Dashed place filled only on the calendar | — | **accepted** |
 | 8 | Double click: the menu flashes, then rename. Single and double click must be told apart; double click with the menu open must rename too | fix | double click removed by Max for now (Decision 123); **open** |
 | 9a | Inline notes in the menu: Enter closes, Shift+Enter adds a strange indent (like spaces); no proper new line | fix | **accepted** by Max |
-| 9b | Notes look different in three places (menu inline, full screen, the field); one look, variants shown to Max before building | discuss, variants as boards | **next**: variants as pictures, a new line in notes on the phone included |
+| 9b | Notes look different in three places (menu inline, full screen, the field); one look, variants shown to Max before building | discuss, variants as boards | decided by Max: variant 2, notes right under the title (Decision 124); **done**, on the stand |
