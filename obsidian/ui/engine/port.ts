@@ -144,11 +144,43 @@ export interface EntryDraft {
 }
 
 /**
+ * The field a task is typed in (the plugin's one `QuickEntry` field): where its text is written, and the task whose
+ * title it edits; a new task and a rename are the same field.
+ */
+export interface EntryField {
+	/** Where the typed task goes: a list's slot, a minute of the calendar, the end of a calendar task's stack (`under`). */
+	readonly at: Destination;
+	/** The task renamed; null for a new one. */
+	readonly renaming: string | null;
+	/** The field stands in an open menu's stack (a calendar task's new subtask, or a card of the stack renamed), not on the screen. */
+	readonly stack: boolean;
+}
+
+/** A rename's field as it opens: where it stands, what its bar starts with (the task's level and project), its text. */
+export interface RenameStart {
+	readonly field: EntryField;
+	readonly draft: EntryDraft;
+	readonly text: string;
+}
+
+/** What Enter or a tap elsewhere does with the field's text (the plugin's `QuickEntry.enter` and `blur`): the port decides. */
+export interface EntryCommit {
+	/** The write; null when nothing is written (an empty text, a name unchanged). */
+	readonly write: Promise<unknown> | null;
+	/** The renamed card as it will read, shown on every card at once until the write is read back (F298); null for none. */
+	readonly face: CardFace | null;
+	/** The field open next (batch typing, a level out, a new task under a renamed one); null: typing ends. */
+	readonly next: EntryField | null;
+	/** What the next field's bar starts with. */
+	readonly draft: EntryDraft;
+}
+
+/**
  * The bar of a task being typed (F184–F189, the plugin's `QuickBarState`), as the port answers for the field where it
  * stands and what is set and typed: each button shown or not, enabled or not, and what it shows.
  */
 export interface EntryBar {
-	/** The level buttons (none on the calendar's field), and which way the field may go. */
+	/** The level buttons (none on the calendar's field nor in a stack; shown but off in a rename), and which way the field may go. */
 	readonly indents: boolean;
 	readonly canIndent: boolean;
 	readonly canOutdent: boolean;
@@ -229,7 +261,6 @@ export type MenuAction =
 	/** A day picked on the month page (`YYYY-MM-DD`); null: Remove due date. */
 	| { readonly kind: "date"; readonly date: string | null }
 	| { readonly kind: "reminder"; readonly reminder: ReminderKind }
-	| { readonly kind: "rename"; readonly text: string }
 	| { readonly kind: "delete" }
 	/** A row whose own screen is part 2's (Repeat, Section, Project, First step, Add description, the open rows, Open in Calendar): on the stand it closes the menu and writes nothing. */
 	| { readonly kind: "row"; readonly id: EditId | OpenId | "calendar" };
@@ -268,12 +299,14 @@ export interface ScreenPort {
 	newTaskPlace(dayOffset: number, shown: readonly ListId[]): Destination;
 	/** Where Add subtask opens the field of a new last subtask of `id` in its list (F124): under its last subtask, a level deeper. */
 	subtaskPlace(id: string, dayOffset: number): Destination;
-	/** The bar of the field at `at`, with what is set (`draft`) and typed (`text`). */
-	entryBar(at: Destination, draft: EntryDraft, text: string): EntryBar;
+	/** The bar of `field`, with what is set (`draft`) and typed (`text`). */
+	entryBar(field: EntryField, draft: EntryDraft, text: string): EntryBar;
 	/** Where the field goes for a place picked on the bar (`date` with Date): the end of that list or day. */
-	entryPlace(at: Destination, choice: PlaceId, date: string | null): Destination;
-	/** A new task from its typed text at `at`, with what the bar set; resolves with its id once read back. */
-	add(text: string, at: Destination, draft?: EntryDraft): Promise<string>;
+	entryPlace(field: EntryField, choice: PlaceId, date: string | null): EntryField;
+	/** Rename of the task `id` from its menu opened `from` there (F117): the field in the card's place, the bar set as the task is. */
+	rename(id: string, from: MenuFrom, dayOffset: number): RenameStart;
+	/** Enter (`next`) or a tap elsewhere on `field` holding `text`: what is written and which field opens next. */
+	commit(field: EntryField, text: string, draft: EntryDraft, next: boolean): EntryCommit;
 	/** What the menu of the task or event `id` offers, opened `from` there. */
 	menu(id: string, from: MenuFrom): MenuModel;
 	/** Writes what was tapped in the menu of `id`; resolves once written and read back. */

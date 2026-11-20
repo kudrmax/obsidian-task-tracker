@@ -26,6 +26,7 @@ export default {
 			await t.sleep(300);
 		};
 		const field = () => t.cdp.eval(`(() => { const f = document.activeElement; if (!f?.isContentEditable) return null; const row = f.closest(".tc-quick-row"); const r = row.getBoundingClientRect(); const sel = getSelection(); return { text: f.textContent, atEnd: sel.anchorOffset === (sel.anchorNode?.textContent?.length ?? -1) || sel.anchorNode === f, left: r.left, top: r.top, width: r.width, renaming: row.dataset.renaming ?? null }; })()`);
+		const bars = () => t.cdp.eval(`(() => { const b = document.querySelector(".tc-quick-bar"); if (!b) return null; const shifts = b.querySelector(".tc-bar-shifts")?.hidden ? [] : [...b.querySelectorAll(".tc-bar-shift")]; return { shifts: shifts.length, shiftsOff: shifts.filter((x) => x.disabled).length, flag: !!b.querySelector(".tc-bar-flag"), project: !!b.querySelector(".tc-bar-project"), place: b.querySelector(".tc-bar-place")?.textContent ?? null }; })()`);
 		const file = async (title) => (await t.file()).split("\n").find((l) => l.includes(title)) ?? "";
 
 		if (item === "list rename") {
@@ -44,6 +45,13 @@ export default {
 			t.expect(f && f.text === title && f.renaming === card.id, `the card itself is the field, its title in it, the focus in it: ${JSON.stringify(f)}`);
 			t.expect(f && Math.abs(f.top - card.top) <= 1 && Math.abs(f.left - card.left) <= 1, `the field stands where the card stood: ${JSON.stringify(f)} card ${JSON.stringify(card)}`);
 			t.expect((await menuNow(t)) === null || (await t.cdp.eval(`!document.querySelector(".tc-menu-layer .tc-panel:not(.is-closing)")`)), "the menu has closed");
+			/** Max, 2026-11-20: «Rename and creating a task are literally one interface»: the same field with the same bar. */
+			const bar = await bars();
+			t.expect(bar && bar.shifts === 2 && bar.shiftsOff === 2 && bar.flag && bar.project && bar.place === "Now", `the rename has quick add's bar: the level buttons off, the flag, the project, the place: ${JSON.stringify(bar)}`);
+			await key("Tab", "Tab", 9);
+			await t.sleep(150);
+			const tabbed = await field();
+			t.expect(tabbed && tabbed.text === title, `Tab never types a tab into the name: ${JSON.stringify(tabbed?.text)}`);
 			await t.shot("renaming");
 			await t.stand("setDelay(300)");
 			await t.cdp.send("Input.insertText", { text: " и ещё" });
@@ -52,6 +60,11 @@ export default {
 			t.expect((await t.oracle.cards("day")).includes(`${title} и ещё`), "Enter shows the new name at once, before the write is read back (F298)");
 			await t.sleep(500);
 			t.expect((await file(`${title} и ещё`)) !== "", `and writes it: ${await file(title)}`);
+			const next = await field();
+			const renamedCard = await cardBy(t, `${title} и ещё`, "day");
+			t.expect(next && next.text === "" && next.renaming === null && next.top > renamedCard.top && Math.abs(next.left - renamedCard.left) <= 1, `and a new task's field opens right under it, as the plugin's rename (quick-add spec §4.8): ${JSON.stringify(next)} card ${JSON.stringify(renamedCard)}`);
+			await key("Escape", "Escape", 27);
+			await t.sleep(300);
 			await t.stand("setDelay(30)");
 			const other = (await t.oracle.cards("day"))[4];
 			await tap(await cardBy(t, other, "day"));
@@ -85,6 +98,9 @@ export default {
 			await press("Rename");
 			const f = await field();
 			t.expect(f && f.text === "Заказать машину" && Math.abs(f.top - stack[1].top) <= 1, `Rename turns that card into the field in its place (F108): ${JSON.stringify(f)}`);
+			const subBar = await bars();
+			t.expect(subBar && subBar.shifts === 0 && subBar.flag && !subBar.project && subBar.place === null, `a stack card's rename has the bar with the flag only: ${JSON.stringify(subBar)}`);
+			t.expect(await t.cdp.eval(`getComputedStyle(document.querySelector(".tc-backdrop.tc-menu-layer")).opacity === "1"`), "the sheet stays while the stack's card is renamed");
 			await t.cdp.send("Input.insertText", { text: " на субботу" });
 			await key("Enter", "Enter", 13);
 			await t.sleep(500);
@@ -97,6 +113,9 @@ export default {
 			const typing = await field();
 			t.expect(typing && typing.text === "", `Add subtask types at the end of the stack (F108): ${JSON.stringify(typing)} ${JSON.stringify(await blockNow())} ${JSON.stringify(await menuNow(t))} ${await t.cdp.eval("document.activeElement?.className")}`);
 			await t.cdp.send("Input.insertText", { text: "Отключить интернет" });
+			await key("Tab", "Tab", 9);
+			await t.sleep(150);
+			t.expect((await field())?.text === "Отключить интернет", `Tab never types a tab into the stack's field: ${JSON.stringify((await field())?.text)}`);
 			await key("Enter", "Enter", 13);
 			await t.sleep(400);
 			const after = await t.cdp.eval(`[...document.querySelectorAll(".tc-menu-subtasks > [data-stack]")].map((c) => c.textContent)`);
@@ -114,6 +133,9 @@ export default {
 			await press("Rename");
 			const blockField = await field();
 			t.expect(blockField?.text === "Обед", `a block's Rename makes the block the field: ${JSON.stringify(blockField)}`);
+			const blockBar = await bars();
+			t.expect(blockBar && blockBar.shifts === 0 && blockBar.flag && blockBar.project && blockBar.place === null, `a block's rename has the calendar field's bar, the flag and the project: ${JSON.stringify(blockBar)}`);
+			await t.shot("block-rename");
 			await t.cdp.send("Input.insertText", { text: " с Олей" });
 			await key("Enter", "Enter", 13);
 			await t.sleep(500);

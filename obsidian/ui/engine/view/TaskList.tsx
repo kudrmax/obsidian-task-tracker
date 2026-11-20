@@ -4,12 +4,11 @@ import { PROPERTY } from "../../design";
 import { PLUS, SortableList, SortableRow, useListTarget } from "../drag/Drag";
 import { descendantsOf } from "../drag/tree";
 import { useAnchor } from "../layers/Layers";
-import type { Destination, ListId, Row } from "../port";
+import type { EntryField as Field, ListId, Row } from "../port";
 import { DayContext, useData, useScreen, useScreenApi } from "../store";
 import { Card, PressedLook } from "./Card";
 import { MovingRow } from "./MovingRow";
 import { EntryField } from "./QuickAdd";
-import { RenameField } from "./RenameField";
 
 /** A row counts as this tall until it is drawn and measured (a card and its gap at the default size). */
 const ESTIMATE_PX = 37;
@@ -45,7 +44,7 @@ export const TaskList = memo(function TaskList({ list }: { readonly list: ListId
 	}, [rows, plusAt, list]);
 	/** A day's list draws the field only for its own day: the day sliding out keeps none. */
 	const day = useContext(DayContext);
-	const entry = useScreen((s) => (s.entry && (list !== "day" || day === null || day === s.entry.dayOffset) ? s.entry : null));
+	const entry = useScreen((s) => (s.entry && !s.entry.stack && (list !== "day" || day === null || day === s.entry.at.dayOffset) ? s.entry : null));
 	const entrySeq = useScreen((s) => s.entrySeq);
 	/** The rows drawn: the list's, with the new task's field standing in its slot when it is in this list. */
 	const drawn = useMemo(() => withEntry(withPlus, list, entry), [withPlus, list, entry]);
@@ -145,7 +144,6 @@ const RowFace = memo(function RowFace({ row }: { readonly row: Row }) {
 	const api = useScreenApi();
 	const anchor = useAnchor();
 	const pressed = useContext(PressedLook);
-	const renaming = useScreen((s) => (s.renaming === row.id ? s.shown.cards[row.id] : null));
 	if (row.kind === "section")
 		return (
 			<SortableRow id={row.id}>
@@ -154,8 +152,6 @@ const RowFace = memo(function RowFace({ row }: { readonly row: Row }) {
 				</div>
 			</SortableRow>
 		);
-	/** Rename (F117): the card itself is the field, at its level. */
-	if (renaming) return <RenameField face={renaming} depth={row.depth} className="" onDone={(text) => api.getState().endRename(text)} />;
 	return (
 		<SortableRow
 			id={row.id}
@@ -174,13 +170,22 @@ const RowFace = memo(function RowFace({ row }: { readonly row: Row }) {
 type Drawn = Row | { readonly kind: "entry"; readonly id: string; readonly depth: number } | { readonly kind: "plus"; readonly id: string };
 
 /**
- * The list's rows with the new task's field put in its slot: before the task it goes before, else at the end of its
- * section. Its level is no deeper than one under the task above it.
+ * The list's rows with the field put in its slot: before the task it goes before, else at the end of its section; a
+ * rename's in its card's place, the card hidden wherever the field stands (moved by the bar's place). Its level is no
+ * deeper than one under the task above it.
  */
-function withEntry(rows: readonly Drawn[], list: ListId, entry: Destination | null): readonly Drawn[] {
-	if (!entry) return rows;
+function withEntry(all: readonly Drawn[], list: ListId, field: Field | null): readonly Drawn[] {
+	if (!field) return all;
+	const entry = field.at;
 	const { list: where, section, before } = entry;
-	if (where !== list || entry.at !== undefined) return rows;
+	const renamed = field.renaming;
+	const here = where === list && entry.at === undefined;
+	if (here && renamed !== null && before === renamed) {
+		const own = all.findIndex((row) => row.id === renamed);
+		if (own >= 0) return [...all.slice(0, own), { kind: "entry", id: "entry", depth: entry.depth ?? 0 }, ...all.slice(own + 1)];
+	}
+	const rows = renamed === null || !all.some((row) => row.id === renamed) ? all : all.filter((row) => row.id !== renamed);
+	if (!here) return rows;
 	let at = before === null ? -1 : rows.findIndex((row) => row.id === before);
 	if (at < 0) {
 		const head = section === null || section === undefined ? -1 : rows.findIndex((row) => row.id === section);
@@ -190,6 +195,6 @@ function withEntry(rows: readonly Drawn[], list: ListId, entry: Destination | nu
 	}
 	const above = rows[at - 1];
 	const depth = Math.min(entry.depth ?? 0, above?.kind === "task" ? above.depth + 1 : 0);
-	const field: Drawn = { kind: "entry", id: "entry", depth };
-	return [...rows.slice(0, at), field, ...rows.slice(at)];
+	const slot: Drawn = { kind: "entry", id: "entry", depth };
+	return [...rows.slice(0, at), slot, ...rows.slice(at)];
 }

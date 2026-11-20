@@ -7,8 +7,7 @@ import { type Asking, type Layer, useScreen, useScreenApi } from "../store";
 import { type BlockLook, CardInsides, PressedLook } from "./Card";
 import { useHost } from "./host";
 import { Icon } from "./Icon";
-import { ObsidianEditor } from "./ObsidianEditor";
-import { RenameField } from "./RenameField";
+import { EntryField } from "./QuickAdd";
 import { paintStyle } from "./Timeline";
 
 const STATUS_LOOKS: Readonly<Record<StatusId, { readonly label: string; readonly icon: IconName }>> = {
@@ -57,6 +56,8 @@ export const TaskMenu = memo(function TaskMenu() {
 	const anchor = useAnchor();
 	const look = useContext(PressedLook);
 	const layer = useScreen((s) => s.layer);
+	/** A field typed in the menu itself: a stack's card renamed in its place, or a new subtask at the stack's end (F108). */
+	const typing = useScreen((s) => (s.entry?.stack ? (s.entry.renaming === null ? "subtask" : "rename") : null));
 	const last = useRef<{ layer: Layer; reference: Element | null; look: BlockLook | null; seq: number; panelBy: Element | null } | null>(null);
 	const was = useRef<Layer | null>(null);
 	/** Opened afresh: from the element pressed now; another page or a question of the same menu keeps it. */
@@ -71,7 +72,7 @@ export const TaskMenu = memo(function TaskMenu() {
 	if (!shown) return null;
 	const { model } = shown.layer;
 	const pick = (action: MenuAction) => api.getState().pick(action);
-	const groups = model.kind === "event" ? [<RowGroup key="open" rows={[{ label: "Open in Calendar", icon: "calendar", onPick: () => pick({ kind: "row", id: "calendar" }) }]} />] : taskGroups(shown.layer, model, pick, api.getState());
+	const groups = model.kind === "event" ? [<RowGroup key="open" rows={[{ label: "Open in Calendar", icon: "calendar", onPick: () => pick({ kind: "row", id: "calendar" }) }]} />] : taskGroups(shown.layer, typing !== null, model, pick, api.getState());
 	return (
 		<MenuLayer
 			key={shown.seq}
@@ -85,9 +86,9 @@ export const TaskMenu = memo(function TaskMenu() {
 				<>
 					<MenuCopy id={shown.layer.stack?.of ?? shown.layer.id} look={shown.look} />
 					{shown.layer.stack ? (
-						<Stack ids={shown.layer.stack.ids} typing={false} renaming={shown.layer.field === "rename" ? shown.layer.id : null} pressed={shown.layer.id} />
-					) : model.kind === "task" && (model.subtasks.length > 0 || shown.layer.field === "subtask") ? (
-						<Stack ids={model.subtasks} typing={shown.layer.field === "subtask"} renaming={null} pressed={null} />
+						<Stack ids={shown.layer.stack.ids} typing={false} renaming={typing === "rename" ? shown.layer.id : null} pressed={shown.layer.id} />
+					) : model.kind === "task" && (model.subtasks.length > 0 || typing === "subtask") ? (
+						<Stack ids={model.subtasks} typing={typing === "subtask"} renaming={null} pressed={null} />
 					) : null}
 				</>
 			}
@@ -96,7 +97,7 @@ export const TaskMenu = memo(function TaskMenu() {
 			page={`${shown.layer.id}:${shown.layer.page}`}
 			keepWidth={model.kind === "event"}
 			holdSplit={shown.layer.asking !== null}
-			peek={model.kind === "task" && model.peek !== null && shown.layer.field === null ? { content: <PeekText text={model.peek} />, onPress: () => pick({ kind: "row", id: "fullScreen" }) } : undefined}
+			peek={model.kind === "task" && model.peek !== null && typing === null ? { content: <PeekText text={model.peek} />, onPress: () => pick({ kind: "row", id: "fullScreen" }) } : undefined}
 		/>
 	);
 });
@@ -109,9 +110,9 @@ interface MenuSteps {
 }
 
 /** The groups of a task's menu on its page: the menu itself, the month, the Reminder kinds. */
-function taskGroups(layer: Layer, model: TaskMenuModel, pick: (action: MenuAction) => void, steps: MenuSteps): readonly ReactNode[] {
+function taskGroups(layer: Layer, typing: boolean, model: TaskMenuModel, pick: (action: MenuAction) => void, steps: MenuSteps): readonly ReactNode[] {
 	/** Typing in the menu: the panel gives its room to the field (the plugin's `giveToField`). */
-	if (layer.field !== null) return [];
+	if (typing) return [];
 	if (layer.page === "picker") return [<MonthPage key={`month-${layer.id}`} model={model} pick={pick} />, ...(model.date.removable ? [<Row key="remove" label="Remove due date" icon="removeDue" className="tc-picker-remove" onPick={() => pick({ kind: "date", date: null })} />] : [])];
 	if (layer.page === "reminders")
 		return [
@@ -346,7 +347,7 @@ function Stack({ ids, typing, renaming, pressed }: { readonly ids: readonly stri
 		<div className={`tc-menu-subtasks${pressed ? " is-handed" : ""}`}>
 			{ids.map((id) =>
 				id === renaming ? (
-					<MenuRename key={id} id={id} />
+					<EntryField key={`rename-${entrySeq}`} />
 				) : (
 				<StackCard
 					key={id}
@@ -361,9 +362,7 @@ function Stack({ ids, typing, renaming, pressed }: { readonly ids: readonly stri
 				),
 			)}
 			{typing ? (
-				<div className="tc-quick-row">
-					<ObsidianEditor key={entrySeq} text="" className="tc-quick-field tc-title-field" onEnter={(text) => api.getState().commitStackSubtask(text)} onEscape={() => api.getState().closeLayer()} />
-				</div>
+				<EntryField key={entrySeq} />
 			) : null}
 		</div>
 	);
@@ -378,12 +377,3 @@ function StackCard({ id, pressed, onPress }: { readonly id: string; readonly pre
 		</div>
 	);
 }
-
-/** Rename on a card of a calendar menu's stack (F108): the card becomes the field in its copy's place, the dot of a task in progress kept. */
-function MenuRename({ id }: { readonly id: string }) {
-	const api = useScreenApi();
-	const face = useScreen((s) => s.shown.cards[id]);
-	if (!face) return null;
-	return <RenameField face={face} onDone={(text) => api.getState().endRename(text)} className="" />;
-}
-

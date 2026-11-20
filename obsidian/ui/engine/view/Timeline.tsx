@@ -10,7 +10,6 @@ import { type DayTurn, DayTurnContext } from "../gestures/FollowRibbon";
 import type { AllDayEvent, Block, DayData, DayEvent, EventPaint, Now } from "../port";
 import { DayContext, useData, useScreen, useScreenApi } from "../store";
 import { Card, PressedLook } from "./Card";
-import { RenameField } from "./RenameField";
 import { useHost } from "./host";
 import { MovingRow } from "./MovingRow";
 import { EntryField } from "./QuickAdd";
@@ -46,7 +45,7 @@ export const Timeline = memo(function Timeline() {
 	const now = useScreen((s) => s.now);
 	const zoom = useScreen((s) => s.zoom);
 	const plusMinute = useScreen((s) => s.plusMinute);
-	const entry = useScreen((s) => s.entry);
+	const entry = useScreen((s) => (s.entry && s.entry.renaming === null && !s.entry.stack ? s.entry.at : null));
 	const dayOffset = useScreen((s) => s.dayOffset);
 	const own = useContext(DayContext);
 	const turn = useContext(DayTurnContext);
@@ -163,7 +162,7 @@ const DayItems = memo(function DayItems({ day, turn, scale, shown, now }: { read
 function DayItemsOf({ day: offset, turn, scale, shown, now }: { readonly day: number; readonly turn: DayTurn | null; readonly scale: TimeScale; readonly shown: boolean; readonly now: Now }) {
 	const day = useData((d) => d.day);
 	const plusMinute = useScreen((s) => (shown ? s.plusMinute : null));
-	const entry = useScreen((s) => (shown ? s.entry : null));
+	const entry = useScreen((s) => (shown && s.entry && s.entry.renaming === null && !s.entry.stack ? s.entry.at : null));
 	const dayOffset = useScreen((s) => s.dayOffset);
 	const extra = plusMinute !== null ? plusMinute : entry?.at !== undefined && entry.dayOffset === dayOffset ? entry.at : null;
 	const { events, boxes, drawn } = useDayLayout(day, extra, scale);
@@ -346,7 +345,7 @@ const BlockItem = memo(function BlockItem({ block, box, shades, order, z, top, s
 	const lifted = useScreen((s) => s.lifted === block.id);
 	const selected = useScreen((s) => s.selected === block.id);
 	const resizing = useScreen((s) => (s.resizing?.id === block.id ? s.resizing.edge : null));
-	const renaming = useScreen((s) => (s.renaming === block.id ? s.shown.cards[block.id] : null));
+	const renaming = useScreen((s) => s.entry !== null && s.entry.renaming === block.id && !s.entry.stack && s.entry.at.at !== undefined);
 	const api = useScreenApi();
 	const anchor = useAnchor();
 	const pressed = useContext(PressedLook);
@@ -369,7 +368,7 @@ const BlockItem = memo(function BlockItem({ block, box, shades, order, z, top, s
 				<Card id={block.id} block={look} />
 			</SortableRow>
 			{/* Rename on the calendar (F108): the block becomes the field over its place, growing down for a long name. */}
-			{renaming ? <RenameField face={renaming} className="tc-block-rename" onDone={(text) => api.getState().endRename(text)} /> : null}
+			{renaming ? <EntryField className="tc-block-rename" /> : null}
 			{shades.length > 0 ? (
 				<div className="tc-shades" aria-hidden="true">
 					{shades.map((shade, i) => (

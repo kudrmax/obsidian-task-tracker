@@ -19,7 +19,7 @@ export default {
 			await t.sleep(400);
 		};
 		const type = (text) => t.cdp.send("Input.insertText", { text });
-		const box = (selector) => t.cdp.eval(`(() => { const e = document.querySelector(${JSON.stringify(selector)}); if (!e) return null; const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, left: r.left, top: r.top, right: r.right, bottom: r.bottom, width: r.width, height: r.height, set: e.classList.contains("is-set"), disabled: !!e.disabled, priority: e.dataset.priority ?? null, text: e.textContent }; })()`);
+		const box = (selector) => t.cdp.eval(`(() => { const e = document.querySelector(${JSON.stringify(selector)}); if (!e || e.closest("[hidden]")) return null; const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, left: r.left, top: r.top, right: r.right, bottom: r.bottom, width: r.width, height: r.height, set: e.classList.contains("is-set"), disabled: !!e.disabled, priority: e.dataset.priority ?? null, text: e.textContent }; })()`);
 		const press = async (selector) => {
 			const at = await box(selector);
 			if (!t.expect(at && !at.disabled, `${selector} is there to press: ${JSON.stringify(at)}`)) return;

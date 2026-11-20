@@ -1,7 +1,7 @@
 import { DESIGN } from "../../design";
 import { createStore, type StoreApi } from "zustand/vanilla";
 import { LAYER_MS } from "../layers/motion";
-import type { Destination, Edge, EntryBar, EntryDraft, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, ScreenData, ScreenPort, StatusId } from "../port";
+import type { Destination, Edge, EntryBar, EntryDraft, EntryField, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, ScreenData, ScreenPort, StatusId } from "../port";
 import { share } from "./share";
 
 /** Where the ribbon stands: Inbox–Soon, Soon–the day, the day–its calendar. */
@@ -38,8 +38,6 @@ export interface Layer {
 	readonly model: MenuModel;
 	readonly page: MenuPage;
 	readonly asking: Asking | null;
-	/** A field typed in the menu itself: a stack card renamed in its copy's place, or a new subtask at the end of a calendar task's stack (F108). */
-	readonly field: "rename" | "subtask" | null;
 	/** A subtask's menu opened from a calendar menu's stack: the task whose copy and stack stay drawn, and the stack's cards. */
 	readonly stack: { readonly of: string; readonly ids: readonly string[] } | null;
 }
@@ -68,8 +66,11 @@ export interface ScreenState {
 	/** The present minute from today's start, ticking each minute (spec, «Time»). */
 	readonly now: Now;
 	readonly layer: Layer | null;
-	/** The new task's field: where it stands (the slot a typed task is written to), open while not null. */
-	readonly entry: Destination | null;
+	/**
+	 * The field a task is typed in, open while not null (the plugin's one quick entry): a new task's or a rename's, where it
+	 * stands; in a list, on the calendar, or in an open menu's stack.
+	 */
+	readonly entry: EntryField | null;
 	/** Where the carried plus would open the field: a list and the index among its rows, where they part for it. */
 	readonly plusAt: { readonly into: ListId; readonly index: number } | null;
 	/** Where the carried plus would open the field on the calendar: a minute of the shown day, where its place stands. */
@@ -88,8 +89,6 @@ export interface ScreenState {
 	/** What the bar has set for the task being typed, and the text typed so far (a level's prefix lights the flag). */
 	readonly draft: EntryDraft;
 	readonly entryText: string;
-	/** The task whose card is its rename field now (F117), in a list or on the calendar. */
-	readonly renaming: string | null;
 	/** Counts the fields opened: each new one (after Enter) is a fresh, empty field. */
 	readonly entrySeq: number;
 	/** Tasks new in the last read: their rows come in; a row merely scrolled into sight does not. */
@@ -140,18 +139,14 @@ export interface ScreenActions {
 	pick(action: MenuAction): void;
 	/**
 	 * Rename from the menu (F117, F108): the menu closes and in the same tap the card (a list's, a calendar's block) becomes
-	 * the field; a card of a calendar menu's stack becomes it in the menu, which stays.
+	 * the field, the new task's field with its bar; a card of a calendar menu's stack becomes it in the menu, which stays.
 	 */
 	startRename(): void;
-	/** The rename field let go: `text` written (shown at once, before it is read back, F298); null or nothing changed writes nothing. */
-	endRename(text: string | null): void;
 	/**
 	 * Add subtask from the menu (F124, F108): a list's card opens the new task's field under its last subtask, the menu
 	 * closed in the same tap; a calendar's task types it at the end of its stack in the menu, which stays.
 	 */
 	startSubtask(): void;
-	/** Enter in the stack's field: the subtask written under the menu's task, the field emptied for the next (batch typing); empty, the menu closes. */
-	commitStackSubtask(text: string): void;
 	setPlusAt(at: { readonly into: ListId; readonly index: number } | null): void;
 	setPlusMinute(minute: number | null): void;
 	setZoom(zoom: Zoom): void;
@@ -169,10 +164,10 @@ export interface ScreenActions {
 	 * `least`, the minutes of the shortest length kept. Whether anything was written.
 	 */
 	endResize(id: string, edge: Edge, minute: number | null, least: number): boolean;
-	/** Opens the new task's field at `at`; null closes it. */
+	/** Opens a new task's field at `at`; null closes the field writing nothing (Escape), with the menu it stood in. */
 	openEntry(at: Destination | null): void;
-	/** The bar of the field at `at` (the port's answer). */
-	entryBar(at: Destination, draft: EntryDraft, text: string): EntryBar;
+	/** The bar of `field` (the port's answer). */
+	entryBar(field: EntryField, draft: EntryDraft, text: string): EntryBar;
 	/** The field's text as typed. */
 	typeEntry(text: string): void;
 	/** A level's tile on the bar: set, or taken off when it was the one set. */
@@ -186,10 +181,10 @@ export interface ScreenActions {
 	/** The field one level deeper (1) or shallower (-1), as Tab and Shift+Tab do. */
 	indentEntry(by: -1 | 1): void;
 	/**
-	 * The typed text written as a task where the field stands. With `next`, a new empty field opens right under it (batch
-	 * typing); empty text ends typing instead (a subtask's field steps one level out first).
+	 * Enter (`next`) or a tap elsewhere: the port says what the text writes and which field opens next (batch typing, a
+	 * level out, a new task under a renamed one); a renamed card shows its new name at once (F298).
 	 */
-	commitEntry(text: string, next: boolean): Promise<void>;
+	commitEntry(text: string, next: boolean): void;
 	/** Starts following the port and the clock; returns the stop. Called by the screen as it mounts. */
 	start(): () => void;
 }
@@ -268,7 +263,6 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 			entry: null,
 			draft: NO_DRAFT,
 			entryText: "",
-			renaming: null,
 			entrySeq: 0,
 			plusAt: null,
 			plusMinute: null,
@@ -388,39 +382,19 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 				if (reveal) set({ reveal: { id, seq: (get().reveal?.seq ?? 0) + 1 } });
 				const over = get().layer;
 				const stack = from !== "stack" || !over ? null : (over.stack ?? (over.model.kind === "task" ? { of: over.id, ids: over.model.subtasks } : null));
-				set({ layer: { kind: "menu", id, from, model: port.menu(id, from), page: "menu", asking: null, field: null, stack }, ...(from === "list" ? { selected: null } : {}) });
+				set({ layer: { kind: "menu", id, from, model: port.menu(id, from), page: "menu", asking: null, stack }, ...(from === "list" ? { selected: null } : {}) });
 			},
 			startRename() {
 				const layer = get().layer;
 				if (!layer) return;
-				if (layer.from === "stack") set({ layer: { ...layer, field: "rename", asking: null } });
-				else set({ layer: null, renaming: layer.id });
-			},
-			endRename(text) {
-				const { layer, renaming } = get();
-				const id = renaming ?? (layer?.field === "rename" ? layer.id : null);
-				if (!id) return;
-				set({ renaming: null, ...(layer?.field === "rename" ? { layer: null } : {}) });
-				const was = get().shown.cards[id];
-				const typed = text?.trim() ?? "";
-				if (!was || typed === "" || typed === was.title) return;
-				/** The new name on every card at once, until the write is read back (F298). */
-				const shown = get().shown;
-				set({ shown: { ...shown, cards: { ...shown.cards, [id]: { ...was, title: typed } } } });
-				write(port.act(id, { kind: "rename", text: typed }));
+				const { field, draft, text } = port.rename(layer.id, layer.from, get().dayOffset);
+				set({ entry: field, draft, entryText: text, entrySeq: get().entrySeq + 1, layer: field.stack ? { ...layer, asking: null } : null });
 			},
 			startSubtask() {
 				const layer = get().layer;
 				if (!layer) return;
-				if (layer.from === "calendar") return set({ layer: { ...layer, field: "subtask", asking: null } });
-				set({ layer: null, entry: port.subtaskPlace(layer.id, get().dayOffset), entrySeq: get().entrySeq + 1 });
-			},
-			commitStackSubtask(text) {
-				const layer = get().layer;
-				if (!layer) return;
-				if (text.trim() === "") return set({ layer: null });
-				set({ entrySeq: get().entrySeq + 1 });
-				write(port.add(text, { list: "day", before: null, dayOffset: get().dayOffset, under: layer.id }));
+				if (layer.from === "calendar") return set({ entry: { at: { list: "day", before: null, dayOffset: get().dayOffset, under: layer.id }, renaming: null, stack: true }, draft: NO_DRAFT, entryText: "", entrySeq: get().entrySeq + 1, layer: { ...layer, asking: null } });
+				set({ layer: null, entry: { at: port.subtaskPlace(layer.id, get().dayOffset), renaming: null, stack: false }, draft: NO_DRAFT, entryText: "", entrySeq: get().entrySeq + 1 });
 			},
 			menuPage(page) {
 				const layer = get().layer;
@@ -439,13 +413,13 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 				window.setTimeout(() => void port.act(layer.id, action).finally(done), LAYER_MS.close);
 			},
 			closeLayer() {
-				if (get().layer) set({ layer: null });
+				if (get().layer) set({ layer: null, ...(get().entry?.stack ? { entry: null, draft: NO_DRAFT, entryText: "" } : {}) });
 			},
 			openEntry(at) {
-				set({ entry: at, entrySeq: get().entrySeq + 1, layer: null, entryText: "", ...(at === null ? { draft: NO_DRAFT } : {}) });
+				set({ entry: at && { at, renaming: null, stack: false }, entrySeq: get().entrySeq + 1, layer: null, entryText: "", draft: NO_DRAFT });
 			},
-			entryBar(at, draft, text) {
-				return port.entryBar(at, draft, text);
+			entryBar(field, draft, text) {
+				return port.entryBar(field, draft, text);
 			},
 			typeEntry(entryText) {
 				if (get().entryText !== entryText) set({ entryText });
@@ -461,8 +435,8 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 				const { entry, stop } = get();
 				if (!entry) return;
 				const to = port.entryPlace(entry, choice, date);
-				if (to.dayOffset !== get().dayOffset) get().showDay(to.dayOffset);
-				const where = to.list;
+				if (to.at.dayOffset !== get().dayOffset) get().showDay(to.at.dayOffset);
+				const where = to.at.list;
 				/** The field opens again at its new place, with what was typed (a new field brought into sight, F193). */
 				set({ entry: to, entrySeq: get().entrySeq + 1, ...(SHOWS[stop][where] ? {} : { stop: STOP_OF[where] }) });
 			},
@@ -471,24 +445,24 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 			},
 			indentEntry(by) {
 				const entry = get().entry;
-				if (entry) set({ entry: { ...entry, under: undefined, depth: Math.max(0, (entry.depth ?? 0) + by) } });
+				if (entry && port.entryBar(entry, get().draft, get().entryText)[by > 0 ? "canIndent" : "canOutdent"]) set({ entry: { ...entry, at: { ...entry.at, under: undefined, depth: Math.max(0, (entry.at.depth ?? 0) + by) } } });
 			},
-			async commitEntry(text, next) {
-				const entry = get().entry;
+			commitEntry(text, next) {
+				const { entry, draft, shown } = get();
 				if (!entry) return;
-				if (text.trim() === "") {
-					const depth = entry.depth ?? 0;
-					set(next && depth > 0 ? { entry: { ...entry, depth: depth - 1, under: undefined } } : { entry: null, draft: NO_DRAFT, entryText: "" });
-					return;
-				}
-				/** A field on the calendar takes one task: its minute is that task's. */
-				const again = next && entry.at === undefined;
-				const draft = get().draft;
-				/** The next field keeps the project, not the level (the plugin's batch typing). */
-				set({ entry: again ? entry : null, entrySeq: get().entrySeq + 1, entryText: "", draft: again ? { level: null, project: draft.project } : NO_DRAFT });
-				const added = port.add(text, entry, draft);
-				write(added);
-				await added;
+				const done = port.commit(entry, text, draft, next);
+				const face = done.face;
+				set({
+					entry: done.next,
+					draft: done.draft,
+					entryText: "",
+					entrySeq: get().entrySeq + 1,
+					/** The new name on every card at once, until the write is read back (F298). */
+					...(face ? { shown: { ...shown, cards: { ...shown.cards, [face.id]: face } } } : {}),
+					/** A field in a menu's stack ends with the menu. */
+					...(entry.stack && !done.next ? { layer: null } : {}),
+				});
+				if (done.write) write(done.write);
 			},
 			start() {
 				const off = port.subscribe(refresh);

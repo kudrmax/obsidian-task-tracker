@@ -62,7 +62,7 @@ export function TaskScreen({ store, host, place }: { readonly store: ScreenStore
 /** The screen's element: its place's class, `is-entering` while a task is typed, new or renamed (Obsidian's phone toolbar stays away then, the design's «Полоса»). */
 function Root({ place, store }: { readonly place: Place; readonly store: ScreenStore }) {
 	/** A task typed: a new one, or one renamed in place (both the plugin's quick entry). */
-	const entering = useScreen((s) => s.entry !== null || s.renaming !== null);
+	const entering = useScreen((s) => s.entry !== null);
 	return (
 		<div className={`task-calendar is-engine is-${place}${entering ? " is-entering" : ""}`} onTouchStart={keepTouch} onTouchMove={keepTouch} onTouchEnd={keepTouch} onClick={(event) => letSelectionGo(event, store)}>
 			<Layout place={place} />

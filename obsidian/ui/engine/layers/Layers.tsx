@@ -163,7 +163,7 @@ export function MenuLayer({ open, onClose, root, reference, panelBy = null, labe
 		return open ? styles : (stood.current[part] ?? styles);
 	};
 	/** Closed by the click, not the press: the finger's tap ends on the backdrop, never on a card under the fading menu. */
-	const dismiss = useDismiss(lower.context, { outsidePressEvent: "click", outsidePress: (event) => !(event.target instanceof Node && [overEl, parts.current.upper, parts.current.lower].some((part) => part?.contains(event.target as Node))) });
+	const dismiss = useDismiss(lower.context, { outsidePressEvent: "click", outsidePress: (event) => !(event.target instanceof Element && ([overEl, parts.current.upper, parts.current.lower].some((part) => part?.contains(event.target as Node)) || event.target.closest(".tc-quick-bar, .tc-quick-panel"))) });
 	const { getFloatingProps } = useInteractions([dismiss, useRole(lower.context, { role: "menu" })]);
 	if (!isMounted) return null;
 	const settled = holdSplit || wanted === count || (wanted !== undefined && wanted >= groups.length && count === groups.length);
@@ -362,16 +362,17 @@ export function Pinned({ reference, placement, into, along, root, children }: Pi
  * The new task's capsule on the desktop (the design's «Десктоп: капсула у поля», F185): right under the field, right edges
  * together, 8 px from it; over the field where there is no room under it; out of sight while no part of the field shows.
  * Floating UI places it against the field and follows it as the field moves, grows or scrolls. On the phone the bar lies
- * over the keyboard by its CSS and nothing places it. A press on it never takes the focus from the field.
+ * over the keyboard by its CSS and nothing places it. A press on it never takes the focus from the field. A field in a
+ * menu's stack (`over`, the layer's `root`) takes it over the menu's blur, as the plugin's bar leaves the view for the page.
  */
-export function FieldBar({ desk, className, children }: { readonly desk: boolean; readonly className: string; readonly children: (side: "under" | "over", capsule: Element | null) => ReactNode }) {
+export function FieldBar({ desk, over, className, children }: { readonly desk: boolean; readonly over: HTMLElement | null; readonly className: string; readonly children: (side: "under" | "over", capsule: Element | null) => ReactNode }) {
 	const { field } = useField();
 	const [capsule, setCapsule] = useState<Element | null>(null);
 
 	const { refs, floatingStyles, placement, middlewareData, isPositioned } = useFloating({
 		open: desk,
 		placement: "bottom-end",
-		strategy: "absolute",
+		strategy: over ? "fixed" : "absolute",
 		transform: false,
 		middleware: [offset(DESIGN.deskBarGap), flip({ fallbackPlacements: ["top-end"], padding: DESIGN.wholeMargin }), hide()],
 		whileElementsMounted: autoUpdate,
@@ -387,17 +388,18 @@ export function FieldBar({ desk, className, children }: { readonly desk: boolean
 	);
 	const away = desk && (!isPositioned || middlewareData.hide?.referenceHidden === true);
 	const style: CSSProperties | undefined = desk ? floatingStyles : undefined;
-	return (
+	const bar = (
 		<div
 			ref={hold}
 			style={style}
-			className={`${className}${desk ? " is-desk" : ""}${away ? " is-away" : ""}`}
+			className={`${className}${desk ? " is-desk" : ""}${away ? " is-away" : ""}${over ? " is-over" : ""}`}
 			onPointerDown={keepFocus}
 			onMouseDown={keepFocus}
 		>
 			{children(placement.startsWith("top") ? "over" : "under", capsule)}
 		</div>
 	);
+	return over ? <FloatingPortal root={over}>{bar}</FloatingPortal> : bar;
 }
 
 /** A press on the bar or its panels leaves the focus in the field (the plugin's bar). */

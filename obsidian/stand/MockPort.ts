@@ -1,4 +1,4 @@
-import type { AllDayEvent, Block, CardFace, DayEvent, Destination, Edge, EditId, EntryBar, EntryDraft, EventPaint, ListData, ListId, MenuAction, MenuFrom, MenuModel, MoveId, Now, PlaceId, ReminderKind, StatusId, Row, ScreenData, ScreenPort } from "../ui/engine/port";
+import type { AllDayEvent, Block, CardFace, DayEvent, Destination, Edge, EditId, EntryBar, EntryCommit, EntryDraft, EntryField, EventPaint, ListData, ListId, MenuAction, MenuFrom, MenuModel, MoveId, Now, PlaceId, ReminderKind, RenameStart, StatusId, Row, ScreenData, ScreenPort } from "../ui/engine/port";
 import { bgAlphaFor, eventColors } from "../ui/eventColors";
 import { addDays, CALENDAR_COLORS, DAY_START_HOUR, dateOf, dayOf, fileText, LIST_KEYS, LIST_NAMES, type ListKey, MOCK_PROJECTS, type MockFile, type MockSection, type MockTask, minuteOf, mockFile } from "./mockData";
 
@@ -206,38 +206,133 @@ export class MockPort implements ScreenPort {
 		return { list: "inbox", before: null, dayOffset, depth: 1, under: id };
 	}
 
-	/** A new task (F190): Inbox and Soon without a date, a day's list with its date; on a day's calendar its time too, no length, at the end of Now (today) or Soon. */
 	/**
-	 * The bar by the plugin's rules, the simplest: the level buttons in a list (a field goes no deeper than one under the
-	 * task above it), the flag with a typed prefix winning over the level set, the project and the place but on a subtask's
-	 * field and the calendar's (the calendar's keeps the flag and the project).
+	 * The bar by the plugin's rules (the core's `QuickEntry.state`), the simplest: the level buttons in a list (a field goes
+	 * no deeper than one under the task above it; a rename's are shown but off), the flag with a typed prefix winning over
+	 * the level set, the project and the place on a task of the top level in a list; the calendar's field the flag and the
+	 * project; a field in a stack the flag only.
 	 */
-	entryBar(at: Destination, draft: EntryDraft, text: string): EntryBar {
+	entryBar(field: EntryField, draft: EntryDraft, text: string): EntryBar {
+		const { at, renaming, stack } = field;
 		const typed = /^(p1|p2) /.exec(text.trimStart())?.[1] ?? null;
 		const level = typed ?? draft.level;
-		const onCalendar = at.at !== undefined;
+		const inList = at.at === undefined && !stack;
 		const depth = at.depth ?? 0;
-		const sub = depth > 0 || at.under !== undefined;
+		const sub = renaming !== null ? !this.isTop(renaming) : depth > 0 || at.under !== undefined;
 		const today = dateOf(this.day());
 		const shownDay = dateOf(addDays(this.day(), at.dayOffset));
 		const here: PlaceId = at.backlog ? "backlog" : at.list === "inbox" ? "inbox" : at.list === "soon" ? "soon" : at.dayOffset <= 0 ? "now" : "date";
 		const title = (id: PlaceId) => (id === "date" ? `${Number(shownDay.slice(8))} ${MONTHS[Number(shownDay.slice(5, 7)) - 1].charAt(0)}${MONTHS[Number(shownDay.slice(5, 7)) - 1].slice(1).toLowerCase()}` : LIST_NAMES[id]);
-		const above = this.taskAbove(at);
+		const shifts = inList && renaming === null;
+		const above = shifts ? this.taskAbove(at) : null;
 		return {
-			indents: !onCalendar,
-			canIndent: !onCalendar && above !== null && depth <= above.depth,
-			canOutdent: !onCalendar && depth > 0,
+			indents: inList,
+			canIndent: shifts && above !== null && depth <= above.depth,
+			canOutdent: shifts && depth > 0,
 			levels: LEVELS.map((l) => ({ ...l, on: l.prefix === level })),
 			tint: level ? LEVEL_COLORS[level as "p1" | "p2"] : null,
-			projects: sub ? null : { options: MOCK_PROJECTS.map((p) => ({ ...p, on: p.name === draft.project })), lit: draft.project !== null },
-			where: sub || onCalendar ? null : { id: here, title: title(here) },
+			projects: sub || stack ? null : { options: MOCK_PROJECTS.map((p) => ({ ...p, on: p.name === draft.project })), lit: draft.project !== null },
+			where: sub || !inList ? null : { id: here, title: title(here) },
 			places: (["inbox", "backlog", "soon", "now", "date"] as const).map((id) => ({ id, title: id === "date" ? "Date" : LIST_NAMES[id], on: id === here })),
 			date: { today, picked: here === "date" || here === "now" ? shownDay : null },
 		};
 	}
 
+	/** Whether the task `id` stands at the top level of its list (not a subtask). */
+	private isTop(id: string): boolean {
+		const file = this.ahead ?? this.file;
+		const found = this.findBy(file, (t) => t.id === id);
+		return !!found && file[found.list].some((section) => section.tasks.includes(found.task));
+	}
+
+	/**
+	 * Rename (the core's `QuickEntry.open` with a task): in a list the field stands in the card's place, at its level; on the
+	 * calendar over its block; in a stack in the card's place in the menu. The bar starts with the task's level and project.
+	 */
+	rename(id: string, from: MenuFrom, dayOffset: number): RenameStart {
+		const task = this.findBy(this.ahead ?? this.file, (t) => t.id === id)?.task;
+		if (!task) throw new Error(`no task ${id}`);
+		const draft: EntryDraft = { level: task.level, project: task.project ?? null };
+		const field = (at: Destination, stack = false): RenameStart => ({ field: { at, renaming: id, stack }, draft, text: task.title });
+		if (from === "stack") return field({ list: "day", before: null, dayOffset }, true);
+		if (from === "calendar") return field({ list: "day", before: null, dayOffset, at: task.slot?.start ?? 0 });
+		const data = this.read(dayOffset);
+		for (const list of ["inbox", "soon", "day"] as const) {
+			const row = data.lists[list].rows.find((r) => r.id === id);
+			if (row?.kind === "task") return field({ list, before: id, dayOffset, depth: row.depth });
+		}
+		return field({ list: "inbox", before: id, dayOffset, depth: 0 });
+	}
+
+	/**
+	 * Enter and a tap elsewhere (the core's `QuickEntry.enter`, `blur`), the simplest: an empty text writes nothing, and Enter
+	 * on it steps a subtask's field a level out, else ends typing. A new task is written where the field stands; with Enter
+	 * the next field opens there, without the level but with the project (a field on the calendar takes one task). A rename
+	 * writes the title, level and project changed (nothing when none changed), moved where the bar's place says; Enter
+	 * opens a new task's field right under it in a list (its first subtask's place when it shows subtasks).
+	 */
+	commit(field: EntryField, text: string, draft: EntryDraft, next: boolean): EntryCommit {
+		const { at, renaming } = field;
+		const blank = text.trim() === "";
+		const fresh: EntryDraft = { level: null, project: null };
+		if (renaming !== null) {
+			const after = next && !blank && at.at === undefined && !field.stack ? this.under(renaming, at) : null;
+			const done = { next: after, draft: fresh };
+			const task = this.findBy(this.ahead ?? this.file, (t) => t.id === renaming)?.task;
+			if (blank || !task) return { ...done, write: null, face: null };
+			const { title, level } = this.parsed(text, draft);
+			const project = draft.project ?? undefined;
+			const moved = at.backlog === true || (at.at === undefined && !field.stack && at.before !== renaming);
+			if (title === task.title && level === task.level && project === task.project && !moved) return { ...done, write: null, face: null };
+			const write = this.write((file) => {
+				const t = this.findBy(file, (x) => x.id === renaming)?.task;
+				if (!t) return;
+				Object.assign(t, { title, level });
+				if (project === undefined) delete t.project;
+				else t.project = project;
+				if (!moved) return;
+				if (at.backlog) {
+					this.take(file, renaming);
+					Object.assign(t, { due: null, slot: null });
+					file.backlog[file.backlog.length - 1].tasks.push(t);
+				} else this.apply(file, renaming, { ...at, depth: 0 });
+			});
+			const face: CardFace = { ...this.faceOf(task, null), title, color: level ? LEVEL_COLORS[level] : null, due: this.read(at.dayOffset).cards[renaming]?.due ?? null };
+			return { ...done, write, face };
+		}
+		if (blank) {
+			const depth = at.depth ?? 0;
+			const out = next && depth > 0 && at.at === undefined && !field.stack;
+			return { write: null, face: null, next: out ? { ...field, at: { ...at, depth: depth - 1, under: undefined } } : null, draft: out ? draft : fresh };
+		}
+		const again = next && at.at === undefined;
+		return { write: this.add(text, at, draft), face: null, next: again ? field : null, draft: again ? { level: null, project: draft.project } : fresh };
+	}
+
+	/** The field of a new task right under the renamed `id` in its list (the core's `QuickEntry.under`): its first subtask's place when it shows subtasks, else its own level. */
+	private under(id: string, at: Destination): EntryField | null {
+		const rows = this.read(at.dayOffset).lists[at.list].rows;
+		const index = rows.findIndex((row) => row.id === id);
+		const row = rows[index];
+		if (row?.kind !== "task") return null;
+		const following = rows[index + 1];
+		const parent = following?.kind === "task" && following.depth > row.depth;
+		const head = rows.slice(0, index).reverse().find((r) => r.kind === "section");
+		return { at: { list: at.list, dayOffset: at.dayOffset, before: following?.kind === "task" ? following.id : null, section: head?.id ?? null, depth: row.depth + (parent ? 1 : 0) }, renaming: null, stack: false };
+	}
+
+	/** A typed text's title and level: a `p1 ` or `p2 ` prefix sets the level (F182), else the bar's. */
+	private parsed(text: string, draft: EntryDraft): { readonly title: string; readonly level: MockTask["level"] } {
+		const prefixed = /^(p1|p2) +(.*)$/.exec(text.trim());
+		return { title: prefixed ? prefixed[2] : text.trim(), level: (prefixed?.[1] ?? draft.level) as MockTask["level"] };
+	}
+
 	/** The end of the list picked, in its last section, at the top level; a day picked: Now for today and before, else that day's list; Backlog keeps the field where it stands. */
-	entryPlace(at: Destination, place: PlaceId, date: string | null): Destination {
+	entryPlace(field: EntryField, place: PlaceId, date: string | null): EntryField {
+		return { ...field, at: this.placeAt(field.at, place, date) };
+	}
+
+	private placeAt(at: Destination, place: PlaceId, date: string | null): Destination {
 		if (place === "backlog") return { ...at, backlog: true };
 		const dayOffset = place === "date" && date ? Math.round((new Date(Number(date.slice(0, 4)), Number(date.slice(5, 7)) - 1, Number(date.slice(8))).getTime() - this.day().getTime()) / 86_400_000) : place === "now" ? 0 : at.dayOffset;
 		const list: ListId = place === "inbox" ? "inbox" : place === "soon" ? "soon" : "day";
@@ -259,13 +354,12 @@ export class MockPort implements ScreenPort {
 		return row?.kind === "task" ? { depth: row.depth } : null;
 	}
 
-	async add(text: string, at: Destination, draft: EntryDraft = { level: null, project: null }): Promise<string> {
+	private async add(text: string, at: Destination, draft: EntryDraft): Promise<string> {
 		const id = `x${++this.added}`;
 		await this.write((file) => {
-			/** A level's prefix typed first sets it (F182): «p1 Купить молоко». */
-			const prefixed = /^(p1|p2) +(.*)$/.exec(text.trim());
-			const task = this.newTask(prefixed ? prefixed[2] : text.trim(), null, id);
-			task.level = (prefixed?.[1] ?? draft.level) as MockTask["level"];
+			const { title, level } = this.parsed(text, draft);
+			const task = this.newTask(title, null, id);
+			task.level = level;
 			if (draft.project) task.project = draft.project;
 			if (at.backlog) {
 				task.due = null;
@@ -353,9 +447,6 @@ export class MockPort implements ScreenPort {
 					return;
 				case "reminder":
 					task.reminder = action.reminder;
-					return;
-				case "rename":
-					task.title = action.text.trim() || task.title;
 					return;
 				case "delete":
 					this.take(file, id);

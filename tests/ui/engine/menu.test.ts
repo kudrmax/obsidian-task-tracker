@@ -148,30 +148,86 @@ describe("the menu's fields and the plus, in the store", () => {
 	it("the plus opens the field at the end of the day's list while it shows, else of Inbox's last section (F174)", () => {
 		const { store } = screen();
 		store.getState().plusTap(["soon", "day"]);
-		expect(store.getState().entry).toMatchObject({ list: "day", before: null, depth: 0 });
+		expect(store.getState().entry).toMatchObject({ at: { list: "day", before: null, depth: 0 }, renaming: null, stack: false });
 		store.getState().plusTap(["inbox", "soon"]);
-		const entry = store.getState().entry!;
+		const entry = store.getState().entry!.at;
 		expect(entry.list).toBe("inbox");
 		expect(store.getState().shown.lists.inbox.rows.find((r) => r.kind === "section" && r.id === entry.section)).toMatchObject({ title: "Идеи" });
 	});
 
-	it("Rename closes the menu and makes the card the field; the new name shows at once, then is written (F117, F298)", async () => {
-		const { p, store } = screen();
+	/** Max, 2026-11-20: «Rename and creating a task are literally one interface». */
+	it("Rename is the new task's field: the card's place, the title in it, the bar as the plugin's rename has it (quick-add spec §4.8)", () => {
+		const { store } = screen();
 		const id = firstInbox(store);
 		store.getState().openMenu(id);
 		store.getState().startRename();
-		expect(store.getState().layer).toBeNull();
-		expect(store.getState().renaming).toBe(id);
-		store.getState().endRename("Новое имя");
-		expect(store.getState().renaming).toBeNull();
+		const s = store.getState();
+		expect(s.layer).toBeNull();
+		expect(s.entry).toMatchObject({ renaming: id, stack: false, at: { list: "inbox", before: id, depth: 0 } });
+		expect(s.entryText).toBe(s.shown.cards[id].title);
+		const bar = s.entryBar(s.entry!, s.draft, s.entryText);
+		expect(bar).toMatchObject({ indents: true, canIndent: false, canOutdent: false, where: { id: "inbox" } });
+		expect(bar.projects).not.toBeNull();
+		store.getState().indentEntry(1);
+		expect(store.getState().entry!.at.depth).toBe(0);
+	});
+
+	it("a subtask's rename has no place and no project; a block's has the flag and the project; a stack card's the flag only", () => {
+		const lists = screen().store;
+		const sub = (["inbox", "soon", "day"] as const).flatMap((l) => lists.getState().shown.lists[l].rows).find((r) => r.kind === "task" && r.depth > 0)!.id;
+		lists.getState().openMenu(sub);
+		lists.getState().startRename();
+		let s = lists.getState();
+		expect(s.entryBar(s.entry!, s.draft, s.entryText)).toMatchObject({ indents: true, canIndent: false, projects: null, where: null });
+		const store = createScreenStore(port(calendarFile(NOW)));
+		store.getState().start();
+		store.getState().openMenu("k8", "calendar");
+		store.getState().startRename();
+		s = store.getState();
+		expect(s.entry).toMatchObject({ renaming: "k8", stack: false });
+		const block = s.entryBar(s.entry!, s.draft, s.entryText);
+		expect(block).toMatchObject({ indents: false, where: null });
+		expect(block.projects).not.toBeNull();
+		store.getState().openEntry(null);
+		store.getState().openMenu("k8", "calendar");
+		const child = (store.getState().layer!.model as { subtasks: readonly string[] }).subtasks[0];
+		store.getState().openMenu(child, "stack");
+		store.getState().startRename();
+		s = store.getState();
+		expect(s.layer?.id).toBe(child);
+		expect(s.entry).toMatchObject({ renaming: child, stack: true });
+		expect(s.entryBar(s.entry!, s.draft, s.entryText)).toMatchObject({ indents: false, projects: null, where: null });
+	});
+
+	it("Enter on a rename shows the new name at once, writes it and opens a new task's field right under it (F117, F298)", async () => {
+		const { p, store } = screen();
+		const rows = store.getState().shown.lists.inbox.rows;
+		const id = firstInbox(store);
+		const after = rows[rows.findIndex((r) => r.id === id) + 1];
+		store.getState().openMenu(id);
+		store.getState().startRename();
+		store.getState().commitEntry("Новое имя", true);
 		expect(store.getState().shown.cards[id].title).toBe("Новое имя");
+		expect(store.getState().entry).toMatchObject({ renaming: null, at: { list: "inbox", before: after?.kind === "task" ? after.id : null } });
 		await settle();
 		await settle();
 		expect(p.fileText()).toContain("Новое имя");
-		store.getState().openMenu(id);
-		store.getState().startRename();
-		store.getState().endRename(null);
-		expect(store.getState().shown.cards[id].title).toBe("Новое имя");
+	});
+
+	it("an empty or unchanged name writes nothing; the port decides, not the store", async () => {
+		const { p, store } = screen();
+		const id = firstInbox(store);
+		const title = store.getState().shown.cards[id].title;
+		const before = p.fileText();
+		for (const text of ["   ", title]) {
+			store.getState().openMenu(id);
+			store.getState().startRename();
+			store.getState().commitEntry(text, false);
+			expect(store.getState().entry).toBeNull();
+		}
+		await settle();
+		expect(p.fileText()).toBe(before);
+		expect(store.getState().shown.cards[id].title).toBe(title);
 	});
 
 	it("Add subtask in a list opens the field under the task's last subtask, written as its last subtask (F124)", async () => {
@@ -180,8 +236,9 @@ describe("the menu's fields and the plus, in the store", () => {
 		store.getState().start();
 		store.getState().openMenu("g1");
 		store.getState().startSubtask();
-		expect(store.getState().entry).toMatchObject({ list: "soon", depth: 1, under: "g1" });
-		await store.getState().commitEntry("Шаг", true);
+		expect(store.getState().entry).toMatchObject({ at: { list: "soon", depth: 1, under: "g1" }, stack: false });
+		store.getState().commitEntry("Шаг", true);
+		await settle();
 		await settle();
 		expect(p.fileText()).toMatch(/Купить подарок\n\t- \[ \] Шаг/);
 	});
@@ -192,14 +249,18 @@ describe("the menu's fields and the plus, in the store", () => {
 		store.getState().start();
 		store.getState().openMenu("k8", "calendar");
 		store.getState().startSubtask();
-		expect(store.getState().layer?.field).toBe("subtask");
-		store.getState().commitStackSubtask("Отключить интернет");
+		expect(store.getState().entry).toMatchObject({ stack: true, renaming: null });
+		store.getState().indentEntry(1);
+		expect(store.getState().entry!.at.depth).toBeUndefined();
+		store.getState().commitEntry("Отключить интернет", true);
 		await settle();
 		await settle();
 		const model = store.getState().layer?.model;
 		expect(model?.kind === "task" && model.subtasks.length).toBe(3);
-		store.getState().commitStackSubtask("");
+		expect(store.getState().entry).toMatchObject({ stack: true });
+		store.getState().commitEntry("", true);
 		expect(store.getState().layer).toBeNull();
+		expect(store.getState().entry).toBeNull();
 	});
 });
 

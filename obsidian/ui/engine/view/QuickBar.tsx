@@ -21,7 +21,7 @@ const PLACE_ICONS: Readonly<Record<PlaceId, IconName>> = { inbox: "inbox", backl
  */
 export const QuickBar = memo(function QuickBar() {
 	const api = useScreenApi();
-	const { desk } = useHost();
+	const { desk, layerRoot } = useHost();
 	const entry = useScreen((s) => s.entry);
 	const draft = useScreen((s) => s.draft);
 	const text = useScreen((s) => s.entryText);
@@ -34,21 +34,20 @@ export const QuickBar = memo(function QuickBar() {
 	const toggle = (kind: PanelKind) => setPanel((open) => (open === kind || (open === "date" && kind === "where") ? null : kind));
 	const close = () => setPanel(null);
 	return (
-		<FieldBar desk={desk} className="tc-quick-bar">
+		<FieldBar desk={desk} over={entry.stack ? layerRoot : null} className="tc-quick-bar is-engine">
 			{(side, capsule) => {
 				const away = side === "under" ? "under" : "over";
 				return (
 					<>
-						{bar.indents ? (
-							<span className="tc-bar-shifts">
-								<button type="button" className="tc-btn is-bar is-plain tc-bar-shift tc-bar-outdent" aria-label="Move out" title="Move out (Shift+Tab)" disabled={!bar.canOutdent} onClick={() => api.getState().indentEntry(-1)}>
-									<Icon name="outdent" />
-								</button>
-								<button type="button" className="tc-btn is-bar is-plain tc-bar-shift tc-bar-indent" aria-label="Move in" title="Move in (Tab)" disabled={!bar.canIndent} onClick={() => api.getState().indentEntry(1)}>
-									<Icon name="indent" />
-								</button>
-							</span>
-						) : null}
+						{/* Hidden, not left out, where the field has no levels: the capsule's rule beside them goes with them (the plugin's CSS). */}
+						<span className="tc-bar-shifts" hidden={!bar.indents}>
+							<button type="button" className="tc-btn is-bar is-plain tc-bar-shift tc-bar-outdent" aria-label="Move out" title="Move out (Shift+Tab)" hidden={!bar.indents} disabled={!bar.canOutdent} onClick={() => api.getState().indentEntry(-1)}>
+								<Icon name="outdent" />
+							</button>
+							<button type="button" className="tc-btn is-bar is-plain tc-bar-shift tc-bar-indent" aria-label="Move in" title="Move in (Tab)" hidden={!bar.indents} disabled={!bar.canIndent} onClick={() => api.getState().indentEntry(1)}>
+								<Icon name="indent" />
+							</button>
+						</span>
 						<span className="tc-bar-spacer" />
 						<button ref={setFlagEl} type="button" className={`tc-btn is-bar is-plain tc-bar-flag${bar.tint ? " is-set" : ""}`} data-priority={bar.tint ?? undefined} aria-label="Priority" title="Priority" onClick={() => toggle("priority")}>
 							<Icon name="priority" />
