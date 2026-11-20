@@ -636,11 +636,14 @@ export class QuickEntry {
 		this.reset({ ...field, projects: has ? own.filter((p) => !inProject(p, name)) : [...own, name] }, true);
 	}
 
-	/** Description on the bar: the line under the title opens, empty, for the caret; one open stays as it is. Only where the bar offers it. */
+	/**
+	 * Description on the bar: the line under the title opens for the caret, holding a renamed task's own description, else
+	 * empty; one open stays as it is. Only where the bar offers it.
+	 */
 	openDescription(): void {
 		const field = this.session.field;
 		if (!field || field.description != null || !this.offers("description")) return;
-		this.reset({ ...field, description: "" }, true);
+		this.reset({ ...field, description: field.rename?.item.description ?? "" }, true);
 	}
 
 	/** The description's line typed: its text, written with the title by Enter or a tap away. */
@@ -1054,7 +1057,7 @@ export class QuickEntry {
 	private saveRename(field: EntryField, { item, home }: EntryRename): void {
 		const own = item.projects.map((p) => p.name);
 		const projects = field.projects === undefined || sameProjects(own, field.projects) ? {} : { projects: field.projects };
-		const description = typedDescription(field.description);
+		const description = field.description != null && field.description !== (item.description ?? "") ? field.description : null;
 		const draft: TaskDraft = { text: field.text, placement: this.placement(field), priority: field.priority, ...(!sameNames(field.labels, item.labels.map((l) => l.name)) && { labels: field.labels }), ...(!sameRule(field.repeat, item.repeat) && { repeat: field.repeat }), ...projects, ...(description !== null && { description }) };
 		this.queue(home, { id: this.jobId(), kind: "rename", home, item, draft });
 	}

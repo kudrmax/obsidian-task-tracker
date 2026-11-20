@@ -25,6 +25,6 @@ export interface TaskDraft {
 	readonly projects?: readonly string[];
 	/** One project in place of all (null: none), when `projects` is left out: the quick entry's single choice. */
 	readonly project?: string | null;
-	/** A description written with the edit, as `setDescription` writes it; undefined leaves the task's own. */
+	/** A description written with the edit, as `setDescription` writes it (empty takes it off); undefined leaves the task's own. */
 	readonly description?: string;
 }

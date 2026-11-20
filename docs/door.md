@@ -752,7 +752,7 @@ groups `mode` (`newSection`, the new section switch, its own id beside the menu'
 are read from it and stay. A field on the calendar now offers Repeat, written with the task. Added methods:
 `toggleProject(name)` (the Project page's tap, several projects as the menu's page: on beside the others, or off; a
 rename keeps the task's other projects; `setProject(link)` still makes one alone, `null` none), `openDescription()`
-(Description on the bar: `state.description` turns from `null` to `""`, the line under the title) and
+(Description on the bar: `state.description` turns from `null` to `""`, or to a renamed task's own description; a rename writes it only when changed) and
 `typeDescription(text)`; Enter or `blur()` writes it with the title, a blank one nothing. A created task's job then
 hands `createInPlace` an eighth argument, the description, with `null` in the slots before it; a rename's `edit` draft
 carries `description`. A line with several projects hands their names as an array in the sixth argument (one stays a

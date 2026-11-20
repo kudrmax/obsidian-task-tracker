@@ -4554,11 +4554,9 @@ ${key.title}`.toLowerCase();
   var COLUMNS = /* @__PURE__ */ new Set(["day", "soon", "inbox", "backlog"]);
   var FIRST_STEP_FROM = /* @__PURE__ */ new Set([...COLUMNS, "timeline"]);
   var fromOf = (ctx) => ctx.of.kind === "task" ? ctx.of.from : null;
-  function dayTile(ctx) {
-    const movable = ctx.items.filter((item) => item.can.postpone);
-    if (movable.length === 0) return null;
-    const tomorrow = addDays(ctx.today, 1);
-    return movable.every((item) => item.day === tomorrow) ? "today" : "tomorrow";
+  function offersDay(ctx, days) {
+    const date = addDays(ctx.today, days);
+    return ctx.items.some((item) => item.can.postpone && item.day !== date);
   }
   var levelOffer = (count, holders) => count === 0 ? "hidden" : holders ? "shown" : "disabled";
   var ONE_TASK = "It is about one task: each picked task has its own.";
@@ -4623,8 +4621,8 @@ ${key.title}`.toLowerCase();
     today: {
       name: "Today",
       places: {
-        taskMenu: { group: "when", order: 0, offer: (ctx) => shown2(dayTile(ctx) === "today") },
-        bulkMenu: { group: "when", order: 0, offer: (ctx) => shown2(dayTile(ctx) === "today") },
+        taskMenu: { group: "when", order: 0, offer: (ctx) => shown2(offersDay(ctx, 0)) },
+        bulkMenu: { group: "when", order: 0, offer: (ctx) => shown2(offersDay(ctx, 0)) },
         field: { absent: IN_THE_PLACE },
         fullScreen: { absent: IN_THE_MENU }
       }
@@ -4632,8 +4630,8 @@ ${key.title}`.toLowerCase();
     tomorrow: {
       name: "Tomorrow",
       places: {
-        taskMenu: { group: "when", order: 0, offer: (ctx) => shown2(dayTile(ctx) === "tomorrow") },
-        bulkMenu: { group: "when", order: 0, offer: (ctx) => shown2(dayTile(ctx) === "tomorrow") },
+        taskMenu: { group: "when", order: 1, offer: (ctx) => shown2(offersDay(ctx, 1)) },
+        bulkMenu: { group: "when", order: 1, offer: (ctx) => shown2(offersDay(ctx, 1)) },
         field: { absent: IN_THE_PLACE },
         fullScreen: { absent: IN_THE_MENU }
       }
@@ -4641,8 +4639,8 @@ ${key.title}`.toLowerCase();
     pickDate: {
       name: "Pick a date",
       places: {
-        taskMenu: { group: "when", order: 1, offer: (ctx) => shown2(ctx.items.some((item) => item.can.postpone)) },
-        bulkMenu: { group: "when", order: 1, offer: (ctx) => shown2(ctx.items.some((item) => item.can.postpone)) },
+        taskMenu: { group: "when", order: 2, offer: (ctx) => shown2(ctx.items.some((item) => item.can.postpone)) },
+        bulkMenu: { group: "when", order: 2, offer: (ctx) => shown2(ctx.items.some((item) => item.can.postpone)) },
         field: { group: "place", order: 0, offer: (ctx) => shown2(ctx.task && ctx.place) },
         fullScreen: { absent: IN_THE_MENU }
       }
@@ -4650,8 +4648,8 @@ ${key.title}`.toLowerCase();
     repeat: {
       name: "Repeat",
       places: {
-        taskMenu: { group: "when", order: 2, offer: (ctx) => shown2(ctx.items.every((item) => item.repeatable)) },
-        bulkMenu: { group: "when", order: 2, offer: (ctx) => shown2(ctx.items.some((item) => item.repeatable)) },
+        taskMenu: { group: "when", order: 3, offer: (ctx) => shown2(ctx.items.every((item) => item.repeatable)) },
+        bulkMenu: { group: "when", order: 3, offer: (ctx) => shown2(ctx.items.some((item) => item.repeatable)) },
         field: { group: "marks", order: 1, offer: (ctx) => shown2(ctx.task && (ctx.renaming?.repeatable ?? true)) },
         fullScreen: { absent: IN_THE_MENU }
       }
@@ -4659,7 +4657,7 @@ ${key.title}`.toLowerCase();
     reminder: {
       name: "Reminder",
       places: {
-        taskMenu: { group: "when", order: 3, offer: (ctx) => shown2(ctx.items.every((item) => item.can.remind)) },
+        taskMenu: { group: "when", order: 4, offer: (ctx) => shown2(ctx.items.every((item) => item.can.remind)) },
         bulkMenu: { absent: "A reminder belongs to one task on a time; each is set in its own menu." },
         field: { absent: "A reminder belongs to a task on a time; it is set in the task's menu once the task is written." },
         fullScreen: { absent: IN_THE_MENU }
@@ -4679,7 +4677,7 @@ ${key.title}`.toLowerCase();
       places: {
         taskMenu: { group: "edit", order: 1, offer: (ctx) => shown2(ctx.items.every((item) => item.can.addDescription)) },
         bulkMenu: { absent: ONE_TASK },
-        field: { group: "marks", order: 2, offer: (ctx) => shown2(ctx.task && (ctx.renaming?.can.addDescription ?? true)) },
+        field: { group: "marks", order: 2, offer: (ctx) => shown2(ctx.task) },
         fullScreen: { group: "description", order: 0, offer: always }
       }
     },
@@ -5445,11 +5443,14 @@ ${key.title}`.toLowerCase();
       if (!has && !this.mayTake(field, name)) return;
       this.reset({ ...field, projects: has ? own.filter((p) => !inProject(p, name)) : [...own, name] }, true);
     }
-    /** Description on the bar: the line under the title opens, empty, for the caret; one open stays as it is. Only where the bar offers it. */
+    /**
+     * Description on the bar: the line under the title opens for the caret, holding a renamed task's own description, else
+     * empty; one open stays as it is. Only where the bar offers it.
+     */
     openDescription() {
       const field = this.session.field;
       if (!field || field.description != null || !this.offers("description")) return;
-      this.reset({ ...field, description: "" }, true);
+      this.reset({ ...field, description: field.rename?.item.description ?? "" }, true);
     }
     /** The description's line typed: its text, written with the title by Enter or a tap away. */
     typeDescription(text) {
@@ -5815,7 +5816,7 @@ ${key.title}`.toLowerCase();
     saveRename(field, { item, home }) {
       const own = item.projects.map((p) => p.name);
       const projects = field.projects === void 0 || sameProjects(own, field.projects) ? {} : { projects: field.projects };
-      const description = typedDescription(field.description);
+      const description = field.description != null && field.description !== (item.description ?? "") ? field.description : null;
       const draft = { text: field.text, placement: this.placement(field), priority: field.priority, ...!sameNames(field.labels, item.labels.map((l) => l.name)) && { labels: field.labels }, ...!sameRule(field.repeat, item.repeat) && { repeat: field.repeat }, ...projects, ...description !== null && { description } };
       this.queue(home, { id: this.jobId(), kind: "rename", home, item, draft });
     }
@@ -7555,7 +7556,7 @@ ${key.title}`.toLowerCase();
         const entry = tags.find(tagged, 0);
         const placed = placeTask(tagged, entry, { ...draft, text: EntryTags.marked(taskTitle(draft.text), 0) }, today, void 0, boundary);
         const written = tags.find(placed, 0);
-        const edited = written && draft.description !== void 0 && draft.description.trim() !== "" ? setDescription(placed, written, draft.description) : placed;
+        const edited = written && draft.description !== void 0 ? setDescription(placed, written, draft.description) : placed;
         const moved2 = tags.find(edited, 0);
         place = moved2 && { section: moved2.section, index: moved2.index, path: moved2.path, raw: "" };
         return tags.untag(edited);

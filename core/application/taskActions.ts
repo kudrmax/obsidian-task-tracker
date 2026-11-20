@@ -121,12 +121,10 @@ const FIRST_STEP_FROM: ReadonlySet<MenuFrom> = new Set<MenuFrom>([...COLUMNS, "t
 
 const fromOf = (ctx: MenuContext): MenuFrom | null => (ctx.of.kind === "task" ? ctx.of.from : null);
 
-/** The tasks that may be put off; the day tile offers Today instead of Tomorrow only when every one already stands on tomorrow. */
-function dayTile(ctx: MenuContext): "today" | "tomorrow" | null {
-	const movable = ctx.items.filter((item) => item.can.postpone);
-	if (movable.length === 0) return null;
-	const tomorrow = addDays(ctx.today, 1);
-	return movable.every((item) => item.day === tomorrow) ? "today" : "tomorrow";
+/** A day tile is offered while one of the tasks that may be put off doesn't stand on that day already. */
+function offersDay(ctx: MenuContext, days: number): boolean {
+	const date = addDays(ctx.today, days);
+	return ctx.items.some((item) => item.can.postpone && item.day !== date);
 }
 
 const levelOffer = (count: number, holders: boolean): Offer => (count === 0 ? "hidden" : holders ? "shown" : "disabled");
@@ -198,8 +196,8 @@ export const TASK_ACTIONS = {
 	today: {
 		name: "Today",
 		places: {
-			taskMenu: { group: "when", order: 0, offer: (ctx) => shown(dayTile(ctx) === "today") },
-			bulkMenu: { group: "when", order: 0, offer: (ctx) => shown(dayTile(ctx) === "today") },
+			taskMenu: { group: "when", order: 0, offer: (ctx) => shown(offersDay(ctx, 0)) },
+			bulkMenu: { group: "when", order: 0, offer: (ctx) => shown(offersDay(ctx, 0)) },
 			field: { absent: IN_THE_PLACE },
 			fullScreen: { absent: IN_THE_MENU },
 		},
@@ -207,8 +205,8 @@ export const TASK_ACTIONS = {
 	tomorrow: {
 		name: "Tomorrow",
 		places: {
-			taskMenu: { group: "when", order: 0, offer: (ctx) => shown(dayTile(ctx) === "tomorrow") },
-			bulkMenu: { group: "when", order: 0, offer: (ctx) => shown(dayTile(ctx) === "tomorrow") },
+			taskMenu: { group: "when", order: 1, offer: (ctx) => shown(offersDay(ctx, 1)) },
+			bulkMenu: { group: "when", order: 1, offer: (ctx) => shown(offersDay(ctx, 1)) },
 			field: { absent: IN_THE_PLACE },
 			fullScreen: { absent: IN_THE_MENU },
 		},
@@ -216,8 +214,8 @@ export const TASK_ACTIONS = {
 	pickDate: {
 		name: "Pick a date",
 		places: {
-			taskMenu: { group: "when", order: 1, offer: (ctx) => shown(ctx.items.some((item) => item.can.postpone)) },
-			bulkMenu: { group: "when", order: 1, offer: (ctx) => shown(ctx.items.some((item) => item.can.postpone)) },
+			taskMenu: { group: "when", order: 2, offer: (ctx) => shown(ctx.items.some((item) => item.can.postpone)) },
+			bulkMenu: { group: "when", order: 2, offer: (ctx) => shown(ctx.items.some((item) => item.can.postpone)) },
 			field: { group: "place", order: 0, offer: (ctx) => shown(ctx.task && ctx.place) },
 			fullScreen: { absent: IN_THE_MENU },
 		},
@@ -225,8 +223,8 @@ export const TASK_ACTIONS = {
 	repeat: {
 		name: "Repeat",
 		places: {
-			taskMenu: { group: "when", order: 2, offer: (ctx) => shown(ctx.items.every((item) => item.repeatable)) },
-			bulkMenu: { group: "when", order: 2, offer: (ctx) => shown(ctx.items.some((item) => item.repeatable)) },
+			taskMenu: { group: "when", order: 3, offer: (ctx) => shown(ctx.items.every((item) => item.repeatable)) },
+			bulkMenu: { group: "when", order: 3, offer: (ctx) => shown(ctx.items.some((item) => item.repeatable)) },
 			field: { group: "marks", order: 1, offer: (ctx) => shown(ctx.task && (ctx.renaming?.repeatable ?? true)) },
 			fullScreen: { absent: IN_THE_MENU },
 		},
@@ -234,7 +232,7 @@ export const TASK_ACTIONS = {
 	reminder: {
 		name: "Reminder",
 		places: {
-			taskMenu: { group: "when", order: 3, offer: (ctx) => shown(ctx.items.every((item) => item.can.remind)) },
+			taskMenu: { group: "when", order: 4, offer: (ctx) => shown(ctx.items.every((item) => item.can.remind)) },
 			bulkMenu: { absent: "A reminder belongs to one task on a time; each is set in its own menu." },
 			field: { absent: "A reminder belongs to a task on a time; it is set in the task's menu once the task is written." },
 			fullScreen: { absent: IN_THE_MENU },
@@ -254,7 +252,7 @@ export const TASK_ACTIONS = {
 		places: {
 			taskMenu: { group: "edit", order: 1, offer: (ctx) => shown(ctx.items.every((item) => item.can.addDescription)) },
 			bulkMenu: { absent: ONE_TASK },
-			field: { group: "marks", order: 2, offer: (ctx) => shown(ctx.task && (ctx.renaming?.can.addDescription ?? true)) },
+			field: { group: "marks", order: 2, offer: (ctx) => shown(ctx.task) },
 			fullScreen: { group: "description", order: 0, offer: always },
 		},
 	},

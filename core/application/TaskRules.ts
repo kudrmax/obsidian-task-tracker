@@ -328,7 +328,7 @@ export class TaskRules {
 			const entry = tags.find(tagged, 0)!;
 			const placed = ops.placeTask(tagged, entry, { ...draft, text: EntryTags.marked(taskTitle(draft.text), 0) }, today, undefined, boundary);
 			const written = tags.find(placed, 0);
-			const edited = written && draft.description !== undefined && draft.description.trim() !== "" ? ops.setDescription(placed, written, draft.description) : placed;
+			const edited = written && draft.description !== undefined ? ops.setDescription(placed, written, draft.description) : placed;
 			const moved = tags.find(edited, 0);
 			place = moved && { section: moved.section, index: moved.index, path: moved.path, raw: "" };
 			return tags.untag(edited);

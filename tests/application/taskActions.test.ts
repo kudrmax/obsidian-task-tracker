@@ -32,8 +32,7 @@ describe("the table of task actions", () => {
 				const cell = placementOf(id, surface);
 				return "absent" in cell ? [] : [`${cell.group}:${cell.order}`];
 			});
-			const days = surface === "taskMenu" || surface === "bulkMenu" ? 1 : 0;
-			expect(new Set(spots).size, surface).toBe(spots.length - days);
+			expect(new Set(spots).size, surface).toBe(spots.length);
 		}
 	});
 
@@ -75,10 +74,15 @@ describe("one task's menu, as Max ordered it (2026-11-20)", () => {
 		]);
 	});
 
-	it("offers Today in Tomorrow's place to a task already on tomorrow, with the day it writes", () => {
-		const model = taskMenu([item({ day: TOMORROW, dueDate: TOMORROW })], T, [], [], null, { kind: "task", from: "day" });
-		const when = model.layout.find((g) => g.group === "when")!;
-		expect(when.actions.map((a) => [a.id, a.date])).toEqual([
+	it("offers Today and Tomorrow, each with the day it writes, without the day the task stands on", () => {
+		const when = (task: TaskItem) => taskMenu([task], T, [], [], null, { kind: "task", from: "day" }).layout.find((g) => g.group === "when")!.actions.map((a) => [a.id, a.date]);
+		expect(when(item({ key: { section: "inbox", index: 0, path: [], raw: "- [ ] I" }, day: null }))).toEqual([
+			["today", T],
+			["tomorrow", TOMORROW],
+			["pickDate", null],
+			["repeat", null],
+		]);
+		expect(when(item({ day: TOMORROW, dueDate: TOMORROW }))).toEqual([
 			["today", T],
 			["pickDate", null],
 			["repeat", null],

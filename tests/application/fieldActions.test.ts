@@ -57,7 +57,7 @@ describe("the field's bar, read from the table of task actions", () => {
 		]);
 	});
 
-	it("offers a rename no new section, the shifts not pressable, and Description only to a task without one", () => {
+	it("offers a rename no new section, the shifts not pressable, and Description whether the task has one or not", () => {
 		const { entry } = setUp([card("A", 0)]);
 		const a = task("A");
 		entry.open(atEnd(0), a);
@@ -65,7 +65,7 @@ describe("the field's bar, read from the table of task actions", () => {
 		expect(bar(entry.state)?.map(([g]) => g)).not.toContain("mode");
 		expect(bar(entry.state)?.find(([g]) => g === "marks")?.[1]).toContain("description");
 		entry.open(atEnd(0), task("A", { description: "- note", can: { ...a.can, addDescription: false } }));
-		expect(bar(entry.state)?.find(([g]) => g === "marks")?.[1]).not.toContain("description");
+		expect(bar(entry.state)?.find(([g]) => g === "marks")?.[1]).toContain("description");
 	});
 
 	it("offers a section's name only the switch, lit", () => {
@@ -118,6 +118,22 @@ describe("the field's description", () => {
 		entry.typeDescription("  ");
 		entry.blur();
 		expect(call()?.args[7]).toBeUndefined();
+	});
+
+	it("opens in a rename holding the task's own description; Enter writes both, and an untouched one is not written", () => {
+		const { entry, call } = setUp([card("A", 0)]);
+		const a = task("A", { description: "old note" });
+		entry.open(atEnd(0), a);
+		entry.openDescription();
+		expect(entry.state?.description).toBe("old note");
+		entry.typeDescription("new note");
+		entry.enter();
+		expect(call()).toMatchObject({ method: "edit", args: [expect.anything(), { text: "A", description: "new note" }] });
+		entry.open(atEnd(0), a);
+		entry.openDescription();
+		entry.type("A2");
+		entry.enter();
+		expect(call()?.args[1]).not.toHaveProperty("description");
 	});
 
 	it("goes with a rename into the edit", () => {
