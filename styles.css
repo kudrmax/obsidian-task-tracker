@@ -1914,8 +1914,8 @@ body.theme-light .tc-menu-over .tc-event { --tc-event-bg: var(--tc-event-bg-ligh
 /* A label, a task's name in a question or a row's value too long for its room fades out at the right, as the plugin marks it: the box scrolls only when its text is cut, and only then its scroll timeline runs the fade. */
 @keyframes tc-cut-tile { from, to { text-align: left; -webkit-mask-image: var(--tc-fade-tile-end); mask-image: var(--tc-fade-tile-end); } }
 @keyframes tc-cut-value { from, to { -webkit-mask-image: var(--tc-fade-card-end); mask-image: var(--tc-fade-card-end); } }
-.tc-menu-layer :is(.tc-menu-tile-label, .tc-menu-ask-title) { animation-name: tc-cut-tile; animation-fill-mode: both; animation-timeline: scroll(self inline); }
-.tc-menu-layer .tc-menu-value { animation-name: tc-cut-value; animation-fill-mode: both; animation-timeline: scroll(self inline); }
+:is(.tc-menu-layer, .tc-quick-panel) :is(.tc-menu-tile-label, .tc-menu-ask-title) { animation-name: tc-cut-tile; animation-fill-mode: both; animation-timeline: scroll(self inline); }
+:is(.tc-menu-layer, .tc-quick-panel) .tc-menu-value { animation-name: tc-cut-value; animation-fill-mode: both; animation-timeline: scroll(self inline); }
 @keyframes tc-cut-peek { from, to { -webkit-mask-image: var(--tc-fade-peek-bottom); mask-image: var(--tc-fade-peek-bottom); } }
 .tc-level.tc-menu-layer > .tc-desc-peek .tc-desc-text { animation-name: tc-cut-peek; animation-fill-mode: both; animation-timeline: scroll(self block); }
 /* The calendar's task renamed (F108): the field over the block's place, from its top, growing down for a long name; the block's own card hidden under it. */

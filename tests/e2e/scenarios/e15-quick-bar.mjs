@@ -97,6 +97,8 @@ export default {
 			const tiles = await t.cdp.eval(`[...document.querySelectorAll(".tc-quick-panel .tc-menu-tile")].map((e) => e.textContent + (e.classList.contains("is-on") ? "*" : ""))`);
 			t.expect(JSON.stringify(tiles) === JSON.stringify(["Inbox", "Backlog", "Soon", "Now*", "Date"]), `five places, the field's own on: ${JSON.stringify(tiles)}`);
 			await t.shot("place-panel");
+			const cut = await t.cdp.eval(`(() => { const l = [...document.querySelectorAll(".tc-quick-panel .tc-menu-tile-label")].find((e) => e.scrollWidth > e.clientWidth); return l ? getComputedStyle(l).maskImage : "none cut"; })()`);
+			t.expect(cut === "none cut" || cut.includes("gradient"), `a place's name too long for its tile fades out: ${cut}`);
 			await tile("Inbox");
 			await t.sleep(500);
 			const inbox = await field();

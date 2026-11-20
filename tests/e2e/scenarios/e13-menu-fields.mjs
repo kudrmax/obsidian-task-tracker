@@ -40,6 +40,7 @@ export default {
 			const faults = closingFaults(closing).filter((f) => !f.startsWith("still there"));
 			t.expect(faults.length === 0, `the menu fades out where it stood as the card becomes the field: ${JSON.stringify(faults.slice(0, 4))}`);
 			const f = await field();
+			t.expect(await t.cdp.eval(`!!document.querySelector(".task-calendar.is-entering")`), "while renaming the screen is entering (Obsidian's phone toolbar stays away)");
 			t.expect(f && f.text === title && f.renaming === card.id, `the card itself is the field, its title in it, the focus in it: ${JSON.stringify(f)}`);
 			t.expect(f && Math.abs(f.top - card.top) <= 1 && Math.abs(f.left - card.left) <= 1, `the field stands where the card stood: ${JSON.stringify(f)} card ${JSON.stringify(card)}`);
 			t.expect((await menuNow(t)) === null || (await t.cdp.eval(`!document.querySelector(".tc-menu-layer .tc-panel:not(.is-closing)")`)), "the menu has closed");
