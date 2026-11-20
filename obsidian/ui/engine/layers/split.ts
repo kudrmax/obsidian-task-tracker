@@ -6,11 +6,13 @@
  * a panel that splits keeps over the copy only the groups that fit there whole, and the rest scrolls under it: one part
  * scrolls, never the one over the card, whose cut would halve its tiles (F313), unless the room under the copy holds
  * not one row (`least`): then the whole panel goes over it and scrolls there. A panel that can't split goes whole to the
- * side that leaves the least to scroll.
+ * side that leaves the least to scroll. `prefer`, a task menu's copy among its groups (Max's order, the core's `copy`
+ * group): its groups before it stand over the copy and the rest under it, whenever both parts fit there whole.
  */
-export function groupsAbove(cuts: readonly number[], total: number, above: number, below: number, canSplit: boolean, least = 0): number {
+export function groupsAbove(cuts: readonly number[], total: number, above: number, below: number, canSplit: boolean, least = 0, prefer?: number): number {
 	const groups = cuts.length + 1;
 	const over = (height: number, space: number) => Math.max(0, height - space);
+	if (prefer !== undefined && prefer > 0 && prefer < groups && canSplit && over(cuts[prefer - 1], above) + over(total - cuts[prefer - 1], below) === 0) return prefer;
 	const ways = [
 		{ count: 0, overflow: over(total, below) },
 		{ count: groups, overflow: over(total, above) },

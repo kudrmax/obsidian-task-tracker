@@ -116,8 +116,9 @@ describe("the screen's store", () => {
 		const id = store.getState().shown.lists.inbox.rows.find((r) => r.kind === "task")!.id;
 		store.getState().openMenu(id);
 		const model = store.getState().layer!.model;
-		expect(model.kind === "task" && model.moves).toEqual(["today", "tomorrow", "pick"]);
-		store.getState().pick({ kind: "move", id: "today" });
+		const when = model.kind === "task" ? model.layout.find((group) => group.group === "when")!.actions : [];
+		expect(when.map((action) => action.id)).toEqual(["today", "tomorrow", "pickDate", "repeat"]);
+		store.getState().pick({ kind: "date", date: when[0].date });
 		expect(store.getState().layer).toBeNull();
 		expect(titles(store, "day")).not.toContain(model.title);
 		await new Promise((resolve) => setTimeout(resolve, LAYER_MS.close + 20));

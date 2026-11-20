@@ -461,6 +461,12 @@ const OWNERS: readonly Owner[] = [
 	{ concern: "Portals and roots: react-dom", imports: (t) => t === "react-dom" || t === "react-dom/client", owners: [`${ENGINE}drag/`, `${ENGINE}mount.tsx`] },
 ];
 
+/**
+ * The task actions spec (2026-11-20, «What the engine and MockPort change»): the port takes the task actions' ids and groups
+ * from the contract, so a new action does not compile in the engine until it gets its look. Types only, in the port only.
+ */
+const CONTRACT_TYPES = { file: `${ENGINE}port.ts`, target: "core/application/contracts.ts" } as const;
+
 /** What the engine may import besides itself, React's stack and Obsidian's packages: the design's icons and measures (`DESIGN`, which agrees with the CSS) and Obsidian's editor. */
 const ENGINE_MAY_ALSO = ["obsidian/ui/kit/icons.ts", "obsidian/ui/design.ts", "obsidian/ui/markdown/EmbeddedEditor.ts"];
 
@@ -536,8 +542,16 @@ describe("the engine's owners", () => {
 	});
 
 	it("imports nothing from the core, and of the rest of the plugin only the icons and Obsidian's editor", () => {
-		const outside = engineFiles().flatMap((file) => importsOf(file).filter((t) => (t.startsWith("core/") || t.startsWith("obsidian/") || t.startsWith("tests/")) && !t.startsWith(ENGINE) && !ENGINE_MAY_ALSO.includes(t)).map((t) => `${file} → ${t}`));
+		const outside = engineFiles().flatMap((file) => importsOf(file).filter((t) => (t.startsWith("core/") || t.startsWith("obsidian/") || t.startsWith("tests/")) && !t.startsWith(ENGINE) && !ENGINE_MAY_ALSO.includes(t) && !(file === CONTRACT_TYPES.file && t === CONTRACT_TYPES.target)).map((t) => `${file} → ${t}`));
 		expect(outside).toEqual([]);
+	});
+
+	it("takes the contract's types in the port alone, as types: the task actions' ids and groups, no code of the core", () => {
+		const takers = engineFiles().filter((file) => importsOf(file).includes(CONTRACT_TYPES.target));
+		expect(takers.filter((file) => file !== CONTRACT_TYPES.file)).toEqual([]);
+		const forms = [...withoutComments(source(CONTRACT_TYPES.file)).matchAll(/\b(import|export)\s+(type\s+)?\{[^}]*\}\s+from\s+["']([^"']+)["']/g)].filter((m) => m[3].endsWith("core/application/contracts"));
+		expect(forms.length).toBeGreaterThan(0);
+		expect(forms.filter((m) => !m[2]).map((m) => m[0])).toEqual([]);
 	});
 
 	it("reads the mounting place in the layout only", () => {

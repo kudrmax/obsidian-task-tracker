@@ -1,4 +1,5 @@
-import type { AllDayEvent, Block, CardFace, DayEvent, Destination, Edge, EditId, EntryBar, EntryCommit, EntryDraft, EntryField, EventPaint, ListData, ListId, MenuAction, MenuFrom, MenuModel, MoveId, Now, PlaceId, ReminderKind, RenameStart, StatusId, Row, ScreenData, ScreenPort } from "../ui/engine/port";
+import type { AllDayEvent, Block, CardFace, DayEvent, Destination, Edge, EntryBar, EntryCommit, EntryDraft, EntryField, EventPaint, FieldActionId, ListData, ListId, ListPlaceId, MenuAction, MenuFrom, MenuModel, MenuStatusId, Now, PlaceId, ReminderKind, RenameStart, Row, ScreenData, ScreenPort } from "../ui/engine/port";
+import { type FieldFacts, fieldBar, type MenuFacts, menuLayout, menuPlaces } from "./actionTable";
 import { bgAlphaFor, eventColors } from "../ui/eventColors";
 import { addDays, CALENDAR_COLORS, DAY_START_HOUR, dateOf, dayOf, fileText, LIST_KEYS, LIST_NAMES, type ListKey, MOCK_PROJECTS, type MockFile, type MockSection, type MockTask, minuteOf, mockFile } from "./mockData";
 
@@ -40,8 +41,10 @@ const LEVELS = [
 	{ prefix: "p2", color: LEVEL_COLORS.p2 },
 ] as const;
 /** The file's mark each status tile writes. */
-const STATUS_MARKS: Readonly<Record<StatusId, MockTask["status"]>> = { done: "x", inProgress: "/", stopProgress: " ", wontDo: "-", stop: " " };
+const STATUS_MARKS: Readonly<Record<MenuStatusId, MockTask["status"]>> = { done: "x", inProgress: "/", stopProgress: " ", wontDo: "-", stop: " " };
 const REMINDERS: readonly ReminderKind[] = ["live", "notification", "alarm", "none"];
+/** A draft with nothing set: the field as a new task's opens. */
+const NO_DRAFT: EntryDraft = { level: null, projects: [], descriptionLine: null, section: false };
 /** A task done or given up leaves the screen; it stays in the file. */
 const closed = (t: MockTask) => t.status === "x" || t.status === "-";
 
@@ -214,10 +217,9 @@ export class MockPort implements ScreenPort {
 	}
 
 	/**
-	 * The bar by the plugin's rules (the core's `QuickEntry.state`), the simplest: the level buttons in a list (a field goes
-	 * no deeper than one under the task above it; a rename's are shown but off), the flag with a typed prefix winning over
-	 * the level set, the project and the place on a task of the top level in a list; the calendar's field the flag and the
-	 * project; a field in a stack the flag only.
+	 * The bar as the core's table lays it out (`actionTable`), from what the stand knows of the field: whether it writes a
+	 * task or a section's name, the task it renames, whether it stands at the top level of a list, may shift a level, may
+	 * switch to a new section. The flag takes a typed prefix over the level set; the place button shows where the task goes.
 	 */
 	entryBar(field: EntryField, draft: EntryDraft, text: string): EntryBar {
 		const { at, renaming, stack } = field;
@@ -225,25 +227,48 @@ export class MockPort implements ScreenPort {
 		const level = typed ?? draft.level;
 		const inList = at.at === undefined && !stack;
 		const depth = at.depth ?? 0;
-		const sub = renaming !== null ? !this.isTop(renaming) : depth > 0 || at.under !== undefined;
+		const sub = renaming !== null ? !this.isTop(renaming) : depth > 0 || at.under !== undefined || stack;
 		const today = dateOf(this.day());
 		const goes = at.away ?? at;
 		const shownDay = dateOf(addDays(this.day(), goes.dayOffset));
 		const here: PlaceId = at.backlog ? "backlog" : goes.list === "inbox" ? "inbox" : goes.list === "soon" ? "soon" : goes.dayOffset <= 0 ? "now" : "date";
 		const title = (id: PlaceId) => (id === "date" ? `${Number(shownDay.slice(8))} ${MONTHS[Number(shownDay.slice(5, 7)) - 1].charAt(0)}${MONTHS[Number(shownDay.slice(5, 7)) - 1].slice(1).toLowerCase()}` : LIST_NAMES[id]);
-		const shifts = inList && renaming === null;
+		const shifts = inList && renaming === null && !draft.section;
 		const above = shifts ? this.taskAbove(at) : null;
-		return {
-			indents: inList,
+		const facts: FieldFacts = {
+			task: !draft.section,
+			renaming: renaming === null ? "none" : "repeatable",
+			topLevel: !sub,
+			place: inList && !sub,
+			indents: inList && !draft.section,
 			canIndent: shifts && above !== null && depth <= above.depth,
 			canOutdent: shifts && depth > 0,
+			maySection: renaming === null && inList && this.listOf(this.file, at.list, at.dayOffset).some((section) => section.name !== null),
+		};
+		const lit: Readonly<Record<FieldActionId, boolean>> = {
+			newSection: draft.section,
+			outdent: false,
+			indent: false,
+			level: level !== null,
+			label: false,
+			project: draft.projects.length > 0,
+			repeat: false,
+			description: draft.descriptionLine !== null,
+			pickDate: false,
+		};
+		return {
+			bar: fieldBar(facts, lit),
 			levels: LEVELS.map((l) => ({ ...l, on: l.prefix === level })),
-			tint: level ? LEVEL_COLORS[level as "p1" | "p2"] : null,
-			projects: sub || stack ? null : { options: MOCK_PROJECTS.map((p) => ({ ...p, on: p.name === draft.project })), lit: draft.project !== null },
-			where: sub || !inList ? null : { id: here, title: title(here) },
+			tint: level && !draft.section ? LEVEL_COLORS[level as "p1" | "p2"] : null,
+			projects: MOCK_PROJECTS.map((p) => ({ ...p, on: draft.projects.includes(p.name) })),
+			where: { id: here, title: title(here) },
 			places: (["inbox", "backlog", "soon", "now", "date"] as const).map((id) => ({ id, title: id === "date" ? "Date" : LIST_NAMES[id], on: id === here })),
 			date: { today, picked: here === "date" || here === "now" ? shownDay : null },
 		};
+	}
+
+	entryDescription(field: EntryField): string {
+		return field.renaming === null ? "" : (this.findBy(this.ahead ?? this.file, (t) => t.id === field.renaming)?.task.description ?? "");
 	}
 
 	/** Whether the task `id` stands at the top level of its list (not a subtask). */
@@ -260,7 +285,7 @@ export class MockPort implements ScreenPort {
 	rename(id: string, from: MenuFrom, dayOffset: number): RenameStart {
 		const task = this.findBy(this.ahead ?? this.file, (t) => t.id === id)?.task;
 		if (!task) throw new Error(`no task ${id}`);
-		const draft: EntryDraft = { level: task.level, project: task.project ?? null };
+		const draft: EntryDraft = { ...NO_DRAFT, level: task.level, projects: [...(task.projects ?? [])] };
 		const field = (at: Destination, stack = false): RenameStart => ({ field: { at, renaming: id, stack }, draft, text: task.title });
 		if (from === "stack") return field({ list: "day", before: null, dayOffset }, true);
 		if (from === "calendar") return field({ list: "day", before: null, dayOffset, at: task.slot?.start ?? 0 });
@@ -274,30 +299,33 @@ export class MockPort implements ScreenPort {
 
 	/**
 	 * Enter and a tap elsewhere (the core's `QuickEntry.enter`, `blur`), the simplest: an empty text writes nothing, and Enter
-	 * on it steps a subtask's field a level out, else ends typing. A new task is written where the field stands; with Enter
-	 * the next field opens there, without the level but with the project (a field on the calendar takes one task). A rename
-	 * writes the title, level and project changed (nothing when none changed), moved where the bar's place says; Enter
-	 * opens a new task's field right under it in a list (its first subtask's place when it shows subtasks).
+	 * on it steps a subtask's field a level out, else ends typing. A new section's name is written where the field stands
+	 * and the field closes. A new task is written where the field stands, with its description when one is typed; with
+	 * Enter the next field opens there, without the level or a description but with the projects (a field on the calendar
+	 * takes one task). A rename writes the title, level, projects and description changed (nothing when none changed),
+	 * moved where the bar's place says; Enter opens a new task's field right under it in a list.
 	 */
 	commit(field: EntryField, text: string, draft: EntryDraft, next: boolean): EntryCommit {
 		const { at, renaming } = field;
 		const blank = text.trim() === "";
-		const fresh: EntryDraft = { level: null, project: null };
+		if (draft.section) return { write: blank ? null : this.write((file) => this.newSection(file, text.trim(), at)), face: null, next: null, draft: NO_DRAFT };
+		const described = draft.descriptionLine === null ? undefined : draft.descriptionLine.trim() || null;
 		if (renaming !== null) {
 			const after = next && !blank && at.at === undefined && !field.stack ? this.under(renaming, at) : null;
-			const done = { next: after, draft: fresh };
+			const done = { next: after, draft: NO_DRAFT };
 			const task = this.findBy(this.ahead ?? this.file, (t) => t.id === renaming)?.task;
 			if (blank || !task) return { ...done, write: null, face: null };
 			const { title, level } = this.parsed(text, draft);
-			const project = draft.project ?? undefined;
+			const projects = draft.projects.join("\n") === (task.projects ?? []).join("\n") ? undefined : [...draft.projects];
+			const description = described === undefined || described === task.description ? undefined : described;
 			const moved = at.backlog === true || at.away !== undefined || (at.at === undefined && !field.stack && at.before !== renaming);
-			if (title === task.title && level === task.level && project === task.project && !moved) return { ...done, write: null, face: null };
+			if (title === task.title && level === task.level && projects === undefined && description === undefined && !moved) return { ...done, write: null, face: null };
 			const write = this.write((file) => {
 				const t = this.findBy(file, (x) => x.id === renaming)?.task;
 				if (!t) return;
 				Object.assign(t, { title, level });
-				if (project === undefined) delete t.project;
-				else t.project = project;
+				if (projects !== undefined) t.projects = projects;
+				if (description !== undefined) t.description = description;
 				if (!moved) return;
 				if (at.backlog) {
 					this.take(file, renaming);
@@ -305,16 +333,29 @@ export class MockPort implements ScreenPort {
 					file.backlog[file.backlog.length - 1].tasks.push(t);
 				} else this.apply(file, renaming, at.away ? this.listEnd(at.away.list, at.away.dayOffset) : { ...at, depth: 0 });
 			});
-			const face: CardFace = { ...this.faceOf(task, null), title, color: level ? LEVEL_COLORS[level] : null, due: this.read(at.dayOffset).cards[renaming]?.due ?? null };
+			const face: CardFace = { ...this.faceOf(task, null), title, color: level ? LEVEL_COLORS[level] : null, description: (description === undefined ? task.description : description) !== null, due: this.read(at.dayOffset).cards[renaming]?.due ?? null };
 			return { ...done, write, face };
 		}
 		if (blank) {
 			const depth = at.depth ?? 0;
 			const out = next && depth > 0 && at.at === undefined && !field.stack;
-			return { write: null, face: null, next: out ? { ...field, at: { ...at, depth: depth - 1, under: undefined } } : null, draft: out ? draft : fresh };
+			return { write: null, face: null, next: out ? { ...field, at: { ...at, depth: depth - 1, under: undefined } } : null, draft: out ? draft : NO_DRAFT };
 		}
 		const again = next && at.at === undefined;
-		return { write: this.add(text, at, draft), face: null, next: again ? field : null, draft: again ? { level: null, project: draft.project } : fresh };
+		return { write: this.add(text, at, draft, described ?? null), face: null, next: again ? field : null, draft: again ? { ...NO_DRAFT, projects: draft.projects } : NO_DRAFT };
+	}
+
+	/**
+	 * A new section named `name` where the field stood (the core's `createSection`): after the section the field stands in,
+	 * taking that section's tasks of the top level from the field's place on.
+	 */
+	private newSection(file: MockFile, name: string, at: Destination): void {
+		const sections = this.listOf(file, at.list, at.dayOffset);
+		const index = Math.max(0, at.section === undefined || at.section === null ? sections.findIndex((section) => section.name === null) : sections.findIndex((section) => section.id === at.section));
+		const holder = sections[index];
+		const from = at.before === null ? -1 : (holder?.tasks.findIndex((t) => t.id === at.before) ?? -1);
+		const moved = holder && from >= 0 ? holder.tasks.splice(from) : [];
+		sections.splice(index + 1, 0, { id: `s-new-${++this.added}`, name, tasks: moved });
 	}
 
 	/** The field of a new task right under the renamed `id` in its list (the core's `QuickEntry.under`): its first subtask's place when it shows subtasks, else its own level. */
@@ -366,14 +407,15 @@ export class MockPort implements ScreenPort {
 		return row?.kind === "task" ? { depth: row.depth } : null;
 	}
 
-	private async add(text: string, given: Destination, draft: EntryDraft): Promise<string> {
+	private async add(text: string, given: Destination, draft: EntryDraft, description: string | null): Promise<string> {
 		const at = given.away ? this.listEnd(given.away.list, given.away.dayOffset) : given;
 		const id = `x${++this.added}`;
 		await this.write((file) => {
 			const { title, level } = this.parsed(text, draft);
 			const task = this.newTask(title, null, id);
 			task.level = level;
-			if (draft.project) task.project = draft.project;
+			if (draft.projects.length > 0) task.projects = [...draft.projects];
+			task.description = description;
 			if (at.backlog) {
 				task.due = null;
 				file.backlog[file.backlog.length - 1].tasks.push(task);
@@ -396,10 +438,8 @@ export class MockPort implements ScreenPort {
 	}
 
 	/**
-	 * A task's menu by the plugin's rules, the simplest (`core/application/menus.ts`): Won't do and Delete ask first; the
-	 * levels of the settings; Today and Tomorrow but the day the task stands on; Rename, Reminder for a timed task, Add
-	 * description without one, Repeat, Section for a task of a list with sections, Project (disabled on a subtask), Add
-	 * subtask but in a block's stack, First step but in a stack; a calendar's task its open subtasks.
+	 * A task's menu as the core's table lays it out (`actionTable`), from what the stand knows of the task in the core's
+	 * words (`menuFacts`); a calendar's task its open subtasks.
 	 */
 	menu(id: string, from: MenuFrom): MenuModel {
 		const event = this.file.events.find((e) => e.id === id) ?? this.file.allDay.find((e) => e.id === id);
@@ -408,40 +448,54 @@ export class MockPort implements ScreenPort {
 		if (!found) throw new Error(`no task ${id}`);
 		const { task, list } = found;
 		const today = dateOf(this.day());
-		const tomorrow = dateOf(addDays(this.day(), 1));
-		const top = this.file[list].some((section) => section.tasks.includes(task));
-		const sections = this.file[list].some((section) => section.name !== null);
-		const offered: [EditId, boolean, string][] = [
-			["rename", true, ""],
-			["reminder", task.slot !== null, ""],
-			["description", task.description === null, ""],
-			["repeat", true, ""],
-			["section", from === "list" && top && sections, this.file[list].find((section) => section.tasks.includes(task))?.name ?? ""],
-			["project", true, "No project"],
-			["subtask", from !== "stack", ""],
-			["firstStep", from !== "stack", ""],
-		];
+		const facts = this.menuFacts(task, list, from);
 		const reminder = task.reminder ?? "live";
-		const moves: MoveId[] = [...(task.due === today ? [] : ["today" as const]), ...(task.due === tomorrow ? [] : ["tomorrow" as const]), "pick"];
+		const goes = this.placeOf(task, list);
 		return {
 			kind: "task",
 			title: task.title,
 			statusTitle: this.statusTask(task, from).title,
-			statuses: [
-				{ id: "done", confirm: false },
-				{ id: task.status === "/" ? "stopProgress" : "inProgress", confirm: false },
-				{ id: "wontDo", confirm: true },
-			],
-			levels: { tiles: LEVELS.map((level) => ({ ...level, on: task.level === level.prefix })), disabled: false },
-			moves,
+			layout: menuLayout(facts, (n) => dateOf(addDays(this.day(), n))),
+			levels: LEVELS.map((level) => ({ ...level, on: task.level === level.prefix })),
+			labels: [],
 			date: { today, picked: task.due, removable: task.due !== null && task.due !== today },
-			edits: offered.filter(([, on]) => on).map(([edit, , value]) => ({ id: edit, value: edit === "reminder" ? reminder : value, disabled: edit === "project" && !top })),
-			opens: ["fullScreen", "obsidian"],
-			remove: { confirm: true },
+			places: menuPlaces(facts).map((place) => ({ id: place, title: LIST_NAMES[place], on: place === goes })),
 			reminders: REMINDERS.map((kind) => ({ kind, checked: kind === reminder })),
 			peek: task.description,
 			subtasks: from === "calendar" ? task.children.filter((c) => !closed(c)).map((c) => c.id) : [],
 		};
+	}
+
+	/**
+	 * What the core's menu reads of a task (its `TaskItem` and the screen's offer), as the stand's file says it: the column
+	 * its card stands in, whether it is a subtask, its `can`, the day it stands on (Now's tasks today, a timed task its
+	 * day), whether its column shows sections.
+	 */
+	private menuFacts(task: MockTask, list: ListKey, from: MenuFrom): MenuFacts {
+		const today = dateOf(this.day());
+		const tomorrow = dateOf(addDays(this.day(), 1));
+		const subtask = !this.file[list].some((section) => section.tasks.includes(task));
+		const day = task.slot ? task.due : list === "now" ? today : task.due;
+		const shown = this.statusTask(task, from);
+		return {
+			from: from === "calendar" ? "timeline" : from === "stack" ? "stack" : list === "inbox" ? "inbox" : list === "soon" && task.due === null ? "soon" : "day",
+			subtask,
+			postpone: list !== "done",
+			day: day === today ? "today" : day === tomorrow ? "tomorrow" : "other",
+			inProgress: shown.status === "/",
+			stop: false,
+			remind: task.slot !== null,
+			addDescription: task.description === null,
+			firstStep: !closed(task),
+			repeatable: !closed(task),
+			sections: from === "list" && this.file[list].some((section) => section.name !== null),
+		};
+	}
+
+	/** The list a task goes to, as Pick a date's tiles light it: Soon's dated tasks go to their day, not to a list. */
+	private placeOf(task: MockTask, list: ListKey): ListPlaceId | null {
+		if (list === "done") return null;
+		return list === "soon" && task.due !== null ? null : list;
 	}
 
 	/** The task a status tile writes (the core's `statusTask`): a folded block's shown step, any other menu's own task. */
@@ -458,7 +512,6 @@ export class MockPort implements ScreenPort {
 	/** What a menu's tap writes, by the plugin's rules, the simplest: a move puts the task at the end of Now (today and before) or Soon, due that day, without its time. */
 	async act(given: string, action: MenuAction, from: MenuFrom = "list"): Promise<void> {
 		if (action.kind === "row") return;
-		const today = dateOf(this.day());
 		const shown = this.findBy(this.ahead ?? this.file, (t) => t.id === given)?.task;
 		const id = action.kind === "status" && shown ? this.statusTask(shown, from).id : given;
 		await this.write((file) => {
@@ -478,8 +531,10 @@ export class MockPort implements ScreenPort {
 				case "delete":
 					this.take(file, id);
 					return;
-				case "move":
-					return this.putOff(file, task, action.id === "today" ? today : dateOf(addDays(this.day(), 1)));
+				case "label":
+					return;
+				case "sendTo":
+					return this.sendTo(file, task, action.list);
 				case "date":
 					if (action.date === null) {
 						task.due = null;
@@ -488,6 +543,15 @@ export class MockPort implements ScreenPort {
 					return this.putOff(file, task, action.date);
 			}
 		});
+	}
+
+	/** To the end of a list as the task is, its marks kept (the core's `sendTo`): without a day or a time, Now's for today. */
+	private sendTo(file: MockFile, task: MockTask, place: ListPlaceId): void {
+		this.take(file, task.id);
+		task.due = null;
+		task.slot = null;
+		const sections = file[place];
+		sections[sections.length - 1].tasks.push(task);
 	}
 
 	/** Due `date` without a time, at the end of Now for today and the days before it, of Soon for a later day. */

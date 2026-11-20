@@ -24,8 +24,8 @@ export interface MockTask {
 	children: MockTask[];
 	/** Its subtasks folded under its card. */
 	folded?: boolean;
-	/** Its project, written `🗂️ Name`. */
-	project?: string;
+	/** Its projects, each written `🗂️ Name`. */
+	projects?: string[];
 	/** How a timed task reminds; none set: Live Activity, as a task first put on a time gets. */
 	reminder?: "live" | "notification" | "alarm" | "none";
 }
@@ -161,7 +161,7 @@ export function fileText(file: MockFile, clock: Date): string {
 	};
 	const line = (t: MockTask, depth: number): string[] => {
 		const slot = (due: string, s: NonNullable<MockTask["slot"]>) => ` 📌 ${due} ${time(s.start)}${s.end === null ? "" : `-${time(s.end)}`}`;
-		const fields = [t.level ? `${t.level} ` : "", t.title, t.due ? ` 📅 ${t.due}` : "", t.slot ? slot(t.due ?? dateOf(day), t.slot) : "", t.project ? ` 🗂️ ${t.project}` : "", t.folded ? " 📁" : ""].join("");
+		const fields = [t.level ? `${t.level} ` : "", t.title, t.due ? ` 📅 ${t.due}` : "", t.slot ? slot(t.due ?? dateOf(day), t.slot) : "", (t.projects ?? []).map((name) => ` 🗂️ ${name}`).join(""), t.folded ? " 📁" : ""].join("");
 		const own = `${"\t".repeat(depth)}- [${t.status}] ${fields}`;
 		const description = t.description ? [`${"\t".repeat(depth + 1)}- ${t.description}`] : [];
 		return [own, ...description, ...t.children.flatMap((c) => line(c, depth + 1))];

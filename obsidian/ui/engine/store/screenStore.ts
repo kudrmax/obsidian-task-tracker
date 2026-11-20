@@ -1,7 +1,7 @@
 import { DESIGN, LAYOUT } from "../../design";
 import { createStore, type StoreApi } from "zustand/vanilla";
 import { LAYER_MS } from "../layers/motion";
-import type { Destination, Edge, EntryBar, EntryDraft, EntryField, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, ScreenData, ScreenPort, StatusId } from "../port";
+import type { Destination, Edge, EntryBar, EntryDraft, EntryField, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, MenuStatusId, ScreenData, ScreenPort } from "../port";
 import { share } from "./share";
 
 /** Where the ribbon stands: Inbox–Soon, Soon–the day, the day–its calendar. */
@@ -13,7 +13,7 @@ export const STOP_LISTS: Readonly<Record<Stop, readonly ListId[]>> = { inbox: ["
 const SHOWS: Readonly<Record<Stop, Readonly<Record<ListId, boolean>>>> = { inbox: { inbox: true, soon: true, day: false }, soon: { inbox: false, soon: true, day: true }, calendar: { inbox: false, soon: false, day: true } };
 const STOP_OF: Readonly<Record<ListId, Stop>> = { inbox: "inbox", soon: "soon", day: "soon" };
 
-const NO_DRAFT: EntryDraft = { level: null, project: null };
+const NO_DRAFT: EntryDraft = { level: null, projects: [], descriptionLine: null, section: false };
 
 /** The one gesture that holds the pointer (spec, «Which gesture holds the pointer»). */
 export type Gesture = "drag" | "ribbon" | "resize" | "zoom";
@@ -25,7 +25,7 @@ export type Zoom = number | "wholeDay";
 export type MenuPage = "menu" | "picker" | "reminders";
 
 /** What a menu asks before it acts (Won't do, Stop, Delete), in place of what was pressed. */
-export type Asking = StatusId | "delete";
+export type Asking = MenuStatusId | "delete";
 
 /** A panel of the field's bar: the flag's levels, the projects, the places, the month of Date. */
 export type BarPanelKind = "priority" | "project" | "where" | "date";
@@ -193,8 +193,16 @@ export interface ScreenActions {
 	typeEntry(text: string): void;
 	/** A level's tile on the bar: set, or taken off when it was the one set. */
 	draftLevel(prefix: string): void;
-	/** A project picked on the bar (null: No project). */
-	draftProject(name: string | null): void;
+	/** A project's check on the bar's Project page: on beside the others, or off (the core's `toggleProject`). */
+	toggleProject(name: string): void;
+	/** No project: every project off. */
+	clearProjects(): void;
+	/** Description on the bar: the line under the title opens, holding what the port says (a renamed task's own description). */
+	openDescription(): void;
+	/** The description's line typed. */
+	typeDescription(text: string): void;
+	/** New section on the bar: the field writes a section's name instead of a task, or a task again. */
+	toggleSection(): void;
 	/**
 	 * A place picked on the bar: the field goes to the end of that list or day, the ribbon and the day turning to show it;
 	 * a list the screen can't bring into sight (`reach`, the layout's) keeps the field where it stands.
@@ -413,7 +421,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 				const over = get().layer;
 				const stack = from !== "stack" || !over ? null : (over.stack ?? (over.model.kind === "task" ? { of: over.id, ids: over.model.subtasks } : null));
 				const model = port.menu(id, from);
-				const renames = clicked !== null && model.kind === "task" && model.edits.some((edit) => edit.id === "rename");
+				const renames = clicked !== null && model.kind === "task" && model.layout.some((group) => group.actions.some((action) => action.id === "rename"));
 				set({ layer: { kind: "menu", id, from, model, page: "menu", asking: null, asked: null, stack, renameUntil: renames ? clicked + LAYOUT.doubleClickMs : null }, ...(from === "list" ? { selected: null } : {}) });
 			},
 			pressAgain(at) {
@@ -475,8 +483,24 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 				const draft = get().draft;
 				set({ draft: { ...draft, level: draft.level === prefix ? null : prefix } });
 			},
-			draftProject(project) {
-				set({ draft: { ...get().draft, project } });
+			toggleProject(name) {
+				const draft = get().draft;
+				set({ draft: { ...draft, projects: draft.projects.includes(name) ? draft.projects.filter((p) => p !== name) : [...draft.projects, name] } });
+			},
+			clearProjects() {
+				set({ draft: { ...get().draft, projects: [] } });
+			},
+			openDescription() {
+				const { entry, draft } = get();
+				if (entry && draft.descriptionLine === null) set({ draft: { ...draft, descriptionLine: port.entryDescription(entry) } });
+			},
+			typeDescription(description) {
+				const draft = get().draft;
+				if (draft.descriptionLine !== null && draft.descriptionLine !== description) set({ draft: { ...draft, descriptionLine: description } });
+			},
+			toggleSection() {
+				const draft = get().draft;
+				set({ draft: { ...draft, section: !draft.section }, entryPanel: null });
 			},
 			entryPlace(choice, date, reach) {
 				const { entry, stop } = get();
@@ -495,7 +519,9 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 			},
 			indentEntry(by) {
 				const entry = get().entry;
-				if (entry && port.entryBar(entry, get().draft, get().entryText)[by > 0 ? "canIndent" : "canOutdent"]) set({ entry: { ...entry, at: { ...entry.at, under: undefined, depth: Math.max(0, (entry.at.depth ?? 0) + by) } } });
+				const shift = by > 0 ? "indent" : "outdent";
+				const offered = entry ? port.entryBar(entry, get().draft, get().entryText).bar.some((group) => group.actions.some((action) => action.id === shift && !action.disabled)) : false;
+				if (entry && offered) set({ entry: { ...entry, at: { ...entry.at, under: undefined, depth: Math.max(0, (entry.at.depth ?? 0) + by) } } });
 			},
 			commitEntry(text, next) {
 				const { entry, draft, shown } = get();

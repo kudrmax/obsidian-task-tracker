@@ -1,3 +1,12 @@
+import type { EntryBarGroup, FieldActionId, FieldGroup, MenuActionGroup, MenuStatusId, TaskActionId, TaskMenuActionId, TaskMenuGroup } from "../../../core/application/contracts";
+
+/**
+ * The task actions are the core's (`core/application/taskActions.ts`, task actions spec): the ids, the groups and the
+ * offered actions a surface lays out. The port answers with them; the engine keeps only each action's look and handler,
+ * an exhaustive `Record` over the surface's ids. Types only: the engine runs no code of the core.
+ */
+export type { EntryBarGroup, FieldActionId, FieldGroup, MenuActionGroup, MenuStatusId, TaskActionId, TaskMenuActionId, TaskMenuGroup };
+
 /**
  * The screen's one port (docs/superpowers/specs/2026-11-18-ui-engine.md, «The owners», «Data and writes»): what the screen
  * draws, in the engine's own types; a subscription to its changes; the writes. Product rules sit behind it: where a drop
@@ -139,10 +148,16 @@ export interface Destination {
 /** A place the new task's bar offers: the lists, and a day picked on the month. */
 export type PlaceId = "inbox" | "backlog" | "soon" | "now" | "date";
 
-/** What the bar has set for the task being typed: its level and its project. */
+/**
+ * What the bar has set for the task being typed: its level, its projects (several, as the menu's), the description's
+ * line under the title (null while it is closed), and whether the field writes a new section's name instead of a task.
+ */
 export interface EntryDraft {
 	readonly level: string | null;
-	readonly project: string | null;
+	readonly projects: readonly string[];
+	/** The description's line under the title: what is typed in it while it is open, null while it is closed. */
+	readonly descriptionLine: string | null;
+	readonly section: boolean;
 }
 
 /**
@@ -178,20 +193,18 @@ export interface EntryCommit {
 }
 
 /**
- * The bar of a task being typed (F184–F189, the plugin's `QuickBarState`), as the port answers for the field where it
- * stands and what is set and typed: each button shown or not, enabled or not, and what it shows.
+ * The bar of a task being typed (F184–F189, the core's `EntryState`), as the port answers for the field where it stands
+ * and what is set and typed: its buttons group by group as the table of task actions places them (`bar`, each with
+ * `disabled` and `lit`), and what their panels offer.
  */
 export interface EntryBar {
-	/** The level buttons (none on the calendar's field nor in a stack; shown but off in a rename), and which way the field may go. */
-	readonly indents: boolean;
-	readonly canIndent: boolean;
-	readonly canOutdent: boolean;
+	readonly bar: readonly EntryBarGroup[];
 	/** The flag's levels, the one set (or typed as a prefix) on; `tint` the colour of the flag and the field. */
 	readonly levels: readonly LevelTile[];
 	readonly tint: string | null;
-	/** The project button's page (none on a subtask's field): the tree, the one set checked, folders not to be chosen. */
-	readonly projects: { readonly options: readonly { readonly name: string; readonly depth: number; readonly on: boolean; readonly folder: boolean }[]; readonly lit: boolean } | null;
-	/** The place button (none on a subtask's or the calendar's field): what it shows, and the places offered. */
+	/** The Project page: the tree, each project checked while the field has it, folders not to be chosen. */
+	readonly projects: readonly { readonly name: string; readonly depth: number; readonly on: boolean; readonly folder: boolean }[];
+	/** What the place button shows, and the places its panel offers. */
 	readonly where: { readonly id: PlaceId; readonly title: string } | null;
 	readonly places: readonly { readonly id: PlaceId; readonly title: string; readonly on: boolean }[];
 	/** The month page of Date: today, and the day the field stands on (`YYYY-MM-DD`). */
@@ -201,16 +214,10 @@ export interface EntryBar {
 /** Where a task's menu is opened from: a list's card, a calendar's block, a card of a block's stack in its menu (F107). */
 export type MenuFrom = "list" | "calendar" | "stack";
 
-/** A status tile: Done, In progress (Stop progress on a task in progress), Won't do, Stop (a repeating task). */
-export type StatusId = "done" | "inProgress" | "stopProgress" | "wontDo" | "stop";
-/** A row of the edit group, in the plugin's order. */
-export type EditId = "rename" | "reminder" | "description" | "repeat" | "section" | "project" | "subtask" | "firstStep";
-/** A move tile: today, tomorrow, or the month to pick a day in. */
-export type MoveId = "today" | "tomorrow" | "pick";
 /** How a timed task reminds on the iPhone. */
 export type ReminderKind = "live" | "notification" | "alarm" | "none";
-/** A row of the open group. */
-export type OpenId = "fullScreen" | "obsidian";
+/** A list tile of Pick a date's page: where a tap sends the task (the core's `sendTo`). */
+export type ListPlaceId = Exclude<PlaceId, "date">;
 
 /** A priority level's tile: its prefix, its colour (a preset's name or `#RRGGBB`) and whether the task has it. */
 export interface LevelTile {
@@ -220,8 +227,9 @@ export interface LevelTile {
 }
 
 /**
- * A task's menu as the port offers it (the plugin's `TaskMenuModel`): every group in the order drawn, a group with nothing
- * to offer empty. The screen draws it and sends back what was tapped (`MenuAction`).
+ * A task's menu as the port offers it (the core's `TaskMenuModel`): `layout`, the task actions group by group as the table
+ * places them (statuses, levels, labels, the copy, When, Edit, the rows, Delete), and what its pages show. The screen
+ * draws it and sends back what was tapped (`MenuAction`).
  */
 export interface TaskMenuModel {
 	readonly kind: "task";
@@ -232,18 +240,15 @@ export interface TaskMenuModel {
 	 * `statusTask`, `docs/plugin/screen.md` «Done в нём тоже закрывает шаг»), any other the task's own.
 	 */
 	readonly statusTitle: string;
-	readonly statuses: readonly { readonly id: StatusId; readonly confirm: boolean }[];
-	/** In the settings' order; `disabled` while the task may have no priority. */
-	readonly levels: { readonly tiles: readonly LevelTile[]; readonly disabled: boolean };
-	/** No tile for the day the task already stands on; none for a task put off nowhere. */
-	readonly moves: readonly MoveId[];
-	/** The month page: today, the task's due day (shown picked), and whether Remove due date is offered. Days are `YYYY-MM-DD`. */
+	readonly layout: readonly MenuActionGroup<TaskMenuActionId>[];
+	/** The level tiles, in the settings' order (the `level` action's group). */
+	readonly levels: readonly LevelTile[];
+	/** The label tiles (the `label` action's group): a label's name, its colour, whether the task has it. */
+	readonly labels: readonly { readonly name: string; readonly color: string; readonly on: boolean }[];
+	/** Pick a date's page: today, the task's due day (shown picked), and whether Remove due date is offered. Days are `YYYY-MM-DD`. */
 	readonly date: { readonly today: string; readonly picked: string | null; readonly removable: boolean };
-	/** The rows with their values on the right (Reminder's, Repeat's rule, Section's and Project's names); Project on a subtask disabled. */
-	readonly edits: readonly { readonly id: EditId; readonly value: string; readonly disabled: boolean }[];
-	readonly opens: readonly OpenId[];
-	/** Delete, asking first when `confirm`; null: none. */
-	readonly remove: { readonly confirm: boolean } | null;
+	/** Pick a date's list tiles above the month (the core's `places`), each on while the task goes there; none for a subtask. */
+	readonly places: readonly { readonly id: ListPlaceId; readonly title: string; readonly on: boolean }[];
 	/** The Reminder page's kinds, the task's own checked. */
 	readonly reminders: readonly { readonly kind: ReminderKind; readonly checked: boolean }[];
 	/** The start of the task's description, over its copy (markdown); null without one. */
@@ -262,15 +267,17 @@ export type MenuModel = TaskMenuModel | EventMenuModel;
 
 /** What a tap in a menu writes; the port says what it means for the task. */
 export type MenuAction =
-	| { readonly kind: "status"; readonly id: StatusId }
+	| { readonly kind: "status"; readonly id: MenuStatusId }
 	| { readonly kind: "priority"; readonly prefix: string }
-	| { readonly kind: "move"; readonly id: "today" | "tomorrow" }
-	/** A day picked on the month page (`YYYY-MM-DD`); null: Remove due date. */
+	| { readonly kind: "label"; readonly name: string }
+	/** A day: Today's or Tomorrow's tile (the day the layout gives it), or one picked on the month (`YYYY-MM-DD`); null: Remove due date. */
 	| { readonly kind: "date"; readonly date: string | null }
+	/** A list tile of Pick a date's page: the task goes there as it is (the core's `sendTo`). */
+	| { readonly kind: "sendTo"; readonly list: ListPlaceId }
 	| { readonly kind: "reminder"; readonly reminder: ReminderKind }
 	| { readonly kind: "delete" }
-	/** A row whose own screen is part 2's (Repeat, Section, Project, First step, Add description, the open rows, Open in Calendar): on the stand it closes the menu and writes nothing. */
-	| { readonly kind: "row"; readonly id: EditId | OpenId | "calendar" };
+	/** An action whose own screen is part 2's (Repeat, Description, Project, Section, First step, the opens, Open in Calendar): on the stand it closes the menu and writes nothing. */
+	| { readonly kind: "row"; readonly id: TaskActionId | "calendar" };
 
 export interface ScreenPort {
 	/** The screen for the day `dayOffset` days from today. */
@@ -315,6 +322,8 @@ export interface ScreenPort {
 	 * the lists the screen can bring into sight (`reach`); else the field stays and the task is written there.
 	 */
 	entryPlace(field: EntryField, choice: PlaceId, date: string | null, reach: readonly ListId[]): EntryField;
+	/** The text the description's line opens with (Description on the bar): a renamed task's own description, else empty. */
+	entryDescription(field: EntryField): string;
 	/** Rename of the task `id` from its menu opened `from` there (F117): the field in the card's place, the bar set as the task is. */
 	rename(id: string, from: MenuFrom, dayOffset: number): RenameStart;
 	/** Enter (`next`) or a tap elsewhere on `field` holding `text`: what is written and which field opens next. */

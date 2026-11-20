@@ -135,8 +135,7 @@ export default {
 			const block = await t.cdp.eval(`(() => { const el = [...document.querySelectorAll("[data-block]")].find((b) => b.textContent.includes("Обед")); const r = el.getBoundingClientRect(); return { x: r.left + 20, y: r.top + 12 }; })()`);
 			await tap(block);
 			await t.sleep(400);
-			const reminder = await t.cdp.eval(`[...document.querySelectorAll(".tc-menu-layer .tc-menu-row")].find((r) => r.textContent.startsWith("Reminder"))?.querySelector(".tc-menu-value")?.textContent ?? null`);
-			t.expect(reminder === "Live Activity", `a timed task's Reminder row shows its kind: ${reminder}`);
+			t.expect((await menuNow(t))?.words.includes("Reminder"), "a timed task's menu offers Reminder, last in When");
 			await press("Reminder");
 			const page = await menuNow(t);
 			t.expect(page && JSON.stringify(page.words) === JSON.stringify(["Reminder", "Live Activity", "Notification", "Alarm", "Off"]), `its page: the way back and the kinds: ${JSON.stringify(page?.words)}`);
@@ -151,8 +150,9 @@ export default {
 			t.expect((await menuNow(t)) === null, "a pick closes the menu");
 			await tap(block);
 			await t.sleep(400);
-			const after = await t.cdp.eval(`[...document.querySelectorAll(".tc-menu-layer .tc-menu-row")].find((r) => r.textContent.startsWith("Reminder"))?.querySelector(".tc-menu-value")?.textContent ?? null`);
-			t.expect(after === "Alarm", `the kind picked is the task's now: ${after}`);
+			await press("Reminder");
+			const after = await t.cdp.eval(`[...document.querySelectorAll(".tc-menu-layer .tc-menu-row.is-choice")].filter((r) => r.querySelector("svg")).map((r) => r.textContent)`);
+			t.expect(JSON.stringify(after) === JSON.stringify(["Alarm"]), `the kind picked is the task's now: ${JSON.stringify(after)}`);
 		}
 	},
 };

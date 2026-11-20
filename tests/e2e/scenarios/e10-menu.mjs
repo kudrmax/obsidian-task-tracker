@@ -6,7 +6,7 @@ const LONG = "Длинная задача, у которой название н
 /**
  * E4, the task menu over the card (F110, F112–F115, F133, F297; the design's «Меню задачи», «Полная карточка»): a tap
  * opens the copy of the card where it stood over the blurred backdrop, and the panel grows out by it, every part placed
- * before it shows (Max, 2026-11-19: the E0 menu jumped in from the side); its groups in the plugin's order; Escape, a tap
+ * before it shows (Max, 2026-11-19: the E0 menu jumped in from the side); its groups in Max's order (task actions spec, Decision 96); Escape, a tap
  * on the backdrop and a tap on an item close it, all parts fading together; a long title shows whole on the copy; on the
  * calendar a block's copy and an event's copy with its one row.
  */
@@ -34,8 +34,8 @@ export default {
 			const open = await menuNow(t);
 			t.expect(open.copyText.includes(title) && !open.titleCut, `the copy over the backdrop is the card: ${open.copyText}`);
 			const words = open.words;
-			const order = ["Done", "In progress", "Won’t do", "p1", "p2", "Tomorrow", "Pick a date", "Rename", "Repeat", "Project", "Add subtask", "First step", "Open full screen", "Open in Obsidian", "Delete"];
-			t.expect(JSON.stringify(words.filter((w) => order.includes(w))) === JSON.stringify(order.filter((w) => words.includes(w))) && words.includes("Done") && words.includes("Delete") && !words.includes("Today"), `its groups in the plugin's order, no Today for a task of today: ${JSON.stringify(words)}`);
+			const order = ["Done", "In progress", "Won’t do", "p1", "p2", "Tomorrow", "Pick a date", "Repeat", "Rename", "Description", "Project", "Section", "Subtask", "First step", "Open full screen", "Open in Obsidian", "Delete"];
+			t.expect(JSON.stringify(words.filter((w) => order.includes(w))) === JSON.stringify(order.filter((w) => words.includes(w))) && words.includes("Done") && words.includes("Delete") && !words.includes("Today"), `its groups in Max's order (task actions spec, Decision 96), no Today for a task of today: ${JSON.stringify(words)}`);
 			const under = open.panels.find((p) => !p.above);
 			const panelLeft = Math.max(0, Math.min(open.copy.left, (await t.cdp.eval("innerWidth")) - 12 - 300));
 			t.expect(under && Math.abs(under.top - (open.copy.bottom + 12)) <= 1 && Math.abs(under.left - panelLeft) <= 1 && Math.abs(under.width - 300) <= 0.5, `the panel 12 px under the copy, on its left edge unless the window needs it left, 300 wide: ${JSON.stringify(under)} copy ${JSON.stringify(open.copy)}`);

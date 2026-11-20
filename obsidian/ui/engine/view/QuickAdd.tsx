@@ -34,8 +34,9 @@ const RING = (
 /**
  * The field a task is typed in, new or renamed (spec, «Text fields»: Obsidian's own editor; the plugin's one quick entry):
  * a new task's stands in its list where it will be written, at its level; a rename's is the card itself, its title in it,
- * the caret at the end, the dot of a task in progress kept. Both have the bar. Enter, Escape, Tab and Shift+Tab and a tap
- * elsewhere go to the store, which asks the port what they do.
+ * the caret at the end, the dot of a task in progress kept. Both have the bar. Description on the bar opens a second line
+ * under the title (task actions spec, Decision 101); Enter in either line or a tap away from both writes both. Enter,
+ * Escape, Tab and Shift+Tab and a tap elsewhere go to the store, which asks the port what they do.
  */
 export const EntryField = memo(function EntryField({ depth, className = "" }: { readonly depth?: number; readonly className?: string }) {
 	const api = useScreenApi();
@@ -44,21 +45,23 @@ export const EntryField = memo(function EntryField({ depth, className = "" }: { 
 	const tint = useScreen((s) => (s.entry ? s.entryBar(s.entry, s.draft, s.entryText).tint : null));
 	const renaming = useScreen((s) => s.entry?.renaming ?? null);
 	const inProgress = useScreen((s) => (renaming ? (s.shown.cards[renaming]?.inProgress ?? false) : false));
-	/** A field opened again elsewhere (its place changed on the bar) keeps what was typed; a rename opens with the title. */
-	const [typed] = useState(() => api.getState().entryText);
+	const describing = useScreen((s) => s.draft.descriptionLine !== null);
+	const section = useScreen((s) => s.draft.section);
 	const commitOnLeave = (event: FocusEvent<HTMLDivElement>, text: () => string) => {
 		const to = event.relatedTarget as Element | null;
-		/** The bar, or the same field opened again at its new place, keeps the typing going. */
+		/** The bar, the other line, or the same field opened again at its new place, keeps the typing going. */
 		if (event.currentTarget.contains(to) || to?.closest?.(".tc-quick-bar, .tc-quick-panel, .tc-quick-field")) return;
 		api.getState().commitEntry(text(), false);
 	};
 	return (
-		<div ref={setField} className={`tc-quick-row tc-entry ${className}`.trim()} data-renaming={renaming ?? undefined} style={depth === undefined ? undefined : ({ [PROPERTY.level]: String(depth) } as CSSProperties)}>
+		<div ref={setField} className={`tc-quick-row tc-entry ${className}`.trim()} data-renaming={renaming ?? undefined} data-priority={describing ? (tint ?? undefined) : undefined} style={depth === undefined ? undefined : ({ [PROPERTY.level]: String(depth) } as CSSProperties)}>
 			{inProgress ? <span className="tc-progress-dot" /> : null}
+			{/* New section changes what the field writes: it opens again, its text kept, with the section's placeholder and weight. */}
 			<ObsidianEditor
-				text={typed}
-				className="tc-quick-field tc-title-field"
-				placeholder={renaming ? undefined : "New task"}
+				key={section ? "section" : "task"}
+				text={api.getState().entryText}
+				className={`tc-quick-field tc-title-field${section ? " is-section" : ""}`}
+				placeholder={renaming ? undefined : section ? "New section" : "New task"}
 				priority={tint}
 				onChange={(text) => api.getState().typeEntry(text)}
 				onEnter={(text) => api.getState().commitEntry(text, true)}
@@ -66,6 +69,25 @@ export const EntryField = memo(function EntryField({ depth, className = "" }: { 
 				onTab={(shift) => api.getState().indentEntry(shift ? -1 : 1)}
 				onLeave={commitOnLeave}
 			/>
+			{describing ? <DescriptionLine onLeave={commitOnLeave} /> : null}
 		</div>
 	);
 });
+
+/** The description's line under the title (the core's `openDescription`): it opens with the caret in it, holding what the port gave. */
+function DescriptionLine({ onLeave }: { readonly onLeave: (event: FocusEvent<HTMLDivElement>, text: () => string) => void }) {
+	const api = useScreenApi();
+	const [text] = useState(() => api.getState().draft.descriptionLine ?? "");
+	const title = () => api.getState().entryText;
+	return (
+		<ObsidianEditor
+			text={text}
+			className="tc-quick-field tc-title-field tc-desc-field"
+			placeholder="Description"
+			onChange={(typed) => api.getState().typeDescription(typed)}
+			onEnter={() => api.getState().commitEntry(title(), true)}
+			onEscape={() => api.getState().escapeEntry()}
+			onLeave={(event) => onLeave(event, title)}
+		/>
+	);
+}

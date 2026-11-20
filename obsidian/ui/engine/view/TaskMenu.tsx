@@ -2,7 +2,7 @@ import { memo, type ReactNode, useContext, useEffect, useRef, useState } from "r
 import type { IconName } from "../../kit/icons";
 import { MenuLayer, mouseClick, secondaryClick, useAnchor } from "../layers/Layers";
 import { monthGrid, monthOf, monthTitle } from "../layout/month";
-import type { EditId, MenuAction, OpenId, ReminderKind, StatusId, TaskMenuModel } from "../port";
+import type { ListPlaceId, MenuAction, MenuActionGroup, MenuStatusId, ReminderKind, TaskMenuActionId, TaskMenuModel } from "../port";
 import { type Asking, type Layer, useScreen, useScreenApi } from "../store";
 import { type BlockLook, CardInsides, PressedLook } from "./Card";
 import { useHost } from "./host";
@@ -10,28 +10,81 @@ import { Icon } from "./Icon";
 import { EntryField } from "./QuickAdd";
 import { paintStyle } from "./Timeline";
 
-const STATUS_LOOKS: Readonly<Record<StatusId, { readonly label: string; readonly icon: IconName }>> = {
+/** A status tile's words and icon, by the status it writes: the progress tile is In progress, or Stop progress on a task in progress. */
+const STATUS_LOOKS: Readonly<Record<MenuStatusId, { readonly label: string; readonly icon: IconName }>> = {
 	done: { label: "Done", icon: "done" },
 	inProgress: { label: "In progress", icon: "progress" },
 	stopProgress: { label: "Stop progress", icon: "progress" },
 	wontDo: { label: "Won’t do", icon: "wontdo" },
 	stop: { label: "Stop", icon: "stop" },
 };
-const MOVE_LOOKS = { today: { label: "Today", icon: "now" }, tomorrow: { label: "Tomorrow", icon: "tomorrow" }, pick: { label: "Pick a date", icon: "calendar" } } as const;
-const EDIT_LOOKS: Readonly<Record<EditId, { readonly label: string; readonly icon: IconName }>> = {
-	rename: { label: "Rename", icon: "rename" },
-	reminder: { label: "Reminder", icon: "reminder" },
-	description: { label: "Add description", icon: "description" },
-	repeat: { label: "Repeat", icon: "repeat" },
-	section: { label: "Section", icon: "section" },
-	project: { label: "Project", icon: "project" },
-	subtask: { label: "Add subtask", icon: "subtask" },
-	firstStep: { label: "First step", icon: "firstStep" },
+
+/** A list's icon, as the place tiles of the bar and of Pick a date show it. */
+export const PLACE_ICONS: Readonly<Record<ListPlaceId | "date", IconName>> = { inbox: "inbox", backlog: "backlog", soon: "soon", now: "now", date: "calendar" };
+
+/** An action as the menu offers it now (the core's `MenuAction`). */
+type Offered = MenuActionGroup<TaskMenuActionId>["actions"][number];
+
+interface MenuSteps {
+	menuPage(page: Layer["page"]): void;
+	ask(what: Asking | null): void;
+	startRename(): void;
+	startSubtask(): void;
+	pick(action: MenuAction): void;
+}
+
+interface ActionLook {
+	readonly label: string;
+	readonly icon: IconName;
+	readonly onPick: (action: Offered, steps: MenuSteps) => void;
+}
+
+/** A tap that leaves the menu for the action's own screen, part 2's: on the stand it closes the menu and writes nothing. */
+const leave = (action: Offered, steps: MenuSteps) => steps.pick({ kind: "row", id: action.id });
+const day = (action: Offered, steps: MenuSteps) => steps.pick({ kind: "date", date: action.date });
+
+/**
+ * Each action of a task's menu: its words and icon, and what a tap does (task actions spec, Decision 95). Exhaustive over
+ * the ids the core's table places in the menu: a new action does not compile here until it gets its look. The level and
+ * label actions are their groups' tiles, drawn from the model's levels and labels.
+ */
+const MENU_ACTIONS: Readonly<Record<TaskMenuActionId, ActionLook | { readonly tiles: "levels" | "labels" }>> = {
+	done: { label: "Done", icon: "done", onPick: status },
+	progress: { label: "In progress", icon: "progress", onPick: status },
+	wontDo: { label: "Won’t do", icon: "wontdo", onPick: status },
+	stop: { label: "Stop", icon: "stop", onPick: status },
+	level: { tiles: "levels" },
+	label: { tiles: "labels" },
+	today: { label: "Today", icon: "now", onPick: day },
+	tomorrow: { label: "Tomorrow", icon: "tomorrow", onPick: day },
+	pickDate: { label: "Pick a date", icon: "calendar", onPick: (_, steps) => steps.menuPage("picker") },
+	repeat: { label: "Repeat", icon: "repeat", onPick: leave },
+	reminder: { label: "Reminder", icon: "reminder", onPick: (_, steps) => steps.menuPage("reminders") },
+	rename: { label: "Rename", icon: "rename", onPick: (_, steps) => steps.startRename() },
+	description: { label: "Description", icon: "description", onPick: leave },
+	project: { label: "Project", icon: "project", onPick: leave },
+	section: { label: "Section", icon: "section", onPick: leave },
+	subtask: { label: "Subtask", icon: "subtask", onPick: (_, steps) => steps.startSubtask() },
+	firstStep: { label: "First step", icon: "firstStep", onPick: leave },
+	openFull: { label: "Open full screen", icon: "fullScreen", onPick: leave },
+	openInObsidian: { label: "Open in Obsidian", icon: "openFile", onPick: leave },
+	delete: { label: "Delete", icon: "delete", onPick: (action, steps) => (action.asks ? steps.ask("delete") : steps.pick({ kind: "delete" })) },
 };
-const OPEN_LOOKS: Readonly<Record<OpenId, { readonly label: string; readonly icon: IconName }>> = {
-	fullScreen: { label: "Open full screen", icon: "fullScreen" },
-	obsidian: { label: "Open in Obsidian", icon: "openFile" },
-};
+
+/** A status tile asks first where the core says so, else writes the status it carries. */
+function status(action: Offered, steps: MenuSteps): void {
+	if (!action.status) return;
+	if (action.asks) steps.ask(action.status);
+	else steps.pick({ kind: "status", id: action.status });
+}
+
+/** The look of an action drawn as a tile or a row; a status tile is named for the status it writes. */
+function lookOf(action: Offered): ActionLook | null {
+	const look = MENU_ACTIONS[action.id];
+	if ("tiles" in look) return null;
+	return action.status ? { ...look, ...STATUS_LOOKS[action.status] } : look;
+}
+
 const REMINDER_NAMES: Readonly<Record<ReminderKind, string>> = { live: "Live Activity", notification: "Notification", alarm: "Alarm", none: "Off" };
 const WEEKDAYS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
 const TILES_PER_ROW = 3;
@@ -72,7 +125,7 @@ export const TaskMenu = memo(function TaskMenu() {
 	if (!shown) return null;
 	const { model } = shown.layer;
 	const pick = (action: MenuAction) => api.getState().pick(action);
-	const groups = model.kind === "event" ? [<RowGroup key="open" rows={[{ label: "Open in Calendar", icon: "calendar", onPick: () => pick({ kind: "row", id: "calendar" }) }]} />] : taskGroups(shown.layer, typing !== null, model, pick, api.getState());
+	const { groups, copyAt } = model.kind === "event" ? { groups: [<RowGroup key="open" rows={[{ label: "Open in Calendar", icon: "calendar", onPick: () => pick({ kind: "row", id: "calendar" }) }]} />], copyAt: undefined } : taskGroups(shown.layer, typing !== null, model, { ...api.getState(), pick });
 	return (
 		<MenuLayer
 			key={shown.seq}
@@ -95,63 +148,95 @@ export const TaskMenu = memo(function TaskMenu() {
 				</>
 			}
 			groups={groups}
+			copyAt={copyAt}
 			panelClass={model.kind === "event" ? "is-event" : shown.layer.page === "picker" ? "is-task is-picker" : "is-task"}
 			page={`${shown.layer.id}:${shown.layer.page}`}
 			keepWidth={model.kind === "event"}
 			holdSplit={shown.layer.asking !== null}
-			peek={model.kind === "task" && model.peek !== null && typing === null ? { content: <PeekText text={model.peek} />, onPress: () => pick({ kind: "row", id: "fullScreen" }) } : undefined}
+			peek={model.kind === "task" && model.peek !== null && typing === null ? { content: <PeekText text={model.peek} />, onPress: () => pick({ kind: "row", id: "openFull" }) } : undefined}
 		/>
 	);
 });
 
-interface MenuSteps {
-	menuPage(page: Layer["page"]): void;
-	ask(what: Asking | null): void;
-	startRename(): void;
-	startSubtask(): void;
-}
-
-/** The groups of a task's menu on its page: the menu itself, the month, the Reminder kinds. */
-function taskGroups(layer: Layer, typing: boolean, model: TaskMenuModel, pick: (action: MenuAction) => void, steps: MenuSteps): readonly ReactNode[] {
+/** The groups of a task's menu on its page (the menu itself, Pick a date, the Reminder kinds), and how many stand before the copy. */
+function taskGroups(layer: Layer, typing: boolean, model: TaskMenuModel, steps: MenuSteps): { readonly groups: readonly ReactNode[]; readonly copyAt: number | undefined } {
+	const { pick } = steps;
 	/** Typing in the menu: the panel gives its room to the field (the plugin's `giveToField`). */
-	if (typing) return [];
-	if (layer.page === "picker") return [<MonthPage key={`month-${layer.id}`} model={model} pick={pick} />, ...(model.date.removable ? [<Row key="remove" label="Remove due date" icon="removeDue" className="tc-picker-remove" onPick={() => pick({ kind: "date", date: null })} />] : [])];
+	if (typing) return { groups: [], copyAt: undefined };
+	if (layer.page === "picker")
+		return {
+			groups: [
+				...(model.places.length > 0 ? [<TileGroup key="places" kind="is-place" rows={[model.places.map((list) => ({ label: list.title, icon: PLACE_ICONS[list.id], on: list.on, onPick: () => pick({ kind: "sendTo", list: list.id }) }))]} />] : []),
+				<MonthPage key={`month-${layer.id}`} model={model} pick={pick} />,
+				...(model.date.removable ? [<Row key="remove" label="Remove due date" icon="removeDue" className="tc-picker-remove" onPick={() => pick({ kind: "date", date: null })} />] : []),
+			],
+			copyAt: undefined,
+		};
 	if (layer.page === "reminders")
-		return [
-			<Row key="back" label="Reminder" icon="chevronLeft" className="tc-menu-back" lead onPick={() => steps.menuPage("menu")} />,
-			<RowGroup key="kinds" rows={model.reminders.map((r) => ({ label: REMINDER_NAMES[r.kind], icon: r.checked ? "check" : undefined, choice: true, quiet: r.kind === "none", onPick: () => pick({ kind: "reminder", reminder: r.kind }) }))} />,
-		];
+		return {
+			groups: [
+				<Row key="back" label="Reminder" icon="chevronLeft" className="tc-menu-back" lead onPick={() => steps.menuPage("menu")} />,
+				<RowGroup key="kinds" rows={model.reminders.map((r) => ({ label: REMINDER_NAMES[r.kind], icon: r.checked ? "check" : undefined, choice: true, quiet: r.kind === "none", onPick: () => pick({ kind: "reminder", reminder: r.kind }) }))} />,
+			],
+			copyAt: undefined,
+		};
 	const asking = layer.asking;
 	const groups: ReactNode[] = [];
-	if (asking !== null && asking !== "delete") groups.push(<Ask key="statuses" what={asking} title={model.statusTitle} onCancel={() => steps.ask(null)} onConfirm={() => pick({ kind: "status", id: asking })} />);
-	else
-		groups.push(
-			<TileGroup
-				key="statuses"
-				kind={model.statuses.length > 3 ? "is-status is-four" : "is-status"}
-				rows={[model.statuses.map((s) => ({ ...STATUS_LOOKS[s.id], focus: layer.asked === s.id, onPick: () => (s.confirm ? steps.ask(s.id) : pick({ kind: "status", id: s.id })) }))]}
-			/>,
-		);
-	if (model.levels.tiles.length > 0)
-		groups.push(<TileGroup key="levels" kind="is-priority" rows={tileRows(model.levels.tiles.map((tile) => ({ label: tile.prefix, icon: "priority" as const, color: tile.color, on: tile.on, disabled: model.levels.disabled, onPick: () => pick({ kind: "priority", prefix: tile.prefix }) })))} />);
-	if (model.moves.length > 0) groups.push(<TileGroup key="moves" kind="is-move" rows={[model.moves.map((move) => ({ ...MOVE_LOOKS[move], onPick: () => (move === "pick" ? steps.menuPage("picker") : pick({ kind: "move", id: move })) }))]} />);
-	if (model.edits.length > 0)
-		groups.push(
-			<RowGroup
-				key="edits"
-				rows={model.edits.map((edit) => ({
-					...EDIT_LOOKS[edit.id],
-					value: edit.id === "reminder" ? REMINDER_NAMES[edit.value as ReminderKind] : edit.value,
-					disabled: edit.disabled,
-					onPick: () => (edit.id === "reminder" ? steps.menuPage("reminders") : edit.id === "rename" ? steps.startRename() : edit.id === "subtask" ? steps.startSubtask() : pick({ kind: "row", id: edit.id })),
-				}))}
-			/>,
-		);
-	if (model.opens.length > 0) groups.push(<RowGroup key="opens" rows={model.opens.map((open) => ({ ...OPEN_LOOKS[open], onPick: () => pick({ kind: "row", id: open }) }))} />);
-	const remove = model.remove;
-	if (asking === "delete") groups.push(<Ask key="remove" what="delete" title={model.title} onCancel={() => steps.ask(null)} onConfirm={() => pick({ kind: "delete" })} />);
-	else if (remove) groups.push(<Row key="remove" label="Delete" icon="delete" className="is-danger is-apart" focus={layer.asked === "delete"} onPick={() => (remove.confirm ? steps.ask("delete") : pick({ kind: "delete" }))} />);
-	return groups;
+	let copyAt: number | undefined;
+	const tile = (action: Offered) => {
+		const look = lookOf(action);
+		return look ? [{ label: look.label, icon: look.icon, disabled: action.disabled, focus: layer.asked !== null && layer.asked === (action.status ?? (action.id === "delete" ? "delete" : null)), onPick: () => look.onPick(action, steps) }] : [];
+	};
+	for (const { group, actions } of model.layout) {
+		switch (group) {
+			case "statuses":
+				if (asking !== null && asking !== "delete") groups.push(<Ask key={group} what={asking} title={model.statusTitle} onCancel={() => steps.ask(null)} onConfirm={() => pick({ kind: "status", id: asking })} />);
+				else groups.push(<TileGroup key={group} kind={actions.length > 3 ? "is-status is-four" : "is-status"} rows={[actions.flatMap(tile)]} />);
+				break;
+			case "levels":
+				groups.push(<TileGroup key={group} kind="is-priority" rows={tileRows(model.levels.map((level) => ({ label: level.prefix, icon: "priority" as const, color: level.color, on: level.on, disabled: actions[0]?.disabled, onPick: () => pick({ kind: "priority", prefix: level.prefix }) })))} />);
+				break;
+			case "labels":
+				groups.push(<TileGroup key={group} kind="is-priority is-label" rows={tileRows(model.labels.map((label) => ({ label: label.name, icon: "label" as const, color: label.color, on: label.on, disabled: actions[0]?.disabled, onPick: () => pick({ kind: "label", name: label.name }) })))} />);
+				break;
+			case "copy":
+				copyAt = groups.length;
+				break;
+			case "when":
+				groups.push(<TileGroup key={group} kind="is-move is-when" rows={tileRows(actions.flatMap(tile))} />);
+				break;
+			case "edit":
+				groups.push(<TileGroup key={group} kind="is-edit" rows={tileRows(actions.flatMap(tile))} />);
+				break;
+			case "rows":
+				groups.push(<RowGroup key={group} rows={actions.flatMap((action) => tile(action).map(({ focus: _, ...spec }) => spec))} />);
+				break;
+			case "remove":
+				if (asking === "delete") groups.push(<Ask key={group} what="delete" title={model.title} onCancel={() => steps.ask(null)} onConfirm={() => pick({ kind: "delete" })} />);
+				else for (const action of actions) {
+					const look = lookOf(action);
+					if (look) groups.push(<Row key={group} label={look.label} icon={look.icon} className="is-danger is-apart" focus={layer.asked === "delete"} onPick={() => look.onPick(action, steps)} />);
+				}
+				break;
+		}
+	}
+	return { groups, copyAt };
+}
+
+/**
+ * A tile's label, whole inside its tile with room at both sides (Max, 2026-11-20: a word never presses on a tile's
+ * border): a label too long for its tile is drawn smaller until it fits, never cut. The stylesheet measures it (`tc-tile-fit`,
+ * a hidden copy at a known fraction of the size and container units), so no size is read from the page.
+ */
+function TileLabel({ text }: { readonly text: string }) {
+	return (
+		<span className="tc-tile-fit">
+			<span className="tc-tile-room">
+				<span className="tc-menu-tile-label">{text}</span>
+			</span>
+			<span className="tc-tile-probe" aria-hidden="true" data-text={text} />
+		</span>
+	);
 }
 
 export interface TileSpec {
@@ -175,7 +260,7 @@ export function TileGroup({ kind, rows }: { readonly kind: string; readonly rows
 					{row.map((tile) => (
 						<button key={tile.label} type="button" role="menuitem" className={`tc-btn tc-menu-tile${tile.on ? " is-on" : ""}`} data-priority={tile.color} disabled={tile.disabled} autoFocus={tile.focus} onClick={tile.onPick}>
 							<Icon name={tile.icon} />
-							<span className="tc-menu-tile-label">{tile.label}</span>
+							<TileLabel text={tile.label} />
 							{tile.on && tile.color ? (
 								<span className="tc-menu-badge">
 									<Icon name="cross" />

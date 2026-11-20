@@ -92,7 +92,7 @@ export default {
 			await tap({ x: stack[1].left + 30, y: stack[1].top + 15 });
 			await t.sleep(450);
 			const sub = await menuNow(t);
-			t.expect(sub && sub.words.includes("Done") && !sub.words.includes("Add subtask") && !sub.words.includes("First step"), `a tap on a subtask opens its own menu, no Add subtask or First step: ${JSON.stringify(sub?.words)}`);
+			t.expect(sub && sub.words.includes("Done") && !sub.words.includes("Subtask") && !sub.words.includes("First step"), `a tap on a subtask opens its own menu, no Subtask or First step: ${JSON.stringify(sub?.words)}`);
 			t.expect(await t.cdp.eval(`getComputedStyle(document.querySelector(".tc-backdrop.tc-menu-layer")).opacity === "1"`), "in the same sheet: the backdrop stays");
 			await t.shot("subtask-menu");
 			await press("Rename");
@@ -109,7 +109,7 @@ export default {
 
 			await tap(await blockNow());
 			await t.sleep(450);
-			await press("Add subtask");
+			await press("Subtask");
 			const typing = await field();
 			t.expect(typing && typing.text === "", `Add subtask types at the end of the stack (F108): ${JSON.stringify(typing)} ${JSON.stringify(await blockNow())} ${JSON.stringify(await menuNow(t))} ${await t.cdp.eval("document.activeElement?.className")}`);
 			await t.cdp.send("Input.insertText", { text: "Отключить интернет" });
@@ -151,7 +151,7 @@ export default {
 			while (rows[last + 1] && rows[last + 1].level > 0) last++;
 			await tap(await cardBy(t, parent, "inbox"));
 			await t.sleep(400);
-			await press("Add subtask");
+			await press("Subtask");
 			const f = await field();
 			const lastCard = await cardBy(t, rows[last].text, "inbox");
 			const parentCard = await cardBy(t, parent, "inbox");

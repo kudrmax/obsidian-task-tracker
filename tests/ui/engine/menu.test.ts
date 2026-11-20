@@ -8,7 +8,7 @@ import { calendarFile, mockFile } from "../../../obsidian/stand/mockData";
 import { LAYER_MS } from "../../../obsidian/ui/engine/layers/motion";
 import { groupsAbove } from "../../../obsidian/ui/engine/layers/split";
 import { monthGrid, monthOf, monthTitle } from "../../../obsidian/ui/engine/layout/month";
-import type { TaskMenuModel } from "../../../obsidian/ui/engine/port";
+import type { EntryBar, TaskMenuModel } from "../../../obsidian/ui/engine/port";
 import { createScreenStore } from "../../../obsidian/ui/engine/store";
 import { tileRows } from "../../../obsidian/ui/engine/view/TaskMenu";
 
@@ -29,59 +29,83 @@ const taskMenu = (p: MockPort, title: string, from: "list" | "calendar" | "stack
 	return model;
 };
 
-describe("the stand's task menu (the plugin's rules, the simplest)", () => {
-	it("offers Done, the progress tile named for what it sets, and Won't do, which asks", () => {
+const shape = (model: TaskMenuModel) => model.layout.map(({ group, actions }) => [group, actions.map((a) => a.id)]);
+const ids = (model: TaskMenuModel, group: string) => model.layout.find((g) => g.group === group)?.actions.map((a) => a.id) ?? [];
+const barOf = (bar: EntryBar) => bar.bar.map(({ group, actions }) => [group, actions.map((a) => `${a.id}${a.disabled ? " off" : ""}${a.lit ? " lit" : ""}`)]);
+
+describe("the stand's task menu, read from the core's table (task actions spec)", () => {
+	it("stands statuses, levels, the copy, When, Edit, the rows and Delete, top to bottom, as Max ordered them", () => {
 		const p = port();
-		const open = taskMenu(p, "Задача с описанием");
-		expect(open.statuses).toEqual([
-			{ id: "done", confirm: false },
-			{ id: "inProgress", confirm: false },
-			{ id: "wontDo", confirm: true },
+		expect(shape(taskMenu(p, "Задача с описанием"))).toEqual([
+			["statuses", ["done", "progress", "wontDo"]],
+			["levels", ["level"]],
+			["copy", []],
+			["when", ["tomorrow", "pickDate", "repeat"]],
+			["edit", ["rename", "project", "section", "subtask"]],
+			["rows", ["firstStep", "openFull", "openInObsidian"]],
+			["remove", ["delete"]],
+		]);
+	});
+
+	it("names the progress tile for what it sets, and lets Won't do and Delete ask", () => {
+		const p = port();
+		const open = taskMenu(p, "Задача с описанием").layout[0].actions;
+		expect(open.map((a) => [a.status, a.asks])).toEqual([
+			["done", false],
+			["inProgress", false],
+			["wontDo", true],
 		]);
 		const going = taskMenu(p, "Длинная задача, у которой название не помещается в колонку и уходит за правый край карточки");
-		expect(going.statuses[1].id).toBe("stopProgress");
-		expect(open.remove).toEqual({ confirm: true });
+		expect(going.layout[0].actions[1].status).toBe("stopProgress");
+		expect(taskMenu(p, "Задача с описанием").layout[taskMenu(p, "Задача с описанием").layout.length - 1].actions[0]).toMatchObject({ id: "delete", asks: true });
 	});
 
-	it("offers no tile for the day a task stands on, and Remove due date only for a day that isn't today", () => {
+	it("offers no day tile for the day a task stands on, each tile with the day it writes; Remove due date only off today", () => {
 		const p = port();
 		const today = taskMenu(p, "Задача с описанием");
-		expect(today.moves).toEqual(["tomorrow", "pick"]);
+		expect(ids(today, "when")).toEqual(["tomorrow", "pickDate", "repeat"]);
+		expect(today.layout.find((g) => g.group === "when")!.actions[0].date).toBe("2026-11-19");
 		expect(today.date.removable).toBe(false);
 		const inbox = taskMenu(p, p.read(0).cards[p.read(0).lists.inbox.rows.find((r) => r.kind === "task")!.id].title);
-		expect(inbox.moves).toEqual(["today", "tomorrow", "pick"]);
+		expect(ids(inbox, "when")).toEqual(["today", "tomorrow", "pickDate", "repeat"]);
 	});
 
-	it("names the rows of the edit group as the plugin does: Reminder for a timed task, Add description without one, Section in a list with sections", () => {
+	it("offers Reminder on a timed task, Description on one without, Section where the column shows sections", () => {
 		const p = port(calendarFile(NOW));
 		const timed = taskMenu(p, "Тренировка", "calendar");
-		expect(timed.edits.map((e) => e.id)).toEqual(["rename", "reminder", "repeat", "project", "subtask", "firstStep"]);
-		expect(timed.edits.find((e) => e.id === "reminder")?.value).toBe("live");
+		expect(ids(timed, "when")).toContain("reminder");
+		expect(ids(timed, "edit")).toEqual(["rename", "project", "subtask"]);
 		expect(timed.peek).toBe("разминка, потом зал");
-		const plain = taskMenu(p, "Купить подарок");
-		expect(plain.edits.map((e) => e.id)).toContain("description");
+		expect(ids(taskMenu(p, "Купить подарок"), "edit")).toContain("description");
 		const inbox = port();
 		const first = inbox.read(0).lists.inbox.rows.find((r) => r.kind === "task")!.id;
-		expect((inbox.menu(first, "list") as TaskMenuModel).edits.map((e) => e.id)).toContain("section");
-		expect((inbox.menu(first, "calendar") as TaskMenuModel).edits.map((e) => e.id)).not.toContain("section");
+		expect(ids(inbox.menu(first, "list") as TaskMenuModel, "edit")).toContain("section");
+		expect(ids(inbox.menu(first, "calendar") as TaskMenuModel, "edit")).not.toContain("section");
 	});
 
-	it("shows a calendar task's open subtasks in its menu (F107), and none in a stack's own menu", () => {
+	it("shows a calendar task's open subtasks in its menu (F107); a stack's card offers no Subtask, and its Project is off", () => {
 		const p = port(calendarFile(NOW));
-		const folded = taskMenu(p, "Переезд", "calendar");
-		expect(folded.subtasks).toEqual(["k10", "k11"]);
-		expect(p.menu("k10", "stack").kind === "task" && (p.menu("k10", "stack") as TaskMenuModel).edits.map((e) => e.id)).not.toContain("subtask");
-	});
-
-	it("disables Project on a subtask", () => {
-		const p = port(calendarFile(NOW));
+		expect(taskMenu(p, "Переезд", "calendar").subtasks).toEqual(["k10", "k11"]);
 		const sub = p.menu("k10", "stack") as TaskMenuModel;
-		expect(sub.edits.find((e) => e.id === "project")?.disabled).toBe(true);
+		expect(ids(sub, "edit")).not.toContain("subtask");
+		expect(sub.layout.find((g) => g.group === "edit")!.actions.find((a) => a.id === "project")?.disabled).toBe(true);
 	});
 
-	it("writes what was tapped: a move to the end of Now, a level on and off, a day picked, Delete", async () => {
+	it("offers Pick a date's lists above the month, the task's own on; none for a subtask", () => {
+		const p = port();
+		const inbox = taskMenu(p, p.read(0).cards[p.read(0).lists.inbox.rows.find((r) => r.kind === "task")!.id].title);
+		expect(inbox.places.map((place) => [place.id, place.on])).toEqual([
+			["inbox", true],
+			["backlog", false],
+			["soon", false],
+			["now", false],
+		]);
+		expect((port(calendarFile(NOW)).menu("k10", "stack") as TaskMenuModel).places).toEqual([]);
+	});
+
+	it("writes what was tapped: a day, a level on and off, a day picked, a list, Delete, a status", async () => {
 		const p = port(calendarFile(NOW));
-		await p.act("g1", { kind: "move", id: "today" });
+		await p.act("g1", { kind: "date", date: "2026-11-18" });
 		expect(p.fileText()).toMatch(/Купить подарок 📅 2026-11-18\n(?![\s\S]*## Soon[\s\S]*Купить подарок)/);
 		await p.act("g2", { kind: "priority", prefix: "p1" });
 		expect(p.fileText()).toContain("p1 Сдать отчёт");
@@ -89,6 +113,8 @@ describe("the stand's task menu (the plugin's rules, the simplest)", () => {
 		expect(p.fileText()).not.toContain("p1 Сдать отчёт");
 		await p.act("g3", { kind: "date", date: "2026-11-25" });
 		expect(p.fileText()).toContain("Написать письмо 📅 2026-11-25");
+		await p.act("g3", { kind: "sendTo", list: "backlog" });
+		expect(p.fileText()).toMatch(/## Backlog[\s\S]*- \[ \] Написать письмо\n/);
 		await p.act("g4", { kind: "delete" });
 		expect(p.fileText()).not.toContain("Забрать посылку");
 		await p.act("g5", { kind: "status", id: "wontDo" });
@@ -167,28 +193,38 @@ describe("the menu's fields and the plus, in the store", () => {
 		expect(s.entry).toMatchObject({ renaming: id, stack: false, at: { list: "inbox", before: id, depth: 0 } });
 		expect(s.entryText).toBe(s.shown.cards[id].title);
 		const bar = s.entryBar(s.entry!, s.draft, s.entryText);
-		expect(bar).toMatchObject({ indents: true, canIndent: false, canOutdent: false, where: { id: "inbox" } });
-		expect(bar.projects).not.toBeNull();
+		expect(barOf(bar)).toEqual([
+			["shifts", ["outdent off", "indent off"]],
+			["flag", [s.draft.level ? "level lit" : "level"]],
+			["marks", ["project", "repeat", "description"]],
+			["place", ["pickDate"]],
+		]);
+		expect(bar.where?.id).toBe("inbox");
 		store.getState().indentEntry(1);
 		expect(store.getState().entry!.at.depth).toBe(0);
 	});
 
-	it("a subtask's rename has no place and no project; a block's has the flag and the project; a stack card's the flag only", () => {
+	it("a subtask's rename has no place and no project; a block's has no shifts and no place; a stack card's neither shifts, project nor place", () => {
 		const lists = screen().store;
 		const sub = (["inbox", "soon", "day"] as const).flatMap((l) => lists.getState().shown.lists[l].rows).find((r) => r.kind === "task" && r.depth > 0)!.id;
 		lists.getState().openMenu(sub);
 		lists.getState().startRename();
 		let s = lists.getState();
-		expect(s.entryBar(s.entry!, s.draft, s.entryText)).toMatchObject({ indents: true, canIndent: false, projects: null, where: null });
+		expect(barOf(s.entryBar(s.entry!, s.draft, s.entryText))).toEqual([
+			["shifts", ["outdent off", "indent off"]],
+			["flag", ["level"]],
+			["marks", ["repeat", "description"]],
+		]);
 		const store = createScreenStore(port(calendarFile(NOW)));
 		store.getState().start();
 		store.getState().openMenu("k8", "calendar");
 		store.getState().startRename();
 		s = store.getState();
 		expect(s.entry).toMatchObject({ renaming: "k8", stack: false });
-		const block = s.entryBar(s.entry!, s.draft, s.entryText);
-		expect(block).toMatchObject({ indents: false, where: null });
-		expect(block.projects).not.toBeNull();
+		expect(barOf(s.entryBar(s.entry!, s.draft, s.entryText))).toEqual([
+			["flag", ["level"]],
+			["marks", ["project", "repeat", "description"]],
+		]);
 		store.getState().openEntry(null);
 		store.getState().openMenu("k8", "calendar");
 		const child = (store.getState().layer!.model as { subtasks: readonly string[] }).subtasks[0];
@@ -197,7 +233,10 @@ describe("the menu's fields and the plus, in the store", () => {
 		s = store.getState();
 		expect(s.layer?.id).toBe(child);
 		expect(s.entry).toMatchObject({ renaming: child, stack: true });
-		expect(s.entryBar(s.entry!, s.draft, s.entryText)).toMatchObject({ indents: false, projects: null, where: null });
+		expect(barOf(s.entryBar(s.entry!, s.draft, s.entryText))).toEqual([
+			["flag", ["level"]],
+			["marks", ["repeat", "description"]],
+		]);
 	});
 
 	it("Enter on a rename shows the new name at once, writes it and opens a new task's field right under it (F117, F298)", async () => {
@@ -285,7 +324,7 @@ describe("the menu's fields and the plus, in the store", () => {
 		store.getState().entryPlace("date", "2026-11-27", ["inbox", "soon", "day"]);
 		store.getState().commitEntry("A", true);
 		const s = store.getState();
-		expect(s.entryBar(s.entry!, s.draft, "").canIndent).toBe(true);
+		expect(barOf(s.entryBar(s.entry!, s.draft, "")).find(([group]) => group === "shifts")).toEqual(["shifts", ["outdent off", "indent"]]);
 		store.getState().indentEntry(1);
 		expect(store.getState().entry!.at.depth).toBe(1);
 	});
@@ -346,5 +385,87 @@ describe("the stand's calendar at any hour of its day (verifier, 2026-11-20)", (
 		expect(ahead.every((b) => b.start + (b.length ?? 30) <= 24 * 60)).toBe(true);
 		expect(new Set(ahead.map((b) => b.start)).size).toBeGreaterThan(5);
 		expect(events.every((e) => e.end <= 24 * 60)).toBe(true);
+	});
+});
+
+describe("the field's description, projects and new section (task actions spec, Decisions 101–103)", () => {
+	const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+	const screen = (file = mockFile(NOW)) => {
+		const p = port(file);
+		const store = createScreenStore(p);
+		store.getState().start();
+		return { p, store };
+	};
+
+	it("Description opens a line under the title; Enter writes both, and the next field opens without one", async () => {
+		const { p, store } = screen();
+		store.getState().plusTap(["soon", "day"]);
+		store.getState().openDescription();
+		expect(store.getState().draft.descriptionLine).toBe("");
+		store.getState().typeDescription("с подробностями");
+		const bar = store.getState().entryBar(store.getState().entry!, store.getState().draft, "");
+		expect(bar.bar.flatMap((g) => g.actions).find((a) => a.id === "description")?.lit).toBe(true);
+		store.getState().commitEntry("С описанием", true);
+		expect(store.getState().draft.descriptionLine).toBeNull();
+		await settle();
+		await settle();
+		expect(p.fileText()).toMatch(/- \[ \] С описанием[^\n]*\n\t- с подробностями/);
+	});
+
+	it("a rename's Description opens holding the task's own; only a changed one is written, an emptied one taken off", async () => {
+		const { p, store } = screen(calendarFile(NOW));
+		const id = Object.values(store.getState().shown.cards).find((c) => c.title === "Тренировка")!.id;
+		store.getState().openMenu(id, "calendar");
+		store.getState().startRename();
+		store.getState().openDescription();
+		expect(store.getState().draft.descriptionLine).toBe("разминка, потом зал");
+		store.getState().typeDescription("");
+		store.getState().commitEntry("Тренировка", false);
+		await settle();
+		await settle();
+		expect(p.fileText()).not.toContain("разминка, потом зал");
+		store.getState().openMenu("g1");
+		store.getState().startRename();
+		store.getState().openDescription();
+		expect(store.getState().draft.descriptionLine).toBe("");
+	});
+
+	it("Project is several checks: each toggles beside the others and is written with the task; No project takes all off", async () => {
+		const { p, store } = screen();
+		store.getState().plusTap(["soon", "day"]);
+		store.getState().toggleProject("Дом");
+		store.getState().toggleProject("Отпуск");
+		const bar = store.getState().entryBar(store.getState().entry!, store.getState().draft, "");
+		expect(bar.projects.filter((o) => o.on).map((o) => o.name)).toEqual(["Дом", "Отпуск"]);
+		store.getState().commitEntry("Два проекта", true);
+		expect(store.getState().draft.projects).toEqual(["Дом", "Отпуск"]);
+		store.getState().clearProjects();
+		expect(store.getState().draft.projects).toEqual([]);
+		await settle();
+		await settle();
+		expect(p.fileText()).toContain("Два проекта 📅");
+		expect(p.fileText()).toMatch(/Два проекта[^\n]* 🗂️ Дом 🗂️ Отпуск/);
+	});
+
+	it("New section, where the column shows sections, makes the field write a section's name there", async () => {
+		const { store } = screen();
+		store.getState().plusTap(["inbox", "soon"]);
+		const bar = store.getState().entryBar(store.getState().entry!, store.getState().draft, "");
+		expect(bar.bar[0]).toMatchObject({ group: "mode", actions: [{ id: "newSection", lit: false }] });
+		store.getState().toggleSection();
+		const section = store.getState().entryBar(store.getState().entry!, store.getState().draft, "");
+		expect(section.bar.map((g) => g.group)).toEqual(["mode"]);
+		store.getState().commitEntry("Новый раздел", true);
+		expect(store.getState().entry).toBeNull();
+		await settle();
+		await settle();
+		expect(store.getState().shown.lists.inbox.rows.some((r) => r.kind === "section" && r.title === "Новый раздел")).toBe(true);
+	});
+
+	it("Repeat is on the calendar's field too", () => {
+		const { store } = screen(calendarFile(NOW));
+		store.getState().openEntry({ list: "day", before: null, dayOffset: 0, at: 600 });
+		const bar = store.getState().entryBar(store.getState().entry!, store.getState().draft, "");
+		expect(bar.bar.flatMap((g) => g.actions).map((a) => a.id)).toContain("repeat");
 	});
 });

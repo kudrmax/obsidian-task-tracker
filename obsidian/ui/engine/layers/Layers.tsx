@@ -79,6 +79,8 @@ export interface MenuLayerProps {
 	readonly peek?: { readonly content: ReactNode; readonly onPress: () => void };
 	/** A question stands in a group's place: the groups keep the side of the copy they stood on (the plugin's `keepAbove`). */
 	readonly holdSplit?: boolean;
+	/** How many first groups stand over the copy where they fit there (the task menu's `copy` group, Max's order); the rest under it. */
+	readonly copyAt?: number;
 	/** The copy keeps the pressed thing's width (an event wraps its title inside it); otherwise it grows right for its title. */
 	readonly keepWidth?: boolean;
 }
@@ -102,8 +104,10 @@ const motionClass = (status: string, ready: boolean) => (status === "open" && re
  * in from where it stood unplaced. The parts open together and close together (Floating UI's transition status keeps
  * them mounted while they fade, `LAYER_MS`).
  */
-export function MenuLayer({ open, onClose, onPressAgain, escapes = true, root, reference, panelBy = null, label, over, groups, panelClass, page, peek, keepWidth = false, holdSplit = false }: MenuLayerProps) {
+export function MenuLayer({ open, onClose, onPressAgain, escapes = true, root, reference, panelBy = null, label, over, groups, panelClass, page, peek, keepWidth = false, holdSplit = false, copyAt }: MenuLayerProps) {
 	const [above, setAbove] = useState(0);
+	const prefer = useRef<number | undefined>(copyAt);
+	prefer.current = copyAt;
 
 	const [overEl, setOverEl] = useState<HTMLElement | null>(null);
 	const parts = useRef<{ upper: HTMLElement | null; lower: HTMLElement | null }>({ upper: null, lower: null });
@@ -132,7 +136,7 @@ export function MenuLayer({ open, onClose, onPressAgain, escapes = true, root, r
 		placement: "bottom-start",
 		strategy: "fixed",
 		transform: false,
-		middleware: [offset(DESIGN.menuGap), splitBy(parts, safe), shift({ padding: EDGES, ...within }), size({ padding: DESIGN.wholeMargin, apply: scrollWithin, ...within })],
+		middleware: [offset(DESIGN.menuGap), splitBy(parts, safe, prefer), shift({ padding: EDGES, ...within }), size({ padding: DESIGN.wholeMargin, apply: scrollWithin, ...within })],
 		whileElementsMounted: autoUpdate,
 		elements: { reference: panelBy ?? overEl },
 	});
@@ -344,7 +348,7 @@ function scrollWithin({ availableHeight, elements }: { availableHeight: number; 
  * How many of the panel's groups stand over the copy (the plugin's `groupsAbove` over its `placePanel`): measured by
  * Floating UI as the panel is placed, each group's height wherever it stands now, against the room over and under the copy.
  */
-function splitBy(parts: MutableRefObject<{ upper: HTMLElement | null; lower: HTMLElement | null }>, safe: MutableRefObject<HTMLElement | null>): Middleware {
+function splitBy(parts: MutableRefObject<{ upper: HTMLElement | null; lower: HTMLElement | null }>, safe: MutableRefObject<HTMLElement | null>, prefer: MutableRefObject<number | undefined>): Middleware {
 	return {
 		name: "split",
 		async fn(state) {
@@ -357,7 +361,7 @@ function splitBy(parts: MutableRefObject<{ upper: HTMLElement | null; lower: HTM
 			const bounds = await roomOf(state, safe);
 			const roomOver = rects.reference.y - DESIGN.menuGap - DESIGN.wholeMargin - bounds.top;
 			const roomUnder = bounds.bottom - (rects.reference.y + rects.reference.height) - DESIGN.menuGap - DESIGN.wholeMargin;
-			return { data: { above: groupsAbove(cuts, total, roomOver, roomUnder, groups.length > 1, DESIGN.menuRow) } };
+			return { data: { above: groupsAbove(cuts, total, roomOver, roomUnder, groups.length > 1, DESIGN.menuRow, prefer.current) } };
 		},
 	};
 }
