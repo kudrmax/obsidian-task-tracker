@@ -1,4 +1,6 @@
-import { type App, Component, ItemView, MarkdownRenderChild, MarkdownRenderer, Platform, Plugin, Scope, type TFile, type WorkspaceLeaf } from "obsidian";
+import { type App, Component, FileSystemAdapter, ItemView, MarkdownRenderChild, MarkdownRenderer, Platform, Plugin, Scope, type TFile, type WorkspaceLeaf } from "obsidian";
+import { MacTrackpadFingers } from "../infrastructure/trackpad/MacTrackpadFingers";
+import { TRACKPAD_MODULE } from "../infrastructure/trackpad/module";
 import { KEYS, takesKeys } from "../ui/engine/keys";
 import type { Place } from "../ui/engine/layout/Layout";
 import { type MountedScreen, mountScreen } from "../ui/engine/mount";
@@ -78,7 +80,7 @@ class StandView extends ItemView {
 		this.unmount();
 		this.contentEl.empty();
 		this.contentEl.addClass("tc-view");
-		this.screen = mountScreen(this.contentEl, { port: this.stand.port, place: this.stand.leafPlace, app: this.app, sourcePath: "", haptics: haptics(), zoom: this.stand.zoom(), markdown: markdownOf(this.app), desk: !Platform.isMobile });
+		this.screen = mountScreen(this.contentEl, { port: this.stand.port, place: this.stand.leafPlace, app: this.app, sourcePath: "", haptics: haptics(), zoom: this.stand.zoom(), markdown: markdownOf(this.app), desk: !Platform.isMobile, fingers: this.stand.fingers });
 		this.stand.screens.add(this.screen);
 	}
 
@@ -103,7 +105,7 @@ class StandBlock extends MarkdownRenderChild {
 
 	override onload(): void {
 		this.containerEl.addClass("tc-stand-block");
-		this.screen = mountScreen(this.containerEl, { port: this.stand.port, place: "note", app: this.stand.app, sourcePath: this.path, haptics: haptics(), zoom: this.stand.zoom(), markdown: markdownOf(this.stand.app), desk: !Platform.isMobile });
+		this.screen = mountScreen(this.containerEl, { port: this.stand.port, place: "note", app: this.stand.app, sourcePath: this.path, haptics: haptics(), zoom: this.stand.zoom(), markdown: markdownOf(this.stand.app), desk: !Platform.isMobile, fingers: this.stand.fingers });
 		this.stand.screens.add(this.screen);
 	}
 
@@ -136,6 +138,8 @@ export default class TaskCalendarStand extends Plugin {
 	readonly screens = new Set<MountedScreen>();
 	/** What a leaf shows: the whole screen, or a step alone (one column, then two) with plain tasks. */
 	leafPlace: Place = "leaf";
+	/** macOS's touch and lift on the trackpad (Decision 125); null on the phone, on Windows and Linux, and wherever the native module can't load. */
+	fingers: MacTrackpadFingers | null = null;
 
 	/** The calendar's zoom, kept on this device by Obsidian's local storage. */
 	zoom() {
@@ -168,6 +172,11 @@ export default class TaskCalendarStand extends Plugin {
 		};
 		(window as unknown as { __tcStand?: StandApi }).__tcStand = api;
 		this.register(() => delete (window as unknown as { __tcStand?: StandApi }).__tcStand);
+		this.fingers = this.hearFingers();
+		this.register(() => {
+			this.fingers?.dispose();
+			this.fingers = null;
+		});
 		showPriorityColors([]);
 		this.register(clearPriorityColors);
 		this.followWindows();
@@ -191,6 +200,28 @@ export default class TaskCalendarStand extends Plugin {
 		this.addCommand({ id: "step-quick-add", name: "Step 9: quick add", callback: () => void this.showStep("leaf") });
 		this.addCommand({ id: "whole-screen", name: "The whole screen", callback: () => void this.showStep("leaf") });
 		for (const delay of WRITE_DELAYS) this.addCommand({ id: `delay-${delay}`, name: `Write delay ${delay} ms`, callback: () => (port.delay = delay) });
+	}
+
+	private hearFingers(): MacTrackpadFingers | null {
+		const adapter = this.app.vault.adapter;
+		if (!Platform.isDesktopApp || !Platform.isMacOS || !(adapter instanceof FileSystemAdapter) || !this.manifest.dir) return null;
+		const host = window as unknown as { require?: (id: string) => unknown };
+		return MacTrackpadFingers.load(
+			TRACKPAD_MODULE,
+			{
+				dir: adapter.getFullPath(this.manifest.dir),
+				electron: () => host.require?.("electron") as never,
+				remoteFallback: () => {
+					try {
+						return host.require?.("@electron/remote") as never;
+					} catch {
+						return undefined;
+					}
+				},
+				log: (message) => console.info(`[task-calendar-stand] ${message}`),
+			},
+			window,
+		);
 	}
 
 	private onActiveView(checking: boolean, run: (view: StandView) => void): boolean {

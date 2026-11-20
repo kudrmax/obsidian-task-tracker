@@ -2,6 +2,7 @@ import type { App } from "obsidian";
 import { createRoot } from "react-dom/client";
 import { DESIGN } from "../design";
 import type { Place } from "./layout/Layout";
+import type { TrackpadFingers } from "./gestures/trackpadFollow";
 import type { ScreenPort } from "./port";
 import { createScreenStore, type ScreenStore, type Zoom } from "./store";
 import { TaskScreen } from "./view/TaskScreen";
@@ -19,6 +20,8 @@ export interface MountOptions {
 	readonly desk: boolean;
 	/** Draws markdown as Obsidian does: the start of a description by the menu. */
 	readonly markdown: (text: string, el: HTMLElement, sourcePath: string) => () => void;
+	/** macOS's touch and lift on the trackpad, where the host hears them (Decision 125). */
+	readonly fingers?: TrackpadFingers | null;
 }
 
 export interface MountedScreen {
@@ -27,7 +30,7 @@ export interface MountedScreen {
 }
 
 /** The engine's screen in `el`: its own store over the port, in the element's own document and window. */
-export function mountScreen(el: HTMLElement, { port, place, app, sourcePath, haptics, zoom, markdown, desk }: MountOptions): MountedScreen {
+export function mountScreen(el: HTMLElement, { port, place, app, sourcePath, haptics, zoom, markdown, desk, fingers = null }: MountOptions): MountedScreen {
 	const doc = el.ownerDocument;
 	const store = createScreenStore(port, zoom.kept ?? DESIGN.hourPx);
 	const keep = store.subscribe((s, was) => {
@@ -35,7 +38,7 @@ export function mountScreen(el: HTMLElement, { port, place, app, sourcePath, hap
 		else if (was.gesture === "zoom" && s.gesture !== "zoom") zoom.keep(s.zoom);
 	});
 	const root = createRoot(el);
-	root.render(<TaskScreen store={store} place={place} host={{ doc, win: doc.defaultView ?? window, layerRoot: doc.body, app, sourcePath, haptics, zoomMost: zoom.most, markdown, desk }} />);
+	root.render(<TaskScreen store={store} place={place} host={{ doc, win: doc.defaultView ?? window, layerRoot: doc.body, app, sourcePath, haptics, zoomMost: zoom.most, markdown, desk, fingers }} />);
 	return {
 		store,
 		unmount: () => {

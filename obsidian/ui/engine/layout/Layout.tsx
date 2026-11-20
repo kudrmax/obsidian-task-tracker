@@ -103,8 +103,8 @@ function RibbonColumns() {
  */
 function FollowColumns() {
 	const ribbon = useRef<HTMLDivElement>(null);
-	const { win } = useHost();
-	const { at, turn, bind } = useFollowRibbon(ribbon, win);
+	const { win, fingers } = useHost();
+	const { at, turn, bind } = useFollowRibbon(ribbon, win, fingers);
 	return (
 		<div className="tc-ribbon" ref={ribbon} {...bind()}>
 			<DayTurnContext.Provider value={turn}>

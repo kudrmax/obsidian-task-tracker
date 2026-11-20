@@ -1,5 +1,6 @@
 import type { App } from "obsidian";
 import { createContext, useContext } from "react";
+import type { TrackpadFingers } from "../gestures/trackpadFollow";
 
 /**
  * What the host passes the screen (spec, «Haptics, theme, platform»): the view's own document and window (a pop-out has its
@@ -21,6 +22,8 @@ export interface ScreenHost {
 	readonly desk: boolean;
 	/** Draws markdown into `el` as Obsidian does (a description's start by the menu); returns what takes it away. */
 	readonly markdown: (text: string, el: HTMLElement, sourcePath: string) => () => void;
+	/** macOS's touch and lift of the fingers on the trackpad (Decision 125); null where the host can't hear them: the ribbon then reads them from the deltas. */
+	readonly fingers: TrackpadFingers | null;
 }
 
 export const HostContext = createContext<ScreenHost | null>(null);

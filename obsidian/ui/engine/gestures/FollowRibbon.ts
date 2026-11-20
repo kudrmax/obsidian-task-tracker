@@ -3,6 +3,7 @@ import { animate, type AnimationPlaybackControls, type MotionValue, useMotionVal
 import { createContext, type RefObject, useEffect, useRef, useState } from "react";
 import { STOPS, type Stop, useScreen, useScreenApi } from "../store";
 import { FollowPager, LANDING, landingVelocity } from "./followPager";
+import { type FingerSignal, TrackpadFollow, type TrackpadFingers } from "./trackpadFollow";
 import { type WheelCue, WheelFollow } from "./wheelFollow";
 
 /** Where the landing counts as done, in places: under a pixel at any width the ribbon has. */
@@ -47,11 +48,12 @@ const sameDays = (a: readonly number[], b: readonly number[]) => a.length === b.
  * The ribbon as a gallery (Max, 2026-11-19; stage0.md, «Round seven»): one finger on glass and two on the trackpad are
  * one action. The strip follows them (`FollowPager`, one place either way of where the stroke began); let go, one spring
  * lands it on the place the rule gives; a stroke during the landing takes the strip from where it stands. The trackpad's
- * wheel deltas become a finger's cues in `WheelFollow` (the lift read from macOS's momentum, which then moves nothing);
- * @use-gesture's wheel end (its 140 ms of quiet) lets go fingers that stopped without momentum. Both read the one gesture
+ * wheel deltas become a finger's cues in `TrackpadFollow` by macOS's own touch and lift when the host hears them
+ * (`fingers`, Decision 125), else in `WheelFollow` (the lift read from macOS's momentum, which then moves nothing;
+ * @use-gesture's wheel end, its 140 ms of quiet, lets go fingers that stopped without momentum). Both read the one gesture
  * slot; the stop the store keeps is where the strip lands.
  */
-export function useFollowRibbon(ribbon: RefObject<HTMLElement | null>, win: Window): FollowGestures {
+export function useFollowRibbon(ribbon: RefObject<HTMLElement | null>, win: Window, fingers: TrackpadFingers | null): FollowGestures {
 	const api = useScreenApi();
 	const stop = useScreen((s) => s.stop);
 	const dayOffset = useScreen((s) => s.dayOffset);
@@ -64,7 +66,12 @@ export function useFollowRibbon(ribbon: RefObject<HTMLElement | null>, win: Wind
 	const drawnDays = useRef(days);
 	const glide = useRef<AnimationPlaybackControls | null>(null);
 	const pager = useRef(new FollowPager(placeOf(stop, dayOffset), Infinity));
-	const fingers = useRef(new WheelFollow());
+	const wheelFingers = useRef(new WheelFollow());
+	const trackpad = useRef(new TrackpadFollow());
+	/** The strip is landing: fingers that touch now stop it. */
+	const landing = useRef(false);
+	/** The pointer is over the ribbon: the fingers on the trackpad are its. */
+	const over = useRef(false);
 	/** The finger's movement so far in this drag, px on: the pager takes it piece by piece. */
 	const drawn = useRef(0);
 
@@ -92,10 +99,13 @@ export function useFollowRibbon(ribbon: RefObject<HTMLElement | null>, win: Wind
 	const land = (to: number, speed = 0) => {
 		glide.current?.stop();
 		const velocity = landingVelocity(along.get(), to, speed, column());
-		const landing = animate(along, to, { type: "spring", ...LANDING, velocity, restDelta: REST, restSpeed: REST });
-		glide.current = landing;
-		void landing.then(() => {
-			if (glide.current === landing && !pager.current.following) draw(false);
+		const spring = animate(along, to, { type: "spring", ...LANDING, velocity, restDelta: REST, restSpeed: REST });
+		glide.current = spring;
+		landing.current = true;
+		void spring.then(() => {
+			if (glide.current !== spring) return;
+			landing.current = false;
+			if (!pager.current.following) draw(false);
 		});
 	};
 
@@ -117,6 +127,7 @@ export function useFollowRibbon(ribbon: RefObject<HTMLElement | null>, win: Wind
 		const screen = api.getState();
 		if (!pager.current.following && !screen.claim("ribbon")) return false;
 		glide.current?.stop();
+		landing.current = false;
 		pager.current.begin(along.get(), fresh);
 		screen.setStop(STOPS[Math.min(pager.current.stop, CALENDAR)]);
 		screen.showDay(Math.max(0, pager.current.stop - CALENDAR));
@@ -145,6 +156,16 @@ export function useFollowRibbon(ribbon: RefObject<HTMLElement | null>, win: Wind
 		else release(c.speed);
 	};
 
+	/** macOS's touch and lift, in this window's time: the ribbon's when the pointer is over it. */
+	useEffect(() => {
+		if (!fingers) return;
+		return fingers.listen(win, (signal: FingerSignal) => {
+			const cues = trackpad.current.signal(signal, landing.current && over.current);
+			if (api.getState().gesture === "drag") return;
+			cues.forEach(cue);
+		});
+	}, [fingers, win]);
+
 	const bind = useGesture(
 		{
 			onDrag: ({ first, last, xy: [x], initial: [x0], velocity: [vx], direction: [dx], event, cancel }) => {
@@ -160,9 +181,14 @@ export function useFollowRibbon(ribbon: RefObject<HTMLElement | null>, win: Wind
 				drawn.current = on;
 				if (last) release(-vx * dx);
 			},
+			onHover: ({ hovering }) => {
+				over.current = !!hovering;
+			},
 			onWheel: ({ event, last }) => {
-				/** @use-gesture's wheel ends after its own quiet (140 ms, more than `quietMs`): fingers still down then let go. */
-				const cues = last ? fingers.current.tick(Infinity) : fingers.current.feed({ dx: event.deltaX, dy: event.deltaY, t: event.timeStamp, ctrl: event.ctrlKey });
+				if (!last) over.current = true;
+				const sample = { dx: event.deltaX, dy: event.deltaY, t: event.timeStamp, ctrl: event.ctrlKey };
+				/** @use-gesture's wheel ends after its own quiet (140 ms): without macOS's signals fingers still down then let go (more than `quietMs`); with them only a lift still waiting for its last deltas, or a cut no touch followed. */
+				const cues = fingers ? (last ? trackpad.current.tick() : trackpad.current.feed(sample)) : last ? wheelFingers.current.tick(Infinity) : wheelFingers.current.feed(sample);
 				if (api.getState().gesture === "drag") return;
 				cues.forEach(cue);
 			},
