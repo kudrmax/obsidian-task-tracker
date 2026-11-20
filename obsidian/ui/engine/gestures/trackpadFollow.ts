@@ -11,7 +11,7 @@ export type FingerSignal =
 	| { readonly kind: "up"; readonly t: number; readonly lastMove: number | null }
 	| { readonly kind: "momentumEnded"; readonly t: number; readonly last: number };
 
-/** The fingers on the Mac's trackpad, where the host can hear them (Decision 125): what `listen` returns stops listening. */
+/** The fingers on the Mac's trackpad, where the host can hear them (Decision 126): what `listen` returns stops listening. */
 export interface TrackpadFingers {
 	listen(win: Window, listener: (signal: FingerSignal) => void): () => void;
 }
@@ -47,7 +47,7 @@ interface Touch {
 }
 
 /**
- * Two fingers on the Mac's trackpad as one finger on glass (Decision 125), read from macOS's own touch and lift instead of
+ * Two fingers on the Mac's trackpad as one finger on glass (Decision 126), read from macOS's own touch and lift instead of
  * the deltas' pace (`WheelFollow`, the path without the native module): a touch stops the columns at once and the
  * fingers' deltas move them 1:1; the lift lets them go at the fingers' speed; the momentum's deltas move nothing. A touch
  * is the ribbon's when it lands on moving columns, or when its first movement is sideways. The lift waits for the deltas

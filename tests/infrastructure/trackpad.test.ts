@@ -28,7 +28,7 @@ function mainProcess(installed = true) {
 	return { loader, addon, sent, destroyed };
 }
 
-describe("the trackpad's native module (Decision 125)", () => {
+describe("the trackpad's native module (Decision 126)", () => {
 	it("is the build of the source beside it: rebuild with `node scripts/build-trackpad.mjs` after changing addon.m", () => {
 		const { sha256 } = JSON.parse(readFileSync(join(NATIVE, "trackpad.node.json"), "utf8")) as { sha256: string };
 		expect(createHash("sha256").update(readFileSync(join(NATIVE, "addon.m"))).digest("hex")).toBe(sha256);

@@ -33,7 +33,7 @@ const under = (target: string, dir: string): boolean => target.startsWith(`${HOM
 /** What the iOS app's entry may use besides the contract: the door, which reaches the same rules the services write with. */
 const PHONE_DOOR = "core/application/PhoneDoor.ts";
 
-/** The trackpad's native module (Decision 125): it reads nothing of the core, so the stand takes it too. */
+/** The trackpad's native module (Decision 126): it reads nothing of the core, so the stand takes it too. */
 const STAND_TRACKPAD = "obsidian/infrastructure/trackpad/";
 
 /** What a layer may import: a path in the repository, or a package's name. */
@@ -47,7 +47,7 @@ const MAY_IMPORT: Readonly<Record<Layer, (target: string) => boolean>> = {
 	root: (t) => !under(t, "stand"),
 	/**
 	 * The stand (`obsidian/stand`, docs/superpowers/specs/2026-11-18-ui-engine.md): the engine over `MockPort`, never the core;
-	 * nothing imports it. Of the infrastructure only the trackpad's native module, as the plugin gets it (Decision 125).
+	 * nothing imports it. Of the infrastructure only the trackpad's native module, as the plugin gets it (Decision 126).
 	 */
 	stand: (t) => under(t, "stand") || under(t, "ui") || t.startsWith(STAND_TRACKPAD) || OBSIDIAN_PACKAGES.includes(t) || UI_PACKAGES.includes(t),
 };

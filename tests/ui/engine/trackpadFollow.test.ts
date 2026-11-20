@@ -111,7 +111,7 @@ const momentumWheels = (events: readonly Heard[]) => {
 	return byTime.filter((e) => e.type === "wheel" && (e.dx !== 0 || e.dy !== 0) && spans.some(([a, b]) => e.t >= a && e.t <= b)).map((e) => e.t);
 };
 
-describe("TrackpadFollow on Max's probe session (Decision 125)", () => {
+describe("TrackpadFollow on Max's probe session (Decision 126)", () => {
 	const strokes = replay(SESSION);
 	const lifts = touches(SESSION);
 

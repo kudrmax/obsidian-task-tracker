@@ -22,7 +22,7 @@ export interface ScreenHost {
 	readonly desk: boolean;
 	/** Draws markdown into `el` as Obsidian does (a description's start by the menu); returns what takes it away. */
 	readonly markdown: (text: string, el: HTMLElement, sourcePath: string) => () => void;
-	/** macOS's touch and lift of the fingers on the trackpad (Decision 125); null where the host can't hear them: the ribbon then reads them from the deltas. */
+	/** macOS's touch and lift of the fingers on the trackpad (Decision 126); null where the host can't hear them: the ribbon then reads them from the deltas. */
 	readonly fingers: TrackpadFingers | null;
 }
 

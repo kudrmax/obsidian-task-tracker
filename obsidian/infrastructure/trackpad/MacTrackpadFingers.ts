@@ -55,7 +55,7 @@ export interface TrackpadHost {
 const CLOCK_SAMPLES = 7;
 
 /**
- * macOS's touch and lift of the fingers on the trackpad (Decision 125), heard through a native module in Obsidian's main
+ * macOS's touch and lift of the fingers on the trackpad (Decision 126), heard through a native module in Obsidian's main
  * process: the module (native/trackpad, derived from electron-trackpad-utils) reads the phases
  * of the scroll events AppKit hands the window, and the loader sends them to this window by IPC. The moments come in
  * macOS's uptime; each listener gets them on its own window's clock (its wheel events' `timeStamp`), the offset measured

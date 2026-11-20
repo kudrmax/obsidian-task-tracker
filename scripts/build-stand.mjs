@@ -29,7 +29,7 @@ const result = await esbuild.build({
 	define: { "process.env.NODE_ENV": '"production"' },
 	external: ["obsidian", "electron", "@codemirror/state", "@codemirror/view", ...builtinModules, ...builtinModules.map((name) => `node:${name}`)],
 	plugins: [raw],
-	/** The trackpad's native module, embedded and written beside the plugin on load (Decision 125). */
+	/** The trackpad's native module, embedded and written beside the plugin on load (Decision 126). */
 	loader: { ".node": "base64" },
 	outfile: path.join(out, "main.js"),
 	banner: { js: `// task-calendar-stand ${new Date().toISOString()}` },

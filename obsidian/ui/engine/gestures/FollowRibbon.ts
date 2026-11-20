@@ -49,7 +49,7 @@ const sameDays = (a: readonly number[], b: readonly number[]) => a.length === b.
  * one action. The strip follows them (`FollowPager`, one place either way of where the stroke began); let go, one spring
  * lands it on the place the rule gives; a stroke during the landing takes the strip from where it stands. The trackpad's
  * wheel deltas become a finger's cues in `TrackpadFollow` by macOS's own touch and lift when the host hears them
- * (`fingers`, Decision 125), else in `WheelFollow` (the lift read from macOS's momentum, which then moves nothing;
+ * (`fingers`, Decision 126), else in `WheelFollow` (the lift read from macOS's momentum, which then moves nothing;
  * @use-gesture's wheel end, its 140 ms of quiet, lets go fingers that stopped without momentum). Both read the one gesture
  * slot; the stop the store keeps is where the strip lands.
  */

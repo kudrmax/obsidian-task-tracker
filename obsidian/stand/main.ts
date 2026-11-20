@@ -138,7 +138,7 @@ export default class TaskCalendarStand extends Plugin {
 	readonly screens = new Set<MountedScreen>();
 	/** What a leaf shows: the whole screen, or a step alone (one column, then two) with plain tasks. */
 	leafPlace: Place = "leaf";
-	/** macOS's touch and lift on the trackpad (Decision 125); null on the phone, on Windows and Linux, and wherever the native module can't load. */
+	/** macOS's touch and lift on the trackpad (Decision 126); null on the phone, on Windows and Linux, and wherever the native module can't load. */
 	fingers: MacTrackpadFingers | null = null;
 
 	/** The calendar's zoom, kept on this device by Obsidian's local storage. */

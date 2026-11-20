@@ -20,7 +20,7 @@ export interface MountOptions {
 	readonly desk: boolean;
 	/** Draws markdown as Obsidian does: the start of a description by the menu. */
 	readonly markdown: (text: string, el: HTMLElement, sourcePath: string) => () => void;
-	/** macOS's touch and lift on the trackpad, where the host hears them (Decision 125). */
+	/** macOS's touch and lift on the trackpad, where the host hears them (Decision 126). */
 	readonly fingers?: TrackpadFingers | null;
 }
 
