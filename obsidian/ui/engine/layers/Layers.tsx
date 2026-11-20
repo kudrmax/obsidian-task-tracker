@@ -318,7 +318,7 @@ function splitBy(parts: MutableRefObject<{ upper: HTMLElement | null; lower: HTM
 			const bounds = await roomOf(state, safe);
 			const roomOver = rects.reference.y - DESIGN.menuGap - DESIGN.wholeMargin - bounds.top;
 			const roomUnder = bounds.bottom - (rects.reference.y + rects.reference.height) - DESIGN.menuGap - DESIGN.wholeMargin;
-			return { data: { above: groupsAbove(cuts, total, roomOver, roomUnder, groups.length > 1) } };
+			return { data: { above: groupsAbove(cuts, total, roomOver, roomUnder, groups.length > 1, DESIGN.menuRow) } };
 		},
 	};
 }

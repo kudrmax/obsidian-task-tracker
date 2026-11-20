@@ -57,6 +57,8 @@ export const DESIGN = {
 	menuBand: 8,
 	/** The start of a description by the menu is never taller than this. */
 	descPeekMax: 214,
+	/** A menu's row: a part of the menu with less room than this shows nothing worth reaching. */
+	menuRow: 44,
 } as const;
 
 export type DesignMeasure = keyof typeof DESIGN;
@@ -93,6 +95,7 @@ export const DESIGN_TOKENS: Readonly<Record<DesignMeasure, string>> = {
 	wholeMargin: "--tc-space-10",
 	menuBand: "--tc-space-8",
 	descPeekMax: "--tc-desc-peek-max",
+	menuRow: "--tc-row",
 };
 
 /** The custom properties the code sets on elements; styles.css does the arithmetic with them. */
