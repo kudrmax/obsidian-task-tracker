@@ -63,8 +63,11 @@ export class FollowPager {
 	}
 }
 
-/** The columns' landing: a spring that settles in about 200 ms (critically damped, stage 0 round six). */
-export const LANDING = { stiffness: 1400, damping: 75 } as const;
+/**
+ * The columns' landing: a spring that settles in about 150 ms (critically damped, stage 0 round six; Max, 2026-11-20,
+ * «нужно чуть быстрее»: was 1400 and 75, about 250 ms; Decision 126).
+ */
+export const LANDING = { stiffness: 4096, damping: 128 } as const;
 const OMEGA = Math.sqrt(LANDING.stiffness);
 
 /**

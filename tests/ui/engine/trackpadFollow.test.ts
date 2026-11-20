@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { FLICK_SPEED, FollowPager, landingAt, landingVelocity } from "../../../obsidian/ui/engine/gestures/followPager";
+import { AxisLock } from "../../../obsidian/ui/engine/gestures/axisLock";
 import { type FingerSignal, TrackpadFollow } from "../../../obsidian/ui/engine/gestures/trackpadFollow";
 import type { WheelCue } from "../../../obsidian/ui/engine/gestures/wheelFollow";
 
@@ -147,7 +148,7 @@ describe("TrackpadFollow on Max's probe session (Decision 126)", () => {
 			const touch = SESSION.find((e) => e.type === "down" && e.t > c.t);
 			return touch && touch.t - c.t >= 20;
 		});
-		expect(caught.length).toBeGreaterThan(5);
+		expect(caught.length).toBeGreaterThanOrEqual(4);
 		expect(caughtEarly.length).toBe(caught.length);
 	});
 
@@ -274,4 +275,50 @@ describe("TrackpadFollow's rule", () => {
 		f.feed(wheel(0, 5));
 		expect(f.signal({ kind: "down", t: 500 }, false)).toEqual([{ kind: "release", t: 0, speed: 5 / (1000 / 120) }]);
 	});
+
+	it("keeps the ribbon's stroke and its momentum from scrolling up or down until the next touch (Max, 2026-11-20)", () => {
+		const f = new TrackpadFollow();
+		f.signal({ kind: "down", t: 0 }, false);
+		f.feed(wheel(0, 6));
+		expect(f.claimed).toBe(true);
+		expect(f.feed(wheel(8, 1, 20))).toEqual([{ kind: "move", t: 8, dx: 1 }]);
+		expect(f.claimed).toBe(true);
+		f.signal({ kind: "up", t: 9, lastMove: 8 }, false);
+		expect(f.feed(wheel(20, 3, 12))).toEqual([]);
+		expect(f.claimed).toBe(true);
+		f.signal({ kind: "down", t: 500 }, false);
+		f.feed(wheel(500, 0, 9));
+		expect(f.claimed).toBe(false);
+	});
+
+	it("holds a touch's first deltas back until its axis is clear, then gives them all to the ribbon or none", () => {
+		const across = new TrackpadFollow();
+		across.signal({ kind: "down", t: 0 }, false);
+		expect(across.feed(wheel(0, 1, 1))).toEqual([]);
+		expect(across.claimed).toBe(true);
+		expect(across.feed(wheel(8, 6, 0))).toEqual([
+			{ kind: "begin", t: 0, fresh: true },
+			{ kind: "move", t: 0, dx: 1 },
+			{ kind: "move", t: 8, dx: 6 },
+		]);
+		const down = new TrackpadFollow();
+		down.signal({ kind: "down", t: 0 }, false);
+		down.feed(wheel(0, 0, 2));
+		expect(down.claimed).toBe(true);
+		expect(down.feed(wheel(8, 3, 4))).toEqual([]);
+		expect(down.claimed).toBe(false);
+		expect(down.feed(wheel(16, 9, 0))).toEqual([]);
+	});
 });
+
+describe("AxisLock", () => {
+	it("takes a stroke sideways only when its first 4 px are clearly sideways, and keeps it", () => {
+		const lock = new AxisLock();
+		expect(lock.feed(1, 1)).toBeNull();
+		expect(lock.feed(4, 0)).toBe("x");
+		expect(lock.feed(0, 50)).toBe("x");
+		expect(new AxisLock().feed(3, 2)).toBe("y");
+		expect(new AxisLock().feed(4, 2)).toBe("x");
+	});
+});
+

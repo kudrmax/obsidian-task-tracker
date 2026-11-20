@@ -96,11 +96,18 @@ export function useRibbon(ribbon: RefObject<HTMLElement | null>, win: Window): R
 	return { at, bind };
 }
 
+/**
+ * The strip's transform, kept while Motion measures a moving card inside it: Motion takes its ancestors' transforms off
+ * for the measurement (`resetTransform`, «none») and puts them back at its next render, which a card measured as a stroke
+ * begins left to the next frame, so the strip stood at Inbox for a frame (Decision 126).
+ */
+const standing = ({ x }: { readonly x?: unknown }, generated: string) => (x === undefined ? generated : `translateX(${typeof x === "number" ? `${x}px` : String(x)})`);
+
 /** The strip of columns, `width` percent of the window, each column `share` percent of it, standing where the gestures put it. */
 export function RibbonTrack({ at, className, width, share, children }: { readonly at: MotionValue<number>; readonly className: string; readonly width: number; readonly share: number; readonly children: ReactNode }) {
 	const x = useTransform(at, (columns) => `${-columns * share}%`);
 	return (
-		<motion.div className={className} style={{ x, width: `${width}%` } as unknown as CSSProperties}>
+		<motion.div className={className} style={{ x, width: `${width}%` } as unknown as CSSProperties} transformTemplate={standing}>
 			{children}
 		</motion.div>
 	);

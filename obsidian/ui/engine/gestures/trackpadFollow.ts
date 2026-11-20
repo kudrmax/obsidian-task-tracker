@@ -1,3 +1,4 @@
+import { AxisLock } from "./axisLock";
 import type { WheelCue } from "./wheelFollow";
 import type { WheelSample } from "./wheelStrokes";
 
@@ -44,19 +45,27 @@ interface Touch {
 	/** The latest wheel event of this touch the page has seen. */
 	seen: number;
 	readonly moves: { readonly t: number; readonly dx: number }[];
+	/** The touch's axis while its owner is undecided, and its deltas held back meanwhile. */
+	readonly axis: AxisLock;
+	held: WheelSample[];
 }
 
 /**
  * Two fingers on the Mac's trackpad as one finger on glass (Decision 126), read from macOS's own touch and lift instead of
  * the deltas' pace (`WheelFollow`, the path without the native module): a touch stops the columns at once and the
  * fingers' deltas move them 1:1; the lift lets them go at the fingers' speed; the momentum's deltas move nothing. A touch
- * is the ribbon's when it lands on moving columns, or when its first movement is sideways. The lift waits for the deltas
+ * is the ribbon's when it lands on moving columns, or when its first movement is clearly sideways (`AxisLock`); the
+ * ribbon's touch and its momentum then scroll nothing up or down (`claimed`) until the next touch. The lift waits for the deltas
  * of the fingers still on their way to the page (they come 0.3–25 ms after macOS's signal), up to the one macOS saw last.
  */
 export class TrackpadFollow {
 	private readonly tuning: TrackpadTuning;
 	private touch: Touch | null = null;
 	private early: WheelSample[] = [];
+	/** Whose the last touch was: its momentum's deltas are its too, until the next touch. */
+	private after: Owner = "other";
+	/** Whether the last event fed is the ribbon's (or may be, its touch's axis undecided): the page keeps it from scrolling anything. */
+	claimed = false;
 
 	constructor(tuning: TrackpadTuning = TRACKPAD) {
 		this.tuning = tuning;
@@ -71,24 +80,37 @@ export class TrackpadFollow {
 
 	feed(e: WheelSample): WheelCue[] {
 		const touch = this.touch;
+		this.claimed = !e.ctrl && this.after === "ribbon";
 		if (!touch) {
 			this.early = [...this.early.filter((w) => w.t > e.t - this.tuning.earlyMs), e];
 			return [];
 		}
 		if (e.t < touch.from) return [];
-		if (touch.until !== null && e.t > touch.until) return touch.owner === "ribbon" ? this.release() : [];
+		if (touch.until !== null && e.t > touch.until) {
+			if (touch.owner !== "ribbon") return [];
+			const cues = this.release();
+			this.claimed = !e.ctrl;
+			return cues;
+		}
 		touch.seen = Math.max(touch.seen, e.t);
 		const cues: WheelCue[] = [];
+		const fingers: WheelSample[] = [];
 		if (touch.owner === "undecided") {
-			if (e.ctrl || Math.abs(e.dy) > Math.abs(e.dx)) touch.owner = "other";
-			else if (e.dx !== 0) {
+			const axis = e.ctrl ? "y" : touch.axis.feed(e.dx, e.dy);
+			if (axis === null) touch.held.push(e);
+			else if (axis === "y") touch.owner = "other";
+			else {
 				touch.owner = "ribbon";
-				cues.push({ kind: "begin", t: e.t, fresh: true });
+				cues.push({ kind: "begin", t: touch.held[0]?.t ?? e.t, fresh: true });
+				fingers.push(...touch.held, e);
 			}
-		}
-		if (touch.owner === "ribbon" && !e.ctrl && e.dx !== 0) {
-			touch.moves.push({ t: e.t, dx: e.dx });
-			cues.push({ kind: "move", t: e.t, dx: e.dx });
+			if (axis !== null) touch.held = [];
+		} else if (touch.owner === "ribbon") fingers.push(e);
+		this.claimed = !e.ctrl && touch.owner !== "other";
+		for (const w of fingers) {
+			if (w.ctrl || w.dx === 0) continue;
+			touch.moves.push({ t: w.t, dx: w.dx });
+			cues.push({ kind: "move", t: w.t, dx: w.dx });
 		}
 		if (touch.until !== null && this.allSeen(touch)) cues.push(...this.release());
 		return cues;
@@ -119,7 +141,7 @@ export class TrackpadFollow {
 
 	private start(t: number, owner: Owner, confirmed: boolean): WheelCue[] {
 		const from = confirmed ? t - this.tuning.clockMs : t;
-		this.touch = { from, owner, confirmed, until: null, lastMove: null, seen: -Infinity, moves: [] };
+		this.touch = { from, owner, confirmed, until: null, lastMove: null, seen: -Infinity, moves: [], axis: new AxisLock(), held: [] };
 		const cues: WheelCue[] = owner === "ribbon" ? [{ kind: "begin", t, fresh: true }] : [];
 		const early = this.early.filter((w) => w.t >= from);
 		this.early = [];
@@ -145,12 +167,14 @@ export class TrackpadFollow {
 		const touch = this.touch;
 		if (!touch) return [];
 		this.touch = null;
+		this.after = "ribbon";
 		const at = touch.until ?? Math.max(touch.from, touch.seen);
 		return [{ kind: "release", t: at, speed: speedAt(touch.moves, at) }];
 	}
 
 	private end(): WheelCue[] {
 		this.touch = null;
+		this.after = "other";
 		return [];
 	}
 }

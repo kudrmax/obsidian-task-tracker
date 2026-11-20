@@ -1,9 +1,10 @@
-import { useGesture } from "@use-gesture/react";
+import { useGesture, useWheel } from "@use-gesture/react";
 import { animate, type AnimationPlaybackControls, type MotionValue, useMotionValue, useMotionValueEvent, useTransform } from "motion/react";
 import { createContext, type RefObject, useEffect, useRef, useState } from "react";
 import { STOPS, type Stop, useScreen, useScreenApi } from "../store";
 import { FollowPager, LANDING, landingVelocity } from "./followPager";
 import { type FingerSignal, TrackpadFollow, type TrackpadFingers } from "./trackpadFollow";
+import type { WheelSample } from "./wheelStrokes";
 import { type WheelCue, WheelFollow } from "./wheelFollow";
 
 /** Where the landing counts as done, in places: under a pixel at any width the ribbon has. */
@@ -67,6 +68,8 @@ export function useFollowRibbon(ribbon: RefObject<HTMLElement | null>, win: Wind
 	const glide = useRef<AnimationPlaybackControls | null>(null);
 	const pager = useRef(new FollowPager(placeOf(stop, dayOffset), Infinity));
 	const wheelFingers = useRef(new WheelFollow());
+	/** Without macOS's signals: the wheel gesture has begun a stroke of the ribbon, so it scrolls nothing else until it ends. */
+	const wheelLocked = useRef(false);
 	const trackpad = useRef(new TrackpadFollow());
 	/** The strip is landing: fingers that touch now stop it. */
 	const landing = useRef(false);
@@ -166,6 +169,19 @@ export function useFollowRibbon(ribbon: RefObject<HTMLElement | null>, win: Wind
 		});
 	}, [fingers, win]);
 
+	const fed = (sample: WheelSample) => {
+		const cues = trackpad.current.feed(sample);
+		return { cues, claimed: trackpad.current.claimed };
+	};
+
+	/** Without macOS's signals the strokes are `WheelFollow`'s, as before; once one began, the wheel gesture is the ribbon's to its end (@use-gesture's wheel end), its momentum too. */
+	const fedByStroke = (sample: WheelSample, first: boolean) => {
+		if (first) wheelLocked.current = false;
+		const cues = wheelFingers.current.feed(sample);
+		if (cues.some((c) => c.kind === "begin")) wheelLocked.current = true;
+		return { cues, claimed: wheelLocked.current && !sample.ctrl };
+	};
+
 	const bind = useGesture(
 		{
 			onDrag: ({ first, last, xy: [x], initial: [x0], velocity: [vx], direction: [dx], event, cancel }) => {
@@ -184,14 +200,6 @@ export function useFollowRibbon(ribbon: RefObject<HTMLElement | null>, win: Wind
 			onHover: ({ hovering }) => {
 				over.current = !!hovering;
 			},
-			onWheel: ({ event, last }) => {
-				if (!last) over.current = true;
-				const sample = { dx: event.deltaX, dy: event.deltaY, t: event.timeStamp, ctrl: event.ctrlKey };
-				/** @use-gesture's wheel ends after its own quiet (140 ms): without macOS's signals fingers still down then let go (more than `quietMs`); with them only a lift still waiting for its last deltas, or a cut no touch followed. */
-				const cues = fingers ? (last ? trackpad.current.tick() : trackpad.current.feed(sample)) : last ? wheelFingers.current.tick(Infinity) : wheelFingers.current.feed(sample);
-				if (api.getState().gesture === "drag") return;
-				cues.forEach(cue);
-			},
 		},
 		{
 			window: win,
@@ -203,6 +211,20 @@ export function useFollowRibbon(ribbon: RefObject<HTMLElement | null>, win: Wind
 				filterTaps: true,
 			},
 		},
+	);
+	useWheel(
+		({ event, first, last }) => {
+			if (!last) over.current = true;
+			const sample = { dx: event.deltaX, dy: event.deltaY, t: event.timeStamp, ctrl: event.ctrlKey };
+			/** @use-gesture's wheel ends after its own quiet (140 ms): without macOS's signals fingers still down then let go (more than `quietMs`); with them only a lift still waiting for its last deltas, or a cut no touch followed. */
+			const { cues, claimed } = last ? { cues: fingers ? trackpad.current.tick() : wheelFingers.current.tick(Infinity), claimed: false } : fingers ? fed(sample) : fedByStroke(sample, first);
+			if (api.getState().gesture === "drag") return;
+			/** One stroke, one axis: the ribbon's stroke and its momentum scroll no list or calendar up or down. */
+			if (claimed && event.cancelable) event.preventDefault();
+			cues.forEach(cue);
+		},
+		/** On the ribbon itself and not passive (React's own wheel listener is): the ribbon's stroke keeps its wheel events from scrolling the lists. */
+		{ target: ribbon, enabled: !dragging, eventOptions: { passive: false } },
 	);
 	/** A card carried: only the shown day is drawn, so a day out of sight never lies under it as a place to drop on. */
 	const drawnNow = dragging ? [Math.max(0, dayOffset)] : days;
