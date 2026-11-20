@@ -154,6 +154,7 @@ export const TaskMenu = memo(function TaskMenu() {
 			groups={groups}
 			panelClass={model.kind === "event" ? "is-event" : shown.layer.page === "picker" ? "is-task is-picker" : "is-task"}
 			page={`${shown.layer.id}:${shown.layer.page}`}
+			shape={shown.layer.asking ?? ""}
 			keepWidth={model.kind === "event"}
 		/>
 	);
@@ -215,7 +216,12 @@ function taskGroups(layer: Layer, typing: boolean, model: TaskMenuModel, steps: 
 				if (asking === "delete") groups.push(<Ask key={group} what="delete" title={model.title} onCancel={() => steps.ask(null)} onConfirm={() => pick({ kind: "delete" })} />);
 				else for (const action of actions) {
 					const look = lookOf(action);
-					if (look) groups.push(<Row key={group} label={look.label} icon={look.icon} className="is-danger is-apart" focus={layer.asked === "delete"} onPick={() => look.onPick(action, steps)} />);
+					if (look)
+						groups.push(
+							<div key={group} className="tc-menu-tiles is-remove">
+								<Row label={look.label} icon={look.icon} className="is-danger" focus={layer.asked === "delete"} onPick={() => look.onPick(action, steps)} />
+							</div>,
+						);
 				}
 				break;
 		}
