@@ -91,7 +91,7 @@ body{margin:0}
 </sc-for>
 </div>
 </sc-for>
-<div style="border-top: 8px solid {{c.gap}}; height: 44px; box-sizing: content-box; padding: 0 16px; display: flex; align-items: center; color: {{c.danger}}; font-size: 16px;"><span style="flex: 1;">Delete</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{icons.delete}}"></path></svg></div>
+<div style="border-top: 8px solid transparent; height: 44px; box-sizing: content-box; padding: 0 16px; display: flex; align-items: center; color: {{c.danger}}; font-size: 16px;"><span style="flex: 1;">Delete</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{icons.delete}}"></path></svg></div>
 </div>
 </sc-if>
 
@@ -233,7 +233,7 @@ class Component extends DCLogic {
       ? { on: true, panel: look === 'panel', inside: look !== 'panel', items: notes(s, true), ink: s.ink, font: s.font, gapTop: s.gapTop, padBottom: look === 'panel' ? 8.5 : 9 }
       : { on: false, panel: false, inside: false, items: [] };
 
-    const band = '8px solid ' + c.gap;
+    const band = '8px solid transparent';
     const tile = (label, d, ink, fd, fillAll) => ({ label, d, ink: ink ?? c.text, fd: fd ?? '', fillAll: fillAll ?? 'none' });
     const groups = [
       { rows: [[tile('Done', CIRCLE, null, CIRCLE), tile('In progress', CIRCLE, null, 'M12 3a9 9 0 0 1 0 18z'), tile('Won’t do', CIRCLE + ' M8 12h8')]] },
