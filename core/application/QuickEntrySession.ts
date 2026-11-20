@@ -6,7 +6,7 @@ import type { ListCard, ListPlace } from "./nesting";
 import type { EntryList } from "./screenPlaces";
 import { type EntryDrawing, type EntryJob, type EntryLook, type EntrySpot, type EntryState, type EntryTasks, type ListEntry, type PendingRename, type PlaceMove, QuickEntry, type StackEntry } from "./QuickEntry";
 
-export { ENTRY_PLACES, type EntryAt, type EntryDrawing, type EntryProject, type EntrySpot, type EntryState, type ListEntry, type PendingRename, type PendingText, type PlaceChoice, type PlaceMove, type StackAt, type StackEntry } from "./QuickEntry";
+export { ENTRY_PLACES, type EntryAt, type EntryBarAction, type EntryBarGroup, type EntryDrawing, type EntryProject, type EntrySpot, type EntryState, type ListEntry, type PendingRename, type PendingText, type PlaceChoice, type PlaceMove, type StackAt, type StackEntry } from "./QuickEntry";
 
 /** What the session reads from the service: the marks, the places and the writes. */
 export type QuickEntryTasks = EntryTasks & Pick<TaskService, "createWithId" | "createSection" | "edit"> & Partial<Pick<TaskService, "unfoldAbove">>;
