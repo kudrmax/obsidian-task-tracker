@@ -1,4 +1,4 @@
-import { type CSSProperties, memo, type MouseEvent, useCallback, useContext, useMemo, useRef, useState } from "react";
+import { type CSSProperties, memo, type MouseEvent, type PointerEvent as ReactPointerEvent, useCallback, useContext, useMemo, useRef, useState } from "react";
 import { DESIGN, PROPERTY } from "../../design";
 import { CalendarBlocks, SortableRow, useCalendarDrop, useNewSlot } from "../drag/Drag";
 import { type Edge, useResize } from "../gestures/Resize";
@@ -357,11 +357,11 @@ const BlockItem = memo(function BlockItem({ block, box, shades, order, z, top, s
 			<SortableRow
 				id={block.id}
 				placed
-				onTap={(target) => {
+				onTap={(target, clicked) => {
 					anchor.current = target.querySelector("[data-block]") ?? target;
 					anchor.current.scrollIntoView({ block: "nearest" });
 					pressed.current = look;
-					api.getState().openMenu(block.id, "calendar");
+					api.getState().openMenu(block.id, "calendar", false, clicked);
 					api.getState().select(block.id);
 				}}
 			>
@@ -424,6 +424,14 @@ function Grips({ block, reference, scale }: { readonly block: Block; readonly re
 
 function Grip({ block, edge, scale }: { readonly block: Block; readonly edge: Edge; readonly scale: TimeScale }) {
 	const { haptics } = useHost();
+	const api = useScreenApi();
 	const bind = useResize(block, edge, scale, () => haptics.tap());
-	return <div className="tc-grip" data-own-press="" data-grip={edge} {...bind()} />;
+	/** A double click's second press may land on a dot: it renames, as anywhere on the menu (the plugin's `onClickedAgain`), and pulls nothing. */
+	const again = (event: ReactPointerEvent) => {
+		if (event.pointerType !== "mouse" || !api.getState().pressAgain(event.timeStamp)) return;
+		event.stopPropagation();
+		/** No mouse down follows: the focus stays in the field. */
+		event.preventDefault();
+	};
+	return <div className="tc-grip" data-own-press="" data-grip={edge} onPointerDownCapture={again} {...bind()} />;
 }

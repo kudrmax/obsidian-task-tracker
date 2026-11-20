@@ -1,5 +1,5 @@
 import { autoUpdate, flip, FloatingFocusManager, FloatingOverlay, FloatingPortal, hide, type Middleware, type MiddlewareState, offset, type Placement, shift, size, useDismiss, useFloating, useInteractions, useRole, useTransitionStatus } from "@floating-ui/react";
-import { type CSSProperties, createContext, type MutableRefObject, type ReactNode, useContext, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, createContext, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type MutableRefObject, type ReactNode, useContext, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { DESIGN, LAYOUT } from "../../design";
 import { LAYER_MS } from "./motion";
 import { groupsAbove } from "./split";
@@ -34,6 +34,9 @@ export function useField(): { readonly field: Element | null; readonly setField:
 	return field;
 }
 
+/** A click's moment (`timeStamp`) when a mouse made it, which a second press may make a double click; null for a finger's tap. */
+export const mouseClick = (event: ReactMouseEvent): number | null => ((event.nativeEvent as PointerEvent).pointerType === "mouse" ? event.timeStamp : null);
+
 /** Where the next layer opens from. */
 export function useAnchor(): MutableRefObject<Element | null> {
 	const anchor = useContext(AnchorContext);
@@ -44,6 +47,8 @@ export function useAnchor(): MutableRefObject<Element | null> {
 export interface MenuLayerProps {
 	readonly open: boolean;
 	readonly onClose: () => void;
+	/** A mouse's press anywhere on the layer, at its `timeStamp`: whether it was taken (a double click's second press), its click then reaching nothing. */
+	readonly onPressAgain?: (at: number) => boolean;
 	/** The element of the view's own document that holds the layer. */
 	readonly root: HTMLElement;
 	/** The element pressed: the copy stands over it. */
@@ -86,7 +91,7 @@ const motionClass = (status: string, ready: boolean) => (status === "open" && re
  * in from where it stood unplaced. The parts open together and close together (Floating UI's transition status keeps
  * them mounted while they fade, `LAYER_MS`).
  */
-export function MenuLayer({ open, onClose, root, reference, panelBy = null, label, over, groups, panelClass, page, peek, keepWidth = false, holdSplit = false }: MenuLayerProps) {
+export function MenuLayer({ open, onClose, onPressAgain, root, reference, panelBy = null, label, over, groups, panelClass, page, peek, keepWidth = false, holdSplit = false }: MenuLayerProps) {
 	const [above, setAbove] = useState(0);
 
 	const [overEl, setOverEl] = useState<HTMLElement | null>(null);
@@ -162,8 +167,26 @@ export function MenuLayer({ open, onClose, root, reference, panelBy = null, labe
 		if (open && placed) stood.current[part] = styles;
 		return open ? styles : (stood.current[part] ?? styles);
 	};
+	/**
+	 * A mouse's second press soon after the click that opened the menu is a double click (the plugin's `onClickedAgain`):
+	 * the press selects no word of the copy and its click reaches nothing, the backdrop's closing too.
+	 */
+	const taken = useRef(false);
+	const pressed = {
+		onPointerDownCapture: (event: ReactPointerEvent) => {
+			taken.current = event.pointerType === "mouse" && open && (onPressAgain?.(event.timeStamp) ?? false);
+		},
+		onMouseDownCapture: (event: ReactMouseEvent) => {
+			if (taken.current) event.preventDefault();
+		},
+		onClickCapture: (event: ReactMouseEvent) => {
+			if (!taken.current) return;
+			taken.current = false;
+			event.stopPropagation();
+		},
+	};
 	/** Closed by the click, not the press: the finger's tap ends on the backdrop, never on a card under the fading menu. */
-	const dismiss = useDismiss(lower.context, { outsidePressEvent: "click", outsidePress: (event) => !(event.target instanceof Element && ([overEl, parts.current.upper, parts.current.lower].some((part) => part?.contains(event.target as Node)) || event.target.closest(".tc-quick-bar, .tc-quick-panel"))) });
+	const dismiss = useDismiss(lower.context, { outsidePressEvent: "click", outsidePress: (event) => !taken.current && !(event.target instanceof Element && ([overEl, parts.current.upper, parts.current.lower].some((part) => part?.contains(event.target as Node)) || event.target.closest(".tc-quick-bar, .tc-quick-panel"))) });
 	const { getFloatingProps } = useInteractions([dismiss, useRole(lower.context, { role: "menu" })]);
 	if (!isMounted) return null;
 	const settled = holdSplit || wanted === count || (wanted !== undefined && wanted >= groups.length && count === groups.length);
@@ -172,8 +195,8 @@ export function MenuLayer({ open, onClose, root, reference, panelBy = null, labe
 	const panel = `tc-panel is-menu ${panelClass}`;
 	return (
 		<FloatingPortal root={root}>
-			<FloatingOverlay className={`tc-backdrop tc-menu-layer${motion}`} />
-			<div className={`tc-level tc-menu-layer${motion}`}>
+			<FloatingOverlay className={`tc-backdrop tc-menu-layer${motion}`} {...pressed} />
+			<div className={`tc-level tc-menu-layer${motion}`} {...pressed}>
 				<div ref={holdSafe} className="tc-safe-room" aria-hidden="true" />
 				<div ref={(el) => {
 					copy.refs.setFloating(el);

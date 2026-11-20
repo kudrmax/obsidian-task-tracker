@@ -1,4 +1,4 @@
-import { DESIGN } from "../../design";
+import { DESIGN, LAYOUT } from "../../design";
 import { createStore, type StoreApi } from "zustand/vanilla";
 import { LAYER_MS } from "../layers/motion";
 import type { Destination, Edge, EntryBar, EntryDraft, EntryField, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, ScreenData, ScreenPort, StatusId } from "../port";
@@ -40,6 +40,8 @@ export interface Layer {
 	readonly asking: Asking | null;
 	/** A subtask's menu opened from a calendar menu's stack: the task whose copy and stack stay drawn, and the stack's cards. */
 	readonly stack: { readonly of: string; readonly ids: readonly string[] } | null;
+	/** Opened by a mouse's click on a card: until this moment (the events' own clock, `timeStamp`) a second press is a double click that renames. */
+	readonly renameUntil: number | null;
 }
 
 export interface ScreenState {
@@ -124,9 +126,15 @@ export interface ScreenActions {
 	drop(id: string, to: Destination | null): void;
 	/**
 	 * Opens the menu of the task or event `id`, opened `from` there (a list's card unless said). `reveal`: a tap, not a finger
-	 * still held: a card partly out of its list's sight is scrolled into it first (the design's «Полная карточка»).
+	 * still held: a card partly out of its list's sight is scrolled into it first (the design's «Полная карточка»). `clicked`:
+	 * the moment (`timeStamp`) of a mouse's click that opened it, which a second press soon after makes a double click.
 	 */
-	openMenu(id: string, from?: MenuFrom, reveal?: boolean): void;
+	openMenu(id: string, from?: MenuFrom, reveal?: boolean, clicked?: number | null): void;
+	/**
+	 * A mouse's press on the open menu at `at` (`timeStamp`): within a double click of the click that opened it, the menu
+	 * goes and the task is renamed (the plugin's `onClickedAgain`, F117); whether it did.
+	 */
+	pressAgain(at: number): boolean;
 	closeLayer(): void;
 	/** The open menu shows another page. */
 	menuPage(page: MenuPage): void;
@@ -378,17 +386,25 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 				set({ lifted: null, liftedDepth: null });
 				get().release("drag");
 			},
-			openMenu(id, from = "list", reveal = false) {
+			openMenu(id, from = "list", reveal = false, clicked = null) {
 				if (reveal) set({ reveal: { id, seq: (get().reveal?.seq ?? 0) + 1 } });
 				const over = get().layer;
 				const stack = from !== "stack" || !over ? null : (over.stack ?? (over.model.kind === "task" ? { of: over.id, ids: over.model.subtasks } : null));
-				set({ layer: { kind: "menu", id, from, model: port.menu(id, from), page: "menu", asking: null, stack }, ...(from === "list" ? { selected: null } : {}) });
+				const model = port.menu(id, from);
+				const renames = clicked !== null && model.kind === "task" && model.edits.some((edit) => edit.id === "rename");
+				set({ layer: { kind: "menu", id, from, model, page: "menu", asking: null, stack, renameUntil: renames ? clicked + LAYOUT.doubleClickMs : null }, ...(from === "list" ? { selected: null } : {}) });
+			},
+			pressAgain(at) {
+				const layer = get().layer;
+				if (!layer || layer.renameUntil === null || at > layer.renameUntil) return false;
+				get().startRename();
+				return true;
 			},
 			startRename() {
 				const layer = get().layer;
 				if (!layer) return;
 				const { field, draft, text } = port.rename(layer.id, layer.from, get().dayOffset);
-				set({ entry: field, draft, entryText: text, entrySeq: get().entrySeq + 1, layer: field.stack ? { ...layer, asking: null } : null });
+				set({ entry: field, draft, entryText: text, entrySeq: get().entrySeq + 1, layer: field.stack ? { ...layer, asking: null, renameUntil: null } : null });
 			},
 			startSubtask() {
 				const layer = get().layer;

@@ -155,10 +155,10 @@ const RowFace = memo(function RowFace({ row }: { readonly row: Row }) {
 	return (
 		<SortableRow
 			id={row.id}
-			onTap={(target) => {
+			onTap={(target, clicked) => {
 				anchor.current = target.querySelector("[data-id]") ?? target;
 				pressed.current = null;
-				api.getState().openMenu(row.id, "list", true);
+				api.getState().openMenu(row.id, "list", true, clicked);
 			}}
 		>
 			<Card id={row.id} depth={row.depth} />

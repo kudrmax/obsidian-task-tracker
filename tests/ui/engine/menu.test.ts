@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { LAYOUT } from "../../../obsidian/ui/design";
 import { describe, expect, it } from "vitest";
 import { MockPort } from "../../../obsidian/stand/MockPort";
 import { calendarFile, mockFile } from "../../../obsidian/stand/mockData";
@@ -228,6 +229,21 @@ describe("the menu's fields and the plus, in the store", () => {
 		await settle();
 		expect(p.fileText()).toBe(before);
 		expect(store.getState().shown.cards[id].title).toBe(title);
+	});
+
+	it("a mouse's second press within a double click of the click that opened the menu renames; later, or a finger's, doesn't (F117)", () => {
+		const { store } = screen();
+		const id = firstInbox(store);
+		store.getState().openMenu(id, "list", false, 1000);
+		expect(store.getState().pressAgain(1000 + LAYOUT.doubleClickMs + 1)).toBe(false);
+		expect(store.getState().layer).not.toBeNull();
+		store.getState().openMenu(id, "list", false, 2000);
+		expect(store.getState().pressAgain(2000 + LAYOUT.doubleClickMs)).toBe(true);
+		expect(store.getState().layer).toBeNull();
+		expect(store.getState().entry).toMatchObject({ renaming: id });
+		store.getState().openEntry(null);
+		store.getState().openMenu(id, "list", false, null);
+		expect(store.getState().pressAgain(1)).toBe(false);
 	});
 
 	it("Add subtask in a list opens the field under the task's last subtask, written as its last subtask (F124)", async () => {

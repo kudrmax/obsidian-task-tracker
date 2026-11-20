@@ -1,6 +1,6 @@
 import { memo, type ReactNode, useContext, useEffect, useRef, useState } from "react";
 import type { IconName } from "../../kit/icons";
-import { MenuLayer, useAnchor } from "../layers/Layers";
+import { MenuLayer, mouseClick, useAnchor } from "../layers/Layers";
 import { monthGrid, monthOf, monthTitle } from "../layout/month";
 import type { EditId, MenuAction, OpenId, ReminderKind, StatusId, TaskMenuModel } from "../port";
 import { type Asking, type Layer, useScreen, useScreenApi } from "../store";
@@ -78,6 +78,7 @@ export const TaskMenu = memo(function TaskMenu() {
 			key={shown.seq}
 			open={layer !== null}
 			onClose={() => api.getState().closeLayer()}
+			onPressAgain={(at) => api.getState().pressAgain(at)}
 			root={layerRoot}
 			reference={shown.reference}
 			panelBy={shown.layer.stack ? shown.panelBy : null}
@@ -353,10 +354,10 @@ function Stack({ ids, typing, renaming, pressed }: { readonly ids: readonly stri
 					key={id}
 					id={id}
 					pressed={id === pressed}
-					onPress={(card) => {
+					onPress={(card, clicked) => {
 						anchor.current = card;
 						look.current = null;
-						api.getState().openMenu(id, "stack");
+						api.getState().openMenu(id, "stack", false, clicked);
 					}}
 				/>
 				),
@@ -368,11 +369,11 @@ function Stack({ ids, typing, renaming, pressed }: { readonly ids: readonly stri
 	);
 }
 
-function StackCard({ id, pressed, onPress }: { readonly id: string; readonly pressed: boolean; readonly onPress: (card: HTMLElement) => void }) {
+function StackCard({ id, pressed, onPress }: { readonly id: string; readonly pressed: boolean; readonly onPress: (card: HTMLElement, clicked: number | null) => void }) {
 	const face = useScreen((s) => s.shown.cards[id]);
 	if (!face) return null;
 	return (
-		<div className={`tc-card${pressed ? " is-pressed" : ""}`} data-stack={id} data-status={face.inProgress ? "inProgress" : "open"} data-priority={face.color ?? undefined} onClick={(e) => onPress(e.currentTarget)}>
+		<div className={`tc-card${pressed ? " is-pressed" : ""}`} data-stack={id} data-status={face.inProgress ? "inProgress" : "open"} data-priority={face.color ?? undefined} onClick={(e) => onPress(e.currentTarget, mouseClick(e))}>
 			<CardInsides face={face} />
 		</div>
 	);
