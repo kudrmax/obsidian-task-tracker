@@ -230,6 +230,7 @@ export class QuickEntryController {
 			onPlace: (placement) => void this.moveTo(placement),
 			onRepeat: (rule) => this.entry.setRepeat(rule),
 			onProject: (link) => this.entry.setProject(link),
+			onToggleProject: (link) => this.entry.toggleProject(link),
 			onNewProject: (name) => void this.newProject(name),
 			onNameEnd: () => this.field?.refocus(),
 		});
@@ -811,7 +812,7 @@ export class QuickEntryController {
 	private async newProject(name: string): Promise<void> {
 		try {
 			const project = await this.deps.tasks.newProject(name, []);
-			if (project && this.state) this.entry.setProject(project.name);
+			if (project && this.state) this.entry.toggleProject(project.name);
 		} catch (error) {
 			this.deps.onError(error);
 		}

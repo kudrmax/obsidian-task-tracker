@@ -734,7 +734,7 @@ function everyCall(screen: ScreenView): { method: string; args: unknown[]; conte
 			["listEntry", "day"],
 			["placeOf", "day", { kind: "task", group: null, before: null }],
 		].map(([m, ...a]) => entry(m as string, ...a)),
-		...[["type", "x"], ["setPriority", "p1"], ["togglePriority", "p1"], ["setLabels", ["Fast"]], ["toggleLabel", "Fast"], ["setRepeat", rule], ["setProject", "Alpha"], ["indent", 1], ["toggleSection"], ["enter"], ["blur"], ["escape"], ["choosePlace", { kind: "soon" }], ["moveToEnd", "soon"]].map(([m, ...a]) =>
+		...[["type", "x"], ["setPriority", "p1"], ["togglePriority", "p1"], ["setLabels", ["Fast"]], ["toggleLabel", "Fast"], ["setRepeat", rule], ["setProject", "Alpha"], ["toggleProject", "Alpha"], ["openDescription"], ["typeDescription", "Notes"], ["indent", 1], ["toggleSection"], ["enter"], ["blur"], ["escape"], ["choosePlace", { kind: "soon" }], ["moveToEnd", "soon"]].map(([m, ...a]) =>
 			plain(`entry.${m}`, (opened.result as { session: unknown }).session, look, ...a),
 		),
 		...[["call", job], ["job", job], ["shown", job, null, {}], ["unshown", job], ["done", job]].map(([m, ...a]) => plain(`entry.${m}`, session, look, ...a)),

@@ -21,6 +21,7 @@ const DRAWINGS = {
 	now: { d: "M12 8a4 4 0 1 1 0 8a4 4 0 1 1 0-8z M12 2.5v2 M12 19.5v2 M2.5 12h2 M19.5 12h2 M5.3 5.3l1.4 1.4 M17.3 17.3l1.4 1.4 M5.3 18.7l1.4-1.4 M17.3 6.7l1.4-1.4" },
 	tomorrow: { d: "M4 12h13 M12 6l6 6-6 6 M20.5 5v14" },
 	section: { d: "M4 6h9 M4 12h16 M4 18h16" },
+	newSection: { d: "M4 6h9 M4 12h9 M4 18h9 M18 9v6 M15 12h6" },
 	outdent: { d: "M21 6H11 M21 12H11 M21 18H11 M7 8l-4 4 4 4" },
 	indent: { d: "M21 6H11 M21 12H11 M21 18H11 M3 8l4 4-4 4" },
 	description: { d: "M4 6h16 M4 12h16 M4 18h10" },

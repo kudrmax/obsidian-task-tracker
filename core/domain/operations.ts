@@ -472,8 +472,11 @@ export function createInPlace(doc: TaskDocument, typedText: string, priority: st
 			return intoUnfolded(doc, place.parent, (d, same) =>
 				d.insertUnder(same(place.parent), withRepeat(newTask(text, marks), repeat, today, boundary), place.before && same(place.before)),
 			);
-		case "slot":
-			return createInSlot(doc, place.slot, text, { ...marks, projects }, today, boundary);
+		case "slot": {
+			const made = createInSlot(doc, place.slot, text, { ...marks, projects }, today, boundary);
+			const inserted = repeat ? made.insertedSince(doc) : undefined;
+			return repeat && inserted ? setRepeat(made, inserted, repeat, today, boundary) : made;
+		}
 		case "list": {
 			const { list, before } = place;
 			const dueDate = list === "now" ? (place.date ?? today) : enteringList(list, today, place.date).dueDate;

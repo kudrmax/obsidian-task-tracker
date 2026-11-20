@@ -14,6 +14,7 @@ import { plainText } from "../domain/TaskText";
 import { ENTRY_LISTS, type EntryList } from "./screenPlaces";
 import { type EntryPart, placementOfNewTask } from "./projectsEntry";
 import { type PlaceChoice, placeChoices } from "./placeChoices";
+import { type ActionGroup, type FieldActionId, type FieldContext, fieldActions, type FieldGroup } from "./taskActions";
 
 /** Where the field stands: a gap of a list, a slot on the calendar, or the end of a task's subtasks in the calendar menu. */
 /**
@@ -125,7 +126,27 @@ export interface EntryProject {
 }
 
 
+/** A button of the field's bar as the table of task actions offers it now: `lit` while what it sets is set. */
+export interface EntryBarAction {
+	readonly id: FieldActionId;
+	readonly disabled: boolean;
+	readonly lit: boolean;
+}
+
+/** A group of the bar, in the order drawn: the new section switch, the shifts, the flag (levels and labels), the marks, the place. */
+export interface EntryBarGroup {
+	readonly group: FieldGroup;
+	readonly actions: readonly EntryBarAction[];
+}
+
 export interface EntryState {
+	/**
+	 * The bar's buttons, group by group, as the table of task actions (`TASK_ACTIONS`) places them: what a frontend draws.
+	 * The booleans below (`markable`, `repeatable`, `indents`, `section`, `place`, `project`) are read from it.
+	 */
+	readonly bar: readonly EntryBarGroup[];
+	/** The description's line under the title: its text while it is open (Description on the bar), null while it is not. Enter or a tap away writes it with the title. */
+	readonly description: string | null;
 	readonly spot: EntrySpot;
 	readonly text: string;
 	/** A level's prefix chosen, or none. */
@@ -235,8 +256,10 @@ export interface EntryLine extends PendingText {
 	readonly priority: string | null;
 	readonly labels: readonly string[];
 	readonly repeat: RepeatRule | null;
-	/** The field's project as it was when the line was entered (its name), null for none. */
-	readonly project?: string | null;
+	/** The field's projects as they were when the line was entered (their names), none for none. */
+	readonly projects?: readonly string[];
+	/** The description typed under the title, if any. */
+	readonly description?: string | null;
 	/** The place chosen in the bar for a line typed where the list keeps the field (`EntryField.placement`). */
 	readonly placement?: Placement;
 }
@@ -269,10 +292,12 @@ export interface EntryField {
 	readonly repeat: RepeatRule | null;
 	readonly rename: EntryRename | null;
 	/**
-	 * The field's own project (`ProjectRef.link`), null for none, like its labels: what it was opened in (a project's
-	 * group or view; a renamed task's own) until Max picks another. Place moves the field and keeps it.
+	 * The field's own projects (`ProjectRef.link`), none for none, like its labels: what it was opened in (a project's group
+	 * or view; a renamed task's own) until Max picks others, several as the menu's Project page. Place moves the field and keeps them.
 	 */
-	readonly project?: string | null;
+	readonly projects?: readonly string[];
+	/** The description's line, open with its text; null or left out while closed. */
+	readonly description?: string | null;
 	/** The field writes a section's name (empty sections spec §4). */
 	readonly section: boolean;
 	/**
@@ -303,7 +328,7 @@ export interface EntrySession {
 
 /** The service call a job is, read once the lists show the writes before it. */
 export type EntryCall =
-	| { readonly method: "createInPlace"; readonly args: readonly [string, string | null, NewTaskPlace, RepeatRule | null, readonly string[], (string | null)?, (ProjectsNodeId | null)?] }
+	| { readonly method: "createInPlace"; readonly args: readonly [string, string | null, NewTaskPlace, RepeatRule | null, readonly string[], (string | readonly string[] | null)?, (ProjectsNodeId | null)?, (string | null)?] }
 	| { readonly method: "edit"; readonly args: readonly [TaskKey, TaskDraft] }
 	| { readonly method: "createSection"; readonly args: readonly [string, Extract<NewTaskPlace, { readonly kind: "list" | "day" }>] }
 	| { readonly method: "unfoldAbove"; readonly args: readonly [TaskKey] };
@@ -353,9 +378,26 @@ export class QuickEntry {
 		const task = !field.section;
 		const typed = this.tasks.draftMarks(field.text, field.priority, field.labels);
 		const marks = task ? typed : { ...typed, tint: null };
-		const place = task ? this.shownPlace(field) : null;
+		const shownPlace = task ? this.shownPlace(field) : null;
 		const run = this.run(field.run);
+		const shifts = this.mayShift(field);
+		const ctx: FieldContext = {
+			task,
+			renaming: field.rename?.item ?? null,
+			topLevel: this.topLevel(field),
+			place: shownPlace !== null,
+			levels: marks.tiles.levels.length,
+			labels: marks.tiles.labels.length,
+			indents: task && listSpot(run.spot) !== null,
+			...shifts,
+			maySection: this.maySection(field),
+		};
+		const bar = this.bar(fieldActions(ctx), field, marks);
+		const offered = new Set(bar.flatMap((group) => group.actions.map((action) => action.id)));
+		const place = offered.has("pickDate") ? shownPlace : null;
 		return {
+			bar,
+			description: field.description ?? null,
 			spot: run.spot,
 			text: field.text,
 			priority: field.priority,
@@ -363,19 +405,35 @@ export class QuickEntry {
 			repeat: field.repeat,
 			pending: run.pending.map(({ text, level }) => ({ text, level })),
 			renaming: field.rename ? faced(field.rename) : null,
-			indents: task && listSpot(run.spot) !== null,
-			...this.mayShift(field),
-			section: this.maySection(field) ? field.section : null,
+			indents: offered.has("indent") || offered.has("outdent"),
+			...shifts,
+			section: offered.has("newSection") ? field.section : null,
 			marks,
-			markable: task && marks.tiles.levels.length + marks.tiles.labels.length > 0,
+			markable: offered.has("level") || offered.has("label"),
 			place,
 			places: placeChoices(place),
-			repeatable: task && run.spot.kind !== "slot",
+			repeatable: offered.has("repeat"),
 			repeatDay: repeatDay(place && this.tasks.dayOfPlacement(place), this.look.today()),
 			renamed: this.renamed,
-			project: task && this.topLevel(field) ? this.projectButton(field.project ?? null) : null,
+			project: offered.has("project") ? this.projectButton(field.projects ?? []) : null,
 			locksPanel: true,
 		};
+	}
+
+	/** The table's bar for the field, each button lit while what it sets is set. */
+	private bar(groups: readonly ActionGroup<FieldGroup, FieldActionId>[], field: EntryField, marks: DraftMarks): readonly EntryBarGroup[] {
+		const lit: Readonly<Record<FieldActionId, boolean>> = {
+			newSection: field.section,
+			outdent: false,
+			indent: false,
+			level: marks.priority !== null,
+			label: marks.labels.length > 0,
+			project: (field.projects ?? []).length > 0,
+			repeat: field.repeat !== null,
+			description: field.description != null,
+			pickDate: false,
+		};
+		return groups.map(({ group, actions }) => ({ group, actions: actions.map(({ id, disabled }) => ({ id, disabled, lit: lit[id] })) }));
 	}
 
 	/** The field writes a task of the top level: in a list at its first level, in a slot, or a rename of one. */
@@ -386,8 +444,8 @@ export class QuickEntry {
 		return spot.kind === "slot" || spot.place.level === 0;
 	}
 
-	private projectButton(link: string | null): EntryProject {
-		return entryProject(link, this.tasks.projects?.() ?? []);
+	private projectButton(links: readonly string[]): EntryProject {
+		return entryProjects(links, this.tasks.projects?.() ?? []);
 	}
 
 	/** Every rename entered and not yet written, in the order entered, whether the field is still open or not. */
@@ -549,22 +607,57 @@ export class QuickEntry {
 		const spot: EntrySpot = given.kind === "list" ? { kind: "list", column: given.column, place: given.place } : given;
 		const face = renaming ? this.faceOf(renaming, spot) : undefined;
 		const rename = renaming ? { item: renaming, home: this.newRun(spot), moved: false, ...(face && { face }) } : null;
-		const project = renaming ? (renaming.project?.name ?? null) : this.partProject(spot);
+		const projects = renaming ? renaming.projects.map((p) => p.name) : namesOf(this.partProject(spot));
 		const run = this.newRun(spot);
-		this.reset({ run, text: renaming?.text ?? "", priority: renaming?.priority?.prefix ?? null, labels: renaming?.labels.map((l) => l.name) ?? [], repeat: renaming?.repeat ?? null, rename, section: false, project });
+		this.reset({ run, text: renaming?.text ?? "", priority: renaming?.priority?.prefix ?? null, labels: renaming?.labels.map((l) => l.name) ?? [], repeat: renaming?.repeat ?? null, rename, section: false, projects });
 		if (unfold) this.queue(run, { id: this.jobId(), kind: "unfold", run, key: unfold });
 	}
 
 	/**
-	 * A project picked on the Project button (its name; null: No project); the field stays where it is. A folder is not
-	 * taken (the field keeps its project), unless the renamed task carries it already.
+	 * The field's project becomes this one alone (its name; null: No project, none at all); the field stays where it is. A
+	 * folder is not taken (the field keeps its projects), unless the renamed task carries it already.
 	 */
 	setProject(name: string | null): void {
 		const field = this.session.field;
+		if (!field || !this.mayTake(field, name)) return;
+		this.reset({ ...field, projects: namesOf(name) }, true);
+	}
+
+	/**
+	 * A project of the Project button's page tapped, as on the menu's page: on beside the field's others, or off when the
+	 * field has it. A folder is not taken, unless the renamed task carries it already.
+	 */
+	toggleProject(name: string): void {
+		const field = this.session.field;
 		if (!field) return;
+		const own = field.projects ?? [];
+		const has = own.some((p) => inProject(p, name));
+		if (!has && !this.mayTake(field, name)) return;
+		this.reset({ ...field, projects: has ? own.filter((p) => !inProject(p, name)) : [...own, name] }, true);
+	}
+
+	/** Description on the bar: the line under the title opens, empty, for the caret; one open stays as it is. Only where the bar offers it. */
+	openDescription(): void {
+		const field = this.session.field;
+		if (!field || field.description != null || !this.offers("description")) return;
+		this.reset({ ...field, description: "" }, true);
+	}
+
+	/** The description's line typed: its text, written with the title by Enter or a tap away. */
+	typeDescription(text: string): void {
+		const field = this.session.field;
+		if (field && field.description != null) this.reset({ ...field, description: text }, true);
+	}
+
+	/** Whether the bar offers `id` now. */
+	private offers(id: FieldActionId): boolean {
+		return this.state?.bar.some((group) => group.actions.some((action) => action.id === id)) ?? false;
+	}
+
+	/** A project the field may take: none, any but a folder, or a folder the renamed task carries already. */
+	private mayTake(field: EntryField, name: string | null): boolean {
 		const held = field.rename?.item.projects.some((p) => inProject(p.name, name)) ?? false;
-		if (!held && isFolderRef(name, this.tasks.projects?.() ?? [])) return;
-		this.reset({ ...field, project: name }, true);
+		return held || !isFolderRef(name, this.tasks.projects?.() ?? []);
 	}
 
 	type(text: string): void {
@@ -723,17 +816,17 @@ export class QuickEntry {
 				job.landing = null;
 				switch (spot.kind) {
 					case "slot":
-						return { method: "createInPlace", args: [line.text, line.priority, this.slotPlace(spot.slot), null, line.labels, line.project ?? null] };
+						return { method: "createInPlace", args: withDescription([line.text, line.priority, this.slotPlace(spot.slot), line.repeat, line.labels, projectArg(line.projects)], line) };
 					case "stack":
-						return { method: "createInPlace", args: [line.text, line.priority, { kind: "subtask", parent: spot.parent, before: null }, line.repeat, line.labels] };
+						return { method: "createInPlace", args: withDescription([line.text, line.priority, { kind: "subtask", parent: spot.parent, before: null }, line.repeat, line.labels], line) };
 					case "list": {
 						const cards = this.look.cards(spot.column);
 						const place = fitLevel(cards, { ...spot.place, level: line.level });
 						job.landing = spot.column;
 						const at = this.placeOf(spot.column, placeOfGap(cards, place), line.placement);
 						const filter = this.look.filter?.()?.node ?? null;
-						if (at.kind === "subtask") return { method: "createInPlace", args: [line.text, line.priority, at, line.repeat, line.labels] };
-						return { method: "createInPlace", args: filter !== null && at.kind !== "projects" ? [line.text, line.priority, at, line.repeat, line.labels, line.project ?? null, filter] : [line.text, line.priority, at, line.repeat, line.labels, line.project ?? null] };
+						if (at.kind === "subtask") return { method: "createInPlace", args: withDescription([line.text, line.priority, at, line.repeat, line.labels], line) };
+						return { method: "createInPlace", args: withDescription(filter !== null && at.kind !== "projects" ? [line.text, line.priority, at, line.repeat, line.labels, projectArg(line.projects), filter] : [line.text, line.priority, at, line.repeat, line.labels, projectArg(line.projects)], line) };
 					}
 				}
 				break;
@@ -917,7 +1010,7 @@ export class QuickEntry {
 		else {
 			this.saveRename(field, rename);
 			const under = list && !rename.face && this.under(list, rename.item);
-			this.reset(under ? { run: this.newRun(under), text: "", priority: null, labels: [], repeat: null, rename: null, section: false, project: this.partProject(under) } : null);
+			this.reset(under ? { run: this.newRun(under), text: "", priority: null, labels: [], repeat: null, rename: null, section: false, projects: namesOf(this.partProject(under)) } : null);
 		}
 	}
 
@@ -937,7 +1030,7 @@ export class QuickEntry {
 	private enterTask(field: EntryField): void {
 		this.create(field);
 		const ends = this.run(field.run).spot.kind === "slot";
-		this.reset(ends ? null : { ...field, text: "", priority: null, labels: [], repeat: null });
+		this.reset(ends ? null : { ...field, text: "", priority: null, labels: [], repeat: null, description: null });
 	}
 
 	/** The field becomes `field` (none: closed); the runs it stands on are held while it does. `sameShifts`: only its text or marks changed. */
@@ -959,8 +1052,10 @@ export class QuickEntry {
 
 	/** Edits by the key the lists give the task when the job runs: the one read at the open may have gone stale. The task's own rule and labels, the same in the field, are left as the file has them. */
 	private saveRename(field: EntryField, { item, home }: EntryRename): void {
-		const project = field.project === undefined || inProject(item.project?.name ?? null, field.project) ? {} : { project: field.project };
-		const draft: TaskDraft = { text: field.text, placement: this.placement(field), priority: field.priority, ...(!sameNames(field.labels, item.labels.map((l) => l.name)) && { labels: field.labels }), ...(!sameRule(field.repeat, item.repeat) && { repeat: field.repeat }), ...project };
+		const own = item.projects.map((p) => p.name);
+		const projects = field.projects === undefined || sameProjects(own, field.projects) ? {} : { projects: field.projects };
+		const description = typedDescription(field.description);
+		const draft: TaskDraft = { text: field.text, placement: this.placement(field), priority: field.priority, ...(!sameNames(field.labels, item.labels.map((l) => l.name)) && { labels: field.labels }), ...(!sameRule(field.repeat, item.repeat) && { repeat: field.repeat }), ...projects, ...(description !== null && { description }) };
 		this.queue(home, { id: this.jobId(), kind: "rename", home, item, draft });
 	}
 
@@ -984,7 +1079,7 @@ export class QuickEntry {
 	/** The field's text queued at its run, waiting under the cards until the lists show it written. */
 	private create(field: EntryField): void {
 		const run = this.run(field.run);
-		const line: EntryLine = { text: field.text, priority: field.priority, labels: field.labels, repeat: field.repeat, level: listSpot(run.spot)?.place.level ?? 0, project: field.project ?? null, ...(field.placement && { placement: field.placement }) };
+		const line: EntryLine = { text: field.text, priority: field.priority, labels: field.labels, repeat: field.repeat, level: listSpot(run.spot)?.place.level ?? 0, projects: field.projects ?? [], description: typedDescription(field.description), ...(field.placement && { placement: field.placement }) };
 		run.pending.push(line);
 		this.queue(field.run, { id: this.jobId(), kind: "create", run: field.run, line });
 	}
@@ -1074,8 +1169,38 @@ function placeOfDrop(result: DropTo): ListPlace | null {
 
 /** The Project button for a field (or the New Task sheet) whose project is `link`, null for none, among the `known` project notes. */
 export function entryProject(link: string | null, known: readonly ProjectRef[]): EntryProject {
-	const ref = refOf(link, known);
-	return { page: projectPage([ref ? [ref] : []], known.map((project) => ({ project, depth: project.path.length - 1 }))), lit: link !== null };
+	return entryProjects(namesOf(link), known);
+}
+
+/** The Project button for a field whose projects are `links`, none for none: each checked on its page, as the menu's. */
+export function entryProjects(links: readonly string[], known: readonly ProjectRef[]): EntryProject {
+	const refs = links.flatMap((link) => refOf(link, known) ?? []);
+	return { page: projectPage([refs], known.map((project) => ({ project, depth: project.path.length - 1 }))), lit: links.length > 0 };
+}
+
+function namesOf(link: string | null): readonly string[] {
+	return link === null ? [] : [link];
+}
+
+/** What a line's projects are handed to `createInPlace` as: none, the one name, or the names. */
+function projectArg(projects: readonly string[] | undefined): string | readonly string[] | null {
+	if (!projects || projects.length === 0) return null;
+	return projects.length === 1 ? projects[0] : projects;
+}
+
+/** A `createInPlace` call's arguments, with the line's description last where it has one (the filter's place kept). */
+function withDescription(args: readonly [string, string | null, NewTaskPlace, RepeatRule | null, readonly string[], (string | readonly string[] | null)?, (ProjectsNodeId | null)?], line: EntryLine): Extract<EntryCall, { readonly method: "createInPlace" }>["args"] {
+	if (!line.description) return args;
+	return [args[0], args[1], args[2], args[3], args[4], args[5] ?? null, args[6] ?? null, line.description];
+}
+
+/** The description to write: the line's text, none while it is closed or blank. */
+function typedDescription(text: string | null | undefined): string | null {
+	return text != null && text.trim() !== "" ? text : null;
+}
+
+function sameProjects(a: readonly string[], b: readonly string[]): boolean {
+	return a.length === b.length && a.every((name, i) => inProject(name, b[i]));
 }
 
 /** A folder among the `known` projects: nothing may give a task it. */

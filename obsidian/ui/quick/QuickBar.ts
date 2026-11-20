@@ -1,5 +1,5 @@
 import type { EntryPart } from "./EntryPart";
-import { type EntryState, type GroupedList, labelTitle, type PlaceChoice, type Placement, repeatDraft, type RepeatRule, samePlacement } from "../../../core/application/contracts";
+import { type EntryState, type FieldActionId, type GroupedList, labelTitle, type PlaceChoice, type Placement, repeatDraft, type RepeatRule, samePlacement } from "../../../core/application/contracts";
 import { DESIGN, DURATION } from "../design";
 import { Motion, timingOf } from "../motion/Motion";
 import { el, px, restingTop } from "../dom";
@@ -13,7 +13,7 @@ import type { LocalDate } from "../types";
 import { barBesideField, panelSide, type Side } from "./barPlacement";
 
 /** What the bar shows: the session's answer for the field, what each button shows and whether it shows at all. */
-export type QuickBarState = Pick<EntryState, "canIndent" | "canOutdent" | "indents" | "markable" | "marks" | "place" | "places" | "project" | "repeat" | "repeatable" | "repeatDay" | "section">;
+export type QuickBarState = Pick<EntryState, "bar" | "canIndent" | "canOutdent" | "indents" | "markable" | "marks" | "place" | "places" | "project" | "repeat" | "repeatable" | "repeatDay" | "section">;
 
 /** Where the field stands, for the bar to stand by it. */
 export interface BarAnchor {
@@ -46,8 +46,10 @@ export interface QuickBarDeps {
 	onPlace(placement: Placement): void;
 	/** A rule set in the repeat panel, or null to take it off. */
 	onRepeat(rule: RepeatRule | null): void;
-	/** A project picked on the Project button's page: its link, null for No project. */
+	/** No project picked on the Project button's page: the field's projects all go. */
 	onProject(link: string | null): void;
+	/** A project of the Project button's page tapped: on beside the field's others, or off; the page stays. */
+	onToggleProject(link: string): void;
 	/** «New project…» named on that page: the note made or tagged, then the field's project. */
 	onNewProject(name: string): void;
 	/** The project's name was being typed in the panel and no longer is: the field takes the focus back. */
@@ -113,7 +115,7 @@ export class QuickBar implements EntryPart {
 
 	constructor(private readonly parent: HTMLElement, private readonly deps: QuickBarDeps) {
 		this.bar = this.part("tc-quick-bar");
-		this.section = Button.create(this.bar, { kind: "bar", label: "Section", title: "Section (⌥Tab)", icon: "section", cls: "tc-bar-section", onPress: () => this.deps.onSection() }).el;
+		this.section = Button.create(this.bar, { kind: "bar", label: "New section", title: "New section (⌥Tab)", icon: "newSection", cls: "tc-bar-section", onPress: () => this.deps.onSection() }).el;
 		this.mode = this.part("tc-quick-mode");
 		parent.insertBefore(this.mode, this.bar);
 		this.shifts = el(this.bar, "span", "tc-bar-shifts");
@@ -133,36 +135,64 @@ export class QuickBar implements EntryPart {
 		return Button.create(this.shifts, { kind: "bar", label, title: `${label} (${key})`, icon: name, cls: `tc-bar-shift ${cls}`, onPress: () => this.deps.onIndent(delta) }).el;
 	}
 
+	/**
+	 * The element each action of the bar is drawn as; the flag holds the levels and the labels. Description has no line under
+	 * the plugin's title field: the engine's field draws it (task actions spec, Decision 101), so the plugin leaves it out.
+	 */
+	private buttons(): Readonly<Record<FieldActionId, HTMLElement | { readonly notDrawn: string }>> {
+		return {
+			newSection: this.section,
+			outdent: this.outdent,
+			indent: this.indent,
+			level: this.flag,
+			label: this.flag,
+			project: this.project,
+			repeat: this.repeat,
+			description: { notDrawn: "The plugin's field has one line; the engine's field opens the description's line." },
+			pickDate: this.place.el,
+		};
+	}
+
 	show(state: QuickBarState): void {
 		this.state = state;
+		const offered = new Map(state.bar.flatMap((group) => group.actions).map((action) => [action.id, action]));
+		const buttons = this.buttons();
+		const drawn = new Set<HTMLElement>();
+		for (const id of offered.keys()) {
+			const button = buttons[id];
+			if (button instanceof HTMLElement) drawn.add(button);
+		}
+		const shows = (button: HTMLElement) => drawn.has(button);
 		if (this.bar.hidden || this.leaving) this.comeIn();
 		this.bar.classList.toggle("is-desk", this.deps.desktop());
 		const section = state.section === true;
 		const desktop = this.deps.desktop();
 		if (desktop && this.section.parentElement !== this.mode) this.mode.appendChild(this.section);
 		if (!desktop && this.section.parentElement !== this.bar) this.bar.prepend(this.section);
-		this.mode.hidden = !desktop || state.section === null;
-		this.section.hidden = state.section === null;
+		this.mode.hidden = !desktop || !shows(this.section);
+		this.section.hidden = !shows(this.section);
 		this.section.classList.toggle("is-set", section);
 		this.section.setAttribute("aria-pressed", String(section));
 		reclass(this.bar, "is-idle", desktop && section);
 		this.spacer.hidden = section && desktop;
-		this.shifts.hidden = this.outdent.hidden = this.indent.hidden = !state.indents;
-		this.outdent.disabled = !state.canOutdent;
-		this.indent.disabled = !state.canIndent;
-		this.flag.hidden = !state.markable;
+		this.outdent.hidden = !shows(this.outdent);
+		this.indent.hidden = !shows(this.indent);
+		this.shifts.hidden = this.outdent.hidden && this.indent.hidden;
+		this.outdent.disabled = offered.get("outdent")?.disabled ?? true;
+		this.indent.disabled = offered.get("indent")?.disabled ?? true;
+		this.flag.hidden = !shows(this.flag);
 		const color = state.marks.tint;
 		this.flag.classList.toggle("is-set", color !== null);
 		if (color) this.flag.dataset.priority = color;
 		else delete this.flag.dataset.priority;
-		this.project.hidden = state.project === null;
+		this.project.hidden = !shows(this.project) || state.project === null;
 		const lit = state.project?.lit === true;
 		this.project.classList.toggle("is-set", lit);
 		this.project.setAttribute("aria-pressed", String(lit));
-		this.repeat.hidden = !state.repeatable;
+		this.repeat.hidden = !shows(this.repeat);
 		this.repeat.classList.toggle("is-set", state.repeat !== null);
 		this.repeat.setAttribute("aria-pressed", String(state.repeat !== null));
-		this.place.el.hidden = state.place === null;
+		this.place.el.hidden = !shows(this.place.el) || state.place === null;
 		if (state.place && !(this.shownPlace && samePlacement(this.shownPlace, state.place))) this.showPlace(state.place);
 		if (!this.place.el.hidden) this.fadeLongPlace();
 		if (section) this.closePanel();
@@ -431,7 +461,7 @@ export class QuickBar implements EntryPart {
 				project: page,
 				back: false,
 				onBack: () => undefined,
-				onPick: (link) => this.picked(() => this.deps.onProject(link))(),
+				onPick: (link) => (link === null ? this.picked(() => this.deps.onProject(null))() : this.deps.onToggleProject(link)),
 				onNew: () => this.nameProject(true),
 			});
 			return;

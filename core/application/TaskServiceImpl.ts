@@ -386,12 +386,12 @@ export class TaskServiceImpl implements TaskService {
 		return this.run(this.writes.createAtTime(date, start, text));
 	}
 
-	createInPlace(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels: readonly string[] = [], project?: string | null, filter?: ProjectsNodeId | null): Promise<TaskKey | null> {
-		return this.run(this.writes.createInPlace(text, priority, place, repeat, labels, project, filter));
+	createInPlace(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels: readonly string[] = [], project?: string | readonly string[] | null, filter?: ProjectsNodeId | null, description?: string | null): Promise<TaskKey | null> {
+		return this.run(this.writes.createInPlace(text, priority, place, repeat, labels, project, filter, description));
 	}
 
-	createWithId(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels: readonly string[] = [], project?: string | null, filter?: ProjectsNodeId | null): Promise<CreatedTask | null> {
-		return this.run(this.writes.createWithId(text, priority, place, repeat, labels, project, filter));
+	createWithId(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels: readonly string[] = [], project?: string | readonly string[] | null, filter?: ProjectsNodeId | null, description?: string | null): Promise<CreatedTask | null> {
+		return this.run(this.writes.createWithId(text, priority, place, repeat, labels, project, filter, description));
 	}
 
 	create(draft: TaskDraft, slot?: Slot): Promise<void> {

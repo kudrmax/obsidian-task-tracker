@@ -278,17 +278,28 @@ export class TaskRules {
 		return (doc, today, _settings, boundary) => ops.createAtTime(doc, date, today, start, text, boundary);
 	}
 
-	/** `project`, the task's own whatever the place's, which then only places it; a subtask takes none. */
-	createInPlace(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels: readonly string[] = [], project?: string | null): Operation | null {
+	/** `project`, the task's own whatever the place's (one name, or several), which then only places it; a subtask takes none. */
+	createInPlace(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels: readonly string[] = [], project?: string | readonly string[] | null): Operation | null {
 		if (this.isBlank(text)) return null;
 		return this.placeNew(text, priority, place, repeat, labels, project);
 	}
 
 	/** A new task where `place` says, whatever its title: `createInPlace` without its check for a blank one. */
-	placeNew(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels: readonly string[] = [], project?: string | null): Operation {
+	placeNew(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels: readonly string[] = [], project?: string | readonly string[] | null): Operation {
 		return (doc, today, _settings, boundary) => {
-			const own = project === undefined ? undefined : project === null || projectWrites.isFolder(doc, project) ? [] : [project];
+			const named = project === undefined ? undefined : project === null ? [] : typeof project === "string" ? [project] : project;
+			const own = named?.filter((name) => !projectWrites.isFolder(doc, name));
 			return ops.createInPlace(doc, text, priority, this.resolve(doc, place, today), today, boundary, repeat, labels, own);
+		};
+	}
+
+	/** `operation`, then the task it made gets `description` (none: nothing more): one write. */
+	withDescription(operation: Operation | null, description: string | null | undefined): Operation | null {
+		if (!operation || !description || description.trim() === "") return operation;
+		return (doc, today, settings, boundary) => {
+			const after = operation(doc, today, settings, boundary);
+			const made = after.insertedSince(doc);
+			return made ? ops.setDescription(after, made, description) : after;
 		};
 	}
 
@@ -315,7 +326,9 @@ export class TaskRules {
 		const operation: Operation = (doc, today, _settings, boundary) => {
 			const { doc: tagged, tags } = EntryTags.tag(doc, [this.entryOf(doc, key)]);
 			const entry = tags.find(tagged, 0)!;
-			const edited = ops.placeTask(tagged, entry, { ...draft, text: EntryTags.marked(taskTitle(draft.text), 0) }, today, undefined, boundary);
+			const placed = ops.placeTask(tagged, entry, { ...draft, text: EntryTags.marked(taskTitle(draft.text), 0) }, today, undefined, boundary);
+			const written = tags.find(placed, 0);
+			const edited = written && draft.description !== undefined && draft.description.trim() !== "" ? ops.setDescription(placed, written, draft.description) : placed;
 			const moved = tags.find(edited, 0);
 			place = moved && { section: moved.section, index: moved.index, path: moved.path, raw: "" };
 			return tags.untag(edited);

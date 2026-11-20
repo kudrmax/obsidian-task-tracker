@@ -146,6 +146,20 @@ export class QuickEntrySession {
 		this.entry.setProject(link);
 	}
 
+	/** A project of the bar's Project page tapped: on beside the field's others, or off (`QuickEntry.toggleProject`). */
+	toggleProject(name: string): void {
+		this.entry.toggleProject(name);
+	}
+
+	/** Description on the bar: the line under the title opens. */
+	openDescription(): void {
+		this.entry.openDescription();
+	}
+
+	typeDescription(text: string): void {
+		this.entry.typeDescription(text);
+	}
+
 	indent(delta: 1 | -1): void {
 		this.entry.indent(delta);
 	}

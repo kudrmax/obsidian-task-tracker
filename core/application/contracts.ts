@@ -1355,12 +1355,12 @@ export interface TaskService {
 	 * `filter`, the screen's (`ProjectFilter.node`): a task typed at the end of a section of a list (`before` null) goes right
 	 * after the last task of that section the filter shows, not after the tasks it hides (none shown: the section's end).
 	 */
-	createInPlace(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels?: readonly string[], project?: string | null, filter?: ProjectsNodeId | null): Promise<TaskKey | null>;
+	createInPlace(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels?: readonly string[], project?: string | readonly string[] | null, filter?: ProjectsNodeId | null, description?: string | null): Promise<TaskKey | null>;
 	/**
 	 * `createInPlace`, answering the new task's id with its key: the key names it as the file stands right after this write,
 	 * the id for as long as the service runs, whatever writes come before the screen draws it. Null when nothing was created.
 	 */
-	createWithId(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels?: readonly string[], project?: string | null, filter?: ProjectsNodeId | null): Promise<CreatedTask | null>;
+	createWithId(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels?: readonly string[], project?: string | readonly string[] | null, filter?: ProjectsNodeId | null, description?: string | null): Promise<CreatedTask | null>;
 	/**
 	 * The marks `createInPlace`, `create` or `edit` writes for a title typed as `text` with `priority` (a level's prefix or
 	 * null) and `labels` chosen: the chosen priority, else the level the text's first word is; the labels only without one.

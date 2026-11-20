@@ -1096,7 +1096,7 @@ describe("QuickEntrySession", () => {
 			expect(entry.choosePlace({ kind: "backlog" })).toEqual({ column: "backlog", day: null });
 		});
 
-		it("a new rule starts from the field's day, else today; a slot takes none; only a list's field shifts", () => {
+		it("a new rule starts from the field's day, else today; a slot repeats too (Max, 2026-11-20); only a list's field shifts", () => {
 			const tasks = new FakeTasks(["A"]);
 			tasks.day = "2026-11-05";
 			const entry = tasks.entry();
@@ -1105,7 +1105,7 @@ describe("QuickEntrySession", () => {
 			entry.open(inSoon(0));
 			expect(entry.state).toMatchObject({ repeatDay: DAY });
 			entry.open({ kind: "slot", slot: SLOT });
-			expect(entry.state).toMatchObject({ repeatable: false, indents: false });
+			expect(entry.state).toMatchObject({ repeatable: true, indents: false });
 			entry.open({ kind: "stack", parent: key("A") });
 			expect(entry.state).toMatchObject({ repeatable: true, indents: false });
 		});

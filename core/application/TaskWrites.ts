@@ -85,19 +85,21 @@ export class TaskWrites {
 		return nothing(this.rules.createAtTime(date, start, text));
 	}
 
-	createInPlace(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels: readonly string[] = [], project?: string | null, filter?: ProjectsNodeId | null): Write<TaskKey | null> {
-		const write = this.createWithId(text, priority, place, repeat, labels, project, filter);
+	createInPlace(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels: readonly string[] = [], project?: string | readonly string[] | null, filter?: ProjectsNodeId | null, description?: string | null): Write<TaskKey | null> {
+		const write = this.createWithId(text, priority, place, repeat, labels, project, filter, description);
 		return { operation: write.operation, answer: (change) => write.answer(change)?.key ?? null };
 	}
 
-	createWithId(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels: readonly string[] = [], project?: string | null, filter?: ProjectsNodeId | null): Write<CreatedTask | null> {
+	createWithId(text: string, priority: string | null, place: NewTaskPlace, repeat?: RepeatRule | null, labels: readonly string[] = [], project?: string | readonly string[] | null, filter?: ProjectsNodeId | null, description?: string | null): Write<CreatedTask | null> {
 		return {
-			operation:
+			operation: this.rules.withDescription(
 				place.kind === "projects"
 					? this.createInProjects(text, priority, place, repeat, labels, project)
 					: filter !== null && filter !== undefined && !this.rules.isBlank(text)
 						? (doc, today, settings, boundary) => this.rules.placeNew(text, priority, shownPlace(doc, place, filter, today, this.reads.subprojects()), repeat, labels, project)(doc, today, settings, boundary)
 						: this.rules.createInPlace(text, priority, place, repeat, labels, project),
+				description,
+			),
 			answer: (change) => {
 				const created = change?.after.insertedSince(change.before);
 				return created ? { key: keyOf(created), id: created.id } : null;
@@ -106,7 +108,7 @@ export class TaskWrites {
 	}
 
 	/** A task typed in the Projects list: its place read off the screen as the file then stands (`projectsNewPlace`). */
-	private createInProjects(text: string, priority: string | null, place: ProjectsPlace, repeat: RepeatRule | null | undefined, labels: readonly string[], project: string | null | undefined): Operation | null {
+	private createInProjects(text: string, priority: string | null, place: ProjectsPlace, repeat: RepeatRule | null | undefined, labels: readonly string[], project: string | readonly string[] | null | undefined): Operation | null {
 		if (this.rules.isBlank(text)) return null;
 		return (doc, today, settings, boundary) => {
 			const view = this.reads.projectsScreen({ text: "", doc, today, boundary }, place.node);

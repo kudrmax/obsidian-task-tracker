@@ -89,7 +89,7 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 	let mode: Shown = startMode;
 	let day = startDay;
 	const turned: Shown[] = [];
-	const created: { text: string; priority: string | null; place: NewTaskPlace; repeat?: RepeatRule; project?: string }[] = [];
+	const created: { text: string; priority: string | null; place: NewTaskPlace; repeat?: RepeatRule; project?: string | readonly string[] }[] = [];
 	const newProjects: { name: string; keys: readonly TaskKey[] }[] = [];
 	const edits: { key: TaskKey; draft: TaskDraft }[] = [];
 	const beginNew = vi.fn<(source: HTMLElement, e: PointerEvent, targets: readonly DropTarget[], onDrop: (result: DropResult | null) => void) => boolean>(() => true);
@@ -947,10 +947,10 @@ describe("QuickEntryController", () => {
 			expect(created[0].repeat).toEqual(WEEKLY_THU);
 		});
 
-		it("is not on a field on the calendar", () => {
+		it("is on a field on the calendar too (Max, 2026-11-20)", () => {
 			const { controller, root } = setUp();
 			controller.openSlot({ date: TODAY, start: 600, end: null });
-			expect(repeatButton(root).hidden).toBe(true);
+			expect(repeatButton(root).hidden).toBe(false);
 		});
 
 		it("a rename of a task that repeats opens with its rule and leaves it as it is when it is not touched", async () => {
