@@ -2,7 +2,7 @@ import { type CSSProperties, type MouseEvent, type TouchEvent, useEffect, useSta
 import { PROPERTY } from "../../design";
 import { Drag, type Grab, type Landing } from "../drag/Drag";
 import { Layers } from "../layers/Layers";
-import { Layout, type Place } from "../layout/Layout";
+import { Layout, type Place, reachOf } from "../layout/Layout";
 import { StoreContext, type ScreenStore, useScreen } from "../store";
 import { type BlockLook, Card, PressedLook } from "./Card";
 import { QuickBar } from "./QuickBar";
@@ -66,7 +66,7 @@ function Root({ place, store }: { readonly place: Place; readonly store: ScreenS
 	return (
 		<div className={`task-calendar is-engine is-${place}${entering ? " is-entering" : ""}`} onTouchStart={keepTouch} onTouchMove={keepTouch} onTouchEnd={keepTouch} onClick={(event) => letSelectionGo(event, store)}>
 			<Layout place={place} />
-			<QuickBar />
+			<QuickBar reach={reachOf(place)} />
 		</div>
 	);
 }

@@ -246,6 +246,50 @@ describe("the menu's fields and the plus, in the store", () => {
 		expect(store.getState().pressAgain(1)).toBe(false);
 	});
 
+	it("Escape with a bar's panel open closes the panel alone; a new field opens with none (the audit's 6, 7)", () => {
+		const { store } = screen();
+		store.getState().plusTap(["soon", "day"]);
+		store.getState().typeEntry("Флажок");
+		store.getState().showEntryPanel("where");
+		store.getState().escapeEntry();
+		expect(store.getState().entryPanel).toBeNull();
+		expect(store.getState().entry).not.toBeNull();
+		store.getState().showEntryPanel("priority");
+		store.getState().openEntry(null);
+		store.getState().plusTap(["soon", "day"]);
+		expect(store.getState().entryPanel).toBeNull();
+		store.getState().escapeEntry();
+		expect(store.getState().entry).toBeNull();
+	});
+
+	it("a place the layout can't show keeps the field where it stands and writes there (the audit's 9)", async () => {
+		const { store } = screen();
+		store.getState().plusTap(["soon", "day"]);
+		const at = store.getState().entry!.at;
+		store.getState().entryPlace("inbox", null, ["soon", "day"]);
+		const field = store.getState().entry!;
+		expect(field.at).toMatchObject({ list: at.list, away: { list: "inbox" } });
+		expect(store.getState().entryBar(field, store.getState().draft, "").where?.id).toBe("inbox");
+		store.getState().commitEntry("В инбокс", true);
+		await settle();
+		await settle();
+		expect(store.getState().shown.lists.inbox.rows.some((r) => store.getState().shown.cards[r.id]?.title === "В инбокс")).toBe(true);
+	});
+
+	it("a task just typed lets the next field under it go a level in, before its write is read back (the audit's 8)", () => {
+		const p = port();
+		p.delay = 300;
+		const store = createScreenStore(p);
+		store.getState().start();
+		store.getState().plusTap(["soon", "day"]);
+		store.getState().entryPlace("date", "2026-11-27", ["inbox", "soon", "day"]);
+		store.getState().commitEntry("A", true);
+		const s = store.getState();
+		expect(s.entryBar(s.entry!, s.draft, "").canIndent).toBe(true);
+		store.getState().indentEntry(1);
+		expect(store.getState().entry!.at.depth).toBe(1);
+	});
+
 	it("Add subtask in a list opens the field under the task's last subtask, written as its last subtask (F124)", async () => {
 		const p = port(calendarFile(NOW));
 		const store = createScreenStore(p);

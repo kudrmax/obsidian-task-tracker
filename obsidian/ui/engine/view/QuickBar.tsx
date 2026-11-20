@@ -2,13 +2,11 @@ import { type CSSProperties, memo, useState } from "react";
 import { PROPERTY } from "../../design";
 import type { IconName } from "../../kit/icons";
 import { BarPanel, FieldBar } from "../layers/Layers";
-import type { EntryBar, PlaceId } from "../port";
-import { useScreen, useScreenApi } from "../store";
+import type { EntryBar, ListId, PlaceId } from "../port";
+import { type BarPanelKind as PanelKind, useScreen, useScreenApi } from "../store";
 import { useHost } from "./host";
 import { Icon } from "./Icon";
 import { MonthGrid, TileGroup, tileRows } from "./TaskMenu";
-
-type PanelKind = "priority" | "project" | "where" | "date";
 
 const PLACE_ICONS: Readonly<Record<PlaceId, IconName>> = { inbox: "inbox", backlog: "backlog", soon: "soon", now: "now", date: "calendar" };
 
@@ -19,19 +17,22 @@ const PLACE_ICONS: Readonly<Record<PlaceId, IconName>> = { inbox: "inbox", backl
  * over it; on the Mac the same buttons are a capsule by the field. One panel at a time. The bar decides nothing: it shows
  * the port's answer and sends back what was tapped.
  */
-export const QuickBar = memo(function QuickBar() {
+export const QuickBar = memo(function QuickBar({ reach }: { readonly reach: readonly ListId[] }) {
 	const api = useScreenApi();
 	const { desk, layerRoot } = useHost();
 	const entry = useScreen((s) => s.entry);
 	const draft = useScreen((s) => s.draft);
 	const text = useScreen((s) => s.entryText);
-	const [panel, setPanel] = useState<PanelKind | null>(null);
+	/** The bar is the port's answer for the screen as read: a task written above the field may let it go a level in. */
+	useScreen((s) => s.read);
+	const panel = useScreen((s) => s.entryPanel);
+	const setPanel = (next: PanelKind | null) => api.getState().showEntryPanel(next);
 	const [flagEl, setFlagEl] = useState<HTMLElement | null>(null);
 	const [projectEl, setProjectEl] = useState<HTMLElement | null>(null);
 	const [whereEl, setWhereEl] = useState<HTMLElement | null>(null);
 	if (!entry) return null;
 	const bar: EntryBar = api.getState().entryBar(entry, draft, text);
-	const toggle = (kind: PanelKind) => setPanel((open) => (open === kind || (open === "date" && kind === "where") ? null : kind));
+	const toggle = (kind: PanelKind) => setPanel(panel === kind || (panel === "date" && kind === "where") ? null : kind);
 	const close = () => setPanel(null);
 	return (
 		<FieldBar desk={desk} over={entry.stack ? layerRoot : null} className="tc-quick-bar is-engine">
@@ -85,10 +86,10 @@ export const QuickBar = memo(function QuickBar() {
 							</button>
 						</BarPanel>
 						<BarPanel open={panel === "where"} onClose={close} reference={whereEl} capsule={desk ? capsule : null} away={away} className="is-place">
-							<TileGroup kind="is-place" rows={[bar.places.map((choice) => ({ label: choice.title, icon: PLACE_ICONS[choice.id], on: choice.on, onPick: () => (choice.id === "date" ? setPanel("date") : (api.getState().entryPlace(choice.id, null), close())) }))]} />
+							<TileGroup kind="is-place" rows={[bar.places.map((choice) => ({ label: choice.title, icon: PLACE_ICONS[choice.id], on: choice.on, onPick: () => (choice.id === "date" ? setPanel("date") : (api.getState().entryPlace(choice.id, null, reach), close())) }))]} />
 						</BarPanel>
 						<BarPanel open={panel === "date"} onClose={close} reference={whereEl} capsule={desk ? capsule : null} away={away} className="is-picker">
-							<MonthGrid today={bar.date.today} picked={bar.date.picked} onPick={(date) => (api.getState().entryPlace("date", date), close())} />
+							<MonthGrid today={bar.date.today} picked={bar.date.picked} onPick={(date) => (api.getState().entryPlace("date", date, reach), close())} />
 						</BarPanel>
 					</>
 				);

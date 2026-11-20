@@ -56,6 +56,8 @@ export function useAnchor(): MutableRefObject<Element | null> {
 export interface MenuLayerProps {
 	readonly open: boolean;
 	readonly onClose: () => void;
+	/** Escape closes the menu; not while a field typed in it takes Escape itself (a bar's panel closes first). */
+	readonly escapes?: boolean;
 	/** A mouse's press anywhere on the layer, at its `timeStamp`: whether it was taken (a double click's second press), its click then reaching nothing. */
 	readonly onPressAgain?: (at: number) => boolean;
 	/** The element of the view's own document that holds the layer. */
@@ -100,7 +102,7 @@ const motionClass = (status: string, ready: boolean) => (status === "open" && re
  * in from where it stood unplaced. The parts open together and close together (Floating UI's transition status keeps
  * them mounted while they fade, `LAYER_MS`).
  */
-export function MenuLayer({ open, onClose, onPressAgain, root, reference, panelBy = null, label, over, groups, panelClass, page, peek, keepWidth = false, holdSplit = false }: MenuLayerProps) {
+export function MenuLayer({ open, onClose, onPressAgain, escapes = true, root, reference, panelBy = null, label, over, groups, panelClass, page, peek, keepWidth = false, holdSplit = false }: MenuLayerProps) {
 	const [above, setAbove] = useState(0);
 
 	const [overEl, setOverEl] = useState<HTMLElement | null>(null);
@@ -195,7 +197,7 @@ export function MenuLayer({ open, onClose, onPressAgain, root, reference, panelB
 		},
 	};
 	/** Closed by the click, not the press: the finger's tap ends on the backdrop, never on a card under the fading menu. */
-	const dismiss = useDismiss(lower.context, { outsidePressEvent: "click", outsidePress: (event) => !taken.current && !(event.target instanceof Element && ([overEl, parts.current.upper, parts.current.lower].some((part) => part?.contains(event.target as Node)) || event.target.closest(".tc-quick-bar, .tc-quick-panel"))) });
+	const dismiss = useDismiss(lower.context, { escapeKey: escapes, outsidePressEvent: "click", outsidePress: (event) => !taken.current && !(event.target instanceof Element && ([overEl, parts.current.upper, parts.current.lower].some((part) => part?.contains(event.target as Node)) || event.target.closest(".tc-quick-bar, .tc-quick-panel"))) });
 	const { getFloatingProps } = useInteractions([dismiss, useRole(lower.context, { role: "menu" })]);
 	if (!isMounted) return null;
 	const settled = holdSplit || wanted === count || (wanted !== undefined && wanted >= groups.length && count === groups.length);

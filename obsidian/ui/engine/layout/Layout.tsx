@@ -25,6 +25,21 @@ export type Place = "leaf" | "note" | "column" | "twoColumns" | "calendar" | "fo
  * strip, the strip slides by its own percent. At Inbox and at Soon the two columns split the window in half (CLAUDE.md,
  * «Behaviours Max had to ask for twice»); at the day's calendar too until the divider comes (E2).
  */
+/** The lists a screen mounted at `place` can bring into sight: the ribbon turns to any; a fixed layout shows its own. */
+export function reachOf(place: Place): readonly ListId[] {
+	switch (place) {
+		case "note":
+		case "column":
+			return ["inbox"];
+		case "twoColumns":
+			return ["inbox", "soon"];
+		case "calendar":
+			return ["soon", "day"];
+		default:
+			return ["inbox", "soon", "day"];
+	}
+}
+
 export const Layout = memo(function Layout({ place }: { readonly place: Place }) {
 	const stop = useScreen((s) => s.stop);
 	if (place === "column" || place === "twoColumns" || place === "calendar" || place === "follow")

@@ -62,7 +62,7 @@ export const EntryField = memo(function EntryField({ depth, className = "" }: { 
 				priority={tint}
 				onChange={(text) => api.getState().typeEntry(text)}
 				onEnter={(text) => api.getState().commitEntry(text, true)}
-				onEscape={() => api.getState().openEntry(null)}
+				onEscape={() => api.getState().escapeEntry()}
 				onTab={(shift) => api.getState().indentEntry(shift ? -1 : 1)}
 				onLeave={commitOnLeave}
 			/>

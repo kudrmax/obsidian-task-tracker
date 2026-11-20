@@ -227,8 +227,9 @@ export class MockPort implements ScreenPort {
 		const depth = at.depth ?? 0;
 		const sub = renaming !== null ? !this.isTop(renaming) : depth > 0 || at.under !== undefined;
 		const today = dateOf(this.day());
-		const shownDay = dateOf(addDays(this.day(), at.dayOffset));
-		const here: PlaceId = at.backlog ? "backlog" : at.list === "inbox" ? "inbox" : at.list === "soon" ? "soon" : at.dayOffset <= 0 ? "now" : "date";
+		const goes = at.away ?? at;
+		const shownDay = dateOf(addDays(this.day(), goes.dayOffset));
+		const here: PlaceId = at.backlog ? "backlog" : goes.list === "inbox" ? "inbox" : goes.list === "soon" ? "soon" : goes.dayOffset <= 0 ? "now" : "date";
 		const title = (id: PlaceId) => (id === "date" ? `${Number(shownDay.slice(8))} ${MONTHS[Number(shownDay.slice(5, 7)) - 1].charAt(0)}${MONTHS[Number(shownDay.slice(5, 7)) - 1].slice(1).toLowerCase()}` : LIST_NAMES[id]);
 		const shifts = inList && renaming === null;
 		const above = shifts ? this.taskAbove(at) : null;
@@ -289,7 +290,7 @@ export class MockPort implements ScreenPort {
 			if (blank || !task) return { ...done, write: null, face: null };
 			const { title, level } = this.parsed(text, draft);
 			const project = draft.project ?? undefined;
-			const moved = at.backlog === true || (at.at === undefined && !field.stack && at.before !== renaming);
+			const moved = at.backlog === true || at.away !== undefined || (at.at === undefined && !field.stack && at.before !== renaming);
 			if (title === task.title && level === task.level && project === task.project && !moved) return { ...done, write: null, face: null };
 			const write = this.write((file) => {
 				const t = this.findBy(file, (x) => x.id === renaming)?.task;
@@ -302,7 +303,7 @@ export class MockPort implements ScreenPort {
 					this.take(file, renaming);
 					Object.assign(t, { due: null, slot: null });
 					file.backlog[file.backlog.length - 1].tasks.push(t);
-				} else this.apply(file, renaming, { ...at, depth: 0 });
+				} else this.apply(file, renaming, at.away ? this.listEnd(at.away.list, at.away.dayOffset) : { ...at, depth: 0 });
 			});
 			const face: CardFace = { ...this.faceOf(task, null), title, color: level ? LEVEL_COLORS[level] : null, due: this.read(at.dayOffset).cards[renaming]?.due ?? null };
 			return { ...done, write, face };
@@ -335,12 +336,15 @@ export class MockPort implements ScreenPort {
 	}
 
 	/** The end of the list picked, in its last section, at the top level; a day picked: Now for today and before, else that day's list; Backlog keeps the field where it stands. */
-	entryPlace(field: EntryField, place: PlaceId, date: string | null): EntryField {
-		return { ...field, at: this.placeAt(field.at, place, date) };
+	entryPlace(field: EntryField, place: PlaceId, date: string | null, reach: readonly ListId[]): EntryField {
+		const to = this.placeAt(field.at, place, date);
+		const stays = !to.backlog && !reach.includes(to.list);
+		const home = { ...field.at, backlog: undefined, away: undefined };
+		return { ...field, at: stays ? { ...home, away: { list: to.list, dayOffset: to.dayOffset } } : to };
 	}
 
 	private placeAt(at: Destination, place: PlaceId, date: string | null): Destination {
-		if (place === "backlog") return { ...at, backlog: true };
+		if (place === "backlog") return { ...at, backlog: true, away: undefined };
 		const dayOffset = place === "date" && date ? Math.round((new Date(Number(date.slice(0, 4)), Number(date.slice(5, 7)) - 1, Number(date.slice(8))).getTime() - this.day().getTime()) / 86_400_000) : place === "now" ? 0 : at.dayOffset;
 		const list: ListId = place === "inbox" ? "inbox" : place === "soon" ? "soon" : "day";
 		const sections = this.listOf(this.file, list, dayOffset);
@@ -350,7 +354,8 @@ export class MockPort implements ScreenPort {
 
 	/** The task the field at `at` would stand under in its list: the row before it, as the list draws the field. */
 	private taskAbove(at: Destination): { readonly depth: number } | null {
-		const rows = this.read(at.dayOffset).lists[at.list].rows;
+		/** The writes not yet read back count: a task just typed above the field stands there already. */
+		const rows = (this.ahead ? this.screenOf(this.ahead, at.dayOffset) : this.read(at.dayOffset)).lists[at.list].rows;
 		let index = at.before === null ? -1 : rows.findIndex((row) => row.id === at.before);
 		if (index < 0) {
 			const head = at.section ? rows.findIndex((row) => row.id === at.section) : -1;
@@ -361,7 +366,8 @@ export class MockPort implements ScreenPort {
 		return row?.kind === "task" ? { depth: row.depth } : null;
 	}
 
-	private async add(text: string, at: Destination, draft: EntryDraft): Promise<string> {
+	private async add(text: string, given: Destination, draft: EntryDraft): Promise<string> {
+		const at = given.away ? this.listEnd(given.away.list, given.away.dayOffset) : given;
 		const id = `x${++this.added}`;
 		await this.write((file) => {
 			const { title, level } = this.parsed(text, draft);

@@ -10,7 +10,7 @@
 export default {
 	name: "e15-quick-bar",
 	features: ["E4: the new task's bar (F184–F189)"],
-	cases: ["levels and flag", "project", "place", "calendar"],
+	cases: ["levels and flag", "project", "place", "calendar", "panels and escape", "picked day", "place out of sight"],
 	async run(t, item) {
 		const tap = (p) => (t.platform === "phone" ? t.input.tap(p.x, p.y) : t.input.click(p.x, p.y));
 		const enter = async () => {
@@ -125,6 +125,60 @@ export default {
 			await type("Завтрашнее");
 			await enter();
 			t.expect((await line("Завтрашнее")).includes(`📅 ${day}`), `written for that day: ${await line("Завтрашнее")}`);
+		}
+		const esc = async () => {
+			await t.cdp.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
+			await t.cdp.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
+			await t.sleep(350);
+		};
+		const text = () => t.cdp.eval(`document.activeElement?.isContentEditable ? document.activeElement.textContent : null`);
+		const panels = () => t.cdp.eval(`document.querySelectorAll(".tc-quick-panel:not(.is-closing)").length`);
+		if (item === "panels and escape") {
+			await t.setStop("soon");
+			await plus();
+			await type("Флажок");
+			await press(".tc-bar-place");
+			await tile("Date");
+			t.expect((await panels()) === 1, "the month is open");
+			await esc();
+			t.expect((await panels()) === 0 && (await text()) === "Флажок", `Escape with a panel open closes the panel alone, the field and its text kept (the audit's 6): ${await text()}`);
+			await press(".tc-bar-flag");
+			await esc();
+			await esc();
+			t.expect((await field()) === null, "a second Escape closes the field");
+			await plus();
+			t.expect((await panels()) === 0, "a new field opens with no panel (the audit's 7)");
+		}
+		if (item === "picked day") {
+			await t.setStop("soon");
+			await plus();
+			await type("A");
+			await press(".tc-bar-place");
+			await tile("Date");
+			const day = await t.cdp.eval(`[...document.querySelectorAll(".tc-quick-panel .tc-day:not(.is-other)")].find((b) => b.classList.contains("is-today")).nextElementSibling?.nextElementSibling?.dataset.date ?? null`);
+			await tile(day);
+			await t.sleep(400);
+			await enter();
+			const into = await box(".tc-bar-indent");
+			t.expect(into && !into.disabled, `the field under «A» on a picked day may go a level in: Move in on (the audit's 8): ${JSON.stringify(into)}`);
+			const before = await field();
+			await t.cdp.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Tab", code: "Tab", windowsVirtualKeyCode: 9 });
+			await t.cdp.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Tab", code: "Tab", windowsVirtualKeyCode: 9 });
+			await t.sleep(300);
+			t.expect(Math.abs((await field())?.left - before.left - 20) <= 1, "and Tab takes it there, as the button");
+		}
+		if (item === "place out of sight") {
+			await t.cdp.eval(`(async () => { window.__tcStand.step("step-menu"); await new Promise((r) => setTimeout(r, 700)); return 1; })()`);
+			await plus();
+			const here = await field();
+			await type("Флажок");
+			await press(".tc-bar-place");
+			await tile("Inbox");
+			await t.sleep(400);
+			const kept = await field();
+			t.expect(kept && kept.list === here?.list && (await text()) === "Флажок" && (await box(".tc-bar-place"))?.text === "Inbox", `a layout without Inbox keeps the field where it stands, its text in it, the place Inbox (the audit's 9): ${JSON.stringify(kept)}`);
+			await enter();
+			t.expect((await t.oracle.tasks("Inbox")).some((task) => task.title === "Флажок"), "and the task is written to Inbox");
 		}
 		if (item === "calendar") {
 			await t.setClock("12:00");

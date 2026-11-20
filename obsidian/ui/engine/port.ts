@@ -132,6 +132,8 @@ export interface Destination {
 	readonly under?: string;
 	/** A new task written to Backlog, which the screen doesn't show: its field stays where it stands. */
 	readonly backlog?: boolean;
+	/** A new task written at the end of this list (the day's of `dayOffset`), which the screen as laid out can't show: its field stays where it stands. */
+	readonly away?: { readonly list: ListId; readonly dayOffset: number };
 }
 
 /** A place the new task's bar offers: the lists, and a day picked on the month. */
@@ -303,8 +305,11 @@ export interface ScreenPort {
 	subtaskPlace(id: string, dayOffset: number): Destination;
 	/** The bar of `field`, with what is set (`draft`) and typed (`text`). */
 	entryBar(field: EntryField, draft: EntryDraft, text: string): EntryBar;
-	/** Where the field goes for a place picked on the bar (`date` with Date): the end of that list or day. */
-	entryPlace(field: EntryField, choice: PlaceId, date: string | null): EntryField;
+	/**
+	 * Where the field goes for a place picked on the bar (`date` with Date): the end of that list or day, when it is one of
+	 * the lists the screen can bring into sight (`reach`); else the field stays and the task is written there.
+	 */
+	entryPlace(field: EntryField, choice: PlaceId, date: string | null, reach: readonly ListId[]): EntryField;
 	/** Rename of the task `id` from its menu opened `from` there (F117): the field in the card's place, the bar set as the task is. */
 	rename(id: string, from: MenuFrom, dayOffset: number): RenameStart;
 	/** Enter (`next`) or a tap elsewhere on `field` holding `text`: what is written and which field opens next. */

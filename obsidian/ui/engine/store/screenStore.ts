@@ -27,6 +27,9 @@ export type MenuPage = "menu" | "picker" | "reminders";
 /** What a menu asks before it acts (Won't do, Stop, Delete), in place of what was pressed. */
 export type Asking = StatusId | "delete";
 
+/** A panel of the field's bar: the flag's levels, the projects, the places, the month of Date. */
+export type BarPanelKind = "priority" | "project" | "where" | "date";
+
 /**
  * An open layer (spec, «Layers and focus»): the menu of a task or an event, with what the port offers in it, opened from a
  * list's card, a calendar's block or a block's stack; the page it shows and the question it asks, if any.
@@ -91,6 +94,8 @@ export interface ScreenState {
 	/** What the bar has set for the task being typed, and the text typed so far (a level's prefix lights the flag). */
 	readonly draft: EntryDraft;
 	readonly entryText: string;
+	/** The bar's panel open over it: one at a time; every new field, or the field moved, opens with none. */
+	readonly entryPanel: BarPanelKind | null;
 	/** Counts the fields opened: each new one (after Enter) is a fresh, empty field. */
 	readonly entrySeq: number;
 	/** Tasks new in the last read: their rows come in; a row merely scrolled into sight does not. */
@@ -176,14 +181,21 @@ export interface ScreenActions {
 	openEntry(at: Destination | null): void;
 	/** The bar of `field` (the port's answer). */
 	entryBar(field: EntryField, draft: EntryDraft, text: string): EntryBar;
+	/** Opens a panel of the bar (null: closes it). */
+	showEntryPanel(panel: BarPanelKind | null): void;
+	/** Escape in the field: a panel open closes, and only it; else the field closes writing nothing (F181). */
+	escapeEntry(): void;
 	/** The field's text as typed. */
 	typeEntry(text: string): void;
 	/** A level's tile on the bar: set, or taken off when it was the one set. */
 	draftLevel(prefix: string): void;
 	/** A project picked on the bar (null: No project). */
 	draftProject(name: string | null): void;
-	/** A place picked on the bar: the field goes to the end of that list or day, the ribbon and the day turning to show it. */
-	entryPlace(choice: PlaceId, date: string | null): void;
+	/**
+	 * A place picked on the bar: the field goes to the end of that list or day, the ribbon and the day turning to show it;
+	 * a list the screen can't bring into sight (`reach`, the layout's) keeps the field where it stands.
+	 */
+	entryPlace(choice: PlaceId, date: string | null, reach: readonly ListId[]): void;
 	/** The plus tapped while the lists `shown` are on the screen: the field opens at the port's place for new tasks (F174). */
 	plusTap(shown: readonly ListId[]): void;
 	/** A mouse's double click on a list's free room: a new task's field at the list's end (F67, `docs/plugin/tasks.md`). */
@@ -273,6 +285,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 			entry: null,
 			draft: NO_DRAFT,
 			entryText: "",
+			entryPanel: null,
 			entrySeq: 0,
 			plusAt: null,
 			plusMinute: null,
@@ -406,13 +419,13 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 				const layer = get().layer;
 				if (!layer) return;
 				const { field, draft, text } = port.rename(layer.id, layer.from, get().dayOffset);
-				set({ entry: field, draft, entryText: text, entrySeq: get().entrySeq + 1, layer: field.stack ? { ...layer, asking: null, renameUntil: null } : null });
+				set({ entry: field, draft, entryText: text, entrySeq: get().entrySeq + 1, entryPanel: null, layer: field.stack ? { ...layer, asking: null, renameUntil: null } : null });
 			},
 			startSubtask() {
 				const layer = get().layer;
 				if (!layer) return;
-				if (layer.from === "calendar") return set({ entry: { at: { list: "day", before: null, dayOffset: get().dayOffset, under: layer.id }, renaming: null, stack: true }, draft: NO_DRAFT, entryText: "", entrySeq: get().entrySeq + 1, layer: { ...layer, asking: null } });
-				set({ layer: null, entry: { at: port.subtaskPlace(layer.id, get().dayOffset), renaming: null, stack: false }, draft: NO_DRAFT, entryText: "", entrySeq: get().entrySeq + 1 });
+				if (layer.from === "calendar") return set({ entry: { at: { list: "day", before: null, dayOffset: get().dayOffset, under: layer.id }, renaming: null, stack: true }, draft: NO_DRAFT, entryText: "", entrySeq: get().entrySeq + 1, entryPanel: null, layer: { ...layer, asking: null } });
+				set({ layer: null, entry: { at: port.subtaskPlace(layer.id, get().dayOffset), renaming: null, stack: false }, draft: NO_DRAFT, entryText: "", entrySeq: get().entrySeq + 1, entryPanel: null });
 			},
 			menuPage(page) {
 				const layer = get().layer;
@@ -431,13 +444,20 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 				window.setTimeout(() => void port.act(layer.id, action).finally(done), LAYER_MS.close);
 			},
 			closeLayer() {
-				if (get().layer) set({ layer: null, ...(get().entry?.stack ? { entry: null, draft: NO_DRAFT, entryText: "" } : {}) });
+				if (get().layer) set({ layer: null, ...(get().entry?.stack ? { entry: null, draft: NO_DRAFT, entryText: "", entryPanel: null } : {}) });
 			},
 			openEntry(at) {
-				set({ entry: at && { at, renaming: null, stack: false }, entrySeq: get().entrySeq + 1, layer: null, entryText: "", draft: NO_DRAFT });
+				set({ entry: at && { at, renaming: null, stack: false }, entrySeq: get().entrySeq + 1, entryPanel: null, layer: null, entryText: "", draft: NO_DRAFT });
 			},
 			entryBar(field, draft, text) {
 				return port.entryBar(field, draft, text);
+			},
+			showEntryPanel(entryPanel) {
+				if (get().entryPanel !== entryPanel) set({ entryPanel });
+			},
+			escapeEntry() {
+				if (get().entryPanel !== null) set({ entryPanel: null });
+				else get().openEntry(null);
 			},
 			typeEntry(entryText) {
 				if (get().entryText !== entryText) set({ entryText });
@@ -449,14 +469,14 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 			draftProject(project) {
 				set({ draft: { ...get().draft, project } });
 			},
-			entryPlace(choice, date) {
+			entryPlace(choice, date, reach) {
 				const { entry, stop } = get();
 				if (!entry) return;
-				const to = port.entryPlace(entry, choice, date);
+				const to = port.entryPlace(entry, choice, date, reach);
 				if (to.at.dayOffset !== get().dayOffset) get().showDay(to.at.dayOffset);
 				const where = to.at.list;
 				/** The field opens again at its new place, with what was typed (a new field brought into sight, F193). */
-				set({ entry: to, entrySeq: get().entrySeq + 1, ...(SHOWS[stop][where] ? {} : { stop: STOP_OF[where] }) });
+				set({ entry: to, entrySeq: get().entrySeq + 1, entryPanel: null, ...(SHOWS[stop][where] ? {} : { stop: STOP_OF[where] }) });
 			},
 			plusTap(shown) {
 				get().openEntry(port.newTaskPlace(get().dayOffset, shown));
@@ -477,7 +497,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 					entry: done.next,
 					draft: done.draft,
 					entryText: "",
-					entrySeq: get().entrySeq + 1,
+					entrySeq: get().entrySeq + 1, entryPanel: null,
 					/** The new name on every card at once, until the write is read back (F298). */
 					...(face ? { shown: { ...shown, cards: { ...shown.cards, [face.id]: face } } } : {}),
 					/** A field in a menu's stack ends with the menu. */
