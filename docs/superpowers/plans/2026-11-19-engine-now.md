@@ -48,7 +48,7 @@ Screenshots in [`2026-11-20-review/`](2026-11-20-review/). Max's screenshots sti
 | # | Max's remark | Kind | State |
 |---|---|---|---|
 | 1 | The menu splits in pieces around the task's title (`1-menu-gaps.png`); he wants one piece. Then: what if it doesn't fit the phone's screen — what do apps usually do | decided by Max: iOS-style — title on top, the menu one piece under it, the block moves up when there's no room, the menu scrolls inside when taller than the screen; animations must be beautiful | **accepted** by Max |
-| 2 | Between two groups three stripes: grey, black, grey (`2-menu-dividers.png`, `3-divider-closeup.png`). One grey stripe, no black | fix | **accepted** by Max |
+| 2 | Between two groups three stripes: grey, black, grey (`2-menu-dividers.png`, `3-divider-closeup.png`). One grey stripe, no black | fix | **accepted** by Max; b2351bee rejected 2026-11-20 (wide gaps, Delete not a button), redone as Decision 125: one 1 px grey line, groups 6 px from it, Delete a tile-wide button |
 | 3 | Subtask leaves the Edit row and stands in one row with First step: both make a subtask | fix (core's layout, then engine) | **accepted** by Max |
 | 4 | Tasks lying on each other on the calendar | — | **accepted** |
 | 5 | Drop between calendar and list jerks: the card grows part way, stops (red mark in `5-drop-stops-short.png`), then finishes. Both ways. Reported about five times | bug, root cause | **accepted** by Max |
