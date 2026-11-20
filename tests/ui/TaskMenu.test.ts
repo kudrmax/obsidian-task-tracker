@@ -47,13 +47,13 @@ describe("the edit group", () => {
 		expect(rows.map((r) => r.id)).toEqual(["rename", "repeat", "project", "subtask", "firstStep"]);
 	});
 
-	it("offers Add description by what the task may have", () => {
+	it("offers Notes by what the task may have", () => {
 		expect(editRows(item({ can: { ...item().can, addDescription: false } }), menuOf([])(item({ can: { ...item().can, addDescription: false } }))).map((r) => r.id)).not.toContain("description");
 	});
 
-	it("offers Add description after Rename for a task without one", () => {
+	it("offers Notes after Rename for a task without one", () => {
 		const rows = editRows(item(), menuOf([])(item()));
-		expect(rows.map((r) => r.label)).toEqual(["Rename", "Add description", "Repeat", "Project", "Add subtask", "First step"]);
+		expect(rows.map((r) => r.label)).toEqual(["Rename", "Notes", "Repeat", "Project", "Add subtask", "First step"]);
 		expect(rows[1].icon).toBe("description");
 	});
 
@@ -62,7 +62,7 @@ describe("the edit group", () => {
 		expect(rows.map((r) => [r.label, r.value])).toEqual([["Rename", ""], ["Repeat", ""], ["Section", "Morning"], ["Project", "No project"], ["Add subtask", ""], ["First step", ""]]);
 	});
 
-	it("offers Repeat after Add description, or after Rename for a task with a description", () => {
+	it("offers Repeat after Notes, or after Rename for a task with a description", () => {
 		expect(editRows(item(), menuOf([])(item())).map((r) => r.id)).toEqual(["rename", "description", "repeat", "project", "subtask", "firstStep"]);
 		expect(editRows(item({ description: "- note" }), menuOf([], [], sections)(item({ description: "- note" }))).map((r) => r.id)).toEqual(["rename", "repeat", "section", "project", "subtask", "firstStep"]);
 		expect(editRows(item(), menuOf([])(item())).find((r) => r.id === "repeat")).toMatchObject({ label: "Repeat", value: "", icon: "repeat" });
@@ -457,7 +457,7 @@ describe("the menu", () => {
 		expect(labels(".tc-menu-tiles.is-status .tc-menu-tile-label")).toEqual(["Done", "In progress", "Won’t do"]);
 		expect(labels(".tc-menu-tiles.is-priority .tc-menu-tile-label")).toEqual(["p1", "p2"]);
 		expect(labels(".tc-menu-tiles.is-move .tc-menu-tile-label")).toEqual(["Tomorrow", "Pick a date"]);
-		expect(labels(".tc-menu-label")).toEqual(["Rename", "Add description", "Repeat", "Project", "Add subtask", "First step", "Open full screen", "Open in Obsidian", "Delete"]);
+		expect(labels(".tc-menu-label")).toEqual(["Rename", "Notes", "Repeat", "Project", "Add subtask", "First step", "Open full screen", "Open in Obsidian", "Delete"]);
 		expect(panel().querySelector(".tc-menu-badge")).toBeNull();
 	});
 
@@ -677,9 +677,9 @@ describe("the menu", () => {
 		expect(again.openDescription).toHaveBeenCalledWith(false, expect.objectContaining({ description: "- note" }));
 	});
 
-	it("opens the description's editor from Add description", () => {
+	it("opens the description's editor from Notes", () => {
 		const actions = open(item());
-		const row = [...panel().querySelectorAll<HTMLElement>(".tc-menu-row")].find((r) => r.textContent === "Add description");
+		const row = [...panel().querySelectorAll<HTMLElement>(".tc-menu-row")].find((r) => r.textContent === "Notes");
 		row?.click();
 		expect(actions.openDescription).toHaveBeenCalledWith(true);
 	});
@@ -877,7 +877,7 @@ describe("the menu of a subtask from the calendar menu's stack", () => {
 	it("draws no Add subtask, which the model offers no subtask of a stack", () => {
 		const { menu } = openOnStackCard();
 		expect(menu.inStack).toBe(true);
-		expect([...panel().querySelectorAll(".tc-menu-label")].map((l) => l.textContent)).toEqual(["Rename", "Add description", "Project", "Open full screen", "Open in Obsidian", "Delete"]);
+		expect([...panel().querySelectorAll(".tc-menu-label")].map((l) => l.textContent)).toEqual(["Rename", "Notes", "Project", "Open full screen", "Open in Obsidian", "Delete"]);
 	});
 
 	it("stays open on Rename and hands itself to the action", () => {

@@ -38,7 +38,7 @@ const BAR_BUTTONS: Readonly<Record<FieldActionId, (action: BarAction, steps: Bar
 	label: () => null,
 	project: (action, { toggle, hold }) => <BarButton key="project" action={action} cls="tc-bar-project" label="Project" title="Project" icon="project" hold={hold("project")} onPress={() => toggle("project")} />,
 	repeat: (action, { close }) => <BarButton key="repeat" action={action} cls="tc-bar-repeat" label="Repeat" title="Repeat" icon="repeat" onPress={close} />,
-	description: (action, { api, close }) => <BarButton key="description" action={action} cls="tc-bar-description" label="Description" title="Description" icon="description" onPress={() => (close(), api.getState().openDescription())} />,
+	description: (action, { api, close }) => <BarButton key="description" action={action} cls="tc-bar-description" label="Notes" title="Notes" icon="description" onPress={() => (close(), api.getState().openDescription())} />,
 	pickDate: (action, { bar, toggle, hold }) =>
 		bar.where ? (
 			<button key="where" ref={hold("where")} type="button" className="tc-btn is-bar is-plain tc-bar-place" aria-label="Place" title="Place" disabled={action.disabled} onClick={() => toggle("where")}>

@@ -70,7 +70,7 @@ export function editRows(item: TaskItem, model: TaskMenuModel): readonly EditRow
 	const rows: Readonly<Record<EditRowId, () => EditRow>> = {
 		rename: () => ({ id: "rename", label: "Rename", value: "", icon: "rename" }),
 		reminder: () => ({ id: "reminder", label: "Reminder", value: REMINDER_NAMES[item.reminder], icon: "reminder" }),
-		description: () => ({ id: "description", label: "Add description", value: "", icon: "description" }),
+		description: () => ({ id: "description", label: "Notes", value: "", icon: "description" }),
 		repeat: () => ({ id: "repeat", label: "Repeat", value: model.repeat.value, days: model.repeat.days, icon: "repeat" }),
 		section: () => ({ id: "section", label: "Section", value: model.sections?.choice.current ?? "", icon: "section" }),
 		project: () => ({ id: "project", label: "Project", value: model.project.value, icon: "project", disabled: model.project.disabled }),

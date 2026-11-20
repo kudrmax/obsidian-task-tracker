@@ -63,7 +63,7 @@ const MENU_ACTIONS: Readonly<Record<TaskMenuActionId, ActionLook | { readonly ti
 	repeat: { label: "Repeat", icon: "repeat", onPick: leave },
 	reminder: { label: "Reminder", icon: "reminder", onPick: (_, steps) => steps.menuPage("reminders") },
 	rename: { label: "Rename", icon: "rename", onPick: (_, steps) => steps.startRename() },
-	description: { label: "Description", icon: "description", onPick: leave },
+	description: { label: "Notes", icon: "description", onPick: leave },
 	project: { label: "Project", icon: "project", onPick: leave },
 	section: { label: "Section", icon: "section", onPick: leave },
 	subtask: { label: "Subtask", icon: "subtask", onPick: (_, steps) => steps.startSubtask() },
