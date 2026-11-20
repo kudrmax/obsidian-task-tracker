@@ -190,6 +190,13 @@ export class MockPort implements ScreenPort {
 		return { list, section: last?.name === null || !last ? null : last.id, before: null, dayOffset, depth: 0 };
 	}
 
+	/** The core's `QuickEntry.endOf`: after the last card, in the last section, at the top level. */
+	listEnd(list: ListId, dayOffset: number): Destination {
+		const sections = this.listOf(this.file, list, dayOffset);
+		const last = sections[sections.length - 1];
+		return { list, section: !last || last.name === null ? null : last.id, before: null, dayOffset, depth: 0 };
+	}
+
 	/** Under its last subtask, at any depth, in the list the task's card stands in. */
 	subtaskPlace(id: string, dayOffset: number): Destination {
 		const data = this.read(dayOffset);

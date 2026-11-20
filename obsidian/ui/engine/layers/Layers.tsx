@@ -37,6 +37,15 @@ export function useField(): { readonly field: Element | null; readonly setField:
 /** A click's moment (`timeStamp`) when a mouse made it, which a second press may make a double click; null for a finger's tap. */
 export const mouseClick = (event: ReactMouseEvent): number | null => ((event.nativeEvent as PointerEvent).pointerType === "mouse" ? event.timeStamp : null);
 
+/**
+ * A right click (the desktop's secondary click, `docs/plugin/screen.md` «правый клик — тоже меню»): the browser's own menu
+ * kept away; whether it opens ours. A finger's held press is the drag's, never a menu.
+ */
+export const secondaryClick = (event: ReactMouseEvent): boolean => {
+	event.preventDefault();
+	return (event.nativeEvent as PointerEvent).pointerType !== "touch";
+};
+
 /** Where the next layer opens from. */
 export function useAnchor(): MutableRefObject<Element | null> {
 	const anchor = useContext(AnchorContext);
@@ -174,7 +183,7 @@ export function MenuLayer({ open, onClose, onPressAgain, root, reference, panelB
 	const taken = useRef(false);
 	const pressed = {
 		onPointerDownCapture: (event: ReactPointerEvent) => {
-			taken.current = event.pointerType === "mouse" && open && (onPressAgain?.(event.timeStamp) ?? false);
+			taken.current = event.pointerType === "mouse" && event.button === 0 && open && (onPressAgain?.(event.timeStamp) ?? false);
 		},
 		onMouseDownCapture: (event: ReactMouseEvent) => {
 			if (taken.current) event.preventDefault();

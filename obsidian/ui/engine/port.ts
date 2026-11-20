@@ -297,6 +297,8 @@ export interface ScreenPort {
 	clockAt(minute: number): string;
 	/** Where a tap on the plus puts a new task's field, on the screen showing the day `dayOffset` days from today and the lists `shown` (F174). */
 	newTaskPlace(dayOffset: number, shown: readonly ListId[]): Destination;
+	/** The end of `list` (the day's of `dayOffset`), in its last section, at the top level: where a double click on its free room opens a new task's field. */
+	listEnd(list: ListId, dayOffset: number): Destination;
 	/** Where Add subtask opens the field of a new last subtask of `id` in its list (F124): under its last subtask, a level deeper. */
 	subtaskPlace(id: string, dayOffset: number): Destination;
 	/** The bar of `field`, with what is set (`draft`) and typed (`text`). */

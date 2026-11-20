@@ -1,6 +1,6 @@
 import { memo, type ReactNode, useContext, useEffect, useRef, useState } from "react";
 import type { IconName } from "../../kit/icons";
-import { MenuLayer, mouseClick, useAnchor } from "../layers/Layers";
+import { MenuLayer, mouseClick, secondaryClick, useAnchor } from "../layers/Layers";
 import { monthGrid, monthOf, monthTitle } from "../layout/month";
 import type { EditId, MenuAction, OpenId, ReminderKind, StatusId, TaskMenuModel } from "../port";
 import { type Asking, type Layer, useScreen, useScreenApi } from "../store";
@@ -373,7 +373,7 @@ function StackCard({ id, pressed, onPress }: { readonly id: string; readonly pre
 	const face = useScreen((s) => s.shown.cards[id]);
 	if (!face) return null;
 	return (
-		<div className={`tc-card${pressed ? " is-pressed" : ""}`} data-stack={id} data-status={face.inProgress ? "inProgress" : "open"} data-priority={face.color ?? undefined} onClick={(e) => onPress(e.currentTarget, mouseClick(e))}>
+		<div className={`tc-card${pressed ? " is-pressed" : ""}`} data-stack={id} data-status={face.inProgress ? "inProgress" : "open"} data-priority={face.color ?? undefined} onClick={(e) => onPress(e.currentTarget, mouseClick(e))} onContextMenu={(e) => secondaryClick(e) && onPress(e.currentTarget, null)}>
 			<CardInsides face={face} />
 		</div>
 	);

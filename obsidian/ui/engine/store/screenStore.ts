@@ -186,6 +186,8 @@ export interface ScreenActions {
 	entryPlace(choice: PlaceId, date: string | null): void;
 	/** The plus tapped while the lists `shown` are on the screen: the field opens at the port's place for new tasks (F174). */
 	plusTap(shown: readonly ListId[]): void;
+	/** A mouse's double click on a list's free room: a new task's field at the list's end (F67, `docs/plugin/tasks.md`). */
+	openAtEnd(list: ListId): void;
 	/** The field one level deeper (1) or shallower (-1), as Tab and Shift+Tab do. */
 	indentEntry(by: -1 | 1): void;
 	/**
@@ -458,6 +460,9 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 			},
 			plusTap(shown) {
 				get().openEntry(port.newTaskPlace(get().dayOffset, shown));
+			},
+			openAtEnd(list) {
+				get().openEntry(port.listEnd(list, get().dayOffset));
 			},
 			indentEntry(by) {
 				const entry = get().entry;

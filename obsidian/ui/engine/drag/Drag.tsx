@@ -4,7 +4,7 @@ import { CSS, getEventCoordinates } from "@dnd-kit/utilities";
 import { type CSSProperties, memo, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Destination, ListId, Row } from "../port";
-import { mouseClick, useAnchor } from "../layers/Layers";
+import { mouseClick, secondaryClick, useAnchor } from "../layers/Layers";
 import { useScreen, useScreenApi } from "../store";
 import { EdgeHeading } from "./edgeHeading";
 import { descendantsOf, finalOrder, levelAt, levelBetween, spotKey, shiftOf, type Slot, slotOf, SwipeLevel } from "./tree";
@@ -694,7 +694,7 @@ export const SortableRow = memo(function SortableRow({ id, onTap, gap = false, p
 	const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({ id, disabled: { draggable: !carried, droppable: false }, animateLayoutChanges: placed ? STAY : undefined });
 	const style: CSSProperties = placed ? {} : { transform: CSS.Translate.toString(transform), transition };
 	return (
-		<div ref={setNodeRef} className={`tc-drag-source${isDragging || gap ? " is-lifted" : ""}`} style={style} {...(carried ? attributes : {})} {...(carried ? listeners : {})} onClick={carried ? (event) => onTap(event.currentTarget, mouseClick(event)) : undefined}>
+		<div ref={setNodeRef} className={`tc-drag-source${isDragging || gap ? " is-lifted" : ""}`} style={style} {...(carried ? attributes : {})} {...(carried ? listeners : {})} onClick={carried ? (event) => onTap(event.currentTarget, mouseClick(event)) : undefined} onContextMenu={carried ? (event) => secondaryClick(event) && onTap(event.currentTarget, null) : undefined}>
 			{children}
 		</div>
 	);

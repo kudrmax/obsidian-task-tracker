@@ -3,7 +3,7 @@ import { DESIGN, PROPERTY } from "../../design";
 import { CalendarBlocks, SortableRow, useCalendarDrop, useNewSlot } from "../drag/Drag";
 import { type Edge, useResize } from "../gestures/Resize";
 import { hourOf, type RoomMeasure, useCalendarZoom } from "../gestures/Zoom";
-import { Pinned, useAnchor } from "../layers/Layers";
+import { Pinned, secondaryClick, useAnchor } from "../layers/Layers";
 import { type EventBox, layEvents, layTasks, opening, type Shade, shadesOn, stackEnd, type TaskBox } from "../layout/calendar";
 import { TimeScale } from "../layout/timeScale";
 import { type DayTurn, DayTurnContext } from "../gestures/FollowRibbon";
@@ -280,7 +280,7 @@ const AllDayRows = memo(function AllDayRows({ rows }: { readonly rows: readonly 
 
 function AllDayRow({ row, open }: { readonly row: AllDayEvent; readonly open: (id: string, event: MouseEvent<HTMLElement>) => void }) {
 	return (
-		<div className={`tc-allday${row.past ? " is-past" : ""}`} data-event={row.id} style={paintStyle(row.paint)} onClick={(e) => open(row.id, e)}>
+		<div className={`tc-allday${row.past ? " is-past" : ""}`} data-event={row.id} style={paintStyle(row.paint)} onClick={(e) => open(row.id, e)} onContextMenu={(e) => secondaryClick(e) && open(row.id, e)}>
 			<div className="tc-event-bar" />
 			<div className="tc-allday-title">{row.title}</div>
 		</div>
@@ -320,7 +320,7 @@ const EventItem = memo(function EventItem({ event, box, scale }: { readonly even
 		...paintStyle(event.paint),
 	} as CSSProperties;
 	return (
-		<div className={`tc-item tc-event${event.past ? " is-past" : ""}${box.tiny ? " is-tiny" : ""}${held ? " is-held" : ""}`} data-event={event.id} data-own-press="" style={style} onClick={(e) => open(event.id, e)}>
+		<div className={`tc-item tc-event${event.past ? " is-past" : ""}${box.tiny ? " is-tiny" : ""}${held ? " is-held" : ""}`} data-event={event.id} data-own-press="" style={style} onClick={(e) => open(event.id, e)} onContextMenu={(e) => secondaryClick(e) && open(event.id, e)}>
 			{held ? <div className="tc-event-stem" /> : null}
 			<div className="tc-event-block">
 				<div className="tc-event-bar" />
@@ -428,7 +428,7 @@ function Grip({ block, edge, scale }: { readonly block: Block; readonly edge: Ed
 	const bind = useResize(block, edge, scale, () => haptics.tap());
 	/** A double click's second press may land on a dot: it renames, as anywhere on the menu (the plugin's `onClickedAgain`), and pulls nothing. */
 	const again = (event: ReactPointerEvent) => {
-		if (event.pointerType !== "mouse" || !api.getState().pressAgain(event.timeStamp)) return;
+		if (event.pointerType !== "mouse" || event.button !== 0 || !api.getState().pressAgain(event.timeStamp)) return;
 		event.stopPropagation();
 		/** No mouse down follows: the focus stays in the field. */
 		event.preventDefault();

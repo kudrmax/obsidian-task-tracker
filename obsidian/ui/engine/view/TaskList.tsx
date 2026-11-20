@@ -1,5 +1,5 @@
 import { defaultRangeExtractor, type Range, useVirtualizer } from "@tanstack/react-virtual";
-import { type CSSProperties, memo, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { type CSSProperties, memo, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { PROPERTY } from "../../design";
 import { PLUS, SortableList, SortableRow, useListTarget } from "../drag/Drag";
 import { descendantsOf } from "../drag/tree";
@@ -22,6 +22,7 @@ const OVERSCAN = 6;
  * is a `MovingRow`. A task the store asks to reveal is scrolled into sight by the virtualizer's `scrollToIndex`.
  */
 export const TaskList = memo(function TaskList({ list }: { readonly list: ListId }) {
+	const api = useScreenApi();
 	const allRows = useData((d) => d.lists[list].rows);
 	const readRows = useData((d) => d.lists[list].rows, true);
 	const lifted = useScreen((s) => s.lifted);
@@ -105,8 +106,17 @@ export const TaskList = memo(function TaskList({ list }: { readonly list: ListId
 	}, [reveal?.seq]);
 
 	const items = virtualizer.getVirtualItems();
+	/** Whether the pointer that pressed last was a mouse: the phone has no double click. */
+	const mouse = useRef(false);
 	return (
-		<div className="tc-list" ref={setRoom} data-list={list}>
+		<div
+			className="tc-list"
+			ref={setRoom}
+			data-list={list}
+			onPointerDown={(event) => void (mouse.current = event.pointerType === "mouse")}
+			/** A mouse's double click on the list's free room, between or under the cards, opens a new task at its end (F67); a card, a header or a field keeps its own. */
+			onDoubleClick={(event) => mouse.current && !(event.target as Element).closest(".tc-drag-source, .tc-group-head, .tc-quick-row") && api.getState().openAtEnd(list)}
+		>
 			<div className="tc-list-items" style={{ height: virtualizer.getTotalSize() }}>
 				<div className="tc-list-block" style={{ transform: `translateY(${items[0]?.start ?? 0}px)` }}>
 					<SortableList list={list} ids={ids}>
