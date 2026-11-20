@@ -693,8 +693,21 @@ export const SortableRow = memo(function SortableRow({ id, onTap, gap = false, p
 	const carried = onTap !== undefined;
 	const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({ id, disabled: { draggable: !carried, droppable: false }, animateLayoutChanges: placed ? STAY : undefined });
 	const style: CSSProperties = placed ? {} : { transform: CSS.Translate.toString(transform), transition };
+	/** The card takes the focus back when the store asks (a rename ended by a key, Decision 58). */
+	const node = useRef<HTMLDivElement | null>(null);
+	const focusSeq = useScreen((s) => (carried && s.focusCard?.id === id ? s.focusCard.seq : null));
+	useEffect(() => {
+		if (focusSeq !== null) node.current?.focus({ preventScroll: true });
+	}, [focusSeq]);
+	const hold = useCallback(
+		(el: HTMLDivElement | null) => {
+			node.current = el;
+			setNodeRef(el);
+		},
+		[setNodeRef],
+	);
 	return (
-		<div ref={setNodeRef} className={`tc-drag-source${isDragging || gap ? " is-lifted" : ""}`} style={style} {...(carried ? attributes : {})} {...(carried ? listeners : {})} onClick={carried ? (event) => onTap(event.currentTarget, mouseClick(event)) : undefined} onContextMenu={carried ? (event) => secondaryClick(event) && onTap(event.currentTarget, null) : undefined}>
+		<div ref={hold} className={`tc-drag-source${isDragging || gap ? " is-lifted" : ""}`} style={style} {...(carried ? attributes : {})} {...(carried ? listeners : {})} onClick={carried ? (event) => onTap(event.currentTarget, mouseClick(event)) : undefined} onContextMenu={carried ? (event) => secondaryClick(event) && onTap(event.currentTarget, null) : undefined}>
 			{children}
 		</div>
 	);

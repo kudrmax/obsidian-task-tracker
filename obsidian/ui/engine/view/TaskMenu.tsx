@@ -129,7 +129,7 @@ function taskGroups(layer: Layer, typing: boolean, model: TaskMenuModel, pick: (
 			<TileGroup
 				key="statuses"
 				kind={model.statuses.length > 3 ? "is-status is-four" : "is-status"}
-				rows={[model.statuses.map((s) => ({ ...STATUS_LOOKS[s.id], onPick: () => (s.confirm ? steps.ask(s.id) : pick({ kind: "status", id: s.id })) }))]}
+				rows={[model.statuses.map((s) => ({ ...STATUS_LOOKS[s.id], focus: layer.asked === s.id, onPick: () => (s.confirm ? steps.ask(s.id) : pick({ kind: "status", id: s.id })) }))]}
 			/>,
 		);
 	if (model.levels.tiles.length > 0)
@@ -150,7 +150,7 @@ function taskGroups(layer: Layer, typing: boolean, model: TaskMenuModel, pick: (
 	if (model.opens.length > 0) groups.push(<RowGroup key="opens" rows={model.opens.map((open) => ({ ...OPEN_LOOKS[open], onPick: () => pick({ kind: "row", id: open }) }))} />);
 	const remove = model.remove;
 	if (asking === "delete") groups.push(<Ask key="remove" what="delete" title={model.title} onCancel={() => steps.ask(null)} onConfirm={() => pick({ kind: "delete" })} />);
-	else if (remove) groups.push(<Row key="remove" label="Delete" icon="delete" className="is-danger is-apart" onPick={() => (remove.confirm ? steps.ask("delete") : pick({ kind: "delete" }))} />);
+	else if (remove) groups.push(<Row key="remove" label="Delete" icon="delete" className="is-danger is-apart" focus={layer.asked === "delete"} onPick={() => (remove.confirm ? steps.ask("delete") : pick({ kind: "delete" }))} />);
 	return groups;
 }
 
@@ -161,6 +161,8 @@ export interface TileSpec {
 	readonly color?: string;
 	readonly on?: boolean;
 	readonly disabled?: boolean;
+	/** Takes the focus as it mounts: what asked a question taken back by Cancel. */
+	readonly focus?: boolean;
 	readonly onPick: () => void;
 }
 
@@ -171,7 +173,7 @@ export function TileGroup({ kind, rows }: { readonly kind: string; readonly rows
 			{rows.map((row, i) => (
 				<div key={i} className="tc-menu-tile-row">
 					{row.map((tile) => (
-						<button key={tile.label} type="button" role="menuitem" className={`tc-btn tc-menu-tile${tile.on ? " is-on" : ""}`} data-priority={tile.color} disabled={tile.disabled} onClick={tile.onPick}>
+						<button key={tile.label} type="button" role="menuitem" className={`tc-btn tc-menu-tile${tile.on ? " is-on" : ""}`} data-priority={tile.color} disabled={tile.disabled} autoFocus={tile.focus} onClick={tile.onPick}>
 							<Icon name={tile.icon} />
 							<span className="tc-menu-tile-label">{tile.label}</span>
 							{tile.on && tile.color ? (
@@ -195,6 +197,8 @@ export interface RowSpec {
 	/** One of a list to choose from: its check in the accent. */
 	readonly choice?: boolean;
 	readonly quiet?: boolean;
+	/** Takes the focus as it mounts: what asked a question taken back by Cancel. */
+	readonly focus?: boolean;
 	readonly onPick: () => void;
 }
 
@@ -209,10 +213,10 @@ export function RowGroup({ rows }: { readonly rows: readonly RowSpec[] }) {
 }
 
 /** A row: the label, a value beside it, the icon on the right; or, as the way back, the icon leading the label. */
-function Row({ label, icon, value, disabled, choice, quiet, onPick, className = "", lead = false }: RowSpec & { readonly className?: string; readonly lead?: boolean }) {
+function Row({ label, icon, value, disabled, choice, quiet, focus, onPick, className = "", lead = false }: RowSpec & { readonly className?: string; readonly lead?: boolean }) {
 	const root = className.includes("tc-menu-back") ? className : `tc-menu-row ${className}`;
 	return (
-		<button type="button" role="menuitem" className={`tc-btn ${root}${choice ? " is-choice" : ""}${quiet ? " is-quiet" : ""}`.trim()} disabled={disabled} onClick={onPick}>
+		<button type="button" role="menuitem" className={`tc-btn ${root}${choice ? " is-choice" : ""}${quiet ? " is-quiet" : ""}`.trim()} disabled={disabled} autoFocus={focus} onClick={onPick}>
 			{lead ? (
 				<>
 					{icon ? <Icon name={icon} /> : null}

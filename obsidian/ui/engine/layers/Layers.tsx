@@ -1,5 +1,5 @@
 import { autoUpdate, flip, FloatingFocusManager, FloatingOverlay, FloatingPortal, hide, type Middleware, type MiddlewareState, offset, type Placement, shift, size, useDismiss, useFloating, useInteractions, useRole, useTransitionStatus } from "@floating-ui/react";
-import { type CSSProperties, createContext, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type MutableRefObject, type ReactNode, useContext, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, createContext, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type MutableRefObject, type ReactNode, useContext, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { DESIGN, LAYOUT } from "../../design";
 import { LAYER_MS } from "./motion";
 import { groupsAbove } from "./split";
@@ -165,6 +165,11 @@ export function MenuLayer({ open, onClose, onPressAgain, escapes = true, root, r
 	const wanted = (lower.middlewareData.split as { above?: number } | undefined)?.above;
 	/** A new page is laid out afresh: until its split is measured, nothing of it shows. */
 	useLayoutEffect(() => setAbove(0), [page]);
+	/** Another page (a subtask's menu in the same sheet too) takes the focus as the first did: a press on a stack's card gave it to nothing. */
+	const firstPage = useRef(page);
+	useEffect(() => {
+		if (page !== firstPage.current) lower.refs.floating.current?.focus({ preventScroll: true });
+	}, [page, lower.refs.floating]);
 	useLayoutEffect(() => {
 		if (!holdSplit && wanted !== undefined && wanted !== above) setAbove(wanted);
 	}, [wanted, above, holdSplit]);

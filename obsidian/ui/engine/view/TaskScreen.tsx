@@ -1,4 +1,4 @@
-import { type CSSProperties, type MouseEvent, type TouchEvent, useEffect, useState } from "react";
+import { type CSSProperties, type MouseEvent, type PointerEvent, type TouchEvent, useEffect, useRef, useState } from "react";
 import { PROPERTY } from "../../design";
 import { Drag, type Grab, type Landing } from "../drag/Drag";
 import { Layers } from "../layers/Layers";
@@ -59,12 +59,30 @@ export function TaskScreen({ store, host, place }: { readonly store: ScreenStore
 	);
 }
 
+/** Where a press keeps the typing going: the field itself, its bar and the bar's panels. */
+const TYPING = ".tc-quick-row, .tc-quick-bar, .tc-quick-panel";
+
 /** The screen's element: its place's class, `is-entering` while a task is typed, new or renamed (Obsidian's phone toolbar stays away then, the design's «Полоса»). */
 function Root({ place, store }: { readonly place: Place; readonly store: ScreenStore }) {
 	/** A task typed: a new one, or one renamed in place (both the plugin's quick entry). */
 	const entering = useScreen((s) => s.entry !== null);
+	/**
+	 * A finger's tap elsewhere ends the typing and does only that (the audit's 17, as the menu's backdrop does, Decision 74):
+	 * the text is written and the card tapped opens no menu. A scroll is no tap: it ends nothing.
+	 */
+	const ending = useRef(false);
+	const pressed = (event: PointerEvent) => {
+		ending.current = event.pointerType === "touch" && store.getState().entry !== null && !(event.target as Element).closest?.(TYPING);
+	};
+	const clicked = (event: MouseEvent) => {
+		if (!ending.current) return;
+		ending.current = false;
+		event.stopPropagation();
+		const s = store.getState();
+		if (s.entry && !s.entry.stack) s.commitEntry(s.entryText, false);
+	};
 	return (
-		<div className={`task-calendar is-engine is-${place}${entering ? " is-entering" : ""}`} onTouchStart={keepTouch} onTouchMove={keepTouch} onTouchEnd={keepTouch} onClick={(event) => letSelectionGo(event, store)}>
+		<div className={`task-calendar is-engine is-${place}${entering ? " is-entering" : ""}`} onPointerDownCapture={pressed} onClickCapture={clicked} onTouchStart={keepTouch} onTouchMove={keepTouch} onTouchEnd={keepTouch} onClick={(event) => letSelectionGo(event, store)}>
 			<Layout place={place} />
 			<QuickBar reach={reachOf(place)} />
 		</div>

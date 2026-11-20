@@ -43,6 +43,8 @@ export interface Layer {
 	readonly asking: Asking | null;
 	/** A subtask's menu opened from a calendar menu's stack: the task whose copy and stack stay drawn, and the stack's cards. */
 	readonly stack: { readonly of: string; readonly ids: readonly string[] } | null;
+	/** The question last taken back by Cancel: what asked it takes the focus again. */
+	readonly asked: Asking | null;
 	/** Opened by a mouse's click on a card: until this moment (the events' own clock, `timeStamp`) a second press is a double click that renames. */
 	readonly renameUntil: number | null;
 }
@@ -100,6 +102,8 @@ export interface ScreenState {
 	readonly entrySeq: number;
 	/** Tasks new in the last read: their rows come in; a row merely scrolled into sight does not. */
 	readonly fresh: ReadonlySet<string>;
+	/** A card to take the keyboard's focus, once per `seq`: the one a rename ended on by a key (Decision 58). */
+	readonly focusCard: { readonly id: string; readonly seq: number } | null;
 	/** A task to bring into sight in its list, once per `seq`. */
 	readonly reveal: { readonly id: string; readonly seq: number } | null;
 }
@@ -268,6 +272,8 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 			set({ left: { ...Object.fromEntries(kept), [from]: { shown, read } }, dayOffset, dayWay, read: next, shown: drawn ? share(drawn.shown, next) : next, fresh: new Set() });
 		};
 		const turnDay = (shift: -1 | 1) => showDay(get().dayOffset + shift, shift);
+		/** The card `id` takes the focus back, as a menu closing gives it back (Decision 58). */
+		const focusOn = (id: string) => set({ focusCard: { id, seq: (get().focusCard?.seq ?? 0) + 1 } });
 
 		return {
 			shown: first,
@@ -337,6 +343,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 			},
 			fresh: new Set(),
 			reveal: null,
+			focusCard: null,
 
 			step(shift) {
 				const { stop, shown } = get();
@@ -407,7 +414,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 				const stack = from !== "stack" || !over ? null : (over.stack ?? (over.model.kind === "task" ? { of: over.id, ids: over.model.subtasks } : null));
 				const model = port.menu(id, from);
 				const renames = clicked !== null && model.kind === "task" && model.edits.some((edit) => edit.id === "rename");
-				set({ layer: { kind: "menu", id, from, model, page: "menu", asking: null, stack, renameUntil: renames ? clicked + LAYOUT.doubleClickMs : null }, ...(from === "list" ? { selected: null } : {}) });
+				set({ layer: { kind: "menu", id, from, model, page: "menu", asking: null, asked: null, stack, renameUntil: renames ? clicked + LAYOUT.doubleClickMs : null }, ...(from === "list" ? { selected: null } : {}) });
 			},
 			pressAgain(at) {
 				const layer = get().layer;
@@ -433,7 +440,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 			},
 			ask(asking) {
 				const layer = get().layer;
-				if (layer && layer.asking !== asking) set({ layer: { ...layer, asking } });
+				if (layer && layer.asking !== asking) set({ layer: { ...layer, asking, asked: asking === null ? layer.asking : null } });
 			},
 			pick(action) {
 				const layer = get().layer;
@@ -456,8 +463,10 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 				if (get().entryPanel !== entryPanel) set({ entryPanel });
 			},
 			escapeEntry() {
-				if (get().entryPanel !== null) set({ entryPanel: null });
-				else get().openEntry(null);
+				const { entryPanel, entry } = get();
+				if (entryPanel !== null) return set({ entryPanel: null });
+				get().openEntry(null);
+				if (entry?.renaming && !entry.stack) focusOn(entry.renaming);
 			},
 			typeEntry(entryText) {
 				if (get().entryText !== entryText) set({ entryText });
@@ -504,6 +513,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 					...(entry.stack && !done.next ? { layer: null } : {}),
 				});
 				if (done.write) write(done.write);
+				if (next && entry.renaming && !entry.stack && !done.next) focusOn(entry.renaming);
 			},
 			start() {
 				const off = port.subscribe(refresh);
