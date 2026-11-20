@@ -163,7 +163,7 @@ export function fileText(file: MockFile, clock: Date): string {
 		const slot = (due: string, s: NonNullable<MockTask["slot"]>) => ` 📌 ${due} ${time(s.start)}${s.end === null ? "" : `-${time(s.end)}`}`;
 		const fields = [t.level ? `${t.level} ` : "", t.title, t.due ? ` 📅 ${t.due}` : "", t.slot ? slot(t.due ?? dateOf(day), t.slot) : "", (t.projects ?? []).map((name) => ` 🗂️ ${name}`).join(""), t.folded ? " 📁" : ""].join("");
 		const own = `${"\t".repeat(depth)}- [${t.status}] ${fields}`;
-		const description = t.description ? [`${"\t".repeat(depth + 1)}- ${t.description}`] : [];
+		const description = t.description ? t.description.split("\n").map((line) => `${"\t".repeat(depth + 1)}- ${line}`) : [];
 		return [own, ...description, ...t.children.flatMap((c) => line(c, depth + 1))];
 	};
 	const out: string[] = [];

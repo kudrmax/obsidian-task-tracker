@@ -31,6 +31,11 @@ export interface ObsidianEditorProps {
 	readonly onTab?: (shift: boolean) => void;
 	/** The text changed as typed. */
 	readonly onChange?: (text: string) => void;
+	/**
+	 * Notes take several lines (Max, 2026-11-20): Shift+Enter breaks the line, plainly, and a pasted break stays. Without
+	 * it the text is a title, one line: a break typed or pasted becomes a space.
+	 */
+	readonly lines?: boolean;
 	/** The focus left the field: the event, and the text as typed then. */
 	readonly onLeave?: (event: FocusEvent<HTMLDivElement>, text: () => string) => void;
 }
@@ -40,7 +45,7 @@ export interface ObsidianEditorProps {
  * (`EmbeddedEditor`, stage 0 blocker 8): `[[` opens the note search, the look is Obsidian's. Made once as it mounts, given
  * the focus, destroyed as it goes.
  */
-export function ObsidianEditor({ text, className, placeholder, priority = null, onEnter, onEscape, onTab, onChange, onLeave }: ObsidianEditorProps) {
+export function ObsidianEditor({ text, className, placeholder, priority = null, lines = false, onEnter, onEscape, onTab, onChange, onLeave }: ObsidianEditorProps) {
 	const { app, sourcePath } = useHost();
 	const container = useRef<HTMLDivElement>(null);
 	const handlers = useRef({ onEnter, onEscape, onTab, onChange });
@@ -48,11 +53,11 @@ export function ObsidianEditor({ text, className, placeholder, priority = null, 
 	const editorRef = useRef<EmbeddedEditor | null>(null);
 	useEffect(() => {
 		if (!container.current) return;
-		const editor: EmbeddedEditor = new EmbeddedEditor(app, EDITOR_HOST, sourcePath, container.current, text.replace(LINE_BREAK, " "), {
-			extensions: [EditorState.transactionFilter.of(oneLine), ...(placeholder ? [hint(placeholder)] : [])],
+		const editor: EmbeddedEditor = new EmbeddedEditor(app, EDITOR_HOST, sourcePath, container.current, lines ? text : text.replace(LINE_BREAK, " "), {
+			extensions: [...(lines ? [] : [EditorState.transactionFilter.of(oneLine)]), ...(placeholder ? [hint(placeholder)] : [])],
 			onChange: () => handlers.current.onChange?.(editor.value),
 			keys: [
-				{ key: "Enter", run: () => handlers.current.onEnter(editor.value) },
+				{ key: "Enter", run: () => handlers.current.onEnter(editor.value), ...(lines ? { shift: () => editor.insertLineBreak() } : {}) },
 				{ key: "Escape", run: () => handlers.current.onEscape() },
 				...(onTab ? [{ key: "Tab", run: () => handlers.current.onTab?.(false), shift: () => handlers.current.onTab?.(true) }] : []),
 			],
