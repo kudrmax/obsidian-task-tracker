@@ -34,12 +34,13 @@ export default {
 			const open = await menuNow(t);
 			t.expect(open.copyText.includes(title) && !open.titleCut, `the copy over the backdrop is the card: ${open.copyText}`);
 			const words = open.words;
-			const order = ["Done", "In progress", "Won’t do", "p1", "p2", "Tomorrow", "Pick a date", "Repeat", "Rename", "Notes", "Project", "Section", "Subtask", "First step", "Open full screen", "Open in Obsidian", "Delete"];
+			const order = ["Done", "In progress", "Won’t do", "p1", "p2", "Tomorrow", "Pick a date", "Repeat", "Rename", "Notes", "Project", "Section", "First step", "Subtask", "Open full screen", "Open in Obsidian", "Delete"];
 			t.expect(JSON.stringify(words.filter((w) => order.includes(w))) === JSON.stringify(order.filter((w) => words.includes(w))) && words.includes("Done") && words.includes("Delete") && !words.includes("Today"), `its groups in Max's order (task actions spec, Decision 96), no Today for a task of today: ${JSON.stringify(words)}`);
-			/** Max, 2026-11-20: Edit is one row of tiles, never two; the opens one row of two tiles under First step, a row; every tile's label whole inside it. */
+			/** Max, 2026-11-20: Edit is one row of tiles, never two; First step and Subtask a row of two tiles, the opens another under them; every tile's label whole inside it. */
 			const rows = await t.cdp.eval(`[...document.querySelectorAll(".tc-menu-layer .tc-menu-tile-row")].map((r) => [...r.querySelectorAll(".tc-menu-tile-label")].map((l) => l.textContent))`);
-			t.expect(rows.some((r) => JSON.stringify(r) === JSON.stringify(["Rename", "Notes", "Project", "Section", "Subtask"]) || JSON.stringify(r) === JSON.stringify(["Rename", "Notes", "Project", "Subtask"])), `Edit is one row: ${JSON.stringify(rows)}`);
-			t.expect(rows.some((r) => JSON.stringify(r) === JSON.stringify(["Open full screen", "Open in Obsidian"])) && words.indexOf("First step") < words.indexOf("Open full screen"), `the opens are one row of two tiles under First step: ${JSON.stringify(rows)}`);
+			t.expect(rows.some((r) => JSON.stringify(r) === JSON.stringify(["Rename", "Notes", "Project", "Section"]) || JSON.stringify(r) === JSON.stringify(["Rename", "Notes", "Project"])), `Edit is one row: ${JSON.stringify(rows)}`);
+			t.expect(rows.some((r) => JSON.stringify(r) === JSON.stringify(["First step", "Subtask"])), `First step and Subtask are one row of two tiles (Max, 2026-11-20): ${JSON.stringify(rows)}`);
+			t.expect(rows.some((r) => JSON.stringify(r) === JSON.stringify(["Open full screen", "Open in Obsidian"])) && words.indexOf("Subtask") < words.indexOf("Open full screen"), `the opens are one row of two tiles under them: ${JSON.stringify(rows)}`);
 			const cut = await t.cdp.eval(`[...document.querySelectorAll(".tc-menu-layer .tc-menu-tile")].flatMap((tile) => { const l = tile.querySelector(".tc-menu-tile-label"); const range = document.createRange(); range.selectNodeContents(l); const a = range.getBoundingClientRect(); const b = tile.getBoundingClientRect(); return a.left - b.left < 3.5 || b.right - a.right < 3.5 ? [l.textContent] : []; })`);
 			t.expect(cut.length === 0, `every tile's label has room inside its tile: ${JSON.stringify(cut)}`);
 			const under = open.panels.find((p) => !p.above);

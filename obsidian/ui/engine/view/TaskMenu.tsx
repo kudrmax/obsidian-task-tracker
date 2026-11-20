@@ -36,8 +36,11 @@ interface MenuSteps {
 interface ActionLook {
 	readonly label: string;
 	readonly icon: IconName;
-	/** In the rows group, drawn as a tile (icon over label) in one row with the others so drawn, not as a list row (Max, 2026-11-20). */
-	readonly tile?: true;
+	/**
+	 * In the rows group, drawn as a tile (icon over label) in a row of tiles named so, not as a list row (Max, 2026-11-20):
+	 * First step and Subtask side by side (both make a subtask), Open full screen and Open in Obsidian under them.
+	 */
+	readonly tile?: "steps" | "opens";
 	readonly onPick: (action: Offered, steps: MenuSteps) => void;
 }
 
@@ -66,10 +69,10 @@ const MENU_ACTIONS: Readonly<Record<TaskMenuActionId, ActionLook | { readonly ti
 	description: { label: "Notes", icon: "description", onPick: leave },
 	project: { label: "Project", icon: "project", onPick: leave },
 	section: { label: "Section", icon: "section", onPick: leave },
-	subtask: { label: "Subtask", icon: "subtask", onPick: (_, steps) => steps.startSubtask() },
-	firstStep: { label: "First step", icon: "firstStep", onPick: leave },
-	openFull: { label: "Open full screen", icon: "fullScreen", onPick: leave, tile: true },
-	openInObsidian: { label: "Open in Obsidian", icon: "openFile", onPick: leave, tile: true },
+	subtask: { label: "Subtask", icon: "subtask", onPick: (_, steps) => steps.startSubtask(), tile: "steps" },
+	firstStep: { label: "First step", icon: "firstStep", onPick: leave, tile: "steps" },
+	openFull: { label: "Open full screen", icon: "fullScreen", onPick: leave, tile: "opens" },
+	openInObsidian: { label: "Open in Obsidian", icon: "openFile", onPick: leave, tile: "opens" },
 	delete: { label: "Delete", icon: "delete", onPick: (action, steps) => (action.asks ? steps.ask("delete") : steps.pick({ kind: "delete" })) },
 };
 
@@ -212,11 +215,11 @@ function taskGroups(layer: Layer, typing: boolean, model: TaskMenuModel, steps: 
 				break;
 			case "rows":
 				{
-					const asTile = (action: Offered) => lookOf(action)?.tile === true;
-					const listed = actions.filter((action) => !asTile(action));
-					const tiled = actions.filter(asTile);
+					const listed = actions.filter((action) => lookOf(action)?.tile === undefined);
+					const tileRow = (name: "steps" | "opens") => actions.filter((action) => lookOf(action)?.tile === name).flatMap(tile);
+					const tiled = [tileRow("steps"), tileRow("opens")].filter((row) => row.length > 0);
 					if (listed.length > 0) groups.push(<RowGroup key={group} rows={listed.flatMap((action) => tile(action).map(({ focus: _, ...spec }) => spec))} />);
-					if (tiled.length > 0) groups.push(<TileGroup key={`${group}-tiles`} kind="is-edit is-open" rows={[tiled.flatMap(tile)]} />);
+					if (tiled.length > 0) groups.push(<TileGroup key={`${group}-tiles`} kind="is-edit is-open" rows={tiled} />);
 				}
 				break;
 			case "remove":
