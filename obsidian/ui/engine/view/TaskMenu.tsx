@@ -1,6 +1,6 @@
-import { memo, type MouseEvent as ReactMouseEvent, type ReactNode, useContext, useEffect, useRef, useState } from "react";
+import { memo, type ReactNode, useContext, useEffect, useRef, useState } from "react";
 import type { IconName } from "../../kit/icons";
-import { MenuLayer, mouseClick, secondaryClick, useAnchor } from "../layers/Layers";
+import { MenuLayer, secondaryClick, useAnchor } from "../layers/Layers";
 import { monthGrid, monthOf, monthTitle } from "../layout/month";
 import type { ListPlaceId, MenuAction, MenuActionGroup, MenuStatusId, ReminderKind, TaskMenuActionId, TaskMenuModel } from "../port";
 import { type Asking, type Layer, useScreen, useScreenApi } from "../store";
@@ -135,7 +135,6 @@ export const TaskMenu = memo(function TaskMenu() {
 			key={shown.seq}
 			open={layer !== null}
 			onClose={() => api.getState().closeLayer()}
-			onPressAgain={(at) => api.getState().pressAgain(at)}
 			onLift={api.getState().liftMenu}
 			escapes={typing === null}
 			root={layerRoot}
@@ -143,7 +142,7 @@ export const TaskMenu = memo(function TaskMenu() {
 			label={model.kind === "event" ? "Event menu" : "Task menu"}
 			over={
 				<>
-					<MenuCopy id={shown.layer.stack?.of ?? shown.layer.id} look={shown.look} onPress={(e) => api.getState().pressCopy(mouseClick(e))} />
+					<MenuCopy id={shown.layer.stack?.of ?? shown.layer.id} look={shown.look} />
 					{shown.layer.stack ? (
 						<Stack ids={shown.layer.stack.ids} typing={false} renaming={typing === "rename" ? shown.layer.id : null} pressed={shown.layer.id} />
 					) : model.kind === "task" && (model.subtasks.length > 0 || typing === "subtask") ? (
@@ -386,14 +385,14 @@ export function MonthGrid({ today, picked, onPick }: { readonly today: string; r
  * The copy of what was pressed over the backdrop, unchanged but for its whole title (the design's «Полная карточка»): a
  * list's card, a calendar's block in its look there, or an event (F90).
  */
-function MenuCopy({ id, look, onPress }: { readonly id: string; readonly look: BlockLook | null; readonly onPress: (event: ReactMouseEvent) => void }) {
+function MenuCopy({ id, look }: { readonly id: string; readonly look: BlockLook | null }) {
 	const face = useScreen((s) => s.shown.cards[id]);
 	const block = useScreen((s) => s.shown.day.blocks.find((b) => b.id === id));
 	const event = useScreen((s) => s.shown.day.events.find((e) => e.id === id) ?? s.shown.day.allDay.find((e) => e.id === id));
 	const selected = useScreen((s) => s.selected === id);
 	if (event)
 		return (
-			<div className="tc-lifted is-block is-whole" data-lifted={id} onClick={onPress}>
+			<div className="tc-lifted is-block is-whole" data-lifted={id}>
 				<div className={`tc-event${event.past ? " is-past" : ""}`} style={paintStyle(event.paint)}>
 					<div className="tc-event-bar" />
 					<div className="tc-event-body">
@@ -405,14 +404,14 @@ function MenuCopy({ id, look, onPress }: { readonly id: string; readonly look: B
 	if (!face) return null;
 	if (block)
 		return (
-			<div className="tc-lifted is-block is-whole" data-lifted={id} onClick={onPress}>
+			<div className="tc-lifted is-block is-whole" data-lifted={id}>
 				<div className={`tc-block-card${selected ? " is-selected" : ""}`} data-status={face.inProgress ? "inProgress" : "open"} data-priority={face.color ?? undefined}>
 					<CardInsides face={face} block={look ?? { corner: null, pill: null, clock: block.clock }} />
 				</div>
 			</div>
 		);
 	return (
-		<div className={`tc-lifted is-whole${face.step !== null ? " is-two-line" : ""}`} data-lifted={id} onClick={onPress} data-status={face.inProgress ? "inProgress" : "open"} data-priority={face.color ?? undefined}>
+		<div className={`tc-lifted is-whole${face.step !== null ? " is-two-line" : ""}`} data-lifted={id} data-status={face.inProgress ? "inProgress" : "open"} data-priority={face.color ?? undefined}>
 			<CardInsides face={face} />
 		</div>
 	);
@@ -445,10 +444,10 @@ function Stack({ ids, typing, renaming, pressed }: { readonly ids: readonly stri
 					key={id}
 					id={id}
 					pressed={id === pressed}
-					onPress={(card, clicked) => {
+					onPress={(card) => {
 						anchor.current = card;
 						look.current = null;
-						api.getState().openMenu(id, "stack", false, clicked);
+						api.getState().openMenu(id, "stack", false);
 					}}
 				/>
 				),
@@ -460,11 +459,11 @@ function Stack({ ids, typing, renaming, pressed }: { readonly ids: readonly stri
 	);
 }
 
-function StackCard({ id, pressed, onPress }: { readonly id: string; readonly pressed: boolean; readonly onPress: (card: HTMLElement, clicked: number | null) => void }) {
+function StackCard({ id, pressed, onPress }: { readonly id: string; readonly pressed: boolean; readonly onPress: (card: HTMLElement) => void }) {
 	const face = useScreen((s) => s.shown.cards[id]);
 	if (!face) return null;
 	return (
-		<div className={`tc-card${pressed ? " is-pressed" : ""}${face.step !== null ? " is-two-line" : ""}`} data-stack={id} data-status={face.inProgress ? "inProgress" : "open"} data-priority={face.color ?? undefined} onClick={(e) => onPress(e.currentTarget, mouseClick(e))} onContextMenu={(e) => secondaryClick(e) && onPress(e.currentTarget, null)}>
+		<div className={`tc-card${pressed ? " is-pressed" : ""}${face.step !== null ? " is-two-line" : ""}`} data-stack={id} data-status={face.inProgress ? "inProgress" : "open"} data-priority={face.color ?? undefined} onClick={(e) => onPress(e.currentTarget)} onContextMenu={(e) => secondaryClick(e) && onPress(e.currentTarget)}>
 			<CardInsides face={face} />
 		</div>
 	);

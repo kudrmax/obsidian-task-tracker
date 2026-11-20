@@ -6,7 +6,7 @@
 /** The parts of the open menu: the copy over the backdrop, the panel's parts (over and under it), the backdrop. */
 export function menuNow(t) {
 	return t.cdp.eval(`(async () => {
-		/** As a person sees it once it stands: a mouse's click opens the menu once a double click is out, then it lifts to its place (Decision 120). */
+		/** As a person sees it once it stands: the menu's block lifts to its place first (Decision 120). */
 		const t0 = performance.now();
 		for (;;) {
 			const block = document.querySelector(".tc-menu-block");
@@ -37,7 +37,7 @@ export function menuNow(t) {
 /** The centre of the menu's button or tile whose words are `words` (a tile's label, a row's label, a day's number by `data-date`). */
 export function menuButton(t, words) {
 	return t.cdp.eval(`(async () => {
-		/** A person presses once the menu stands still: a mouse's click waits out a double click, then the block lifts to its place (Decision 120). */
+		/** A person presses once the menu stands still: the block lifts to its place first (Decision 120). */
 		for (let i = 0; i < 60; i++) {
 			const block = document.querySelector(".tc-menu-block");
 			const moving = block && [block, ...block.querySelectorAll("*")].some((e) => e.getAnimations().some((a) => a.playState === "running"));

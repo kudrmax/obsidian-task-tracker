@@ -1,4 +1,4 @@
-import { DESIGN, LAYOUT } from "../../design";
+import { DESIGN } from "../../design";
 import { createStore, type StoreApi } from "zustand/vanilla";
 import { LAYER_MS } from "../layers/motion";
 import type { Destination, Edge, EntryBar, EntryDraft, EntryField, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, MenuStatusId, ScreenData, ScreenPort } from "../port";
@@ -45,8 +45,6 @@ export interface Layer {
 	readonly stack: { readonly of: string; readonly ids: readonly string[] } | null;
 	/** The question last taken back by Cancel: what asked it takes the focus again. */
 	readonly asked: Asking | null;
-	/** Opened by a mouse's click on a card: until this moment (the events' own clock, `timeStamp`) a second press is a double click that renames. */
-	readonly renameUntil: number | null;
 }
 
 export interface ScreenState {
@@ -137,24 +135,10 @@ export interface ScreenActions {
 	drop(id: string, to: Destination | null): void;
 	/**
 	 * Opens the menu of the task or event `id`, opened `from` there (a list's card unless said). `reveal`: a tap, not a finger
-	 * still held: a card partly out of its list's sight is scrolled into it first (the design's «Полная карточка»). `clicked`:
-	 * the moment (`timeStamp`) of a mouse's click: the menu waits out a double click (`LAYOUT.doubleClickMs`) before it
-	 * opens, and a second click on the same task within it renames the task instead, no menu shown (Max, 2026-11-20).
+	 * still held: a card partly out of its list's sight is scrolled into it first (the design's «Полная карточка»). It opens
+	 * at once: no double click is waited out (Max, 2026-11-20: the wait felt like lag; double click withdrawn).
 	 */
-	openMenu(id: string, from?: MenuFrom, reveal?: boolean, clicked?: number | null): void;
-	/**
-	 * A press on the open menu's copy of its task, a mouse's at `at` (`timeStamp`), a finger's null: a finger's closes the
-	 * menu, as the backdrop does; a mouse's second click within a double click renames the task, a single one does nothing.
-	 */
-	pressCopy(at: number | null): void;
-	/**
-	 * A mouse's second press at `at` (`timeStamp`) within a double click of a click on a task (its menu still waiting, or
-	 * just opened): the task is renamed, no menu (the plugin's `onClickedAgain`, F117); whether it did. A selected block's
-	 * dot takes a double click's second press this way.
-	 */
-	pressAgain(at: number): boolean;
-	/** Rename of the task `id` drawn `from` there, its menu not shown: a double click on its card. */
-	renameTask(id: string, from: MenuFrom): void;
+	openMenu(id: string, from?: MenuFrom, reveal?: boolean): void;
 	closeLayer(): void;
 	/** The open menu shows another page. */
 	menuPage(page: MenuPage): void;
@@ -254,10 +238,6 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 	let writing = 0;
 	/** The screen as it stood when the carried task was lifted: its place's home, a drop's in-flight write drawn in it. */
 	let home: ScreenData | null = null;
-	/** A mouse's click on a card waiting out a double click before its menu opens. */
-	let pendingClick: { readonly id: string; readonly from: MenuFrom; readonly at: number; readonly timer: number } | null = null;
-	/** A mouse's click on the open menu's copy waiting out a double click before the menu closes. */
-	let copyPress: { readonly at: number; readonly timer: number } | null = null;
 	/** The edge a carried card heads into, and the wait before its room may scroll. */
 	let scrollEdge: string | null = null;
 	let scrollWait = 0;
@@ -434,68 +414,18 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 				set({ lifted: null, liftedDepth: null });
 				get().release("drag");
 			},
-			openMenu(id, from = "list", reveal = false, clicked = null) {
-				if (clicked !== null) {
-					const first = pendingClick;
-					if (first) window.clearTimeout(first.timer);
-					pendingClick = null;
-					if (first && first.id === id && clicked - first.at <= LAYOUT.doubleClickMs) return get().renameTask(id, from);
-					pendingClick = { id, from, at: clicked, timer: window.setTimeout(() => {
-						pendingClick = null;
-						get().openMenu(id, from, reveal, null);
-					}, LAYOUT.doubleClickMs) };
-					return;
-				}
+			openMenu(id, from = "list", reveal = false) {
 				if (reveal) set({ reveal: { id, seq: (get().reveal?.seq ?? 0) + 1 } });
 				const over = get().layer;
 				const stack = from !== "stack" || !over ? null : (over.stack ?? (over.model.kind === "task" ? { of: over.id, ids: over.model.subtasks } : null));
 				const model = port.menu(id, from);
-				const renames = clicked !== null && model.kind === "task" && model.layout.some((group) => group.actions.some((action) => action.id === "rename"));
-				set({ layer: { kind: "menu", id, from, model, page: "menu", asking: null, asked: null, stack, renameUntil: renames ? clicked + LAYOUT.doubleClickMs : null }, ...(from === "list" ? { selected: null } : {}) });
-			},
-			pressCopy(at) {
-				const first = copyPress;
-				if (first) window.clearTimeout(first.timer);
-				copyPress = null;
-				if (at === null) return get().closeLayer();
-				if (first && at - first.at <= LAYOUT.doubleClickMs) {
-					const model = get().layer?.model;
-					if (model?.kind === "task" && model.layout.some((group) => group.actions.some((action) => action.id === "rename"))) get().startRename();
-					return;
-				}
-				copyPress = { at, timer: window.setTimeout(() => (copyPress = null), LAYOUT.doubleClickMs) };
-			},
-			renameTask(id, from) {
-				/** A stack's card is renamed in its place in the menu: its own menu stands first, as Rename from it does. */
-				if (from === "stack") {
-					get().openMenu(id, from, false, null);
-					/** Once the card's own menu has taken the sheet (its focus scope settled), its card becomes the field. */
-					window.setTimeout(() => {
-						if (get().layer?.id === id) get().startRename();
-					}, 0);
-					return;
-				}
-				const { field, draft, text } = port.rename(id, from, get().dayOffset);
-				set({ entry: field, draft, entryText: text, entrySeq: get().entrySeq + 1, entryPanel: null, layer: null });
-			},
-			pressAgain(at) {
-				const first = pendingClick;
-				if (first && at - first.at <= LAYOUT.doubleClickMs) {
-					window.clearTimeout(first.timer);
-					pendingClick = null;
-					get().renameTask(first.id, first.from);
-					return true;
-				}
-				const layer = get().layer;
-				if (!layer || layer.renameUntil === null || at > layer.renameUntil) return false;
-				get().startRename();
-				return true;
+				set({ layer: { kind: "menu", id, from, model, page: "menu", asking: null, asked: null, stack }, ...(from === "list" ? { selected: null } : {}) });
 			},
 			startRename() {
 				const layer = get().layer;
 				if (!layer) return;
 				const { field, draft, text } = port.rename(layer.id, layer.from, get().dayOffset);
-				set({ entry: field, draft, entryText: text, entrySeq: get().entrySeq + 1, entryPanel: null, layer: field.stack ? { ...layer, asking: null, renameUntil: null } : null });
+				set({ entry: field, draft, entryText: text, entrySeq: get().entrySeq + 1, entryPanel: null, layer: field.stack ? { ...layer, asking: null } : null });
 			},
 			startSubtask() {
 				const layer = get().layer;

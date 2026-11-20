@@ -34,8 +34,8 @@ export default {
 			const title = (await t.oracle.cards("day"))[2];
 			const card = await cardBy(t, title, "day");
 			await tap(card);
-			/** A mouse's click waits out a double click before the menu opens (Max, 2026-11-20); it has grown in by then. */
-			await t.sleep(t.platform === "phone" ? 400 : 700);
+			/** The block lifts to its place (Decision 120); it stands by then. */
+			await t.sleep(500);
 			/** The verifier's find (2026-11-20): the menu's copy jumped to the window's corner as the card became the field. */
 			const renameAt = await menuButton(t, "Rename");
 			const closing = await menuFrames(t, () => tap(renameAt), 400);

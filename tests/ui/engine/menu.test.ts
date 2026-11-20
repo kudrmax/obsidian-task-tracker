@@ -1,7 +1,6 @@
 // @vitest-environment happy-dom
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { LAYOUT } from "../../../obsidian/ui/design";
 import { describe, expect, it } from "vitest";
 import { MockPort } from "../../../obsidian/stand/MockPort";
 import { calendarFile, mockFile } from "../../../obsidian/stand/mockData";
@@ -267,38 +266,15 @@ describe("the menu's fields and the plus, in the store", () => {
 		expect(store.getState().shown.cards[id].title).toBe(title);
 	});
 
-	/** Max, 2026-11-20: a double click flashed the menu, then renamed; a single click's menu must not show for a double click. */
-	it("a mouse's click waits out a double click before its menu opens; a second click on the task renames it, no menu shown", async () => {
+	/** Max, 2026-11-20: waiting out a double click felt like lag; double click is withdrawn, a click opens the menu at once. */
+	it("a click opens the task's menu at once; a second click does nothing more: rename is the menu's", () => {
 		const { store } = screen();
 		const id = firstInbox(store);
-		store.getState().openMenu(id, "list", false, 1000);
-		expect(store.getState().layer).toBeNull();
-		store.getState().openMenu(id, "list", false, 1000 + LAYOUT.doubleClickMs);
-		expect(store.getState().layer).toBeNull();
-		expect(store.getState().entry).toMatchObject({ renaming: id });
-		store.getState().openEntry(null);
-		store.getState().openMenu(id, "list", false, 5000);
-		await new Promise((resolve) => setTimeout(resolve, LAYOUT.doubleClickMs + 20));
+		store.getState().openMenu(id, "list", false);
 		expect(store.getState().layer?.id).toBe(id);
-		store.getState().closeLayer();
-		store.getState().openMenu(id, "list", false, null);
+		store.getState().openMenu(id, "list", false);
 		expect(store.getState().layer?.id).toBe(id);
-	});
-
-	it("with the menu open, a double click on its copy of the task renames it; a single one leaves the menu; a finger's tap closes it", async () => {
-		const { store } = screen();
-		const id = firstInbox(store);
-		store.getState().openMenu(id, "list", false, null);
-		store.getState().pressCopy(100);
-		store.getState().pressCopy(100 + LAYOUT.doubleClickMs);
-		expect(store.getState().entry).toMatchObject({ renaming: id });
-		store.getState().openEntry(null);
-		store.getState().openMenu(id, "list", false, null);
-		store.getState().pressCopy(500);
-		await new Promise((resolve) => setTimeout(resolve, LAYOUT.doubleClickMs + 20));
-		expect(store.getState().layer).not.toBeNull();
-		store.getState().pressCopy(null);
-		expect(store.getState().layer).toBeNull();
+		expect(store.getState().entry).toBeNull();
 	});
 
 	it("Escape with a bar's panel open closes the panel alone; a new field opens with none (the audit's 6, 7)", () => {

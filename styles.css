@@ -1942,7 +1942,7 @@ body:not(.is-mobile) .tc-drag-source:focus-visible > :is(.tc-card, .tc-block-car
 .tc-menu-block > .tc-panel.is-menu { position: relative; top: auto; flex-shrink: 0; outline: none; }
 .tc-menu-block > .tc-panel.is-menu.is-shown { animation: tc-menu-panel-in var(--tc-duration-menu) var(--tc-ease-out) backwards; transition: height var(--tc-duration-slide) var(--tc-ease-fly); }
 .tc-menu-block > .tc-panel.is-empty { display: none; }
-.tc-menu-over > .tc-lifted { position: relative; flex: 1 0 auto; opacity: 1; transition: none; pointer-events: auto; }
+.tc-menu-over > .tc-lifted { position: relative; flex: 1 0 auto; opacity: 1; transition: none; }
 .tc-menu-over > .tc-lifted.is-whole { max-width: none; }
 .tc-menu-over > .tc-lifted.is-block { align-items: stretch; }
 .tc-menu-over > .tc-lifted.is-block > :is(.tc-block-card, .tc-event) { position: relative; inset: auto; flex: 1 1 auto; min-width: 0; }

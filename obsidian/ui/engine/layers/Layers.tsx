@@ -1,5 +1,5 @@
 import { autoUpdate, flip, FloatingFocusManager, FloatingOverlay, FloatingPortal, hide, type Middleware, type MiddlewareState, offset, type Placement, useDismiss, useFloating, useInteractions, useRole, useTransitionStatus } from "@floating-ui/react";
-import { type CSSProperties, createContext, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type MutableRefObject, type ReactNode, useContext, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, createContext, type MouseEvent as ReactMouseEvent, type MutableRefObject, type ReactNode, useContext, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { DESIGN, LAYOUT, PROPERTY } from "../../design";
 import { blockTop } from "./block";
 import { LAYER_MS } from "./motion";
@@ -34,9 +34,6 @@ export function useField(): { readonly field: Element | null; readonly setField:
 	return field;
 }
 
-/** A click's moment (`timeStamp`) when a mouse made it, which a second press may make a double click; null for a finger's tap. */
-export const mouseClick = (event: ReactMouseEvent): number | null => ((event.nativeEvent as PointerEvent).pointerType === "mouse" ? event.timeStamp : null);
-
 /**
  * A right click (the desktop's secondary click, `docs/plugin/screen.md` «правый клик — тоже меню»): the browser's own menu
  * kept away; whether it opens ours. A finger's held press is the drag's, never a menu.
@@ -58,8 +55,6 @@ export interface MenuLayerProps {
 	readonly onClose: () => void;
 	/** Escape closes the menu; not while a field typed in it takes Escape itself (a bar's panel closes first). */
 	readonly escapes?: boolean;
-	/** A mouse's press anywhere on the layer, at its `timeStamp`: whether it was taken (a double click's second press), its click then reaching nothing. */
-	readonly onPressAgain?: (at: number) => boolean;
 	/** The element of the view's own document that holds the layer. */
 	readonly root: HTMLElement;
 	/** The element pressed: the copy stands over it. */
@@ -101,7 +96,7 @@ const motionClass = (status: string, ready: boolean) => (status === "open" && re
  * goes back down into the task. Another page grows or shrinks the panel in place (`scrollWithin`). The parts open and
  * close together (Floating UI's transition status keeps them mounted while they fade, `LAYER_MS`).
  */
-export function MenuLayer({ open, onClose, onPressAgain, escapes = true, root, reference, label, over, groups, panelClass, page, peek, keepWidth = false, onLift }: MenuLayerProps) {
+export function MenuLayer({ open, onClose, escapes = true, root, reference, label, over, groups, panelClass, page, peek, keepWidth = false, onLift }: MenuLayerProps) {
 	const [overEl, setOverEl] = useState<HTMLElement | null>(null);
 	const parts = useRef<{ upper: HTMLElement | null; lower: HTMLElement | null }>({ upper: null, lower: null });
 	/** The window less the phone's safe areas (`env(safe-area-inset-*)`, the plugin's `menuRoom`): every part stays inside it. */
@@ -159,26 +154,8 @@ export function MenuLayer({ open, onClose, onPressAgain, escapes = true, root, r
 	const peekStood = useRef<CSSProperties>({});
 	const shownOnce = useRef(false);
 	if (open && peeking.isPositioned) peekStood.current = peeking.floatingStyles;
-	/**
-	 * A mouse's second press soon after the click that opened the menu is a double click (the plugin's `onClickedAgain`):
-	 * the press selects no word of the copy and its click reaches nothing, the backdrop's closing too.
-	 */
-	const taken = useRef(false);
-	const pressed = {
-		onPointerDownCapture: (event: ReactPointerEvent) => {
-			taken.current = event.pointerType === "mouse" && event.button === 0 && open && (onPressAgain?.(event.timeStamp) ?? false);
-		},
-		onMouseDownCapture: (event: ReactMouseEvent) => {
-			if (taken.current) event.preventDefault();
-		},
-		onClickCapture: (event: ReactMouseEvent) => {
-			if (!taken.current) return;
-			taken.current = false;
-			event.stopPropagation();
-		},
-	};
 	/** Closed by the click, not the press: the finger's tap ends on the backdrop, never on a card under the fading menu. */
-	const dismiss = useDismiss(block.context, { escapeKey: escapes, outsidePressEvent: "click", outsidePress: (event) => !taken.current && !(event.target instanceof Element && (block.refs.floating.current?.contains(event.target) || event.target.closest(".tc-quick-bar, .tc-quick-panel"))) });
+	const dismiss = useDismiss(block.context, { escapeKey: escapes, outsidePressEvent: "click", outsidePress: (event) => !(event.target instanceof Element && (block.refs.floating.current?.contains(event.target) || event.target.closest(".tc-quick-bar, .tc-quick-panel"))) });
 	const { getFloatingProps } = useInteractions([dismiss, useRole(block.context, { role: "menu" })]);
 	if (!isMounted) return null;
 	/** Shown once it stands where its page measured it: the panel's groups counted in the block's place (none while typing in the menu). */
@@ -189,8 +166,8 @@ export function MenuLayer({ open, onClose, onPressAgain, escapes = true, root, r
 	const look = shown.spot;
 	return (
 		<FloatingPortal root={root}>
-			<FloatingOverlay className={`tc-backdrop tc-menu-layer${motion}`} {...pressed} />
-			<div className={`tc-level tc-menu-layer${motion}`} style={{ [PROPERTY.menuLift]: `${look?.lift ?? 0}px` } as CSSProperties} {...pressed}>
+			<FloatingOverlay className={`tc-backdrop tc-menu-layer${motion}`} />
+			<div className={`tc-level tc-menu-layer${motion}`} style={{ [PROPERTY.menuLift]: `${look?.lift ?? 0}px` } as CSSProperties}>
 				<div ref={holdSafe} className="tc-safe-room" aria-hidden="true" />
 				<FloatingFocusManager context={block.context} modal={false} initialFocus={-1}>
 					<div ref={block.refs.setFloating} style={shown.styles} className="tc-menu-block" aria-label={label} {...getFloatingProps()}>
