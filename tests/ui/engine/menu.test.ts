@@ -271,19 +271,38 @@ describe("the menu's fields and the plus, in the store", () => {
 		expect(store.getState().shown.cards[id].title).toBe(title);
 	});
 
-	it("a mouse's second press within a double click of the click that opened the menu renames; later, or a finger's, doesn't (F117)", () => {
+	/** Max, 2026-11-20: a double click flashed the menu, then renamed; a single click's menu must not show for a double click. */
+	it("a mouse's click waits out a double click before its menu opens; a second click on the task renames it, no menu shown", async () => {
 		const { store } = screen();
 		const id = firstInbox(store);
 		store.getState().openMenu(id, "list", false, 1000);
-		expect(store.getState().pressAgain(1000 + LAYOUT.doubleClickMs + 1)).toBe(false);
-		expect(store.getState().layer).not.toBeNull();
-		store.getState().openMenu(id, "list", false, 2000);
-		expect(store.getState().pressAgain(2000 + LAYOUT.doubleClickMs)).toBe(true);
+		expect(store.getState().layer).toBeNull();
+		store.getState().openMenu(id, "list", false, 1000 + LAYOUT.doubleClickMs);
 		expect(store.getState().layer).toBeNull();
 		expect(store.getState().entry).toMatchObject({ renaming: id });
 		store.getState().openEntry(null);
+		store.getState().openMenu(id, "list", false, 5000);
+		await new Promise((resolve) => setTimeout(resolve, LAYOUT.doubleClickMs + 20));
+		expect(store.getState().layer?.id).toBe(id);
+		store.getState().closeLayer();
 		store.getState().openMenu(id, "list", false, null);
-		expect(store.getState().pressAgain(1)).toBe(false);
+		expect(store.getState().layer?.id).toBe(id);
+	});
+
+	it("with the menu open, a double click on its copy of the task renames it; a single one leaves the menu; a finger's tap closes it", async () => {
+		const { store } = screen();
+		const id = firstInbox(store);
+		store.getState().openMenu(id, "list", false, null);
+		store.getState().pressCopy(100);
+		store.getState().pressCopy(100 + LAYOUT.doubleClickMs);
+		expect(store.getState().entry).toMatchObject({ renaming: id });
+		store.getState().openEntry(null);
+		store.getState().openMenu(id, "list", false, null);
+		store.getState().pressCopy(500);
+		await new Promise((resolve) => setTimeout(resolve, LAYOUT.doubleClickMs + 20));
+		expect(store.getState().layer).not.toBeNull();
+		store.getState().pressCopy(null);
+		expect(store.getState().layer).toBeNull();
 	});
 
 	it("Escape with a bar's panel open closes the panel alone; a new field opens with none (the audit's 6, 7)", () => {

@@ -1926,7 +1926,7 @@ body:not(.is-mobile) .tc-drag-source:focus-visible > :is(.tc-card, .tc-block-car
 .tc-menu-over { position: fixed; z-index: var(--tc-layer-panel); width: max-content; max-width: calc(100% - 2 * var(--tc-whole-margin)); display: flex; flex-direction: column; pointer-events: none; opacity: 0; transition: opacity var(--tc-duration-menu) var(--tc-ease-out); }
 .tc-level.is-shown > .tc-menu-over { opacity: 1; }
 .tc-level.is-closing > .tc-menu-over { opacity: 0; transition-duration: var(--tc-duration-collapse); }
-.tc-menu-over > .tc-lifted { position: relative; flex: 1 0 auto; opacity: 1; transition: none; }
+.tc-menu-over > .tc-lifted { position: relative; flex: 1 0 auto; opacity: 1; transition: none; pointer-events: auto; }
 .tc-menu-over > .tc-lifted.is-whole { max-width: none; }
 .tc-menu-over > .tc-lifted.is-block { align-items: stretch; }
 .tc-menu-over > .tc-lifted.is-block > :is(.tc-block-card, .tc-event) { position: relative; inset: auto; flex: 1 1 auto; min-width: 0; }
