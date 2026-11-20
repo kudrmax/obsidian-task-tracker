@@ -41,8 +41,8 @@ describe("the stand's task menu, read from the core's table (task actions spec)"
 			["levels", ["level"]],
 			["copy", []],
 			["when", ["tomorrow", "pickDate", "repeat"]],
-			["edit", ["rename", "project", "section", "subtask"]],
-			["rows", ["firstStep", "openFull", "openInObsidian"]],
+			["edit", ["rename", "project", "section"]],
+			["rows", ["firstStep", "subtask", "openFull", "openInObsidian"]],
 			["remove", ["delete"]],
 		]);
 	});
@@ -74,7 +74,8 @@ describe("the stand's task menu, read from the core's table (task actions spec)"
 		const p = port(calendarFile(NOW));
 		const timed = taskMenu(p, "Тренировка", "calendar");
 		expect(ids(timed, "when")).toContain("reminder");
-		expect(ids(timed, "edit")).toEqual(["rename", "project", "subtask"]);
+		expect(ids(timed, "edit")).toEqual(["rename", "project"]);
+		expect(ids(timed, "rows")).toContain("subtask");
 		expect(timed.peek).toBe("разминка, потом зал");
 		expect(ids(taskMenu(p, "Купить подарок"), "edit")).toContain("description");
 		const inbox = port();
@@ -87,7 +88,7 @@ describe("the stand's task menu, read from the core's table (task actions spec)"
 		const p = port(calendarFile(NOW));
 		expect(taskMenu(p, "Переезд", "calendar").subtasks).toEqual(["k10", "k11"]);
 		const sub = p.menu("k10", "stack") as TaskMenuModel;
-		expect(ids(sub, "edit")).not.toContain("subtask");
+		expect(ids(sub, "rows")).not.toContain("subtask");
 		expect(sub.layout.find((g) => g.group === "edit")!.actions.find((a) => a.id === "project")?.disabled).toBe(true);
 	});
 

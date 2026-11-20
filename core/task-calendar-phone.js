@@ -4673,7 +4673,7 @@ ${key.title}`.toLowerCase();
       }
     },
     description: {
-      name: "Description",
+      name: "Notes",
       places: {
         taskMenu: { group: "edit", order: 1, offer: (ctx) => shown2(ctx.items.every((item) => item.can.addDescription)) },
         bulkMenu: { absent: ONE_TASK },
@@ -4702,7 +4702,7 @@ ${key.title}`.toLowerCase();
     subtask: {
       name: "Subtask",
       places: {
-        taskMenu: { group: "edit", order: 4, offer: (ctx) => shown2(fromOf(ctx) !== "stack") },
+        taskMenu: { group: "rows", order: 1, offer: (ctx) => shown2(fromOf(ctx) !== "stack") },
         bulkMenu: { absent: ONE_TASK },
         field: { absent: "Enter, then Tab, types a subtask under the task just typed." },
         fullScreen: { group: "subtasks", order: 0, offer: always }
@@ -4747,7 +4747,7 @@ ${key.title}`.toLowerCase();
     openFull: {
       name: "Open full screen",
       places: {
-        taskMenu: { group: "rows", order: 1, offer: (ctx) => shown2(fromOf(ctx) !== "full") },
+        taskMenu: { group: "rows", order: 2, offer: (ctx) => shown2(fromOf(ctx) !== "full") },
         bulkMenu: { absent: ONE_TASK },
         field: { absent: NOT_WRITTEN },
         fullScreen: { absent: "The full screen already shows the task." }
@@ -4756,7 +4756,7 @@ ${key.title}`.toLowerCase();
     openInObsidian: {
       name: "Open in Obsidian",
       places: {
-        taskMenu: { group: "rows", order: 2, offer: always },
+        taskMenu: { group: "rows", order: 3, offer: always },
         bulkMenu: { absent: ONE_TASK },
         field: { absent: NOT_WRITTEN },
         fullScreen: { absent: IN_THE_MENU }

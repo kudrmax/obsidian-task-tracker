@@ -248,7 +248,7 @@ export const TASK_ACTIONS = {
 		},
 	},
 	description: {
-		name: "Description",
+		name: "Notes",
 		places: {
 			taskMenu: { group: "edit", order: 1, offer: (ctx) => shown(ctx.items.every((item) => item.can.addDescription)) },
 			bulkMenu: { absent: ONE_TASK },
@@ -277,7 +277,7 @@ export const TASK_ACTIONS = {
 	subtask: {
 		name: "Subtask",
 		places: {
-			taskMenu: { group: "edit", order: 4, offer: (ctx) => shown(fromOf(ctx) !== "stack") },
+			taskMenu: { group: "rows", order: 1, offer: (ctx) => shown(fromOf(ctx) !== "stack") },
 			bulkMenu: { absent: ONE_TASK },
 			field: { absent: "Enter, then Tab, types a subtask under the task just typed." },
 			fullScreen: { group: "subtasks", order: 0, offer: always },
@@ -322,7 +322,7 @@ export const TASK_ACTIONS = {
 	openFull: {
 		name: "Open full screen",
 		places: {
-			taskMenu: { group: "rows", order: 1, offer: (ctx) => shown(fromOf(ctx) !== "full") },
+			taskMenu: { group: "rows", order: 2, offer: (ctx) => shown(fromOf(ctx) !== "full") },
 			bulkMenu: { absent: ONE_TASK },
 			field: { absent: NOT_WRITTEN },
 			fullScreen: { absent: "The full screen already shows the task." },
@@ -331,7 +331,7 @@ export const TASK_ACTIONS = {
 	openInObsidian: {
 		name: "Open in Obsidian",
 		places: {
-			taskMenu: { group: "rows", order: 2, offer: always },
+			taskMenu: { group: "rows", order: 3, offer: always },
 			bulkMenu: { absent: ONE_TASK },
 			field: { absent: NOT_WRITTEN },
 			fullScreen: { absent: IN_THE_MENU },

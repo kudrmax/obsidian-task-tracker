@@ -58,8 +58,8 @@ describe("one task's menu, as Max ordered it (2026-11-20)", () => {
 			["labels", ["label"]],
 			["copy", []],
 			["when", ["tomorrow", "pickDate", "repeat"]],
-			["edit", ["rename", "description", "project", "subtask"]],
-			["rows", ["firstStep", "openFull", "openInObsidian"]],
+			["edit", ["rename", "description", "project"]],
+			["rows", ["firstStep", "subtask", "openFull", "openInObsidian"]],
 			["remove", ["delete"]],
 		]);
 	});
@@ -70,7 +70,7 @@ describe("one task's menu, as Max ordered it (2026-11-20)", () => {
 		const model = taskMenu([timed], T, [], [], offer, { kind: "task", from: "day" });
 		expect(shape(model).filter(([g]) => g === "when" || g === "edit")).toEqual([
 			["when", ["tomorrow", "pickDate", "repeat", "reminder"]],
-			["edit", ["rename", "description", "project", "section", "subtask"]],
+			["edit", ["rename", "description", "project", "section"]],
 		]);
 	});
 
@@ -97,6 +97,16 @@ describe("one task's menu, as Max ordered it (2026-11-20)", () => {
 			["wontDo", "wontDo", true],
 		]);
 		expect(model.layout[model.layout.length - 1].actions[0]).toMatchObject({ id: "delete", asks: true });
+	});
+
+	it("stands Subtask beside First step, both making a subtask (Max, 2026-11-20)", () => {
+		const rows = (from: Parameters<typeof taskMenu>[5]) => taskMenu([item()], T, [], [], null, from).layout.find((g) => g.group === "rows")!.actions.map((a) => a.id);
+		expect(rows({ kind: "task", from: "day" })).toEqual(["firstStep", "subtask", "openFull", "openInObsidian"]);
+		expect(rows({ kind: "task", from: "stack" })).not.toContain("subtask");
+	});
+
+	it("calls the description Notes, the word Max reads (Decision 118)", () => {
+		expect(TASK_ACTIONS.description.name).toBe("Notes");
 	});
 
 	it("offers Open full screen everywhere but on the task the full screen shows", () => {
