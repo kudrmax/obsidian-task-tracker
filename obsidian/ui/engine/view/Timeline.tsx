@@ -376,7 +376,7 @@ const BlockItem = memo(function BlockItem({ block, box, shades, order, z, top, s
 					))}
 				</div>
 			) : null}
-			{(selected || resizing) && !lifted && element ? <Grips block={block} reference={element} scale={scale} /> : null}
+			{(selected || resizing) && !lifted && !renaming && element ? <Grips block={block} reference={element} scale={scale} /> : null}
 		</MovingRow>
 	);
 });
@@ -410,14 +410,21 @@ function NewPlace({ minute, box, z, field }: { readonly minute: number; readonly
  */
 function Grips({ block, reference, scale }: { readonly block: Block; readonly reference: Element; readonly scale: TimeScale }) {
 	const { layerRoot } = useHost();
+	/**
+	 * The task's menu stands its subtasks right under its copy (F107): the bottom dot lies under the stack there, as the
+	 * plugin's dot on the copy lies under its stack, so neither covers a card's title (the audit's 13).
+	 */
+	const stacked = useScreen((s) => s.layer !== null && (s.layer.stack?.of === block.id || (s.layer.id === block.id && s.layer.model.kind === "task" && (s.layer.model.subtasks.length > 0 || s.entry?.stack === true))));
 	return (
 		<>
 			<Pinned reference={reference} placement="top-end" into={DESIGN.grip / 2} along={-DESIGN.gripStartRight} root={layerRoot}>
 				<Grip block={block} edge="start" scale={scale} />
 			</Pinned>
-			<Pinned reference={reference} placement="bottom-start" into={DESIGN.grip / 2} along={DESIGN.gripEndLeft} root={layerRoot}>
-				<Grip block={block} edge="end" scale={scale} />
-			</Pinned>
+			{stacked ? null : (
+				<Pinned reference={reference} placement="bottom-start" into={DESIGN.grip / 2} along={DESIGN.gripEndLeft} root={layerRoot}>
+					<Grip block={block} edge="end" scale={scale} />
+				</Pinned>
+			)}
 		</>
 	);
 }

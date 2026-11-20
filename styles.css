@@ -1917,6 +1917,8 @@ body.theme-light .tc-menu-over .tc-event { --tc-event-bg: var(--tc-event-bg-ligh
 @keyframes tc-cut-value { from, to { -webkit-mask-image: var(--tc-fade-card-end); mask-image: var(--tc-fade-card-end); } }
 :is(.tc-menu-layer, .tc-quick-panel) :is(.tc-menu-tile-label, .tc-menu-ask-title) { animation-name: tc-cut-tile; animation-fill-mode: both; animation-timeline: scroll(self inline); }
 :is(.tc-menu-layer, .tc-quick-panel) .tc-menu-value { animation-name: tc-cut-value; animation-fill-mode: both; animation-timeline: scroll(self inline); }
+/* A tile's label takes its whole tile and the gap beside it before it fades (the plugin's four tiles' rule, for every tile of the engine): «Backlog» among five places, «Stop progress» on the phone. */
+:is(.tc-menu-layer, .tc-quick-bar.is-engine .tc-quick-panel) .tc-menu-tile-label { width: calc(100% + var(--tc-space-6)); padding: 0; }
 @keyframes tc-cut-peek { from, to { -webkit-mask-image: var(--tc-fade-peek-bottom); mask-image: var(--tc-fade-peek-bottom); } }
 .tc-level.tc-menu-layer > .tc-desc-peek .tc-desc-text { animation-name: tc-cut-peek; animation-fill-mode: both; animation-timeline: scroll(self block); }
 /* The calendar's task renamed (F108): the field over the block's place, from its top, growing down for a long name; the block's own card hidden under it. */

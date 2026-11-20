@@ -448,7 +448,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 				set({ layer: null });
 				let done: () => void = () => undefined;
 				write(new Promise<void>((resolve) => (done = resolve)));
-				window.setTimeout(() => void port.act(layer.id, action).finally(done), LAYER_MS.close);
+				window.setTimeout(() => void port.act(layer.id, action, layer.from).finally(done), LAYER_MS.close);
 			},
 			closeLayer() {
 				if (get().layer) set({ layer: null, ...(get().entry?.stack ? { entry: null, draft: NO_DRAFT, entryText: "", entryPanel: null } : {}) });

@@ -123,7 +123,7 @@ function taskGroups(layer: Layer, typing: boolean, model: TaskMenuModel, pick: (
 		];
 	const asking = layer.asking;
 	const groups: ReactNode[] = [];
-	if (asking !== null && asking !== "delete") groups.push(<Ask key="statuses" what={asking} title={model.title} onCancel={() => steps.ask(null)} onConfirm={() => pick({ kind: "status", id: asking })} />);
+	if (asking !== null && asking !== "delete") groups.push(<Ask key="statuses" what={asking} title={model.statusTitle} onCancel={() => steps.ask(null)} onConfirm={() => pick({ kind: "status", id: asking })} />);
 	else
 		groups.push(
 			<TileGroup

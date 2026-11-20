@@ -225,8 +225,13 @@ export interface LevelTile {
  */
 export interface TaskMenuModel {
 	readonly kind: "task";
-	/** The task's title, as a question names it: «Delete “…”?». */
+	/** The task's title, as Delete's question names it: «Delete “…”?». */
 	readonly title: string;
+	/**
+	 * The title of the task the status tiles write, as their questions name it: a folded block's shown step (the core's
+	 * `statusTask`, `docs/plugin/screen.md` «Done в нём тоже закрывает шаг»), any other the task's own.
+	 */
+	readonly statusTitle: string;
 	readonly statuses: readonly { readonly id: StatusId; readonly confirm: boolean }[];
 	/** In the settings' order; `disabled` while the task may have no priority. */
 	readonly levels: { readonly tiles: readonly LevelTile[]; readonly disabled: boolean };
@@ -316,6 +321,6 @@ export interface ScreenPort {
 	commit(field: EntryField, text: string, draft: EntryDraft, next: boolean): EntryCommit;
 	/** What the menu of the task or event `id` offers, opened `from` there. */
 	menu(id: string, from: MenuFrom): MenuModel;
-	/** Writes what was tapped in the menu of `id`; resolves once written and read back. */
-	act(id: string, action: MenuAction): Promise<void>;
+	/** Writes what was tapped in the menu of `id` opened `from` there (a status tile of a folded block writes its step); resolves once written and read back. */
+	act(id: string, action: MenuAction, from?: MenuFrom): Promise<void>;
 }

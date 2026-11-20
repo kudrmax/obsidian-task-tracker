@@ -426,6 +426,7 @@ export class MockPort implements ScreenPort {
 		return {
 			kind: "task",
 			title: task.title,
+			statusTitle: this.statusTask(task, from).title,
 			statuses: [
 				{ id: "done", confirm: false },
 				{ id: task.status === "/" ? "stopProgress" : "inProgress", confirm: false },
@@ -443,10 +444,23 @@ export class MockPort implements ScreenPort {
 		};
 	}
 
+	/** The task a status tile writes (the core's `statusTask`): a folded block's shown step, any other menu's own task. */
+	private statusTask(task: MockTask, from: MenuFrom): MockTask {
+		return from === "calendar" && task.folded ? (this.stepOf(task) ?? task) : task;
+	}
+
+	/** A folded task's next open step: its first open subtask, and that one's first open subtask, deeper as far as they go. */
+	private stepOf(t: MockTask): MockTask | null {
+		const open = t.children.find((c) => !closed(c));
+		return open ? (this.stepOf(open) ?? open) : null;
+	}
+
 	/** What a menu's tap writes, by the plugin's rules, the simplest: a move puts the task at the end of Now (today and before) or Soon, due that day, without its time. */
-	async act(id: string, action: MenuAction): Promise<void> {
+	async act(given: string, action: MenuAction, from: MenuFrom = "list"): Promise<void> {
 		if (action.kind === "row") return;
 		const today = dateOf(this.day());
+		const shown = this.findBy(this.ahead ?? this.file, (t) => t.id === given)?.task;
+		const id = action.kind === "status" && shown ? this.statusTask(shown, from).id : given;
 		await this.write((file) => {
 			const found = this.findBy(file, (t) => t.id === id);
 			if (!found) return;
@@ -719,17 +733,12 @@ export class MockPort implements ScreenPort {
 						endClock: end === null ? null : clockOf(end),
 						startParts: [String(Math.floor((DAY_START_HOUR * 60 + from) / 60) % 24), pad(from % 60)],
 						lengthParts: length === null ? null : length < 60 ? [String(length), "MIN"] : [length % 60 ? `${Math.floor(length / 60)}:${pad(length % 60)}` : String(length / 60), "H"],
-						step: t.folded ? this.nextStep(t) : null,
+						step: t.folded ? (this.stepOf(t)?.title ?? null) : null,
 					});
 				}
 		return blocks;
 	}
 
-	/** A folded task's next open step: its first open subtask, and that one's first open subtask, deeper as far as they go. */
-	private nextStep(t: MockTask): string | null {
-		const open = t.children.find((c) => !closed(c));
-		return open ? (this.nextStep(open) ?? open.title) : null;
-	}
 
 	/** The day's events: every made-up event each day; over once its end is past the present minute, and every one of a past day. */
 	private eventsOf(file: MockFile, dayOffset: number): DayEvent[] {
