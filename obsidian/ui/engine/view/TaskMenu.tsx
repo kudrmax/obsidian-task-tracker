@@ -406,12 +406,12 @@ function MenuCopy({ id, look, onPress }: { readonly id: string; readonly look: B
 		return (
 			<div className="tc-lifted is-block is-whole" data-lifted={id} onClick={onPress}>
 				<div className={`tc-block-card${selected ? " is-selected" : ""}`} data-status={face.inProgress ? "inProgress" : "open"} data-priority={face.color ?? undefined}>
-					<CardInsides face={face} block={look ?? { step: block.step, corner: null, pill: null, clock: block.clock }} />
+					<CardInsides face={face} block={look ?? { corner: null, pill: null, clock: block.clock }} />
 				</div>
 			</div>
 		);
 	return (
-		<div className="tc-lifted is-whole" data-lifted={id} onClick={onPress} data-status={face.inProgress ? "inProgress" : "open"} data-priority={face.color ?? undefined}>
+		<div className={`tc-lifted is-whole${face.step !== null ? " is-two-line" : ""}`} data-lifted={id} onClick={onPress} data-status={face.inProgress ? "inProgress" : "open"} data-priority={face.color ?? undefined}>
 			<CardInsides face={face} />
 		</div>
 	);
@@ -463,7 +463,7 @@ function StackCard({ id, pressed, onPress }: { readonly id: string; readonly pre
 	const face = useScreen((s) => s.shown.cards[id]);
 	if (!face) return null;
 	return (
-		<div className={`tc-card${pressed ? " is-pressed" : ""}`} data-stack={id} data-status={face.inProgress ? "inProgress" : "open"} data-priority={face.color ?? undefined} onClick={(e) => onPress(e.currentTarget, mouseClick(e))} onContextMenu={(e) => secondaryClick(e) && onPress(e.currentTarget, null)}>
+		<div className={`tc-card${pressed ? " is-pressed" : ""}${face.step !== null ? " is-two-line" : ""}`} data-stack={id} data-status={face.inProgress ? "inProgress" : "open"} data-priority={face.color ?? undefined} onClick={(e) => onPress(e.currentTarget, mouseClick(e))} onContextMenu={(e) => secondaryClick(e) && onPress(e.currentTarget, null)}>
 			<CardInsides face={face} />
 		</div>
 	);

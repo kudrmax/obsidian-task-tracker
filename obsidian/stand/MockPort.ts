@@ -770,13 +770,15 @@ export class MockPort implements ScreenPort {
 			count: t.children.length ? { done, total: t.children.length } : null,
 			description: t.description !== null,
 			due: due ? { day: String(due[2]), month: MONTHS[due[1] - 1] } : null,
+			step: t.folded ? (this.stepOf(t)?.title ?? null) : null,
+			folded: t.folded === true,
 		};
 	}
 
 	/**
 	 * The shown day's timed tasks, open ones only. An open task of today whose time has passed rides the now line: drawn at
 	 * the present minute, its length kept, its time in the file as it was (the design's «Едет за линией»; at its very minute
-	 * it still stands). A folded task's block is named by its next open step.
+	 * it still stands). A folded task's block is named by its next open step (its card's `step`).
 	 */
 	private blocksOf(file: MockFile, cards: Record<string, CardFace>, shown: string, today: boolean, held: string | null = null): Block[] {
 		const present = minuteOf(this.clock());
@@ -797,7 +799,6 @@ export class MockPort implements ScreenPort {
 						endClock: end === null ? null : clockOf(end),
 						startParts: [String(Math.floor((DAY_START_HOUR * 60 + from) / 60) % 24), pad(from % 60)],
 						lengthParts: length === null ? null : length < 60 ? [String(length), "MIN"] : [length % 60 ? `${Math.floor(length / 60)}:${pad(length % 60)}` : String(length / 60), "H"],
-						step: t.folded ? (this.stepOf(t)?.title ?? null) : null,
 					});
 				}
 		return blocks;

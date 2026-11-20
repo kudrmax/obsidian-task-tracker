@@ -353,7 +353,7 @@ const BlockItem = memo(function BlockItem({ block, box, shades, order, z, top, s
 	const pressed = useContext(PressedLook);
 	const [element, setElement] = useState<HTMLDivElement | null>(null);
 	const className = `tc-block${selected ? " is-selected" : ""}${resizing ? " is-resizing" : ""}${renaming ? " is-renaming" : ""}`;
-	const look = { step: block.step, corner: box.stacked ? block.startParts : box.shortLength ? block.lengthParts : null, pill: resizing === "start" ? block.clock : resizing === "end" ? (block.endClock ?? block.clock) : null, clock: block.clock };
+	const look = { corner: box.stacked ? block.startParts : box.shortLength ? block.lengthParts : null, pill: resizing === "start" ? block.clock : resizing === "end" ? (block.endClock ?? block.clock) : null, clock: block.clock };
 	return (
 		<MovingRow ref={setElement} id={block.id} order={order} carried={lifted} fresh={false} placed className={className} style={boxStyle(box, selected || resizing ? top : z)}>
 			<SortableRow
