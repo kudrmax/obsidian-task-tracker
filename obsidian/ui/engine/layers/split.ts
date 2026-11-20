@@ -4,8 +4,9 @@
  * when the whole fits on neither side. `cuts` are the heights of the panel down to each border between groups, `total`
  * its whole height. The first way that fits wins, in that order and with the fewest groups over the copy. When none fits,
  * a panel that splits keeps over the copy only the groups that fit there whole, and the rest scrolls under it: one part
- * scrolls, never the one over the card, whose cut would halve its tiles (F313). A panel that can't split goes whole to
- * the side that leaves the least to scroll.
+ * scrolls, never the one over the card, whose cut would halve its tiles (F313), unless the room under the copy holds
+ * not one group whole: then the whole panel goes over it and scrolls there. A panel that can't split goes whole to the
+ * side that leaves the least to scroll.
  */
 export function groupsAbove(cuts: readonly number[], total: number, above: number, below: number, canSplit: boolean): number {
 	const groups = cuts.length + 1;
@@ -17,6 +18,11 @@ export function groupsAbove(cuts: readonly number[], total: number, above: numbe
 	];
 	const fits = ways.find((way) => way.overflow === 0);
 	if (fits) return fits.count;
-	if (canSplit) return cuts.filter((cut) => cut <= above).length;
+	if (canSplit) {
+		const count = cuts.filter((cut) => cut <= above).length;
+		/** The part under the copy would show not one group whole (a copy at the window's bottom): the whole panel goes over it and scrolls there, so no group is out of reach. */
+		const firstUnder = (count < cuts.length ? cuts[count] : total) - (count > 0 ? cuts[count - 1] : 0);
+		return below < firstUnder ? groups : count;
+	}
 	return ways.reduce((best, way) => (way.overflow < best.overflow ? way : best)).count;
 }

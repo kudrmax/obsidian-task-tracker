@@ -107,6 +107,9 @@ describe("the menu's layout", () => {
 		expect(groupsAbove([100, 200, 300], 400, 250, 250, true)).toBe(2);
 		expect(groupsAbove([100, 200, 300], 400, 150, 150, true)).toBe(1);
 		expect(groupsAbove([100], 400, 150, 300, false)).toBe(0);
+		/** The test Obsidian, 2026-11-20: a calendar task's copy at the window's bottom left its Delete in a part of no height. */
+		expect(groupsAbove([82, 164, 246, 600, 688], 732, 674, 10, true)).toBe(6);
+		expect(groupsAbove([82, 164, 246, 600, 688], 732, 674, 100, true)).toBe(4);
 	});
 
 	it("lays tiles in rows of at most three, as even as they go", () => {
