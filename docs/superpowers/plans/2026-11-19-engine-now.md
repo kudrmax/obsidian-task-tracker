@@ -40,3 +40,20 @@ The ribbon on the stand («The whole screen») is stage 0's pager (round six, ~9
 ## In work while Max is away (2026-11-19 evening)
 
 - E4, the task menu and the new-task field, carried over from the plugin and the design exactly, in slices on branch `ui-menu` (from `ui-ribbon-follow`), each its own commit for Max to review later; not deployed to his stand.
+
+## Max's review of the stand (2026-11-20)
+
+Screenshots in [`2026-11-20-review/`](2026-11-20-review/). Max's screenshots still show «Description»: taken before 290bf71a (Notes) reached his stand.
+
+| # | Max's remark | Kind | State |
+|---|---|---|---|
+| 1 | The menu splits in pieces around the task's title (`1-menu-gaps.png`); he wants one piece. Then: what if it doesn't fit the phone's screen — what do apps usually do | discuss, variants as boards | **next to discuss** |
+| 2 | Between two groups three stripes: grey, black, grey (`2-menu-dividers.png`, `3-divider-closeup.png`). One grey stripe, no black | fix | in work |
+| 3 | Subtask leaves the Edit row and stands in one row with First step: both make a subtask | fix (core's layout, then engine) | in work |
+| 4 | Tasks lying on each other on the calendar | — | **accepted** |
+| 5 | Drop between calendar and list jerks: the card grows part way, stops (red mark in `5-drop-stops-short.png`), then finishes. Both ways. Reported about five times | bug, root cause | in work — read Decisions 61 (reverted) and 60, stage0.md first |
+| 6 | «Переезд» carried to the calendar turns into «Упаковать книги» | bug: mocks or real | in work |
+| 7 | Dashed place filled only on the calendar | — | **accepted** |
+| 8 | Double click: the menu flashes, then rename. Single and double click must be told apart; double click with the menu open must rename too | fix | in work |
+| 9a | Inline notes in the menu: Enter closes, Shift+Enter adds a strange indent (like spaces); no proper new line | fix | in work |
+| 9b | Notes look different in three places (menu inline, full screen, the field); one look, variants shown to Max before building | discuss, variants as boards | after 1 |
