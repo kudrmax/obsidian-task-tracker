@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Notes — один вид (компонент)</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: {{c.bg}}; color: {{c.text}}; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif; font-size: 15px;">
+
+<dc-import name="Screen" foot="prod" plus="true" theme="{{theme}}" right-mode="calendar" layout="bottom" task-shape="capsule" task-height="35" stack-gap="2" hint-size="390px,844px"></dc-import>
+
+<div style="position: absolute; left: 0; top: 166px; width: 187px; height: {{list.coverH}}px; background: {{c.bg}}; z-index: 5;"></div>
+<div style="position: absolute; left: 10px; top: 166px; width: 380px; height: {{list.boxH}}px; overflow: hidden; display: flex; flex-direction: column; justify-content: {{list.justify}}; gap: 2px; z-index: 6;">
+<sc-for list="{{list.rows}}" as="r" hint-placeholder-count="8">
+<sc-if value="{{r.plain}}" hint-placeholder-val="{{true}}">
+<div style="position: relative; flex-shrink: 0; width: 175px; height: 35px; box-sizing: border-box; overflow: hidden; background: {{c.card}}; border-radius: 17.5px; padding: 0 10px 0 14px; display: flex; align-items: center; gap: 6px;">
+<div style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);">{{r.title}}</div>
+<sc-if value="{{r.desc}}" hint-placeholder-val="{{false}}"><span style="flex-shrink: 0; min-width: 22px; display: flex; justify-content: center; color: {{c.muted}};"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" aria-hidden="true" style="display: block;"><path d="{{icons.description}}"></path></svg></span></sc-if>
+</div>
+</sc-if>
+<sc-if value="{{r.field}}" hint-placeholder-val="{{false}}">
+<div style="position: relative; flex-shrink: 0; width: 175px;">
+<sc-if value="{{edit.panel}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: 0; bottom: calc(100% + 10px); width: 300px; box-sizing: border-box; padding: 10px 14px 10px 6px; border-radius: 14px; background: {{c.panel}}; box-shadow: {{c.panelShadow}}; color: {{md.text}}; font-family: {{md.font}};">
+<sc-for list="{{edit.items}}" as="it" hint-placeholder-count="4">
+<div style="display: flex; align-items: flex-start;"><span style="width: {{it.marker}}px; height: {{it.lh}}px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;"><span style="width: {{it.dot}}px; height: {{it.dot}}px; border-radius: 50%; background: {{it.dotInk}};"></span></span><div style="flex: 1; min-width: 0; font-size: {{it.fs}}px; line-height: {{it.lh}}px; overflow-wrap: anywhere;"><sc-for list="{{it.parts}}" as="p" hint-placeholder-count="1"><span style="color: {{p.color}}; text-decoration: {{p.deco}}; text-underline-offset: 2px;">{{p.t}}</span></sc-for><sc-if value="{{it.cursor}}" hint-placeholder-val="{{false}}"><span style="display: inline-block; width: 2px; height: {{it.caretH}}px; vertical-align: {{it.caretAlign}}px; border-radius: 1px; background: {{md.caret}};"></span></sc-if></div></div>
+</sc-for>
+</div>
+</sc-if>
+<div style="box-sizing: border-box; min-height: 35px; border-radius: 17.5px; background: {{c.card}}; box-shadow: inset 0 0 0 1.5px {{c.accent}}; padding: 8.5px 10px {{edit.padBottom}}px 14px;">
+<div style="font-size: 15px; line-height: 18px; overflow-wrap: anywhere;">Купить билеты в Белград</div>
+<sc-if value="{{edit.inside}}" hint-placeholder-val="{{false}}">
+<div style="margin: {{edit.gapTop}}px 0 0 -6px; color: {{edit.ink}}; font-family: {{edit.font}};">
+<sc-for list="{{edit.items}}" as="it" hint-placeholder-count="4">
+<div style="display: flex; align-items: flex-start;"><span style="width: {{it.marker}}px; height: {{it.lh}}px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;"><span style="width: {{it.dot}}px; height: {{it.dot}}px; border-radius: 50%; background: {{it.dotInk}};"></span></span><div style="flex: 1; min-width: 0; font-size: {{it.fs}}px; line-height: {{it.lh}}px; overflow-wrap: anywhere;"><sc-for list="{{it.parts}}" as="p" hint-placeholder-count="1"><span style="color: {{p.color}}; text-decoration: {{p.deco}}; text-underline-offset: 2px;">{{p.t}}</span></sc-for><sc-if value="{{it.cursor}}" hint-placeholder-val="{{false}}"><span style="display: inline-block; width: 2px; height: {{it.caretH}}px; vertical-align: {{it.caretAlign}}px; border-radius: 1px; background: {{md.caret}};"></span></sc-if></div></div>
+</sc-for>
+</div>
+</sc-if>
+</div>
+</div>
+</sc-if>
+</sc-for>
+</div>
+
+<sc-if value="{{menu.on}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; inset: 0; background: {{c.backdrop}}; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); z-index: 10;"></div>
+
+<sc-if value="{{menu.peek}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: 10px; bottom: {{menu.peekBottom}}px; width: 300px; box-sizing: border-box; padding: 10px 14px 10px 6px; border-radius: 14px; background: {{c.panel}}; box-shadow: {{c.panelShadow}}; color: {{md.text}}; font-family: {{md.font}}; z-index: 11;">
+<sc-for list="{{menu.items}}" as="it" hint-placeholder-count="3">
+<div style="display: flex; align-items: flex-start;"><span style="width: {{it.marker}}px; height: {{it.lh}}px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;"><span style="width: {{it.dot}}px; height: {{it.dot}}px; border-radius: 50%; background: {{it.dotInk}};"></span></span><div style="flex: 1; min-width: 0; font-size: {{it.fs}}px; line-height: {{it.lh}}px; overflow-wrap: anywhere;"><sc-for list="{{it.parts}}" as="p" hint-placeholder-count="1"><span style="color: {{p.color}}; text-decoration: {{p.deco}}; text-underline-offset: 2px;">{{p.t}}</span></sc-for></div></div>
+</sc-for>
+</div>
+</sc-if>
+
+<div style="position: absolute; left: 10px; bottom: {{menu.copyBottom}}px; width: {{menu.copyW}}; box-sizing: border-box; min-height: 35px; border-radius: 17.5px; background: {{c.card}}; padding: 8.5px 10px {{menu.padBottom}}px 14px; z-index: 11;">
+<div style="display: flex; align-items: flex-start; gap: 6px;">
+<div style="flex: 1; min-width: 0; font-size: 15px; line-height: 18px; white-space: nowrap;">Купить билеты в Белград</div>
+<span style="flex-shrink: 0; min-width: 22px; height: 18px; display: flex; align-items: center; justify-content: center; color: {{c.muted}};"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" aria-hidden="true" style="display: block;"><path d="{{icons.description}}"></path></svg></span>
+</div>
+<sc-if value="{{menu.inside}}" hint-placeholder-val="{{false}}">
+<div style="margin: {{menu.gapTop}}px 0 0 -6px; color: {{menu.ink}}; font-family: {{menu.font}};">
+<sc-for list="{{menu.items}}" as="it" hint-placeholder-count="3">
+<div style="display: flex; align-items: flex-start;"><span style="width: {{it.marker}}px; height: {{it.lh}}px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;"><span style="width: {{it.dot}}px; height: {{it.dot}}px; border-radius: 50%; background: {{it.dotInk}};"></span></span><div style="flex: 1; min-width: 0; font-size: {{it.fs}}px; line-height: {{it.lh}}px; overflow-wrap: anywhere;"><sc-for list="{{it.parts}}" as="p" hint-placeholder-count="1"><span style="color: {{p.color}}; text-decoration: {{p.deco}}; text-underline-offset: 2px;">{{p.t}}</span></sc-for></div></div>
+</sc-for>
+</div>
+</sc-if>
+</div>
+
+<div style="position: absolute; left: 10px; top: {{menu.panelTop}}px; width: 300px; border-radius: 14px; overflow: hidden; background: {{c.panel}}; box-shadow: {{c.panelShadow}}; z-index: 11;">
+<sc-for list="{{groups}}" as="g" hint-placeholder-count="5">
+<div style="border-top: {{g.band}}; padding: 8px; display: flex; flex-direction: column; gap: 6px;">
+<sc-for list="{{g.rows}}" as="row" hint-placeholder-count="1">
+<div style="display: flex; gap: 6px;">
+<sc-for list="{{row}}" as="t" hint-placeholder-count="3">
+<div style="flex: 1; min-width: 0; height: {{g.h}}px; border-radius: 10px; background: {{c.tile}}; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: {{g.gap}}px;">
+<svg width="{{g.icon}}" height="{{g.icon}}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="color: {{t.ink}};"><path d="{{t.d}}" fill="{{t.fillAll}}"></path><path d="{{t.fd}}" fill="currentColor" stroke="none"></path></svg>
+<span style="font-size: {{g.fs}}px; font-weight: 500; white-space: nowrap; color: {{c.text}};">{{t.label}}</span>
+</div>
+</sc-for>
+</div>
+</sc-for>
+</div>
+</sc-for>
+<div style="border-top: 8px solid {{c.gap}}; height: 44px; box-sizing: content-box; padding: 0 16px; display: flex; align-items: center; color: {{c.danger}}; font-size: 16px;"><span style="flex: 1;">Delete</span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{icons.delete}}"></path></svg></div>
+</div>
+</sc-if>
+
+<sc-if value="{{full.on}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: 0; top: 54px; width: 390px; height: 722px; background: {{c.bg}}; z-index: 7;"></div>
+<div style="position: absolute; left: 0; right: 0; top: 54px; height: 44px; padding: 0 10px; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; z-index: 8;">
+<span style="height: 44px; padding: 0 10px; display: flex; align-items: center; color: {{c.accent}}; font-size: 17px;">Close</span>
+<span style="height: 44px; padding: 0 10px; display: flex; align-items: center; color: {{c.accent}}; font-size: 17px; font-weight: 600;">Done</span>
+</div>
+<div style="position: absolute; left: 20px; top: 106px; width: 350px; z-index: 8;">
+<div style="font-size: 22px; line-height: 28px; font-weight: 700; overflow-wrap: anywhere;">Купить билеты в Белград</div>
+<div style="margin: {{full.gapTop}}px 0 0 -6px; color: {{full.ink}}; font-family: {{full.font}};">
+<sc-for list="{{full.items}}" as="it" hint-placeholder-count="4">
+<div style="display: flex; align-items: flex-start;"><span style="width: {{it.marker}}px; height: {{it.lh}}px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;"><span style="width: {{it.dot}}px; height: {{it.dot}}px; border-radius: 50%; background: {{it.dotInk}};"></span></span><div style="flex: 1; min-width: 0; font-size: {{it.fs}}px; line-height: {{it.lh}}px; overflow-wrap: anywhere;"><sc-for list="{{it.parts}}" as="p" hint-placeholder-count="1"><span style="color: {{p.color}}; text-decoration: {{p.deco}}; text-underline-offset: 2px;">{{p.t}}</span></sc-for><sc-if value="{{it.cursor}}" hint-placeholder-val="{{false}}"><span style="display: inline-block; width: 2px; height: {{it.caretH}}px; vertical-align: {{it.caretAlign}}px; border-radius: 1px; background: {{md.caret}};"></span></sc-if></div></div>
+</sc-for>
+</div>
+</div>
+<div style="position: absolute; left: 0; right: 0; top: 500px; height: 44px; box-sizing: border-box; padding: 0 6px; background: {{c.kbd}}; border-top: 0.5px solid {{c.sep}}; display: flex; align-items: center; gap: 4px; z-index: 9;">
+<span style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; color: {{c.text}};"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{icons.outdent}}"></path></svg></span>
+<span style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; color: {{c.text}};"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{icons.indent}}"></path></svg></span>
+</div>
+</sc-if>
+
+<sc-if value="{{edit.on}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: 0; right: 0; top: 500px; height: 44px; box-sizing: border-box; padding: 0 8px; background: {{c.bg}}; display: flex; align-items: center; gap: 8px; z-index: 9;">
+<div style="width: 76px; height: 36px; border-radius: 18px; background: {{c.card}}; display: flex; flex-shrink: 0;">
+<span style="flex: 1; display: flex; align-items: center; justify-content: center; color: {{c.inkDim}};"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{icons.outdent}}"></path></svg></span>
+<span style="flex: 1; display: flex; align-items: center; justify-content: center; color: {{c.text}};"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{icons.indent}}"></path></svg></span>
+</div>
+<sc-for list="{{barButtons}}" as="b" hint-placeholder-count="4">
+<span style="width: 38px; height: 36px; flex-shrink: 0; border-radius: 18px; background: {{c.card}}; display: flex; align-items: center; justify-content: center; color: {{b.ink}};"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{b.d}}"></path></svg></span>
+</sc-for>
+<div style="flex: 1; min-width: 0; height: 36px; border-radius: 18px; background: {{c.card}}; padding: 0 12px 0 10px; display: flex; align-items: center; justify-content: center; gap: 6px; color: {{c.text}};"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0;"><path d="{{icons.now}}"></path></svg><span style="font-size: 15px; font-weight: 600;">Now</span></div>
+</div>
+</sc-if>
+
+<sc-if value="{{keyboard}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; left: 0; right: 0; top: 544px; height: 300px; box-sizing: border-box; padding: 8px 3px 0; background: {{c.kbd}}; display: flex; flex-direction: column; gap: 11px; z-index: 9;">
+<sc-for list="{{letterRows}}" as="row" hint-placeholder-count="2">
+<div style="display: flex; gap: 5px;">
+<sc-for list="{{row}}" as="k" hint-placeholder-count="11">
+<span style="flex: 1; height: 42px; border-radius: 5px; background: {{c.key}}; color: {{c.text}}; display: flex; align-items: center; justify-content: center; font-size: 21px; box-shadow: {{c.keyShadow}};">{{k}}</span>
+</sc-for>
+</div>
+</sc-for>
+<div style="display: flex; gap: 5px;">
+<span style="width: 42px; flex-shrink: 0; height: 42px; border-radius: 5px; background: {{c.fnKey}};"></span>
+<sc-for list="{{row3}}" as="k" hint-placeholder-count="9">
+<span style="flex: 1; height: 42px; border-radius: 5px; background: {{c.key}}; color: {{c.text}}; display: flex; align-items: center; justify-content: center; font-size: 21px; box-shadow: {{c.keyShadow}};">{{k}}</span>
+</sc-for>
+<span style="width: 42px; flex-shrink: 0; height: 42px; border-radius: 5px; background: {{c.fnKey}};"></span>
+</div>
+<div style="display: flex; gap: 5px;">
+<span style="width: 46px; flex-shrink: 0; height: 42px; border-radius: 5px; background: {{c.fnKey}}; color: {{c.text}}; display: flex; align-items: center; justify-content: center; font-size: 16px;">123</span>
+<span style="width: 42px; flex-shrink: 0; height: 42px; border-radius: 5px; background: {{c.fnKey}};"></span>
+<span style="flex: 1; height: 42px; border-radius: 5px; background: {{c.key}}; color: {{c.text}}; display: flex; align-items: center; justify-content: center; font-size: 16px;">Пробел</span>
+<span style="width: 92px; flex-shrink: 0; height: 42px; border-radius: 5px; background: {{c.fnKey}}; color: {{c.text}}; display: flex; align-items: center; justify-content: center; font-size: 16px; outline: {{returnMark}}; outline-offset: 3px;">Ввод</span>
+</div>
+</div>
+</sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"look":{"editor":"enum","default":"panel","options":["panel","inside","grey"]},"place":{"editor":"enum","default":"menu","options":["menu","edit","full"]},"theme":{"editor":"enum","default":"dark","options":["dark","light"]},"marks":{"editor":"boolean","default":true},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const look = this.props.look ?? 'panel';
+    const place = this.props.place ?? 'menu';
+    const light = this.props.theme === 'light';
+    const c = light
+      ? { bg: '#FFFFFF', card: '#F2F2F2', text: '#000000', muted: '#8E8E93', inkDim: '#C7C7CC', accent: '#8A5CF5', backdrop: 'rgba(0,0,0,0.22)', panel: 'rgba(250,250,252,0.97)', tile: 'rgba(0,0,0,0.05)', gap: '#E5E5EA', sep: '#D1D1D6', panelShadow: '0 16px 40px rgba(0,0,0,0.18), 0 0 0 0.5px rgba(0,0,0,0.1)', danger: '#FF3B30', p1: '#FF3B30', p2: '#FF9500', mark: '#FF9500', kbd: '#D1D3D9', key: '#FFFFFF', fnKey: '#ABB0BC', keyShadow: '0 1px 0 rgba(0,0,0,0.3)' }
+      : { bg: '#000000', card: '#1C1C1C', text: '#FFFFFF', muted: '#8E8E93', inkDim: '#636366', accent: '#9580FF', backdrop: 'rgba(0,0,0,0.55)', panel: 'rgba(44,44,46,0.96)', tile: 'rgba(255,255,255,0.08)', gap: '#1C1C1E', sep: '#48484A', panelShadow: '0 16px 40px rgba(0,0,0,0.6)', danger: '#FF453A', p1: '#FF453A', p2: '#FF9F0A', mark: '#FFD60A', kbd: '#1E1E20', key: '#48484B', fnKey: '#2F2F31', keyShadow: '0 1px 0 rgba(0,0,0,0.5)' };
+    const md = light
+      ? { font: "Inter, -apple-system, system-ui, sans-serif", text: '#222222', faint: '#ABABAB', link: '#8A5CF5', caret: '#8A5CF5' }
+      : { font: "Inter, -apple-system, system-ui, sans-serif", text: '#DADADA', faint: '#666666', link: '#A88BFA', caret: '#A88BFA' };
+    const sys = "-apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif";
+    const icons = {
+      description: 'M4 6h16 M4 12h16 M4 18h10',
+      outdent: 'M21 6H11 M21 12H11 M21 18H11 M7 8l-4 4 4 4',
+      indent: 'M21 6H11 M21 12H11 M21 18H11 M3 8l4 4-4 4',
+      priority: 'M5.5 21V4 M5.5 4.5h11.5l-2.5 4.75 2.5 4.75H5.5',
+      project: 'M3.5 7.5a2 2 0 0 1 2-2h3.8l2 2.2h7.2a2 2 0 0 1 2 2v7.8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z',
+      repeat: 'M17 2.5l3.5 3.5-3.5 3.5 M3.5 11.5V10a4 4 0 0 1 4-4h13 M7 21.5L3.5 18 7 14.5 M20.5 12.5V14a4 4 0 0 1-4 4h-13',
+      now: 'M12 8a4 4 0 1 1 0 8a4 4 0 1 1 0-8z M12 2.5v2 M12 19.5v2 M2.5 12h2 M19.5 12h2 M5.3 5.3l1.4 1.4 M17.3 17.3l1.4 1.4 M5.3 18.7l1.4-1.4 M17.3 6.7l1.4-1.4',
+      tomorrow: 'M4 12h13 M12 6l6 6-6 6 M20.5 5v14',
+      calendar: 'M6.5 5h11a3 3 0 0 1 3 3v9.5a3 3 0 0 1-3 3h-11a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3z M3.5 10h17 M8 3v3.5 M16 3v3.5',
+      rename: 'M4 20h4L19 9l-4-4L4 16z M13.5 6.5l4 4',
+      firstStep: 'M3.5 20h5v-5h5v-5h5V5h2',
+      subtask: 'M5 4v8a4 4 0 0 0 4 4h11 M16 12l4 4-4 4',
+      fullScreen: 'M4 9V4h5 M20 9V4h-5 M4 15v5h5 M20 15v5h-5',
+      openFile: 'M14 4h6v6 M20 4l-9 9 M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5',
+      delete: 'M4 7h16 M9 7V4.5h6V7 M6 7l1 13h10l1-13'
+    };
+    const CIRCLE = 'M12 3a9 9 0 1 1 0 18a9 9 0 1 1 0-18z';
+
+    const styles = {
+      panel: { fs: 15, lh: 22.5, ink: md.text, dot: md.faint, link: md.link, font: md.font, gapTop: 0 },
+      inside: { fs: 15, lh: 22.5, ink: md.text, dot: md.faint, link: md.link, font: md.font, gapTop: 4 },
+      grey: { fs: 13, lh: 18, ink: c.muted, dot: c.muted, link: c.muted, font: sys, gapTop: 2 }
+    };
+    const fullStyles = {
+      panel: { fs: 16, lh: 24, ink: md.text, dot: md.faint, link: md.link, font: md.font, gapTop: 20 },
+      inside: { fs: 16, lh: 24, ink: md.text, dot: md.faint, link: md.link, font: md.font, gapTop: 20 },
+      grey: { fs: 15, lh: 20, ink: c.muted, dot: c.muted, link: c.muted, font: sys, gapTop: 8 }
+    };
+    const notes = (s, typing) => {
+      const part = (t, link) => ({ t, color: link ? s.link : s.ink, deco: link ? 'underline' : 'none' });
+      const lines = [
+        [part('Летим 14 ноября, обратно 21-го')],
+        [part('Сравнить на '), part('Aviasales', true)],
+        [part('Багаж: один чемодан на двоих')]
+      ];
+      if (typing) lines.push([]);
+      return lines.map((parts, i) => ({
+        parts, fs: s.fs, lh: s.lh,
+        marker: Math.round(s.fs * 1.5),
+        dot: Math.round(s.fs * 0.3 * 10) / 10,
+        dotInk: s.dot,
+        cursor: typing && i === lines.length - 1,
+        caretH: Math.round(s.fs * 1.25),
+        caretAlign: -Math.round(s.fs * 0.25)
+      }));
+    };
+
+    const s = styles[look];
+    const above = ['Созвониться с врачом', 'Записаться в барбершоп', 'Чай масала', 'Позвонить в банк', 'Оплатить интернет', 'Забрать посылку', 'Выбрать подарок маме', 'Сдать отчёт'];
+    const editing = place === 'edit';
+    const rows = editing
+      ? [...above.map((title) => ({ title, plain: true, field: false, desc: false })), { title: '', plain: false, field: true, desc: false }]
+      : [...above.slice(0, 4).map((title) => ({ title, plain: true, field: false, desc: false })), { title: 'Купить билеты в Белград', plain: true, field: false, desc: true }, ...above.slice(4).map((title) => ({ title, plain: true, field: false, desc: false }))];
+    const list = {
+      rows,
+      justify: editing ? 'flex-end' : 'flex-start',
+      boxH: editing ? 484 - 166 : 494,
+      coverH: editing ? 334 : 494
+    };
+
+    const edit = editing
+      ? { on: true, panel: look === 'panel', inside: look !== 'panel', items: notes(s, true), ink: s.ink, font: s.font, gapTop: s.gapTop, padBottom: look === 'panel' ? 8.5 : 9 }
+      : { on: false, panel: false, inside: false, items: [] };
+
+    const band = '8px solid ' + c.gap;
+    const tile = (label, d, ink, fd, fillAll) => ({ label, d, ink: ink ?? c.text, fd: fd ?? '', fillAll: fillAll ?? 'none' });
+    const groups = [
+      { rows: [[tile('Done', CIRCLE, null, CIRCLE), tile('In progress', CIRCLE, null, 'M12 3a9 9 0 0 1 0 18z'), tile('Won’t do', CIRCLE + ' M8 12h8')]] },
+      { rows: [[tile('p1', icons.priority, c.p1, '', 'currentColor'), tile('p2', icons.priority, c.p2, '', 'currentColor')]] },
+      { rows: [[tile('Tomorrow', icons.tomorrow, c.accent), tile('Pick a date', icons.calendar, c.accent), tile('Repeat', icons.repeat, c.accent)]] },
+      { small: true, rows: [[tile('Rename', icons.rename), tile('Notes', icons.description), tile('Project', icons.project)]] },
+      { small: true, rows: [[tile('First step', icons.firstStep), tile('Subtask', icons.subtask)], [tile('Open full screen', icons.fullScreen), tile('Open in Obsidian', icons.openFile)]] }
+    ].map((g, i) => ({ ...g, band: i === 0 ? '0' : band, h: g.small ? 52 : 66, icon: g.small ? 18 : 22, fs: g.small ? 12 : 13, gap: g.small ? 4 : 6 }));
+    const groupH = groups.reduce((sum, g, i) => sum + (i === 0 ? 0 : 8) + 16 + g.rows.length * g.h + (g.rows.length - 1) * 6, 0);
+    const panelH = groupH + 8 + 44;
+    const WINDOW_BOTTOM = 776 - 10;
+    const panelTop = WINDOW_BOTTOM - panelH;
+    const items = notes(s, false);
+    const notesH = items.length * s.lh;
+    const copyH = look === 'panel' ? 35 : 8.5 + 18 + s.gapTop + notesH + 9;
+    const copyBottom = 844 - (panelTop - 12);
+    const menu = place === 'menu'
+      ? {
+          on: true,
+          peek: look === 'panel',
+          inside: look !== 'panel',
+          items, ink: s.ink, font: s.font, gapTop: s.gapTop,
+          panelTop,
+          copyBottom,
+          copyW: look === 'panel' ? 'auto' : '300px',
+          padBottom: look === 'panel' ? 8.5 : 9,
+          peekBottom: copyBottom + copyH + 10
+        }
+      : { on: false, items: [] };
+
+    const fs = fullStyles[look];
+    const full = place === 'full'
+      ? { on: true, items: notes(fs, true), ink: fs.ink, font: fs.font, gapTop: fs.gapTop }
+      : { on: false, items: [] };
+
+    const marksOn = this.props.marks !== false;
+
+    return {
+      c, md, icons,
+      theme: light ? 'light' : 'dark',
+      list, edit, menu, full, groups,
+      keyboard: place !== 'menu',
+      returnMark: marksOn ? '2px dashed ' + c.mark : 'none',
+      barButtons: [
+        { d: icons.priority, ink: c.text },
+        { d: icons.project, ink: c.text },
+        { d: icons.repeat, ink: c.text },
+        { d: icons.description, ink: c.accent }
+      ],
+      letterRows: [
+        ['й', 'ц', 'у', 'к', 'е', 'н', 'г', 'ш', 'щ', 'з', 'х'],
+        ['ф', 'ы', 'в', 'а', 'п', 'р', 'о', 'л', 'д', 'ж', 'э']
+      ],
+      row3: ['я', 'ч', 'с', 'м', 'и', 'т', 'ь', 'б', 'ю']
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -2401,6 +2401,38 @@
    "h": 1340,
    "page": "projects",
    "title": "Группировка по проектам. Вариант 2 — в меню «⋯»"
+  },
+  "NotesV1.dc.html": {
+   "h": 2218,
+   "page": "notesone",
+   "title": "1. Панелью над задачей — как утверждено 01.11",
+   "w": 1418,
+   "x": 0,
+   "y": 0
+  },
+  "NotesV2.dc.html": {
+   "h": 2218,
+   "page": "notesone",
+   "title": "2. Прямо под названием, как на экране задачи",
+   "w": 1418,
+   "x": 1538,
+   "y": 0
+  },
+  "NotesV3.dc.html": {
+   "h": 2218,
+   "page": "notesone",
+   "title": "3. Серым под названием, как в поле сейчас",
+   "w": 1418,
+   "x": 3076,
+   "y": 0
+  },
+  "NotesLook.dc.html": {
+   "h": 844,
+   "page": "components",
+   "title": "Компонент экранов Notes (его показывают доски «Notes — один вид»)",
+   "w": 390,
+   "x": 22650,
+   "y": 0
   }
  },
  "createdOnFiles": {
@@ -3127,7 +3159,11 @@
   "Proj4V2.dc.html",
   "ProjNote.dc.html",
   "Proj5V1.dc.html",
-  "Proj5V2.dc.html"
+  "Proj5V2.dc.html",
+  "NotesV1.dc.html",
+  "NotesV2.dc.html",
+  "NotesV3.dc.html",
+  "NotesLook.dc.html"
  ],
  "pages": [
   {
@@ -3253,6 +3289,10 @@
   {
    "id": "projects",
    "name": "Проекты"
+  },
+  {
+   "id": "notesone",
+   "name": "Notes — один вид"
   }
  ],
  "title": "Task Calendar",
