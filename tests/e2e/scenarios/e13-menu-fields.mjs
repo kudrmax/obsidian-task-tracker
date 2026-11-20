@@ -85,8 +85,10 @@ export default {
 			const blockNow = () => t.cdp.eval(`(() => { const el = [...document.querySelectorAll("[data-block]")].find((b) => b.textContent.includes("Упаковать книги")); const r = el.getBoundingClientRect(); return { x: r.left + 20, y: r.top + 12, left: r.left, top: r.top, bottom: r.bottom }; })()`);
 			await tap(await blockNow());
 			await t.sleep(450);
-			const stack = await t.cdp.eval(`[...document.querySelectorAll(".tc-menu-subtasks > [data-stack]")].map((c) => { const r = c.getBoundingClientRect(); return { text: c.textContent, top: r.top, left: r.left }; })`);
+			const stackNow = () => t.cdp.eval(`[...document.querySelectorAll(".tc-menu-subtasks > [data-stack]")].map((c) => { const r = c.getBoundingClientRect(); return { text: c.textContent, top: r.top, left: r.left }; })`);
+			/** Read once the menu stands: it lifts to its place first (Decision 120). */
 			const menu = await menuNow(t);
+			const stack = await stackNow();
 			t.expect(JSON.stringify(stack.map((s) => s.text)) === JSON.stringify(["Упаковать книги", "Заказать машину"]), `its open subtasks stand under its copy (F107): ${JSON.stringify(stack)}`);
 			t.expect(stack.length === 2 && Math.abs(stack[0].top - (menu.copy.bottom + 2)) <= 1 && Math.abs(stack[0].left - menu.copy.left) <= 1, `right under the copy, 2 px apart: ${JSON.stringify(stack[0])} copy ${JSON.stringify(menu.copy)}`);
 			await t.shot("stack");
@@ -96,9 +98,11 @@ export default {
 			t.expect(sub && sub.words.includes("Done") && !sub.words.includes("Subtask") && !sub.words.includes("First step"), `a tap on a subtask opens its own menu, no Subtask or First step: ${JSON.stringify(sub?.words)}`);
 			t.expect(await t.cdp.eval(`getComputedStyle(document.querySelector(".tc-backdrop.tc-menu-layer")).opacity === "1"`), "in the same sheet: the backdrop stays");
 			await t.shot("subtask-menu");
+			/** The subtask's menu may stand the block elsewhere (its panel another height): the card is where it stands now. */
+			const pressed = (await stackNow()).find((c) => c.text === "Заказать машину");
 			await press("Rename");
 			const f = await field();
-			t.expect(f && f.text === "Заказать машину" && Math.abs(f.top - stack[1].top) <= 1, `Rename turns that card into the field in its place (F108): ${JSON.stringify(f)}`);
+			t.expect(f && f.text === "Заказать машину" && pressed && Math.abs(f.top - pressed.top) <= 1, `Rename turns that card into the field in its place (F108): ${JSON.stringify(f)} card ${JSON.stringify(pressed)}`);
 			const subBar = await bars();
 			t.expect(subBar && subBar.shifts === 0 && subBar.flag && !subBar.project && subBar.place === null, `a stack card's rename has the bar with the flag only: ${JSON.stringify(subBar)}`);
 			t.expect(await t.cdp.eval(`getComputedStyle(document.querySelector(".tc-backdrop.tc-menu-layer")).opacity === "1"`), "the sheet stays while the stack's card is renamed");

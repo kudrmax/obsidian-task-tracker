@@ -25,7 +25,7 @@ export default {
 			await t.setStop("soon");
 			const title = (await t.oracle.cards("day"))[2];
 			const card = await cardBy(t, title, "day");
-			const opening = await menuFrames(t, () => tap(card), 500);
+			const opening = await menuFrames(t, () => tap(card), 900);
 			t.expect(openingFaults(opening, card).length === 0, `the menu opens from its card, each part placed before it shows: ${JSON.stringify(openingFaults(opening, card).slice(0, 6))}`);
 			const shownAt = opening.find((f) => f.panels.some((p) => p.o > 0.005));
 			const full = opening.find((f) => f.panels.length && f.panels.every((p) => p.o > 0.99));
@@ -97,7 +97,7 @@ export default {
 			await t.setClock("12:00");
 			await t.cdp.eval(`(async () => { window.__tcStand.step("step-calendar"); await new Promise((r) => setTimeout(r, 700)); return 1; })()`);
 			const block = await t.cdp.eval(`(() => { const el = [...document.querySelectorAll("[data-block]")].find((b) => b.textContent.includes("Обед")); const r = el.getBoundingClientRect(); return { x: r.left + 20, y: r.top + 12, left: r.left, top: r.top, width: r.width, height: r.height }; })()`);
-			const opening = await menuFrames(t, () => tap(block), 500);
+			const opening = await menuFrames(t, () => tap(block), 900);
 			t.expect(openingFaults(opening, block).length === 0, `a block's menu opens from the block: ${JSON.stringify(openingFaults(opening, block).slice(0, 6))}`);
 			const open = await menuNow(t);
 			t.expect(open.copyText.includes("Обед") && Math.abs(open.copy.height - block.height) <= 1, `the block's copy over the backdrop, its height kept: ${JSON.stringify(open.copy)} vs ${block.height}`);

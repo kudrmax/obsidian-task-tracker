@@ -106,7 +106,7 @@ export default {
 		if (item === "pick a date") {
 			const inbox = (await t.oracle.cards("soon"))[0];
 			await open(inbox, "soon");
-			const frames = await menuFrames(t, () => press("Pick a date"), 300);
+			const frames = await menuFrames(t, () => press("Pick a date"), 500);
 			const picker = await menuNow(t);
 			const today = await t.cdp.eval(`(() => { const d = new Date(Date.now() - 5 * 3600e3); return d.toISOString().slice(0, 10).slice(0, 8) + String(d.getDate()).padStart(2, "0"); })()`);
 			t.expect(picker && picker.panels.length === 1 && Math.abs(picker.panels[0].width - 300) <= 0.5, `Pick a date shows the month in the menu's place, 300 wide: ${JSON.stringify(picker?.panels)}`);

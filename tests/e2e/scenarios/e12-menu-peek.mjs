@@ -16,7 +16,7 @@ export default {
 		const tap = (p) => (t.platform === "phone" ? t.input.tap(p.x, p.y) : t.input.click(p.x, p.y));
 		await t.setStop("calendar");
 		const card = await cardBy(t, TITLE, "day");
-		const frames = await menuFrames(t, () => tap(card), 500);
+		const frames = await menuFrames(t, () => tap(card), 900);
 		t.expect(openingFaults(frames, card).length === 0, `the menu opens as designed: ${JSON.stringify(openingFaults(frames, card).slice(0, 4))}`);
 		const peek = await t.cdp.eval(`(() => { const p = document.querySelector(".tc-menu-layer .tc-desc-peek"); if (!p) return null; const r = p.getBoundingClientRect(); let o = 1; for (let n = p; n && n !== document.body; n = n.parentElement) o *= +getComputedStyle(n).opacity; return { left: r.left, top: r.top, bottom: r.bottom, width: r.width, o, text: p.textContent }; })()`);
 		const menu = await menuNow(t);

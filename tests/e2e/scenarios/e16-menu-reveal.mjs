@@ -20,11 +20,12 @@ export default {
 			const cut = await t.cdp.eval(`(() => { const s = document.querySelector('[data-list="inbox"]'); const box = s.getBoundingClientRect(); const hit = [...s.querySelectorAll(".tc-card[data-id]")].map((c) => ({ c, r: c.getBoundingClientRect() })).find(({ r }) => r.top < box.bottom - 8 && r.bottom > box.bottom + 4); if (!hit) return null; return { id: hit.c.dataset.id, title: hit.c.querySelector(".tc-card-title").textContent, x: hit.r.left + 30, y: (hit.r.top + box.bottom) / 2, bottom: box.bottom, top: box.top }; })()`);
 			if (!t.expect(cut !== null, "a card cut by the list's bottom edge")) return;
 			await tap(cut);
-			await t.sleep(450);
+			await t.sleep(t.platform === "phone" ? 600 : 850);
 			const menu = await menuNow(t);
 			const card = await t.cdp.eval(`(() => { const r = document.querySelector('[data-list="inbox"] .tc-card[data-id="${cut.id}"]').getBoundingClientRect(); return { top: r.top, bottom: r.bottom, left: r.left }; })()`);
 			t.expect(card.bottom <= cut.bottom + 1, `the list scrolled the card into its sight: ${JSON.stringify(card)} edge ${cut.bottom}`);
-			t.expect(menu && Math.abs(menu.copy.top - card.top) <= 1 && menu.copyText.includes(cut.title), `the copy stands over the whole card: ${JSON.stringify(menu?.copy)} card ${JSON.stringify(card)}`);
+			/** The block stands over its card, or higher where the room under the card can't take the panel (Decision 120): the copy on the card's left, never under it. */
+			t.expect(menu && Math.abs(menu.copy.left - card.left) <= 1 && menu.copy.top <= card.top + 1 && menu.copyText.includes(cut.title), `the copy stands over the card or above it: ${JSON.stringify(menu?.copy)} card ${JSON.stringify(card)}`);
 		}
 		if (item === "calendar") {
 			await t.setClock("12:00");
