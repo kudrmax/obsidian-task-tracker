@@ -47,13 +47,13 @@ Screenshots in [`2026-11-20-review/`](2026-11-20-review/). Max's screenshots sti
 
 | # | Max's remark | Kind | State |
 |---|---|---|---|
-| 1 | The menu splits in pieces around the task's title (`1-menu-gaps.png`); he wants one piece. Then: what if it doesn't fit the phone's screen — what do apps usually do | decided by Max: iOS-style — title on top, the menu one piece under it, the block moves up when there's no room, the menu scrolls inside when taller than the screen; animations must be beautiful | in work (after #2, #8, #9a) |
-| 2 | Between two groups three stripes: grey, black, grey (`2-menu-dividers.png`, `3-divider-closeup.png`). One grey stripe, no black | fix | in work |
-| 3 | Subtask leaves the Edit row and stands in one row with First step: both make a subtask | fix (core's layout, then engine) | in work |
+| 1 | The menu splits in pieces around the task's title (`1-menu-gaps.png`); he wants one piece. Then: what if it doesn't fit the phone's screen — what do apps usually do | decided by Max: iOS-style — title on top, the menu one piece under it, the block moves up when there's no room, the menu scrolls inside when taller than the screen; animations must be beautiful | **accepted** by Max |
+| 2 | Between two groups three stripes: grey, black, grey (`2-menu-dividers.png`, `3-divider-closeup.png`). One grey stripe, no black | fix | **accepted** by Max |
+| 3 | Subtask leaves the Edit row and stands in one row with First step: both make a subtask | fix (core's layout, then engine) | **accepted** by Max |
 | 4 | Tasks lying on each other on the calendar | — | **accepted** |
-| 5 | Drop between calendar and list jerks: the card grows part way, stops (red mark in `5-drop-stops-short.png`), then finishes. Both ways. Reported about five times | bug, root cause | in work — read Decisions 61 (reverted) and 60, stage0.md first |
-| 6 | «Переезд» carried to the calendar turns into «Упаковать книги» | bug: mocks or real | in work |
+| 5 | Drop between calendar and list jerks: the card grows part way, stops (red mark in `5-drop-stops-short.png`), then finishes. Both ways. Reported about five times | bug, root cause | **accepted** by Max |
+| 6 | «Переезд» carried to the calendar turns into «Упаковать книги» | bug: mocks or real | **accepted** by Max |
 | 7 | Dashed place filled only on the calendar | — | **accepted** |
-| 8 | Double click: the menu flashes, then rename. Single and double click must be told apart; double click with the menu open must rename too | fix | in work |
-| 9a | Inline notes in the menu: Enter closes, Shift+Enter adds a strange indent (like spaces); no proper new line | fix | in work |
-| 9b | Notes look different in three places (menu inline, full screen, the field); one look, variants shown to Max before building | discuss, variants as boards | after 1 |
+| 8 | Double click: the menu flashes, then rename. Single and double click must be told apart; double click with the menu open must rename too | fix | double click removed by Max for now (Decision 123); **open** |
+| 9a | Inline notes in the menu: Enter closes, Shift+Enter adds a strange indent (like spaces); no proper new line | fix | **accepted** by Max |
+| 9b | Notes look different in three places (menu inline, full screen, the field); one look, variants shown to Max before building | discuss, variants as boards | **next**: variants as pictures, a new line in notes on the phone included |
