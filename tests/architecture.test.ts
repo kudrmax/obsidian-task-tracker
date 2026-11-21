@@ -6,7 +6,7 @@ import { doorMethods } from "../core/application/PhoneCalls";
 
 const ROOT = resolve(__dirname, "..");
 
-type Layer = "domain" | "application" | "infrastructure" | "ui" | "phone" | "settings" | "root" | "stand" | "agentReads" | "agentMain";
+type Layer = "domain" | "application" | "infrastructure" | "ui" | "phone" | "settings" | "root" | "stand" | "adapters" | "agentReads" | "agentMain";
 
 /** Obsidian's own packages: the app provides them at run time (`external` in esbuild.config.mjs). */
 const OBSIDIAN_PACKAGES = ["obsidian", "@codemirror/state", "@codemirror/view"];
@@ -17,15 +17,26 @@ const OBSIDIAN_PACKAGES = ["obsidian", "@codemirror/state", "@codemirror/view"];
  */
 const UI_PACKAGES = ["react", "react/jsx-runtime", "react-dom", "react-dom/client", "zustand", "zustand/vanilla", "zustand/react/shallow", "motion/react", "@use-gesture/react", "@tanstack/react-virtual", "@dnd-kit/core", "@dnd-kit/sortable", "@dnd-kit/utilities", "@floating-ui/react"];
 
+/**
+ * The engine's port over the core (`CorePort`, the plan's step 5): its own layer between the two, which turns the engine's
+ * words into the core's and back and decides nothing.
+ */
+const ADAPTERS = "obsidian/adapters/";
+/** The core over a tasks file in memory: the stand's and the checks' composition, as `obsidian/compose.ts` is the plugin's. */
+const MEMORY_CORE = "obsidian/memoryCore.ts";
+/** The engine's port, the one file of the engine the adapters see. */
+const ENGINE_PORT = "obsidian/ui/engine/port.ts";
+
 /** The agents' program (`agent/`): its composition over Node's files, as `obsidian/compose.ts` is the plugin's. */
 const AGENT_ROOT = ["agent/compose.ts", "agent/nodePorts.ts"];
 
 function layerOf(file: string): Layer | null {
-	if (["obsidian/main.ts", "obsidian/demo.ts", "obsidian/compose.ts", "obsidian/settingsFile.ts", ...AGENT_ROOT].includes(file)) return "root";
+	if (["obsidian/main.ts", "obsidian/demo.ts", "obsidian/compose.ts", "obsidian/settingsFile.ts", MEMORY_CORE, ...AGENT_ROOT].includes(file)) return "root";
 	if (file === "agent/main.ts") return "agentMain";
 	if (file.startsWith("core/application/agent/")) return "agentReads";
 	if (file === "core/settings.ts") return "settings";
 	if (file.startsWith("obsidian/stand/")) return "stand";
+	if (file.startsWith(ADAPTERS)) return "adapters";
 	const m = /^(?:core|obsidian)\/(domain|application|infrastructure|ui|phone)\//.exec(file);
 	return m ? (m[1] as Layer) : null;
 }
@@ -54,11 +65,14 @@ const MAY_IMPORT: Readonly<Record<Layer, (target: string) => boolean>> = {
 	agentMain: (t) => t === "core/application/contracts.ts",
 	settings: (t) => under(t, "domain"),
 	root: (t) => !under(t, "stand"),
+	/** `CorePort`: the contract and the engine's port, nothing else of the core or the engine. */
+	adapters: (t) => t.startsWith(ADAPTERS) || t === "core/application/contracts.ts" || t === ENGINE_PORT,
 	/**
 	 * The stand (`obsidian/stand`, docs/superpowers/specs/2026-11-18-ui-engine.md): the engine over `MockPort`, never the core;
 	 * nothing imports it. Of the infrastructure only the trackpad's native module, as the plugin gets it (Decision 126).
+	 * The core only through `CorePort` over the core in memory (Decision 135), never a module of the core itself.
 	 */
-	stand: (t) => under(t, "stand") || under(t, "ui") || t.startsWith(STAND_TRACKPAD) || OBSIDIAN_PACKAGES.includes(t) || UI_PACKAGES.includes(t),
+	stand: (t) => under(t, "stand") || under(t, "ui") || t.startsWith(STAND_TRACKPAD) || t.startsWith(ADAPTERS) || t === MEMORY_CORE || OBSIDIAN_PACKAGES.includes(t) || UI_PACKAGES.includes(t),
 };
 
 const SOURCE = /\.(?:[cm]?[jt]sx?)$/;
@@ -157,6 +171,15 @@ describe("the guard itself", () => {
 		expect(MAY_IMPORT.stand("obsidian/infrastructure/VaultTaskFileStore.ts")).toBe(false);
 		expect(MAY_IMPORT.stand("obsidian/infrastructure/trackpad/MacTrackpadFingers.ts")).toBe(true);
 		expect(MAY_IMPORT.root("obsidian/stand/main.ts")).toBe(false);
+		expect(MAY_IMPORT.adapters("core/application/contracts.ts")).toBe(true);
+		expect(MAY_IMPORT.adapters(ENGINE_PORT)).toBe(true);
+		expect(MAY_IMPORT.adapters("core/application/TaskServiceImpl.ts")).toBe(false);
+		expect(MAY_IMPORT.adapters("core/application/composeCore.ts")).toBe(false);
+		expect(MAY_IMPORT.adapters("obsidian/ui/engine/store/index.ts")).toBe(false);
+		expect(MAY_IMPORT.adapters("obsidian/ui/design.ts")).toBe(false);
+		expect(MAY_IMPORT.adapters("obsidian/infrastructure/VaultTaskFileStore.ts")).toBe(false);
+		expect(MAY_IMPORT.ui("obsidian/adapters/CorePort.ts")).toBe(false);
+		expect(MAY_IMPORT.stand("obsidian/adapters/CorePort.ts")).toBe(true);
 		expect(MAY_IMPORT.ui("obsidian/stand/main.ts")).toBe(false);
 		expect(MAY_IMPORT.ui("@anthropic-ai/claude-agent-sdk")).toBe(false);
 		expect(MAY_IMPORT.ui("core/application/TaskServiceImpl.ts")).toBe(false);
