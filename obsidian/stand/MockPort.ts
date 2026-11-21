@@ -1,7 +1,7 @@
-import type { AllDayEvent, Block, CardFace, DayEvent, Destination, Edge, EntryBar, EntryCommit, EntryDraft, EntryField, EventPaint, FieldActionId, ListData, ListId, ListPlaceId, MenuAction, MenuFrom, MenuModel, MenuStatusId, Now, PlaceId, ReminderKind, RenameStart, Row, ScreenData, ScreenPort } from "../ui/engine/port";
+import type { AllDayEvent, Block, CardFace, DayEvent, Destination, Edge, EntryBar, EntryCommit, EntryDraft, EntryField, EventPaint, FieldActionId, ListData, ListId, ListPlaceId, MenuAction, MenuFrom, MenuModel, MenuStatusId, Now, PlaceId, ProjectPage, ReminderKind, RenameStart, Row, ScreenData, ScreenPort } from "../ui/engine/port";
 import { type FieldFacts, fieldBar, type MenuFacts, menuLayout, menuPlaces } from "./actionTable";
 import { bgAlphaFor, eventColors } from "../ui/eventColors";
-import { addDays, CALENDAR_COLORS, DAY_START_HOUR, dateOf, dayOf, fileText, LIST_KEYS, LIST_NAMES, type ListKey, MOCK_PROJECTS, type MockFile, type MockSection, type MockTask, minuteOf, mockFile } from "./mockData";
+import { addDays, CALENDAR_COLORS, DAY_START_HOUR, dateOf, dayOf, fileText, LIST_KEYS, LIST_NAMES, type ListKey, type MockFile, type MockSection, type MockTask, minuteOf, mockFile } from "./mockData";
 
 /** The calendar's largest hour on the stand: the settings' default zoom levels end at 224 px an hour. */
 export const ZOOM_MOST = 224;
@@ -45,6 +45,10 @@ const STATUS_MARKS: Readonly<Record<MenuStatusId, MockTask["status"]>> = { done:
 const REMINDERS: readonly ReminderKind[] = ["live", "notification", "alarm", "none"];
 /** A draft with nothing set: the field as a new task's opens. */
 const NO_DRAFT: EntryDraft = { level: null, projects: [], descriptionLine: null, section: false };
+/** What makes two projects one: their names, case aside (the core's `projectKey`). */
+const projectKey = (name: string) => name.normalize("NFC").toLowerCase();
+/** A project's name as typed, one line without the project's mark, brackets or a tag's hash (the core's `cleanProjectName`); null for a name of nothing. */
+const cleanProjectName = (typed: string): string | null => typed.replace(/[\u{1F5C2}\u{1F5C3}]\u{FE0F}?/gu, " ").replace(/[[\]]/g, "").replace(/(^|\s)#(?=\S)/g, "$1").replace(/\s+/g, " ").trim() || null;
 /** A task done or given up leaves the screen; it stays in the file. */
 const closed = (t: MockTask) => t.status === "x" || t.status === "-";
 
@@ -260,7 +264,7 @@ export class MockPort implements ScreenPort {
 			bar: fieldBar(facts, lit),
 			levels: LEVELS.map((l) => ({ ...l, on: l.prefix === level })),
 			tint: level && !draft.section ? LEVEL_COLORS[level as "p1" | "p2"] : null,
-			projects: MOCK_PROJECTS.map((p) => ({ ...p, on: draft.projects.includes(p.name) })),
+			project: this.projectPage(draft.projects),
 			where: { id: here, title: title(here) },
 			places: (["inbox", "backlog", "soon", "now", "date"] as const).map((id) => ({ id, title: id === "date" ? "Date" : LIST_NAMES[id], on: id === here })),
 			date: { today, picked: here === "date" || here === "now" ? shownDay : null },
@@ -460,6 +464,7 @@ export class MockPort implements ScreenPort {
 			labels: [],
 			date: { today, picked: task.due, removable: task.due !== null && task.due !== today },
 			places: menuPlaces(facts).map((place) => ({ id: place, title: LIST_NAMES[place], on: place === goes })),
+			project: this.projectPage(task.projects ?? []),
 			reminders: REMINDERS.map((kind) => ({ kind, checked: kind === reminder })),
 			peek: task.description,
 			subtasks: from === "calendar" ? task.children.filter((c) => !closed(c)).map((c) => c.id) : [],
@@ -510,8 +515,8 @@ export class MockPort implements ScreenPort {
 	}
 
 	/** What a menu's tap writes, by the plugin's rules, the simplest: a move puts the task at the end of Now (today and before) or Soon, due that day, without its time. */
-	async act(given: string, action: MenuAction, from: MenuFrom = "list"): Promise<void> {
-		if (action.kind === "row") return;
+	async act(given: string, action: MenuAction, from: MenuFrom = "list"): Promise<string | null> {
+		if (action.kind === "row") return given;
 		const shown = this.findBy(this.ahead ?? this.file, (t) => t.id === given)?.task;
 		const id = action.kind === "status" && shown ? this.statusTask(shown, from).id : given;
 		await this.write((file) => {
@@ -533,6 +538,13 @@ export class MockPort implements ScreenPort {
 					return;
 				case "label":
 					return;
+				case "project":
+					return this.toggleProject(file, task, action.name);
+				case "newProject": {
+					const made = this.madeProject(file, action.name);
+					if (made !== null) this.toggleProject(file, task, made, true);
+					return;
+				}
 				case "sendTo":
 					return this.sendTo(file, task, action.list);
 				case "date":
@@ -543,6 +555,50 @@ export class MockPort implements ScreenPort {
 					return this.putOff(file, task, action.date);
 			}
 		});
+		/** The stand's ids stay through a write; the core's key is fresh after one. */
+		return this.findBy(this.file, (t) => t.id === given) ? given : null;
+	}
+
+	/** The Project page (the core's `MenuProject`): the tree in its order, each project on while `on` names it (any case), a folder not to be picked unless on. */
+	private projectPage(on: readonly string[]): ProjectPage {
+		const named = new Set(on.map(projectKey));
+		const options = (this.ahead ?? this.file).projects.map(({ name, depth, folder }) => {
+			const has = named.has(projectKey(name));
+			return { name, depth, on: has, disabled: folder && !has };
+		});
+		return { options, none: !options.some((option) => option.on), noneLabel: "No project", newLabel: "New project…" };
+	}
+
+	/** A project's check (the core's `toggleProject`): on beside the task's others, or off; a folder takes no task; null: No project. */
+	private toggleProject(file: MockFile, task: MockTask, name: string | null, on?: boolean): void {
+		if (name === null) {
+			task.projects = [];
+			return;
+		}
+		const has = (task.projects ?? []).some((p) => projectKey(p) === projectKey(name));
+		const next = on ?? !has;
+		if (next === has || (next && file.projects.find((p) => p.name === name)?.folder)) return;
+		task.projects = next ? [...(task.projects ?? []), name] : (task.projects ?? []).filter((p) => projectKey(p) !== projectKey(name));
+	}
+
+	/** «New project…»: the project named so made last at the tree's top unless the tree has it (any case); its name, null for a name of nothing or a folder's. */
+	private madeProject(file: MockFile, typed: string): string | null {
+		const name = cleanProjectName(typed);
+		if (name === null) return null;
+		const found = file.projects.find((p) => projectKey(p.name) === projectKey(name));
+		if (found) return found.folder ? null : found.name;
+		file.projects.push({ name, depth: 0, folder: false });
+		return name;
+	}
+
+	blankProjectName(name: string): boolean {
+		return cleanProjectName(name) === null;
+	}
+
+	async newProject(name: string): Promise<string | null> {
+		let made: string | null = null;
+		await this.write((file) => (made = this.madeProject(file, name)));
+		return made;
 	}
 
 	/** To the end of a list as the task is, its marks kept (the core's `sendTo`): without a day or a time, Now's for today. */

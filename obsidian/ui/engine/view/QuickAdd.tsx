@@ -31,6 +31,12 @@ const RING = (
 	</div>
 );
 
+/** The focus left for the bar, its panels, the other line, or the same field opened again at its new place: the typing goes on. */
+export function keepsTyping(event: FocusEvent<HTMLElement>): boolean {
+	const to = event.relatedTarget as Element | null;
+	return event.currentTarget.contains(to) || !!to?.closest?.(".tc-quick-bar, .tc-quick-panel, .tc-quick-field");
+}
+
 /**
  * The field a task is typed in, new or renamed (spec, «Text fields»: Obsidian's own editor; the plugin's one quick entry):
  * a new task's stands in its list where it will be written, at its level; a rename's is the card itself, its title in it,
@@ -48,10 +54,7 @@ export const EntryField = memo(function EntryField({ depth, className = "" }: { 
 	const describing = useScreen((s) => s.draft.descriptionLine !== null);
 	const section = useScreen((s) => s.draft.section);
 	const commitOnLeave = (event: FocusEvent<HTMLDivElement>, text: () => string) => {
-		const to = event.relatedTarget as Element | null;
-		/** The bar, the other line, or the same field opened again at its new place, keeps the typing going. */
-		if (event.currentTarget.contains(to) || to?.closest?.(".tc-quick-bar, .tc-quick-panel, .tc-quick-field")) return;
-		api.getState().commitEntry(text(), false);
+		if (!keepsTyping(event)) api.getState().commitEntry(text(), false);
 	};
 	return (
 		<div ref={setField} className={`tc-quick-row tc-entry ${className}`.trim()} data-renaming={renaming ?? undefined} data-priority={describing ? (tint ?? undefined) : undefined} style={depth === undefined ? undefined : ({ [PROPERTY.level]: String(depth) } as CSSProperties)}>
@@ -67,6 +70,7 @@ export const EntryField = memo(function EntryField({ depth, className = "" }: { 
 				onEnter={(text) => api.getState().commitEntry(text, true)}
 				onEscape={() => api.getState().escapeEntry()}
 				onTab={(shift) => api.getState().indentEntry(shift ? -1 : 1)}
+				onNewSection={() => api.getState().toggleSection()}
 				onLeave={commitOnLeave}
 			/>
 			{describing ? <DescriptionLine onLeave={commitOnLeave} /> : null}

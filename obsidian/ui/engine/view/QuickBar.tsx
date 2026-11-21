@@ -1,10 +1,11 @@
-import { type CSSProperties, memo, type ReactNode, useRef, useState } from "react";
-import { PROPERTY } from "../../design";
+import { memo, type ReactNode, useRef, useState } from "react";
 import { BarPanel, FieldBar } from "../layers/Layers";
 import type { EntryBar, EntryBarGroup, FieldActionId, ListId } from "../port";
 import { type BarPanelKind as PanelKind, useScreen, useScreenApi } from "../store";
 import { useHost } from "./host";
 import { Icon } from "./Icon";
+import { NewProjectRow, ProjectNameField, ProjectRows } from "./Projects";
+import { keepsTyping } from "./QuickAdd";
 import { MonthGrid, PLACE_ICONS, TileGroup, tileRows } from "./TaskMenu";
 
 /** A button of the bar as the port offers it now: off, lit. */
@@ -78,7 +79,7 @@ export const QuickBar = memo(function QuickBar({ reach }: { readonly reach: read
 	const holders = useRef<Partial<Record<PanelKind, (el: HTMLElement | null) => void>>>({});
 	if (!entry) return null;
 	const bar = api.getState().entryBar(entry, draft, text);
-	const toggle = (kind: PanelKind) => setPanel(panel === kind || (panel === "date" && kind === "where") ? null : kind);
+	const toggle = (kind: PanelKind) => setPanel(panel === kind || (panel === "date" && kind === "where") || (panel === "projectName" && kind === "project") ? null : kind);
 	const close = () => setPanel(null);
 	const hold = (kind: PanelKind) => (holders.current[kind] ??= (el: HTMLElement | null) => setAnchors((was) => (was[kind] === el ? was : { ...was, [kind]: el })));
 	const steps: BarSteps = { api, bar, toggle, close, hold };
@@ -102,23 +103,15 @@ export const QuickBar = memo(function QuickBar({ reach }: { readonly reach: read
 						<BarPanel open={panel === "priority"} onClose={close} reference={anchors.priority ?? null} capsule={desk ? capsule : null} away={away} className="is-flag">
 							<TileGroup kind="is-priority" rows={tileRows(bar.levels.map((level) => ({ label: level.prefix, icon: "priority" as const, color: level.color, on: level.on, onPick: () => (api.getState().draftLevel(level.prefix), close()) })))} />
 						</BarPanel>
-						<BarPanel open={panel === "project"} onClose={close} reference={anchors.project ?? null} capsule={desk ? capsule : null} away={away} className="is-project">
-							<div className="tc-menu-group">
-								{bar.projects.map((option) => (
-									<button key={option.name} type="button" className="tc-btn tc-menu-row is-choice tc-project-option" style={{ [PROPERTY.level]: String(option.depth) } as CSSProperties} disabled={option.folder && !option.on} onClick={() => api.getState().toggleProject(option.name)}>
-										<span className="tc-menu-label">{option.name}</span>
-										{option.on ? <Icon name="check" /> : null}
-									</button>
-								))}
-								<button type="button" className="tc-btn tc-menu-row is-choice is-quiet" onClick={() => (api.getState().clearProjects(), close())}>
-									<span className="tc-menu-label">No project</span>
-									{bar.projects.some((option) => option.on) ? null : <Icon name="check" />}
-								</button>
-							</div>
-							<button type="button" className="tc-btn tc-menu-row is-apart is-add tc-new-project" onClick={close}>
-								<span className="tc-menu-label">New project…</span>
-								<Icon name="plus" />
-							</button>
+						<BarPanel open={panel === "project" || panel === "projectName"} onClose={close} reference={anchors.project ?? null} capsule={desk ? capsule : null} away={away} className="is-project">
+							{panel === "projectName" ? (
+								<ProjectNameField onEnd={(name) => api.getState().nameEntryProject(name)} onLeave={(event) => (keepsTyping(event) ? undefined : api.getState().commitEntry(api.getState().entryText, false))} />
+							) : (
+								<>
+									<ProjectRows page={bar.project} onToggle={(name) => api.getState().toggleProject(name)} onNone={() => (api.getState().clearProjects(), close())} />
+									<NewProjectRow label={bar.project.newLabel} onPick={() => setPanel("projectName")} />
+								</>
+							)}
 						</BarPanel>
 						<BarPanel open={panel === "where"} onClose={close} reference={anchors.where ?? null} capsule={desk ? capsule : null} away={away} className="is-place">
 							<TileGroup kind="is-place" rows={[bar.places.map((choice) => ({ label: choice.title, icon: PLACE_ICONS[choice.id], on: choice.on, onPick: () => (choice.id === "date" ? setPanel("date") : (api.getState().entryPlace(choice.id, null, reach), close())) }))]} />
