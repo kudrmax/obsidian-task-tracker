@@ -42,9 +42,11 @@ export async function replay(cdp, file, { startPlace = 1, strokes = [], steps: g
 	 * The wheel's events as the page received them: Chromium merges the events of one frame into one (their deltas summed),
 	 * and under load this loop sends some late, while the page's wheel gesture ends by its own clock: @use-gesture ends it
 	 * 140 ms after its last event by a timer, which a timer set the same way here marks (`ended`: the gesture ended after
-	 * this event, before the next). Each with its deltas and its time.
+	 * this event, before the next). The timer is set where @use-gesture sets its own, on the ribbon, right after it, so the
+	 * two end the same gestures. Each event with its deltas, its time, and the page's own moments: when it was heard
+	 * (`heard`) and when its gesture ended (`endedAt`): a stroke's events can reach the page long after their time.
 	 */
-	await cdp.eval(`(() => { window.__tcArrived = []; let timer = 0; window.addEventListener("wheel", (e) => { const got = { dx: e.deltaX, dy: e.deltaY, t: e.timeStamp, ctrl: e.ctrlKey, type: "wheel", ended: false }; window.__tcArrived.push(got); clearTimeout(timer); timer = setTimeout(() => { got.ended = true; }, 140); }, { capture: true, passive: true }); return 1; })()`);
+	await cdp.eval(`(() => { window.__tcArrived = []; let timer = 0; const on = document.querySelector(".tc-ribbon") ?? window; on.addEventListener("wheel", (e) => { const got = { dx: e.deltaX, dy: e.deltaY, t: e.timeStamp, ctrl: e.ctrlKey, type: "wheel", ended: false, heard: performance.now(), endedAt: null }; window.__tcArrived.push(got); clearTimeout(timer); timer = setTimeout(() => { got.ended = true; got.endedAt = performance.now(); }, 140); }, { passive: true }); return 1; })()`);
 	const frames = new FrameRecorder(cdp);
 	await frames.start();
 	/**
@@ -95,12 +97,15 @@ export async function replay(cdp, file, { startPlace = 1, strokes = [], steps: g
 	const observed = dedupe(turns.map((at) => Math.round(at)));
 	/**
 	 * Where each stroke leads: one screen its way along the row; nothing before Inbox. Without an expectation file the strokes
-	 * are the recorded ones as the pager's rule finds them (`strokes`).
+	 * are the recorded ones as the pager's rule finds them (`strokes`). `stepsFor` may answer several runs of the rule, each
+	 * as the page may have seen it (see `e9-ribbon-follow`): the page is held to the one it parts from least.
 	 */
-	const steps = expected ?? strokes;
-	const path = [startPlace];
-	for (const s of steps) path.push(Math.min(last, Math.max(0, path.at(-1) + s)));
-	const expectedPlaces = dedupe(path);
+	const runs = Array.isArray((expected ?? strokes)[0]) ? (expected ?? strokes) : [expected ?? strokes];
+	const placesOf = (steps) => {
+		const path = [startPlace];
+		for (const s of steps) path.push(Math.min(last, Math.max(0, path.at(-1) + s)));
+		return dedupe(path);
+	};
 	let stalls = 0;
 	for (let i = 0; i + STALL_FRAMES <= places.length; i++) {
 		const window = places.slice(i, i + STALL_FRAMES);
@@ -118,11 +123,16 @@ export async function replay(cdp, file, { startPlace = 1, strokes = [], steps: g
 	 */
 	const unroll = (xs) => xs.slice(1).flatMap((x, i) => Array.from({ length: Math.abs(x - xs[i]) }, () => Math.sign(x - xs[i])));
 	const seen = unroll(observed);
-	const sent = unroll(expectedPlaces);
-	const astray = Math.max(seen.length, sent.length) - commonLength(seen, sent);
+	const judged = runs.map((steps) => {
+		const expectedPlaces = placesOf(steps);
+		const sent = unroll(expectedPlaces);
+		const astray = Math.max(seen.length, sent.length) - commonLength(seen, sent);
+		const ends = observed.at(-1) === expectedPlaces.at(-1);
+		const onPath = expected && !tolerant ? astray === 0 && ends : tolerant ? astray <= Math.max(2, Math.floor(sent.length * (tolerant === true ? ASTRAY_SHARE : tolerant))) : astray <= Math.max(1, Math.floor(sent.length * ASTRAY_SHARE));
+		return { expectedPlaces, sent, astray, onPath };
+	});
+	const { expectedPlaces, sent, astray, onPath } = judged.find((j) => j.onPath) ?? judged.reduce((a, b) => (b.astray < a.astray ? b : a));
 	const faults = frameFaults(shown);
-	const ends = observed.at(-1) === expectedPlaces.at(-1);
-	const onPath = expected && !tolerant ? astray === 0 && ends : tolerant ? astray <= Math.max(2, Math.floor(sent.length * (tolerant === true ? ASTRAY_SHARE : tolerant))) : astray <= Math.max(1, Math.floor(sent.length * ASTRAY_SHARE));
 	return { recording: file.split("/").pop(), expected: expected ? expectedPlaces : `${sent.length} steps by the pager's rule`, observed: expected ? observed : `${seen.length} steps`, astray, stalls, faults, frames: shown.length, ok: onPath && stalls === 0 && faults.length === 0 };
 }
 
