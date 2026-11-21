@@ -23,8 +23,6 @@ typedef struct {
 } Signal;
 
 static napi_threadsafe_function listener = NULL;
-static BOOL tried = NO;
-static Hook hook = HOOK_REFUSED;
 static IMP originalDeltaY = NULL;
 static IMP originalSendEvent = NULL;
 
@@ -164,22 +162,22 @@ static napi_value uptime(napi_env env, napi_callback_info info) {
 	return result;
 }
 
+static napi_value take(napi_env env, napi_callback_info info) {
+	napi_value result;
+	napi_create_string_utf8(env, HOOK_NAMES[install()], NAPI_AUTO_LENGTH, &result);
+	return result;
+}
+
 static napi_value init(napi_env env, napi_value exports) {
-	if (!tried) {
-		tried = YES;
-		hook = install();
-	}
 	napi_value value;
+	napi_create_function(env, "take", NAPI_AUTO_LENGTH, take, NULL, &value);
+	napi_set_named_property(env, exports, "take", value);
 	napi_create_function(env, "listen", NAPI_AUTO_LENGTH, startListening, NULL, &value);
 	napi_set_named_property(env, exports, "listen", value);
 	napi_create_function(env, "stop", NAPI_AUTO_LENGTH, stopCall, NULL, &value);
 	napi_set_named_property(env, exports, "stop", value);
 	napi_create_function(env, "uptime", NAPI_AUTO_LENGTH, uptime, NULL, &value);
 	napi_set_named_property(env, exports, "uptime", value);
-	napi_get_boolean(env, hook != HOOK_REFUSED, &value);
-	napi_set_named_property(env, exports, "installed", value);
-	napi_create_string_utf8(env, HOOK_NAMES[hook], NAPI_AUTO_LENGTH, &value);
-	napi_set_named_property(env, exports, "hook", value);
 	napi_create_string_utf8(env, TRACKPAD_BUILD, NAPI_AUTO_LENGTH, &value);
 	napi_set_named_property(env, exports, "build", value);
 	return exports;

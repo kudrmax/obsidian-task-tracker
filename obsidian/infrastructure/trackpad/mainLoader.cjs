@@ -47,11 +47,12 @@ function hooked(s, addonPath) {
 	if (s.path === addonPath) return { installed: true, hook: "same" };
 	const addon = require(addonPath);
 	s.inUse.add(addonPath);
-	if (!addon.installed) return { installed: false, hook: addon.hook ?? "refused" };
-	if (s.addon) s.addon.stop();
+	const hook = typeof addon.take === "function" ? addon.take() : "refused";
+	if (hook === "refused") return { installed: false, hook };
+	if (s.addon && s.addon !== addon) s.addon.stop();
 	s.addon = addon;
 	s.path = addonPath;
-	return { installed: true, hook: addon.hook };
+	return { installed: true, hook };
 }
 
 function watch(s, id) {

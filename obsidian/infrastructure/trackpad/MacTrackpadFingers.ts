@@ -67,7 +67,7 @@ export interface TrackpadHost {
 
 const FALLBACK = "the columns read the trackpad by its scrolling";
 
-export const CRASH_NOTICE = `Task Calendar: Obsidian quit while loading the trackpad module, so it is not loaded any more and ${FALLBACK}. Turn «Trackpad through macOS» off and on in the settings to try it again.`;
+export const CRASH_NOTICE = "Task Calendar: the trackpad module is off, as Obsidian quit while loading it. To try it again, turn «Trackpad through macOS» off and on in the settings.";
 export const RESTART_NOTICE = `Task Calendar: restart Obsidian to use the new trackpad module; until then ${FALLBACK}.`;
 
 /** Calls to the main process for the clocks' offset: the one that came back fastest is kept. */

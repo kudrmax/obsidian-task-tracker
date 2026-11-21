@@ -18,7 +18,7 @@ type Forward = (code: number, seconds: number, phase: number, a: number, b: numb
 
 /** A native build as the loader sees it: hooked or refused, and what it was told. */
 function nativeBuild(build: string, hook: "fresh" | "tookOver" | "refused" = "tookOver") {
-	const addon = { installed: hook !== "refused", hook, build, forward: null as Forward | null, stopped: 0, listen: (f: Forward) => (addon.forward = f), stop: () => (addon.stopped++, (addon.forward = null)), uptime: () => 1000.5 };
+	const addon = { hook, build, taken: 0, take: () => (addon.taken++, addon.hook), forward: null as Forward | null, stopped: 0, listen: (f: Forward) => (addon.forward = f), stop: () => (addon.stopped++, (addon.forward = null)), uptime: () => 1000.5 };
 	return addon;
 }
 type NativeBuild = ReturnType<typeof nativeBuild>;
@@ -93,6 +93,7 @@ describe("the trackpad's native module (Decision 126)", () => {
 	it("is the build of the source beside it: rebuild with `node scripts/build-trackpad.mjs` after changing addon.m", () => {
 		const { sha256 } = JSON.parse(readFileSync(join(NATIVE, "trackpad.node.json"), "utf8")) as { sha256: string };
 		expect(createHash("sha256").update(readFileSync(join(NATIVE, "addon.m"))).digest("hex")).toBe(sha256);
+		expect(readFileSync(join(NATIVE, "trackpad.node")).includes(Buffer.from(sha256.slice(0, 12)))).toBe(true);
 	});
 
 	it("is one file for both Macs, Apple's chips and Intel's", () => {
@@ -108,16 +109,17 @@ describe("the trackpad's native module (Decision 126)", () => {
 		expect(license).toContain("Copyright (c) 2023 David Cann");
 	});
 
-	it.runIf(process.platform === "darwin")("hooks AppKit once a process, and a build loaded later takes the hook over from the one before", () => {
+	it.runIf(process.platform === "darwin")("shares one hook a process: a build loaded later takes it over, and the one before takes it back", () => {
 		const dir = mkdtempSync(join(tmpdir(), "trackpad-native-"));
 		const [first, second] = ["a", "b"].map((name) => {
 			copyFileSync(join(NATIVE, "trackpad.node"), join(dir, `${name}.node`));
-			return createRequire(__filename)(join(dir, `${name}.node`)) as { installed: boolean; hook: string; build: string };
+			return createRequire(__filename)(join(dir, `${name}.node`)) as { take(): string; build: string };
 		});
 		const { sha256 } = JSON.parse(readFileSync(join(NATIVE, "trackpad.node.json"), "utf8")) as { sha256: string };
-		expect(first.installed).toBe(true);
-		expect(["fresh", "tookOver"]).toContain(first.hook);
-		expect(second).toMatchObject({ installed: true, hook: "tookOver", build: sha256.slice(0, 12) });
+		expect(["fresh", "tookOver"]).toContain(first.take());
+		expect(second.take()).toBe("tookOver");
+		expect(first.take()).toBe("tookOver");
+		expect(second.build).toBe(sha256.slice(0, 12));
 	});
 });
 
@@ -170,6 +172,22 @@ describe("the main process's loader", () => {
 		next.forward!(1, 1, 1, 0, 0);
 		expect(main.sent.map((s) => s.id).sort()).toEqual([7, 8]);
 		expect(main.loader("/l2.cjs").files().inUse.sort()).toEqual(["/a.node", "/b.node", "/l1.cjs", "/l2.cjs"]);
+	});
+
+	it("back to a build loaded before (a revert after an update): it takes the hook again, the one after it stops", () => {
+		const main = new MainProcess();
+		const first = nativeBuild("aaa", "fresh");
+		const second = nativeBuild("bbb", "tookOver");
+		main.builds.set("/a.node", first);
+		main.builds.set("/b.node", second);
+		const loader = main.loader("/l1.cjs");
+		loader.attach(7, "/a.node");
+		loader.attach(7, "/b.node");
+		first.hook = "tookOver";
+		expect(loader.attach(7, "/a.node")).toMatchObject({ installed: true, hook: "tookOver", build: "aaa" });
+		expect(first.taken).toBe(2);
+		expect(second.forward).toBeNull();
+		expect(first.forward).not.toBeNull();
 	});
 
 	it("the same build loaded again is not loaded a second time", () => {
