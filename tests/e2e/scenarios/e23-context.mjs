@@ -50,7 +50,10 @@ export default {
 	features: ["E2: a change of context drawn in place (F23)"],
 	cases: ["inbox", "soon", "calendar"],
 	async run(t, stop) {
+		/** The ribbon landed on its stop, as a person's swipe lands it: at the calendar the next day's page is drawn beside the shown one, at rest. */
+		if (stop === "calendar") await t.setStop("soon");
 		await t.setStop(stop);
+		if (stop === "calendar") t.expect((await t.cdp.eval(`document.querySelectorAll(".tc-day-lane > .tc-slide").length`)) > 1, "the next day's page stands beside the shown one");
 		const lists = stop === "inbox" ? ["inbox", "soon"] : stop === "soon" ? ["soon", "day"] : ["day"];
 		const mine = projectTitles(await t.file(), PROJECT);
 		const blocksBefore = await blocks(t);
