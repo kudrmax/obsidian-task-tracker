@@ -85,7 +85,7 @@ export default {
 			const blockNow = () => t.cdp.eval(`(() => { const el = [...document.querySelectorAll("[data-block]")].find((b) => b.textContent.includes("Упаковать книги")); const r = el.getBoundingClientRect(); return { x: r.left + 20, y: r.top + 12, left: r.left, top: r.top, bottom: r.bottom }; })()`);
 			await tap(await blockNow());
 			await t.sleep(450);
-			const stackNow = () => t.cdp.eval(`[...document.querySelectorAll(".tc-menu-subtasks > [data-stack]")].map((c) => { const r = c.getBoundingClientRect(); return { text: c.textContent, top: r.top, left: r.left }; })`);
+			const stackNow = () => t.cdp.eval(`[...document.querySelectorAll(".tc-menu-subtasks [data-stack]")].map((c) => { const r = c.getBoundingClientRect(); return { text: c.textContent, top: r.top, left: r.left }; })`);
 			/** Read once the menu stands: it lifts to its place first (Decision 120). */
 			const menu = await menuNow(t);
 			const stack = await stackNow();
@@ -123,7 +123,7 @@ export default {
 			t.expect((await field())?.text === "Отключить интернет", `Tab never types a tab into the stack's field: ${JSON.stringify((await field())?.text)}`);
 			await key("Enter", "Enter", 13);
 			await t.sleep(400);
-			const after = await t.cdp.eval(`[...document.querySelectorAll(".tc-menu-subtasks > [data-stack]")].map((c) => c.textContent)`);
+			const after = await t.cdp.eval(`[...document.querySelectorAll(".tc-menu-subtasks [data-stack]")].map((c) => c.textContent)`);
 			t.expect(after.includes("Отключить интернет") && (await field())?.text === "", `the new subtask joins the stack and the field is empty for the next: ${JSON.stringify(after)}`);
 			const lines = (await t.file()).split("\n");
 			const parent = lines.findIndex((l) => l.includes("Переезд"));

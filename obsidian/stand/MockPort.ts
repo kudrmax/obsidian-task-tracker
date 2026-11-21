@@ -6,7 +6,7 @@ import { bgAlphaFor, eventColors } from "../ui/eventColors";
 import { addDays, CALENDAR_COLORS, DAY_START_HOUR, dateOf, dayOf, fileText, LIST_KEYS, LIST_NAMES, type ListKey, type MockFile, type MockSection, type MockTask, minuteOf, mockFile } from "./mockData";
 
 /** The calendar's largest hour on the stand: the settings' default zoom levels end at 224 px an hour. */
-export const ZOOM_MOST = 224;
+const ZOOM_MOST = 224;
 /** Where the stand keeps the calendar's zoom on the device. */
 export const ZOOM_KEY = "task-calendar-stand-zoom";
 
@@ -221,10 +221,7 @@ export class MockPort implements ScreenPort {
 
 	/** The plus's place (F174, the core's `QuickEntry.plusSpot`): the end of the day's list while it shows, else of Inbox; in its last section, at the top level. */
 	newTaskPlace(dayOffset: number, shown: readonly ListId[]): Destination {
-		const list: ListId = shown.includes("day") ? "day" : "inbox";
-		const sections = this.listOf(this.file, list, dayOffset);
-		const last = sections[sections.length - 1];
-		return { list, section: last?.name === null || !last ? null : last.id, before: null, dayOffset, depth: 0 };
+		return this.listEnd(shown.includes("day") ? "day" : "inbox", dayOffset);
 	}
 
 	/** The core's `QuickEntry.endOf`: after the last card, in the last section, at the top level. */
@@ -440,10 +437,7 @@ export class MockPort implements ScreenPort {
 	private placeAt(at: Destination, place: PlaceId, date: string | null): Destination {
 		if (place === "backlog") return { ...at, backlog: true, away: undefined };
 		const dayOffset = place === "date" && date ? Math.round((new Date(Number(date.slice(0, 4)), Number(date.slice(5, 7)) - 1, Number(date.slice(8))).getTime() - this.day().getTime()) / 86_400_000) : place === "now" ? 0 : at.dayOffset;
-		const list: ListId = place === "inbox" ? "inbox" : place === "soon" ? "soon" : "day";
-		const sections = this.listOf(this.file, list, dayOffset);
-		const last = sections[sections.length - 1];
-		return { list, section: !last || last.name === null ? null : last.id, before: null, dayOffset, depth: 0 };
+		return this.listEnd(place === "inbox" ? "inbox" : place === "soon" ? "soon" : "day", dayOffset);
 	}
 
 	/** The task the field at `at` would stand under in its list: the row before it, as the list draws the field. */

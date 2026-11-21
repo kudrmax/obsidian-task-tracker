@@ -2025,7 +2025,7 @@ body.theme-light .tc-menu-over .tc-event { --tc-event-bg: var(--tc-event-bg-ligh
 .tc-menu-over > .tc-menu-subtasks { position: relative; opacity: 1; transition: none; }
 .tc-menu-over > .tc-menu-subtasks > * { pointer-events: auto; }
 /* A subtask's menu over its task's: the sheet stays, the pressed card stands as the copy, the task's copy and the rest of its stack fade away (the plugin's hand-over). */
-.tc-menu-over:has(> .tc-menu-subtasks.is-handed) > .tc-lifted, .tc-menu-subtasks.is-handed > :not(.is-pressed, .tc-quick-row) { opacity: 0; pointer-events: none; transition: opacity var(--tc-duration-collapse) var(--tc-ease-out); }
+.tc-menu-over:has(> .tc-menu-subtasks.is-handed) > .tc-lifted, .tc-menu-subtasks.is-handed > :not(:has(> .is-pressed, > .tc-quick-row)) { opacity: 0; pointer-events: none; transition: opacity var(--tc-duration-collapse) var(--tc-ease-out); }
 /* The engine's capsule panels on the desktop: Floating UI sets their left and top (fixed, against the capsule), the design's CSS the rest. */
 .tc-quick-bar.is-desk .tc-quick-panel.is-placed { position: fixed; right: auto; bottom: auto; }
 /* The menu's room: the window less the phone's safe areas (the status bar, the home indicator), measured by Floating UI; nothing of the menu goes outside it. */

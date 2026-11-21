@@ -1,12 +1,15 @@
-import { closestCenter, type CollisionDetection, DndContext, defaultDropAnimationSideEffects, getClientRect, getFirstCollision, type MeasuringConfiguration, pointerWithin, rectIntersection, type UniqueIdentifier, useDndContext, useDroppable, type DragEndEvent, type DragMoveEvent, type DragOverEvent, DragOverlay, type DragStartEvent, type DropAnimation, MouseSensor, PointerSensor, TouchSensor, useDraggable, useSensor, useSensors } from "@dnd-kit/core";
+import { closestCenter, type CollisionDetection, DndContext, defaultDropAnimationSideEffects, getClientRect, getFirstCollision, type MeasuringConfiguration, pointerWithin, rectIntersection, type UniqueIdentifier, useDndContext, useDroppable, type DragEndEvent, type DragMoveEvent, type DragOverEvent, DragOverlay, type DragStartEvent, type DropAnimation, type MouseSensorOptions, useDraggable, useSensor, useSensors } from "@dnd-kit/core";
 import { arrayMove, SortableContext, type SortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS, getEventCoordinates } from "@dnd-kit/utilities";
-import { type CSSProperties, memo, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, type CSSProperties, memo, type ReactNode, type TouchEvent as ReactTouchEvent, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { ROW_PX } from "../layout/columns";
 import type { Destination, ListId, Row } from "../port";
-import { secondaryClick, useAnchor } from "../layers/Layers";
+import { secondaryClick, useFocusWhen } from "../layers/Layers";
+import { cssEase, FLY } from "../layers/motion";
 import { useScreen, useScreenApi } from "../store";
 import { EdgeHeading } from "./edgeHeading";
+import { holdsPointer, LONG_PRESS_TOLERANCE_PX, NEW_SLOT, PLUS, PlusTouchSensor, type PressOptions, PressMouseSensor, PressTouchSensor, TouchPresses } from "./sensors";
 import { descendantsOf, finalOrder, levelAt, levelBetween, spotKey, shiftOf, type Slot, slotOf, SwipeLevel } from "./tree";
 
 /**
@@ -17,119 +20,35 @@ import { descendantsOf, finalOrder, levelAt, levelBetween, spotKey, shiftOf, typ
  * the carried card in its own list (`pointerWithin`, `closestCenter`).
  */
 
-/** The mouse lifts a card once it moved this far; the finger once it held still this long (the plugin's long press) within this tolerance. */
-const MOUSE_DISTANCE_PX = 4;
+export { PLUS } from "./sensors";
 
-/** The plus is carried by this id: on its button, and as a row of the list it is over. */
-export const PLUS = "plus";
+/** The gesture's own clock, a sideways swipe's pace (`SwipeLevel`): dnd-kit's move events carry no time, and this is no time of day. */
+const gestureNow = (): number => performance.now();
+
 /** The plus, or the calendar's new place: either opens a new task's field where it is let go. */
 const isPlus = (id: UniqueIdentifier): boolean => id === PLUS || id === NEW_SLOT;
 
-/** Whether a touch starts on the plus: it moves at once, a card only after the long press. */
-const onPlus = (event: Event): boolean => (event.target as Element | null)?.closest?.("[data-plus]") != null;
+/** The touches the screen tells the drag of (`useTouchPresses`): the screen's root hears them, the sensors listen to nothing more. */
+const PressesContext = createContext<TouchPresses | null>(null);
 
 /**
- * Empty time on the calendar is carried as a new task's place (F101): a long press there (the mouse held still too) lifts
- * it at that minute, it follows the finger by the snap step, and let go the new task's field opens where it stands. A press on
- * something of its own there (a block, an event, a dot, a field) is that thing's.
+ * What the screen's root gives the drag of its touches, as React hears them: a finger landing beside one waiting out its
+ * long press forgets the press (a pinch); a touch that became a drag sends no click and no mouse after it, so a field it
+ * opened, let go unmoved, keeps the focus.
  */
-export const NEW_SLOT = "new-slot";
-const ownPress = (event: Event, context: SensorContext | undefined): boolean => context?.active.id === NEW_SLOT && (event.target as Element | null)?.closest?.("[data-own-press]") != null;
-/** What dnd-kit tells a sensor's activator besides the event: the draggable it would lift. */
-type SensorContext = { readonly active: { readonly id: UniqueIdentifier } };
-
-/** A sensor's option of ours: whether another gesture holds the pointer now (a pinch, a resize), so nothing is lifted. */
-interface Gate {
-	readonly busy?: () => boolean;
-}
-const free = (options: unknown): boolean => !(options as Gate).busy?.();
-
-/** What a pointer sensor of dnd-kit keeps while a press waits to become a drag (its own fields, which its types keep private). */
-interface PendingSensor {
-	readonly activated: boolean;
-	readonly initialCoordinates: { readonly x: number; readonly y: number } | null;
-	timeoutId: ReturnType<typeof setTimeout> | null;
-	readonly documentListeners: { add(name: string, handler: (event: Event) => void, options?: AddEventListenerOptions): void };
-	handleStart(): void;
-	handleCancel(): void;
-}
-
-/**
- * Sensors as dnd-kit's custom sensors are made (a sensor's activators filter what may start it): nothing is lifted while a
- * pinch or a resize holds the pointer (`busy`). A card is lifted by the long press of a finger (touch events); a second
- * finger landing while it waits makes the press part of a pinch, and it is forgotten (the plugin's `LongPress`). The mouse
- * lifts a card once it moved, or once held still for the long press (then, let go unmoved, the card's menu opens, as the
- * plugin's mouse long tap does); on empty calendar time only the hold lifts the new task's place, as a finger's long
- * press. The plus moves at once under a finger (the old plugin's F175), started by the pointer events of a touch on it, so the sensors never listen to the same event
- * (dnd-kit keeps one listener per event name). A sensor's own listeners go through its own registry, removed with it.
- */
-class CardTouchSensor extends TouchSensor {
-	static override activators = TouchSensor.activators.map((activator) => ({ ...activator, handler: (event: Parameters<typeof activator.handler>[0], options: Parameters<typeof activator.handler>[1], context?: SensorContext) => free(options) && !onPlus(event.nativeEvent) && !ownPress(event.nativeEvent, context) && activator.handler(event, options) }));
-	constructor(props: ConstructorParameters<typeof TouchSensor>[0]) {
-		super(props);
-		const sensor = this as unknown as PendingSensor;
-		sensor.documentListeners.add(
-			"touchstart",
-			(event) => {
-				if (!sensor.activated && (event as TouchEvent).touches.length > 1) sensor.handleCancel();
+export function useTouchPresses(): { readonly onTouchStartCapture: (event: ReactTouchEvent) => void; readonly onTouchEndCapture: (event: ReactTouchEvent) => void } {
+	const presses = useContext(PressesContext);
+	if (!presses) throw new Error("touches outside the screen's drag");
+	return useMemo(
+		() => ({
+			onTouchStartCapture: (event: ReactTouchEvent) => presses.fingerDown(event.touches.length),
+			onTouchEndCapture: (event: ReactTouchEvent) => {
+				if (presses.carrying && event.cancelable) event.preventDefault();
 			},
-			{ capture: true, passive: true },
-		);
-		/** A touch that became a drag sends no click and no mouse after it: let go unmoved, the field it opened keeps the focus. */
-		sensor.documentListeners.add(
-			"touchend",
-			(event) => {
-				if (sensor.activated && event.cancelable) event.preventDefault();
-			},
-			{ capture: true, passive: false },
-		);
-	}
+		}),
+		[presses],
+	);
 }
-class CardMouseSensor extends MouseSensor {
-	static override activators = MouseSensor.activators.map((activator) => ({ ...activator, handler: (event: Parameters<typeof activator.handler>[0], options: Parameters<typeof activator.handler>[1], context?: SensorContext) => free(options) && !ownPress(event.nativeEvent, context) && activator.handler(event, options) }));
-	constructor(props: ConstructorParameters<typeof MouseSensor>[0]) {
-		super(props);
-		const sensor = this as unknown as PendingSensor;
-		/**
-		 * The plus is lifted by moving only, as under a finger: a mouse held still on it and let go is a click that opens
-		 * the field. A hold lifted it, and let go unmoved over its own place it opened nothing (a slow click; the e2e checks'
-		 * clicks under load, 330–730 ms between the press and the lift).
-		 */
-		if (props.active === PLUS && sensor.timeoutId !== null) {
-			clearTimeout(sensor.timeoutId);
-			sensor.timeoutId = null;
-		}
-		/**
-		 * Waiting out the hold, a mouse moved past the start distance lifts a card at once. Empty time is no thing to drag:
-		 * there only a hold lifts the new task's place, and a mouse that moves first is no long tap (the finger's tolerance).
-		 */
-		sensor.documentListeners.add(
-			"mousemove",
-			(event) => {
-				const from = sensor.initialCoordinates;
-				const at = getEventCoordinates(event);
-				if (sensor.activated || !from || !at) return;
-				const distance = Math.hypot(at.x - from.x, at.y - from.y);
-				if (props.active === NEW_SLOT) {
-					if (distance > LONG_PRESS_TOLERANCE_PX) sensor.handleCancel();
-					return;
-				}
-				if (distance <= MOUSE_DISTANCE_PX) return;
-				if (sensor.timeoutId !== null) clearTimeout(sensor.timeoutId);
-				sensor.timeoutId = null;
-				sensor.handleStart();
-			},
-			{ capture: true },
-		);
-	}
-}
-class PlusTouchSensor extends PointerSensor {
-	static override activators = PointerSensor.activators.map((activator) => ({ ...activator, handler: (event: Parameters<typeof activator.handler>[0], options: Parameters<typeof activator.handler>[1]) => free(options) && event.nativeEvent.pointerType === "touch" && onPlus(event.nativeEvent) && activator.handler(event, options) }));
-}
-const LONG_PRESS_MS = 250;
-const LONG_PRESS_TOLERANCE_PX = 5;
-/** Waiting out a mouse's hold, any move is fine: past the start distance it lifts at once (`CardMouseSensor`). */
-const HOLD_ANYWHERE = Number.POSITIVE_INFINITY;
 
 /**
  * The copy let go flies into the card's place: short, translation only (stage 0, round four). While it flies it takes the
@@ -137,8 +56,8 @@ const HOLD_ANYWHERE = Number.POSITIVE_INFINITY;
  * itself and nothing changes when it goes: dnd-kit's documented drop side effects; the card under it stays hidden meanwhile.
  */
 const DROP_ANIMATION: DropAnimation = {
-	duration: 180,
-	easing: "cubic-bezier(0.2, 0, 0, 1)",
+	duration: FLY.ms,
+	easing: cssEase(FLY.ease),
 	sideEffects: defaultDropAnimationSideEffects({ className: { dragOverlay: "is-dropping" }, styles: { active: { opacity: "0" } } }),
 };
 
@@ -198,16 +117,9 @@ export interface DragProps {
 
 export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 	const api = useScreenApi();
-	const busy = useCallback(() => {
-		const held = api.getState().gesture;
-		return held === "zoom" || held === "resize";
-	}, [api]);
-	const sensors = useSensors(
-		useSensor(CardMouseSensor, { activationConstraint: { delay: LONG_PRESS_MS, tolerance: HOLD_ANYWHERE }, busy }),
-		useSensor(CardTouchSensor, { activationConstraint: { delay: LONG_PRESS_MS, tolerance: LONG_PRESS_TOLERANCE_PX }, busy }),
-		useSensor(PlusTouchSensor, { activationConstraint: { distance: MOUSE_DISTANCE_PX }, busy }),
-	);
-	const anchor = useAnchor();
+	const [presses] = useState(() => new TouchPresses());
+	const options = useMemo((): PressOptions & MouseSensorOptions => ({ busy: () => holdsPointer(api.getState().gesture), presses }), [api, presses]);
+	const sensors = useSensors(useSensor(PressMouseSensor, options), useSensor(PressTouchSensor, options), useSensor(PlusTouchSensor, options));
 	const [active, setActive] = useState<string | null>(null);
 	/**
 	 * Whether what was lifted last has a copy that flies into its place when let go. The calendar's new place has none: its
@@ -286,7 +198,7 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 	const rowsOf = (list: string) => api.getState().shown.lists[list as ListId]?.rows ?? [];
 	/** The carried card's (or plus's) level on the place it stands at, by its sideways swipes there (`SwipeLevel`). */
 	const swipe = useRef(new SwipeLevel(null, 0, 0, 0));
-	const sideLevel = (event: { readonly activatorEvent: Event; readonly delta: { readonly x: number } }, spot: string, allowed: (wanted: number) => number): number => swipe.current.at((getEventCoordinates(event.activatorEvent)?.x ?? 0) + event.delta.x, performance.now(), spot, allowed);
+	const sideLevel = (event: { readonly activatorEvent: Event; readonly delta: { readonly x: number } }, spot: string, allowed: (wanted: number) => number): number => swipe.current.at((getEventCoordinates(event.activatorEvent)?.x ?? 0) + event.delta.x, gestureNow(), spot, allowed);
 	/** The level the carried plus's field would take where the plus stands now among its list's rows: drawn by its place. */
 	const plusLevel = (plus: Sortable, over: Sortable | null, wanted: number): number | null => {
 		const container = containerOf(plus);
@@ -450,7 +362,7 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 		carriedAt.current = null;
 		liftAt.current = null;
 		homeTop.current = null;
-		swipe.current = new SwipeLevel(null, 0, liftX, performance.now());
+		swipe.current = new SwipeLevel(null, 0, liftX, gestureNow());
 		setFlies(lifted.id !== NEW_SLOT);
 		if (isPlus(lifted.id)) {
 			screen.openEntry(null);
@@ -465,7 +377,7 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 		const own = rows.find((row) => row.id === String(lifted.id));
 		const depth = own?.kind === "task" ? own.depth : 0;
 		const under = descendantsOf(rows, String(lifted.id));
-		if (container !== null) swipe.current = new SwipeLevel(spotKey(container, itemsOf(lifted).filter((other) => !under.has(other)), String(lifted.id)), depth, liftX, performance.now());
+		if (container !== null) swipe.current = new SwipeLevel(spotKey(container, itemsOf(lifted).filter((other) => !under.has(other)), String(lifted.id)), depth, liftX, gestureNow());
 		const block = container === CALENDAR ? (screen.shown.day.blocks.find((b) => b.id === String(lifted.id)) ?? null) : null;
 		carriedAt.current = block?.start ?? null;
 		liftAt.current = block?.start ?? null;
@@ -507,16 +419,16 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 		if (container === null || refusedNow.current) return api.getState().drop(id, null);
 		/**
 		 * Held and let go unmoved (the plugin's hold): a task on the calendar is selected with its menu open (F106), a card's
-		 * menu opens under the mouse (the plugin's mouse long tap); it goes back where it was.
+		 * menu opens under the mouse (the plugin's mouse long tap); it goes back where it was. The row opens it as its tap
+		 * does, from the row the press began on.
 		 */
 		if (!moved.current && origin !== null && origin.container === container) {
-			const fromCalendar = container === CALENDAR;
 			const mouse = !("touches" in event.activatorEvent);
 			api.getState().drop(id, null);
-			if (!fromCalendar && !mouse) return;
-			anchor.current = doc.querySelector(fromCalendar ? `[data-block="${id}"]` : `[data-id="${id}"]`);
-			api.getState().openMenu(id, fromCalendar ? "calendar" : "list");
-			if (fromCalendar) api.getState().select(id);
+			if (container !== CALENDAR && !mouse) return;
+			const row = (event.activatorEvent.target as Element | null)?.closest?.(".tc-drag-source");
+			const press = (lifted.data.current as RowData | undefined)?.press;
+			if (row && press) press(row, true);
 			return;
 		}
 		if (container === CALENDAR) {
@@ -543,6 +455,7 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 	/** Armed, the rooms may scroll; until then none does. dnd-kit's auto-scroll stays on so it keeps the pointer's heading (its scroll intent). */
 	const autoScroll = useMemo(() => ({ ...AUTO_SCROLL, canScroll: armed ? undefined : () => false }), [armed]);
 	return (
+		<PressesContext.Provider value={presses}>
 		<DndContext sensors={sensors} collisionDetection={collision} onDragStart={start} onDragMove={move} onDragOver={overList} onDragEnd={end} onDragCancel={cancel} autoScroll={autoScroll} measuring={MEASURING}>
 			{children}
 			{createPortal(
@@ -552,6 +465,7 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 				doc.body,
 			)}
 		</DndContext>
+		</PressesContext.Provider>
 	);
 }
 
@@ -605,7 +519,7 @@ const MEASURING: MeasuringConfiguration = {
 const AUTO_SCROLL = { threshold: { x: 0, y: 0.15 } };
 
 /** The calendar's blocks as dnd-kit's container: a carried block stands among them, and a card carried onto it joins them. */
-export const CALENDAR = "calendar";
+const CALENDAR = "calendar";
 /** The calendar's drop target: its canvas of hours, inside the room it scrolls in, so dnd-kit's auto-scroll scrolls that room. */
 const CALENDAR_TARGET = "calendar:";
 /** The room the calendar scrolls in, a droppable only for dnd-kit to measure it: it stands still on the screen while its hours scroll. */
@@ -692,22 +606,25 @@ export function useListTarget(list: ListId, ids: readonly string[], away: number
 	return useDroppable({ id: away === null ? `${LIST_TARGET}${list}` : `${LIST_TARGET}${list}@${away}`, disabled: away !== null, data: { items: ids } }).setNodeRef;
 }
 
+/** What a carried row tells dnd-kit besides its place (its sortable `data`): how it opens its menu, from the row pressed, held or tapped. */
+interface RowData {
+	readonly press?: (row: Element, held: boolean) => void;
+}
+
 /**
  * A row of a list in dnd-kit's sortable list: the thin wrapper dnd-kit draws again around the memoized card (stage 0,
  * second round). A task's card is carried by it; lifted, it stays where the card will land, as the gap (spec, «Decided»).
  * A section's header moves aside like cards but is not carried (`onTap` absent): a card goes after it into its section.
  * A calendar's block is `placed`: its box says where it stands, so dnd-kit never moves it (its box glides by CSS).
  */
-export const SortableRow = memo(function SortableRow({ id, onTap, gap = false, placed = false, children }: { readonly id: string; readonly onTap?: (target: Element) => void; readonly gap?: boolean; readonly placed?: boolean; readonly children: ReactNode }) {
+export const SortableRow = memo(function SortableRow({ id, onTap, gap = false, placed = false, children }: { readonly id: string; readonly onTap?: (row: Element, held: boolean) => void; readonly gap?: boolean; readonly placed?: boolean; readonly children: ReactNode }) {
 	const carried = onTap !== undefined;
-	const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({ id, disabled: { draggable: !carried, droppable: false }, animateLayoutChanges: placed ? STAY : undefined });
+	const data = useMemo((): RowData => ({ press: onTap }), [onTap]);
+	const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({ id, data, disabled: { draggable: !carried, droppable: false }, animateLayoutChanges: placed ? STAY : undefined });
 	const style: CSSProperties = placed ? {} : { transform: CSS.Translate.toString(transform), transition };
 	/** The card takes the focus back when the store asks (a rename ended by a key, Decision 58). */
 	const node = useRef<HTMLDivElement | null>(null);
-	const focusSeq = useScreen((s) => (carried && s.focusCard?.id === id ? s.focusCard.seq : null));
-	useEffect(() => {
-		if (focusSeq !== null) node.current?.focus({ preventScroll: true });
-	}, [focusSeq]);
+	useFocusWhen(node, useScreen((s) => (carried && s.focusCard?.id === id ? s.focusCard.seq : null)));
 	const hold = useCallback(
 		(el: HTMLDivElement | null) => {
 			node.current = el;
@@ -716,7 +633,7 @@ export const SortableRow = memo(function SortableRow({ id, onTap, gap = false, p
 		[setNodeRef],
 	);
 	return (
-		<div ref={hold} className={`tc-drag-source${isDragging || gap ? " is-lifted" : ""}`} style={style} {...(carried ? attributes : {})} {...(carried ? listeners : {})} onClick={carried ? (event) => onTap(event.currentTarget) : undefined} onContextMenu={carried ? (event) => secondaryClick(event) && onTap(event.currentTarget) : undefined}>
+		<div ref={hold} className={`tc-drag-source${isDragging || gap ? " is-lifted" : ""}`} style={style} {...(carried ? attributes : {})} {...(carried ? listeners : {})} onClick={carried ? (event) => onTap(event.currentTarget, false) : undefined} onContextMenu={carried ? (event) => secondaryClick(event) && onTap(event.currentTarget, false) : undefined}>
 			{children}
 		</div>
 	);
@@ -738,9 +655,6 @@ export function CarriedPlus({ onTap, children, ring, hidden = false }: { readonl
 	);
 }
 
-/** A row counts as this tall while it is not mounted (a card and its gap at the default size). */
-const ROW_ESTIMATE_PX = 37;
-
 /**
  * dnd-kit's sorting strategy for a list, as its strategies are written (`SortingStrategy`): each row moves to where the
  * list's final order puts it once the carried card is let go where it stands (`finalOrder`), the rows in flow one under
@@ -760,7 +674,7 @@ function finalOrderStrategy(ids: readonly string[]): SortingStrategy {
 		const id = ids[index];
 		const heightOf = (other: string) => {
 			const at = ids.indexOf(other);
-			return rects[at]?.height ?? (at === activeIndex ? activeNodeRect?.height : undefined) ?? ROW_ESTIMATE_PX;
+			return rects[at]?.height ?? (at === activeIndex ? activeNodeRect?.height : undefined) ?? ROW_PX;
 		};
 		const y = shiftOf(id, ids, final, heightOf);
 		return y === 0 ? null : { x: 0, y, scaleX: 1, scaleY: 1 };

@@ -49,6 +49,8 @@ const NOTE_PATH = "Заметка о доме.md";
 class StandPage {
 	private readonly screens = new Set<MountedScreen>();
 	private leafScreen: MountedScreen | null = null;
+	/** A note's block open beside the leaf, ahead of it in the page (`openNoteBeside`). */
+	private beside: HTMLElement | null = null;
 	private readonly app = {} as App;
 	private readonly haptics = detectHaptics(window as unknown as HapticsHost);
 	/** The notices shown, in order, as Obsidian's `Notice` would show them. */
@@ -92,6 +94,18 @@ class StandPage {
 		this.mount(block, "note", NOTE_PATH);
 	}
 
+	/** A note's block open beside the leaf's screen and ahead of it in the page, as a note and the view stand side by side in Obsidian: the same tasks on two screens. */
+	openNoteBeside(): void {
+		const doc = this.leaf.ownerDocument;
+		const block = doc.createElement("div");
+		block.className = "tc-stand-block";
+		/** Out of the way of the leaf's screen: it is there to share the tasks' ids, not to be pressed. */
+		block.style.cssText = "position: absolute; left: 0; top: 0; width: 320px; visibility: hidden;";
+		doc.body.insertBefore(block, this.leaf);
+		this.beside = block;
+		this.mount(block, "note", NOTE_PATH);
+	}
+
 	/** A key of the screen's table, as the stand's view scope runs it (`Mod` is ⌘ or Ctrl): only while the screen takes keys. */
 	onKey = (event: KeyboardEvent): void => {
 		if (event.defaultPrevented) return;
@@ -122,6 +136,7 @@ class StandPage {
 			step: (id: string) => this.showStep(id),
 			notices: () => [...this.notices],
 			openNote: () => this.openNote(),
+			openNoteBeside: () => this.openNoteBeside(),
 		};
 	}
 
@@ -136,6 +151,8 @@ class StandPage {
 		this.screens.clear();
 		this.leafScreen = null;
 		this.leaf.replaceChildren();
+		this.beside?.remove();
+		this.beside = null;
 	}
 }
 

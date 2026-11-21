@@ -1,6 +1,6 @@
 import { AnimatePresence, motion, useIsPresent } from "motion/react";
-import { type CSSProperties, type ForwardedRef, forwardRef, type ReactNode, useCallback, useRef } from "react";
-import { EASE_OUT, LAYER_MS } from "../layers/motion";
+import { createContext, type CSSProperties, type ForwardedRef, forwardRef, type ReactNode, useCallback, useContext, useRef } from "react";
+import { EASE_OUT, GLIDE, LAYER_MS } from "../layers/motion";
 
 /**
  * Rows that move (spec, «The owners»; principle 3): a row glides to its new place whatever moved it, a drag, a command,
@@ -13,7 +13,8 @@ import { EASE_OUT, LAYER_MS } from "../layers/motion";
  * measure every other row in the middle of the drop, without the place dnd-kit has them at, so they would glide back from
  * where they stood before the drag.
  */
-export const MovingRow = forwardRef<HTMLDivElement, MovingRowProps>(function MovingRow({ id, order, context = 0, carried, fresh, placed = false, className, style, index, measure, children }, ref) {
+export const MovingRow = forwardRef<HTMLDivElement, MovingRowProps>(function MovingRow({ id, order, context = 0, carried, fresh, placed = false, className, style, index, measure, onGlide, children }, ref) {
+	const screen = useContext(RowScreen);
 	const still = carried || placed;
 	const present = useIsPresent();
 	const setElement = useMeasured(ref, measure, present);
@@ -24,7 +25,7 @@ export const MovingRow = forwardRef<HTMLDivElement, MovingRowProps>(function Mov
 			className={present ? className : `${className ?? ""} is-leaving`}
 			style={style}
 			layout={still ? false : "position"}
-			layoutId={still ? undefined : `row-${context}-${id}`}
+			layoutId={still ? undefined : `row-${screen}-${context}-${id}`}
 			layoutDependency={order}
 			layoutCrossfade={false}
 			initial={fresh ? (placed ? FADED : COME_IN) : false}
@@ -32,11 +33,21 @@ export const MovingRow = forwardRef<HTMLDivElement, MovingRowProps>(function Mov
 			variants={{ leave: (gone: ReadonlySet<string>) => (!gone.has(id) ? AT_ONCE : placed ? { ...FADED, transition: LEAVE } : { ...COME_IN, transition: LEAVE }) }}
 			exit="leave"
 			transition={GLIDE}
+			onTransitionRun={onGlide && ((event) => event.target === event.currentTarget && onGlide(true))}
+			onTransitionEnd={onGlide && ((event) => event.target === event.currentTarget && onGlide(false))}
+			onTransitionCancel={onGlide && ((event) => event.target === event.currentTarget && onGlide(false))}
 		>
 			{children}
 		</motion.div>
 	);
 });
+
+/**
+ * The screen a row belongs to (Decision 139): Motion keeps one register of layout ids for the whole window, so a note's
+ * block and the main screen showing the same task would take each other's row for one (the older hidden). Each mounted
+ * screen gives its rows its own name.
+ */
+export const RowScreen = createContext("");
 
 /** Whether the row drawing this is leaving: its card keeps the face it had, the screen's data no longer has it. */
 export const useLeaving = (): boolean => !useIsPresent();
@@ -77,8 +88,8 @@ export interface MovingRowProps {
 	readonly id: string;
 	/** The order of its list as read: a change measures the rows and glides them. */
 	readonly order: string;
-	/** The context the screen is drawn in (Decision 132): a task's row of another context is another row. */
-	readonly context?: number;
+	/** The context the screen is drawn in (Decision 132), or the region apart from the lists (a menu's stack): a task's row of another context is another row. */
+	readonly context?: number | string;
 	readonly carried: boolean;
 	/**
 	 * Placed by its own box in CSS (a calendar's block: its top, height and lane), so it glides by that box's CSS transition,
@@ -92,11 +103,11 @@ export interface MovingRowProps {
 	/** Its index for the list's virtualizer, and the virtualizer's measure of it; a row leaving has neither. */
 	readonly index?: number;
 	readonly measure?: (element: HTMLDivElement | null) => void;
+	/** A placed row's box starts or stops gliding by its CSS transition (the browser's own transition events). */
+	readonly onGlide?: (gliding: boolean) => void;
 	readonly children: ReactNode;
 }
 
-/** Every row that changes place glides there the same way (stage 0's spring). */
-const GLIDE = { type: "spring", stiffness: 520, damping: 42, mass: 0.9 } as const;
 const COME_IN = { opacity: 0, scale: 0.96 };
 const FADED = { opacity: 0 };
 const SHOWN = { opacity: 1, scale: 1 };

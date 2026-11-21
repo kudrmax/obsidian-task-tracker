@@ -1,22 +1,10 @@
-import { createContext, type CSSProperties, memo, useRef } from "react";
+import { type CSSProperties, type HTMLAttributes, memo, type ReactNode, useRef } from "react";
 import { PROPERTY } from "../../design";
-import type { CardFace } from "../port";
+import type { BlockLook } from "../layers/Layers";
+import type { CardFace as Face } from "../port";
 import { useData } from "../store";
 import { Icon } from "./Icon";
 import { useLeaving } from "./MovingRow";
-
-/**
- * What a task's card shows on the calendar besides what it shows in a list (F91, F93, F94): its corner (its start in a stack, its length when shorter than the card), the moving edge's
- * time on a pill while a dot is pulled, and the start written on its dashed place while carried. No due date there.
- */
-export interface BlockLook {
-	readonly corner: readonly [string, string] | null;
-	readonly pill: string | null;
-	readonly clock: string;
-}
-
-/** How a block pressed on the calendar looks there (its corner, its pill): its copy over the menu's backdrop is drawn the same. */
-export const PressedLook = createContext<{ current: BlockLook | null }>({ current: null });
 
 export interface CardProps {
 	readonly id: string;
@@ -42,19 +30,32 @@ export const Card = memo(function Card({ id, depth = 0, copy = false, block }: C
 	const face = read ?? (leaving ? last.current : undefined);
 	if (!face) return null;
 	const marked = copy ? { "data-copy": id } : block ? { "data-block": id, "data-own-press": "" } : { "data-id": id };
+	return <CardFace face={face} block={block} className={block ? "tc-block-card" : "tc-card"} {...marked} data-collapsed={!block && face.folded ? "true" : undefined} style={block ? undefined : ({ [PROPERTY.level]: String(depth) } as CSSProperties)} />;
+});
+
+/** The element's own attributes besides the face: its marks (`data-…`), its handlers and its style. */
+type FaceAttributes = Omit<HTMLAttributes<HTMLDivElement>, "className" | "children"> & { readonly [mark: `data-${string}`]: string | undefined };
+
+/**
+ * A task's face drawn once for every place that shows it (spec, principle 8): a list's card, a calendar's block, the copy
+ * over a menu's backdrop and a card of a menu's stack. Its status and level on the element, two lines for a folded task's
+ * step in a list; `children` after its insides (a task's notes in the menu's copy).
+ */
+export function CardFace({ face, block, className, children, ...attributes }: { readonly face: Face; readonly block?: BlockLook; readonly className: string; readonly children?: ReactNode } & FaceAttributes) {
 	return (
-		<div className={`${block ? "tc-block-card" : "tc-card"}${!block && face.step !== null ? " is-two-line" : ""}`} {...marked} data-collapsed={!block && face.folded ? "true" : undefined} data-status={face.inProgress ? "inProgress" : "open"} data-priority={face.color ?? undefined} style={block ? undefined : ({ [PROPERTY.level]: String(depth) } as CSSProperties)}>
+		<div className={`${className}${!block && face.step !== null ? " is-two-line" : ""}`} data-status={face.inProgress ? "inProgress" : "open"} data-priority={face.color ?? undefined} {...attributes}>
 			<CardInsides face={face} block={block} />
+			{children}
 		</div>
 	);
-});
+}
 
 /**
  * What a card shows inside its edge: its title (a folded task's in a list small over its next step, F79; on the calendar
  * the step alone, F94), the counter and the description's mark, the date in a list, its look on
  * the calendar. The card and its copy over a menu's backdrop draw the same insides.
  */
-export function CardInsides({ face, block }: { readonly face: CardFace; readonly block?: BlockLook }) {
+function CardInsides({ face, block }: { readonly face: Face; readonly block?: BlockLook }) {
 	return (
 		<>
 			{block || face.step === null ? (

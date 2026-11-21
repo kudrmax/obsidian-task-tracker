@@ -55,7 +55,7 @@ export default {
 			t.expect(blockFocus.card?.startsWith("Обед!"), `Enter on a block's rename gives the focus back to the block: ${JSON.stringify(blockFocus)}`);
 			await tap(await block("Упаковать книги"));
 			await t.sleep(450);
-			const card2 = await t.cdp.eval(`(() => { const c = [...document.querySelectorAll(".tc-menu-subtasks > [data-stack]")].find((e) => e.textContent.includes("Заказать машину")); const r = c.getBoundingClientRect(); return { x: r.left + 30, y: r.top + 15 }; })()`);
+			const card2 = await t.cdp.eval(`(() => { const c = [...document.querySelectorAll(".tc-menu-subtasks [data-stack]")].find((e) => e.textContent.includes("Заказать машину")); const r = c.getBoundingClientRect(); return { x: r.left + 30, y: r.top + 15 }; })()`);
 			await tap(card2);
 			await t.sleep(450);
 			const sub = await focused();

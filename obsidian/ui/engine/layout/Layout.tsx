@@ -4,7 +4,7 @@ import { useDivider } from "../gestures/Divider";
 import { DayTurnContext, type FollowGestures, useFollowRibbon } from "../gestures/FollowRibbon";
 import { RibbonTrack, StripColumn, StripRule } from "../gestures/RibbonTrack";
 import type { ListId } from "../port";
-import { DayContext, type Stop, STOP_LISTS, useData, useScreen } from "../store";
+import { DayContext, useData, useScreen } from "../store";
 import { Capsule } from "../view/Capsule";
 import { useHost } from "../view/host";
 import { PlusButton } from "../view/QuickAdd";
@@ -12,13 +12,12 @@ import { DaySlide } from "../view/Slide";
 import { TaskList } from "../view/TaskList";
 import { TaskMenu } from "../view/TaskMenu";
 import { Timeline } from "../view/Timeline";
-import { COLUMN_SHARE, dayColumnWidth, ruleShift, STRIP_WIDTH } from "./columns";
+import { COLUMN_SHARE, columnsOf, dayColumnWidth, drawnWidths, type Place, ruleShift, type Stop, STRIP_WIDTH } from "./columns";
+
+export { type Place, reachOf } from "./columns";
 
 /** Where the ribbon stands, in places: what moves its columns and dividers each frame. */
 type RibbonAt = FollowGestures["at"];
-
-/** Where a screen is mounted: Obsidian's leaf (the main screen, a pop-out) or a note's block. */
-export type Place = "leaf" | "note";
 
 /**
  * Where things stand (spec, «The owners»): the place's columns. The only module that reads the place. A leaf shows the
@@ -26,17 +25,12 @@ export type Place = "leaf" | "note";
  * strip, the strip slides by its own percent. At Inbox and at Soon the two columns split the window in half (CLAUDE.md,
  * «Behaviours Max had to ask for twice»); at the day's calendar the divider sets the list against the calendar (F51–F53).
  */
-/** The lists a screen mounted at `place` can bring into sight: the ribbon turns to any; a note's block shows Inbox. */
-export function reachOf(place: Place): readonly ListId[] {
-	return place === "note" ? ["inbox"] : ["inbox", "soon", "day"];
-}
-
 export const Layout = memo(function Layout({ place }: { readonly place: Place }) {
 	const stop = useScreen((s) => s.stop);
 	return (
 		<>
-			{place === "leaf" ? <RibbonColumns /> : <NoteColumn />}
-			<PlusButton shown={place === "note" ? ["inbox"] : STOP_LISTS[stop]} />
+			{place === "leaf" ? <RibbonColumns /> : <NoteColumn list={columnsOf(place, stop)[0]} />}
+			<PlusButton shown={columnsOf(place, stop)} />
 			<Capsule />
 			<TaskMenu />
 		</>
@@ -146,8 +140,8 @@ function ListDivider({ at, ribbon, calendar }: { readonly at: RibbonAt; readonly
 	const { haptics } = useHost();
 	/** The list as the browser draws it: all the ribbon but the calendar and the divider's half beside it. */
 	const drawn = () => {
-		const view = ribbon.current?.clientWidth ?? 0;
-		return { view, list: view - (calendar.current?.clientWidth ?? 0) - DESIGN.dividerWidth / 2 };
+		const { view, calendar: beside } = drawnWidths(ribbon.current, calendar.current);
+		return { view, list: view - beside - DESIGN.dividerWidth / 2 };
 	};
 	const bind = useDivider(drawn, () => haptics.tap());
 	const handlers = bind();
@@ -171,10 +165,10 @@ function DayListTitle() {
 	return <span className="tc-day-title">{title}</span>;
 }
 
-function NoteColumn() {
+function NoteColumn({ list }: { readonly list: ListId }) {
 	return (
 		<div className="tc-note-column">
-			<ListColumn list="inbox" share={WHOLE} />
+			<ListColumn list={list} share={WHOLE} />
 		</div>
 	);
 }

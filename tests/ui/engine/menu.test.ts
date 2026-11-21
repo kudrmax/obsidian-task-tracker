@@ -188,7 +188,7 @@ describe("the menu's fields and the plus, in the store", () => {
 		expect(s.layer).toBeNull();
 		expect(s.entry).toMatchObject({ renaming: id, stack: false, at: { list: "inbox", before: id, depth: 0 } });
 		expect(s.entryText).toBe(s.shown.cards[id].title);
-		const bar = s.entryBar(s.entry!, s.draft, s.entryText);
+		const bar = s.bar!;
 		expect(barOf(bar)).toEqual([
 			["shifts", ["outdent off", "indent off"]],
 			["flag", [s.draft.level ? "level lit" : "level"]],
@@ -206,7 +206,7 @@ describe("the menu's fields and the plus, in the store", () => {
 		lists.getState().openMenu(sub);
 		lists.getState().startRename();
 		let s = lists.getState();
-		expect(barOf(s.entryBar(s.entry!, s.draft, s.entryText))).toEqual([
+		expect(barOf(s.bar!)).toEqual([
 			["shifts", ["outdent off", "indent off"]],
 			["flag", ["level"]],
 			["marks", ["repeat", "description"]],
@@ -217,7 +217,7 @@ describe("the menu's fields and the plus, in the store", () => {
 		store.getState().startRename();
 		s = store.getState();
 		expect(s.entry).toMatchObject({ renaming: "k8", stack: false });
-		expect(barOf(s.entryBar(s.entry!, s.draft, s.entryText))).toEqual([
+		expect(barOf(s.bar!)).toEqual([
 			["flag", ["level"]],
 			["marks", ["project", "repeat", "description"]],
 		]);
@@ -229,7 +229,7 @@ describe("the menu's fields and the plus, in the store", () => {
 		s = store.getState();
 		expect(s.layer?.id).toBe(child);
 		expect(s.entry).toMatchObject({ renaming: child, stack: true });
-		expect(barOf(s.entryBar(s.entry!, s.draft, s.entryText))).toEqual([
+		expect(barOf(s.bar!)).toEqual([
 			["flag", ["level"]],
 			["marks", ["repeat", "description"]],
 		]);
@@ -300,7 +300,7 @@ describe("the menu's fields and the plus, in the store", () => {
 		store.getState().entryPlace("inbox", null, ["soon", "day"]);
 		const field = store.getState().entry!;
 		expect(field.at).toMatchObject({ list: at.list, away: { list: "inbox" } });
-		expect(store.getState().entryBar(field, store.getState().draft, "").where?.id).toBe("inbox");
+		expect(store.getState().bar!.where?.id).toBe("inbox");
 		store.getState().commitEntry("В инбокс", true);
 		await settle();
 		await settle();
@@ -326,7 +326,7 @@ describe("the menu's fields and the plus, in the store", () => {
 		store.getState().entryPlace("date", "2026-11-27", ["inbox", "soon", "day"]);
 		store.getState().commitEntry("A", true);
 		const s = store.getState();
-		expect(barOf(s.entryBar(s.entry!, s.draft, "")).find(([group]) => group === "shifts")).toEqual(["shifts", ["outdent off", "indent"]]);
+		expect(barOf(s.bar!).find(([group]) => group === "shifts")).toEqual(["shifts", ["outdent off", "indent"]]);
 		store.getState().indentEntry(1);
 		expect(store.getState().entry!.at.depth).toBe(1);
 	});
@@ -405,7 +405,7 @@ describe("the field's description, projects and new section (task actions spec, 
 		store.getState().openDescription();
 		expect(store.getState().draft.descriptionLine).toBe("");
 		store.getState().typeDescription("с подробностями");
-		const bar = store.getState().entryBar(store.getState().entry!, store.getState().draft, "");
+		const bar = store.getState().bar!;
 		expect(bar.bar.flatMap((g) => g.actions).find((a) => a.id === "description")?.lit).toBe(true);
 		store.getState().commitEntry("С описанием", true);
 		expect(store.getState().draft.descriptionLine).toBeNull();
@@ -437,7 +437,7 @@ describe("the field's description, projects and new section (task actions spec, 
 		store.getState().plusTap(["soon", "day"]);
 		store.getState().toggleProject("Дом");
 		store.getState().toggleProject("Отпуск");
-		const bar = store.getState().entryBar(store.getState().entry!, store.getState().draft, "");
+		const bar = store.getState().bar!;
 		expect(bar.project.options.filter((o) => o.on).map((o) => o.name)).toEqual(["Дом", "Отпуск"]);
 		store.getState().commitEntry("Два проекта", true);
 		expect(store.getState().draft.projects).toEqual(["Дом", "Отпуск"]);
@@ -452,10 +452,10 @@ describe("the field's description, projects and new section (task actions spec, 
 	it("New section, where the column shows sections, makes the field write a section's name there", async () => {
 		const { store } = screen();
 		store.getState().plusTap(["inbox", "soon"]);
-		const bar = store.getState().entryBar(store.getState().entry!, store.getState().draft, "");
+		const bar = store.getState().bar!;
 		expect(bar.bar[0]).toMatchObject({ group: "mode", actions: [{ id: "newSection", lit: false }] });
 		store.getState().toggleSection();
-		const section = store.getState().entryBar(store.getState().entry!, store.getState().draft, "");
+		const section = store.getState().bar!;
 		expect(section.bar.map((g) => g.group)).toEqual(["mode"]);
 		store.getState().commitEntry("Новый раздел", true);
 		expect(store.getState().entry).toBeNull();
@@ -467,7 +467,7 @@ describe("the field's description, projects and new section (task actions spec, 
 	it("Repeat is on the calendar's field too", () => {
 		const { store } = screen(calendarFile(NOW));
 		store.getState().openEntry({ list: "day", before: null, dayOffset: 0, at: 600 });
-		const bar = store.getState().entryBar(store.getState().entry!, store.getState().draft, "");
+		const bar = store.getState().bar!;
 		expect(bar.bar.flatMap((g) => g.actions).map((a) => a.id)).toContain("repeat");
 	});
 });
@@ -493,10 +493,23 @@ describe("the Project page and «New project…» (Decision 134), ⌥Tab's offer
 	});
 
 	it("follows the task's fresh id after a check, so the next check finds it (the core's key changes on a write)", async () => {
+		/** As the core does: the task written reads back under its fresh key. */
 		class FreshIds extends MockPort {
+			private written: string | null = null;
 			override async act(...args: Parameters<MockPort["act"]>): Promise<string | null> {
 				await super.act(...args);
+				this.written = args[0];
 				return `${args[0]}'`;
+			}
+			override read(...args: Parameters<MockPort["read"]>): ReturnType<MockPort["read"]> {
+				const data = super.read(...args);
+				const id = this.written;
+				if (id === null || !data.cards[id]) return data;
+				const { [id]: card, ...rest } = data.cards;
+				return { ...data, cards: { ...rest, [`${id}'`]: { ...card, id: `${id}'` } } };
+			}
+			override menu(id: string, from: Parameters<MockPort["menu"]>[1]): ReturnType<MockPort["menu"]> {
+				return super.menu(id.replace(/'$/, ""), from);
 			}
 		}
 		const p = new FreshIds(() => NOW);
@@ -520,7 +533,8 @@ describe("the Project page and «New project…» (Decision 134), ⌥Tab's offer
 		expect(store.getState().layer?.page).toBe("projects");
 		store.getState().nameMenuProject("Дача");
 		expect(store.getState().layer).toBeNull();
-		await wait(LAYER_MS.close + 20);
+		store.getState().layerGone();
+		await wait(5);
 		expect(lineOf(p, task.title)).toContain("🗂️ Дача");
 	});
 

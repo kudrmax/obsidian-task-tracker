@@ -1,31 +1,26 @@
 import { DESIGN } from "../../design";
 import { createStore, type StoreApi } from "zustand/vanilla";
-import { LAYER_MS } from "../layers/motion";
 import { EVERY_TASK } from "../port";
+import { type Stop, stopShowing } from "../layout/columns";
 import type { Destination, DividerStop, Edge, ScreenContext, UndoOutcome, EntryBar, EntryDraft, EntryField, FieldActionId, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, MenuStatusId, ScreenData, ScreenPort } from "../port";
 import { share } from "./share";
 
-/** Where the ribbon stands: Inbox–Soon, Soon–the day, the day–its calendar. */
-export type Stop = "inbox" | "soon" | "calendar";
-export const STOPS: readonly Stop[] = ["inbox", "soon", "calendar"];
-/** The lists the ribbon shows at each stop. */
-export const STOP_LISTS: Readonly<Record<Stop, readonly ListId[]>> = { inbox: ["inbox", "soon"], soon: ["soon", "day"], calendar: ["day"] };
-/** Whether a stop shows a list, and the stop the ribbon turns to for a list it doesn't show: the screen's columns, not a task's. */
-const SHOWS: Readonly<Record<Stop, Readonly<Record<ListId, boolean>>>> = { inbox: { inbox: true, soon: true, day: false }, soon: { inbox: false, soon: true, day: true }, calendar: { inbox: false, soon: false, day: true } };
-const STOP_OF: Readonly<Record<ListId, Stop>> = { inbox: "inbox", soon: "soon", day: "soon" };
+export type { Stop };
 
 /** Nothing came or went: one object, so a selector of it draws nothing again. */
 const NONE: ReadonlySet<string> = new Set();
 const NO_DRAFT: EntryDraft = { level: null, projects: [], descriptionLine: null, section: false };
+/** No field open: what closing one leaves. */
+const NO_ENTRY = { entry: null, draft: NO_DRAFT, entryText: "", entryPanel: null } as const;
 
 /** The one gesture that holds the pointer (spec, «Which gesture holds the pointer»). */
-export type Gesture = "drag" | "ribbon" | "resize" | "zoom" | "divider";
+type Gesture = "drag" | "ribbon" | "resize" | "zoom" | "divider";
 
 /** Where the calendar was zoomed to: an hour's height, or the whole day whatever the calendar's height. */
 export type Zoom = number | "wholeDay";
 
 /** A page of a task's menu: the menu itself, the month to pick a day in, the Reminder kinds. */
-export type MenuPage = "menu" | "picker" | "reminders" | "projects" | "projectName";
+type MenuPage = "menu" | "picker" | "reminders" | "projects" | "projectName";
 
 /** What a menu asks before it acts (Won't do, Stop, Delete), in place of what was pressed. */
 export type Asking = MenuStatusId | "delete";
@@ -50,7 +45,7 @@ export interface Layer {
 	readonly asked: Asking | null;
 }
 
-export interface ScreenState {
+interface ScreenState {
 	/** What the screen draws: the last read, or a drop's preview until its write is read back. */
 	readonly shown: ScreenData;
 	/** The last read: the order the rows glide by (Motion's `layoutDependency`, stage 0 «Integration findings» 3). */
@@ -102,6 +97,8 @@ export interface ScreenState {
 	/** What the bar has set for the task being typed, and the text typed so far (a level's prefix lights the flag). */
 	readonly draft: EntryDraft;
 	readonly entryText: string;
+	/** The bar of the field open (the port's answer), worked out again only when the field, what the bar set, the text typed or the read changes; null without a field. */
+	readonly bar: EntryBar | null;
 	/** The bar's panel open over it: one at a time; every new field, or the field moved, opens with none. */
 	readonly entryPanel: BarPanelKind | null;
 	/** The open menu's block stands higher than its task (Decision 120): its copy is not over the task, so the task's dots go. */
@@ -135,7 +132,7 @@ export interface ScreenState {
 	readonly reveal: { readonly id: string; readonly seq: number } | null;
 }
 
-export interface ScreenActions {
+interface ScreenActions {
 	setStop(stop: Stop): void;
 	/**
 	 * The ribbon's place past the calendar as a finger lets it go (`offset` days from today): the day shown from now on, the
@@ -172,10 +169,12 @@ export interface ScreenActions {
 	/** The open menu asks before it acts (null: the question taken back, the menu as it was). */
 	ask(what: Asking | null): void;
 	/**
-	 * A tap in the menu: it closes first, and once it has faded out the port writes what was tapped (F132: the action
-	 * happens on the screen under the menu, after it).
+	 * A tap in the menu: it closes first, and once it has faded out (`layerGone`) the port writes what was tapped (F132: the
+	 * action happens on the screen under the menu, after it).
 	 */
 	pick(action: MenuAction): void;
+	/** The closed menu has faded out (Floating UI's transition status, told by the layer): what was tapped in it is written now. */
+	layerGone(): void;
 	/** A tap in the menu that leaves it on its page (a project's check): written, the menu showing the task as it then stands. */
 	actHere(action: MenuAction): void;
 	/** «New project…»'s name typed in the menu (F220): Enter makes it and gives it to the task, closing the menu; a name of nothing goes back to the projects. */
@@ -216,8 +215,6 @@ export interface ScreenActions {
 	endResize(id: string, edge: Edge, minute: number | null, least: number): boolean;
 	/** Opens a new task's field at `at`; null closes the field writing nothing (Escape), with the menu it stood in. */
 	openEntry(at: Destination | null): void;
-	/** The bar of `field` (the port's answer). */
-	entryBar(field: EntryField, draft: EntryDraft, text: string): EntryBar;
 	/** Opens a panel of the bar (null: closes it). */
 	showEntryPanel(panel: BarPanelKind | null): void;
 	/** The menu's block lifted from its task, or standing right over it. */
@@ -294,10 +291,30 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 	/** The edge a carried card heads into, and the wait before its room may scroll. */
 	let scrollEdge: string | null = null;
 	let scrollWait = 0;
+	/** What was tapped in a closing menu, written once the menu has faded out (`layerGone`). */
+	let picked: (() => void) | null = null;
 	/** A context chosen while a drag or a resize held the screen still: set as it ends. */
 	let waitingContext: ScreenContext | null = null;
 	const first = port.read(0);
-	return createStore<Screen>()((set, get) => {
+	return createStore<Screen>()((setRaw, get) => {
+		/**
+		 * The store's one way to change: the field's bar is worked out again in the same change whenever the field, what the
+		 * bar set, the text or the read changes (a task written above the field may let it go a level in), never otherwise.
+		 */
+		const set = (patch: Partial<Screen>): void => {
+			const was = get();
+			const entry = "entry" in patch ? (patch.entry ?? null) : was.entry;
+			const stale = entry !== was.entry || ("draft" in patch && patch.draft !== was.draft) || ("entryText" in patch && patch.entryText !== was.entryText) || (entry !== null && "read" in patch && patch.read !== was.read);
+			setRaw(stale ? { ...patch, bar: entry && port.entryBar(entry, patch.draft ?? was.draft, patch.entryText ?? was.entryText) } : patch);
+		};
+		/** A menu closed, with a field typed in its stack. */
+		const closed = (s: Screen): Partial<Screen> => ({ layer: null, ...(s.entry?.stack ? NO_ENTRY : {}) });
+		/** The open menu over `data`: it shows its task as it now stands (a subtask typed into its stack, F108); a menu whose task is no longer shown closes. */
+		const menuOver = (s: Screen, data: ScreenData): Partial<Screen> => {
+			const layer = s.layer;
+			if (!layer || layer.model.kind !== "task") return {};
+			return layer.id in data.cards ? { layer: { ...layer, model: port.menu(layer.id, layer.from, s.dayOffset) } } : closed(s);
+		};
 		/** The port's data again; held while a drag or a drop's write keeps the screen still (spec, principle 5). */
 		const refresh = () => {
 			const s = get();
@@ -311,11 +328,10 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 			const same = next === s.read;
 			const came = Object.keys(next.cards).filter((id) => !(id in known));
 			const went = Object.keys(known).filter((id) => !(id in next.cards));
-			/** An open menu shows its task as it now stands (a subtask typed into its stack, F108). */
-			const layer = s.layer && s.layer.model.kind === "task" && next.cards[s.layer.id] ? { ...s.layer, model: port.menu(s.layer.id, s.layer.from, s.dayOffset) } : s.layer;
+			const menu = menuOver(s, next);
 			const undo = { canUndo: port.canUndo(), canRedo: port.canRedo() };
-			if (same) return set({ shown: share(s.shown, next), pending: false, layer, ...undo });
-			set({ read: next, shown: share(s.shown, next), pending: false, readSeq: s.readSeq + 1, fresh: came.length === 0 ? NONE : new Set(came), gone: went.length === 0 ? NONE : new Set(went), layer, ...undo });
+			if (same) return set({ shown: share(s.shown, next), pending: false, ...menu, ...undo });
+			set({ read: next, shown: share(s.shown, next), pending: false, readSeq: s.readSeq + 1, fresh: came.length === 0 ? NONE : new Set(came), gone: went.length === 0 ? NONE : new Set(went), ...menu, ...undo });
 		};
 
 		const write = (done: Promise<unknown>) => {
@@ -340,9 +356,14 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 		/** «New project…» on the bar being written: Enter or a tap away on the field waits for it (`commitEntry`). */
 		let naming: Promise<void> | null = null;
 		/** Whether the field's bar offers `id` now (the port's answer): Tab, Shift+Tab and ⌥Tab obey the same buttons. */
-		const offers = (id: FieldActionId): boolean => {
-			const { entry, draft, entryText } = get();
-			return !!entry && port.entryBar(entry, draft, entryText).bar.some((group) => group.actions.some((action) => action.id === id && !action.disabled));
+		const offers = (id: FieldActionId): boolean => !!get().bar?.bar.some((group) => group.actions.some((action) => action.id === id && !action.disabled));
+		/** A carried or stretched task let go: drawn at `to` and written there, or back where it was taken (null). */
+		const letGo = (id: string, to: Destination | null) => {
+			if (to) {
+				set({ shown: share(get().shown, port.preview(id, to, get().context)) });
+				write(port.move(id, to));
+			} else get().carryHome();
+			home = null;
 		};
 		/** Undo or Redo through the port, one more write; a step the file changed under is refused with the port's notice. */
 		const retrace = (step: "undo" | "redo") => {
@@ -373,6 +394,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 			draft: NO_DRAFT,
 			entryText: "",
 			entryPanel: null,
+			bar: null,
 			menuLifted: false,
 			entrySeq: 0,
 			plusAt: null,
@@ -424,11 +446,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 			},
 			endResize(id, edge, minute, least) {
 				const to = minute === null ? null : port.resized(id, get().dayOffset, edge, minute, least);
-				if (to) {
-					set({ shown: share(get().shown, port.preview(id, to, get().context)) });
-					write(port.move(id, to));
-				} else get().carryHome();
-				home = null;
+				letGo(id, to);
 				set({ resizing: null });
 				get().release("resize");
 				return to !== null;
@@ -500,11 +518,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 				set({ shown: share(get().shown, port.preview(id, to, get().context)) });
 			},
 			drop(id, to) {
-				if (to) {
-					set({ shown: share(get().shown, port.preview(id, to, get().context)) });
-					write(port.move(id, to));
-				} else get().carryHome();
-				home = null;
+				letGo(id, to);
 				set({ lifted: null, liftedDepth: null });
 				get().release("drag");
 			},
@@ -542,10 +556,16 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 			pick(action) {
 				const layer = get().layer;
 				if (!layer) return;
+				get().layerGone();
 				set({ layer: null });
 				let done: () => void = () => undefined;
 				write(new Promise<void>((resolve) => (done = resolve)));
-				window.setTimeout(() => void port.act(layer.id, action, layer.from, get().dayOffset).finally(done), LAYER_MS.close);
+				picked = () => void port.act(layer.id, action, layer.from, get().dayOffset).finally(done);
+			},
+			layerGone() {
+				const run = picked;
+				picked = null;
+				run?.();
 			},
 			actHere(action) {
 				const layer = get().layer;
@@ -562,13 +582,10 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 				else get().pick({ kind: "newProject", name });
 			},
 			closeLayer() {
-				if (get().layer) set({ layer: null, ...(get().entry?.stack ? { entry: null, draft: NO_DRAFT, entryText: "", entryPanel: null } : {}) });
+				if (get().layer) set(closed(get()));
 			},
 			openEntry(at) {
 				set({ entry: at && { at, renaming: null, stack: false }, entrySeq: get().entrySeq + 1, entryPanel: null, layer: null, entryText: "", draft: NO_DRAFT });
-			},
-			entryBar(field, draft, text) {
-				return port.entryBar(field, draft, text);
 			},
 			liftMenu(menuLifted) {
 				if (get().menuLifted !== menuLifted) set({ menuLifted });
@@ -630,7 +647,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 				if (to.at.dayOffset !== get().dayOffset) get().showDay(to.at.dayOffset);
 				const where = to.at.list;
 				/** Another day than today stands past the calendar, where the ribbon turns the days (Decision 127); a list out of sight, the stop that shows it. */
-				const next = to.at.dayOffset !== 0 ? "calendar" : SHOWS[stop][where] ? stop : STOP_OF[where];
+				const next = to.at.dayOffset !== 0 ? "calendar" : stopShowing(stop, where);
 				/** The field opens again at its new place, with what was typed (a new field brought into sight, F193). */
 				set({ entry: to, entrySeq: get().entrySeq + 1, entryPanel: null, ...(next === stop ? {} : { stop: next }) });
 			},
@@ -678,9 +695,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 				if (s.context.project === context.project) return void (s.pending && refresh());
 				const next = port.read(s.dayOffset, context);
 				const left = Object.fromEntries(Object.keys(s.left).map((day) => [day, ((data) => ({ shown: data, read: data }))(port.read(Number(day), context))]));
-				/** A menu whose task the new context doesn't show closes with it. */
-				const layer = s.layer && s.layer.model.kind === "task" && !(s.layer.id in next.cards) ? null : s.layer;
-				set({ context, contextSeq: s.contextSeq + 1, read: next, shown: next, left, pending: false, readSeq: s.readSeq + 1, fresh: NONE, gone: NONE, selected: null, layer });
+				set({ context, contextSeq: s.contextSeq + 1, read: next, shown: next, left, pending: false, readSeq: s.readSeq + 1, fresh: NONE, gone: NONE, selected: null, ...menuOver(s, next) });
 			},
 			undo() {
 				retrace("undo");
@@ -705,6 +720,9 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 				return () => {
 					off();
 					window.clearTimeout(timer);
+					window.clearTimeout(scrollWait);
+					scrollEdge = null;
+					get().layerGone();
 				};
 			},
 		};

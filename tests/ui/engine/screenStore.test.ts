@@ -1,6 +1,8 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
 import { MockPort } from "../../../obsidian/stand/MockPort";
+import { mockFile } from "../../../obsidian/stand/mockData";
+import { columnsOf, reachOf, stopShowing } from "../../../obsidian/ui/engine/layout/columns";
 import { LAYER_MS } from "../../../obsidian/ui/engine/layers/motion";
 import { share } from "../../../obsidian/ui/engine/store/share";
 import { createScreenStore } from "../../../obsidian/ui/engine/store";
@@ -58,7 +60,7 @@ describe("the screen's store", () => {
 		expect(store.getState().claim("ribbon")).toBe(true);
 	});
 
-	it("opens a task's menu with what the port offers; a tap closes it first and writes once it has faded out", async () => {
+	it("opens a task's menu with what the port offers; a tap closes it first and writes once the layer says it has faded out, never by a timer of its own", async () => {
 		const { store } = screen();
 		store.getState().start();
 		const id = store.getState().shown.lists.inbox.rows.find((r) => r.kind === "task")!.id;
@@ -70,9 +72,79 @@ describe("the screen's store", () => {
 		expect(store.getState().layer).toBeNull();
 		expect(titles(store, "day")).not.toContain(model.title);
 		await new Promise((resolve) => setTimeout(resolve, LAYER_MS.close + 20));
+		expect(titles(store, "day")).not.toContain(model.title);
+		store.getState().layerGone();
+		await settle();
 		const day = titles(store, "day");
 		expect(day[day.length - 1]).toBe(model.title);
 		expect(titles(store, "inbox")).not.toContain(model.title);
+	});
+});
+
+describe("one rule for a menu whose task the screen no longer shows (review of part 1, finding 4)", () => {
+	it("closes it when a read no longer has the task, as another context does", () => {
+		const { port, store } = screen();
+		const file = mockFile(NOW);
+		port.reset(file);
+		store.getState().start();
+		const task = file.inbox[0].tasks[0];
+		store.getState().openMenu(task.id);
+		expect(store.getState().layer?.id).toBe(task.id);
+		const without = structuredClone(file);
+		without.inbox[0].tasks.shift();
+		port.reset(without);
+		expect(store.getState().layer).toBeNull();
+	});
+});
+
+describe("what the store owns ends with the screen (review of part 1, finding 9)", () => {
+	it("forgets the edge a carried card headed into when the screen stops: the quarter second's wait arms nothing after", async () => {
+		const { store } = screen();
+		const stop = store.getState().start();
+		store.getState().scrollToward("list:inbox:-1");
+		stop();
+		await new Promise((resolve) => setTimeout(resolve, 300));
+		expect(store.getState().scrollArmed).toBe(false);
+	});
+});
+
+describe("the field's bar, ready in the store (review of part 1, finding 10)", () => {
+	it("asks the port for the bar only when the field, what the bar set, the text or the read changes", () => {
+		const { port, store } = screen();
+		let asked = 0;
+		const entryBar = port.entryBar.bind(port);
+		port.entryBar = (...args) => {
+			asked++;
+			return entryBar(...args);
+		};
+		store.getState().plusTap(["soon", "day"]);
+		expect(store.getState().bar).not.toBeNull();
+		const once = asked;
+		store.getState().select("t1");
+		store.getState().setZoom(80);
+		store.getState().setPlusMinute(600);
+		store.getState().showEntryPanel("priority");
+		expect(asked).toBe(once);
+		store.getState().typeEntry("Новая");
+		expect(asked).toBe(once + 1);
+		store.getState().openEntry(null);
+		expect(store.getState().bar).toBeNull();
+	});
+});
+
+describe("what each stop shows, said once by the layout (review of part 1, finding 3)", () => {
+	it("gives the lists of each stop and place, what a place can reach, and the stop that brings a list into sight", () => {
+		expect(columnsOf("leaf", "inbox")).toEqual(["inbox", "soon"]);
+		expect(columnsOf("leaf", "soon")).toEqual(["soon", "day"]);
+		expect(columnsOf("leaf", "calendar")).toEqual(["day"]);
+		expect(columnsOf("note", "calendar")).toEqual(["inbox"]);
+		expect(reachOf("leaf")).toEqual(["inbox", "soon", "day"]);
+		expect(reachOf("note")).toEqual(["inbox"]);
+		expect(stopShowing("calendar", "day")).toBe("calendar");
+		expect(stopShowing("calendar", "inbox")).toBe("inbox");
+		expect(stopShowing("calendar", "soon")).toBe("soon");
+		expect(stopShowing("inbox", "day")).toBe("soon");
+		expect(stopShowing("inbox", "soon")).toBe("inbox");
 	});
 });
 

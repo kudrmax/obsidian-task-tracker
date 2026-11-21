@@ -38,7 +38,7 @@ export interface WheelFollowTuning {
 	readonly retouchMs: number;
 }
 
-export const WHEEL_FOLLOW: WheelFollowTuning = { momentumEvents: 4, momentumMinPx: 10, quietMs: 130, retouchMs: 40 };
+const WHEEL_FOLLOW: WheelFollowTuning = { momentumEvents: 4, momentumMinPx: 10, quietMs: 130, retouchMs: 40 };
 /** A touch stops the momentum at once: the next delta falls under this share of the momentum's last, or none comes this long. */
 const CUT = 0.6;
 const MOMENTUM_GAP_MS = 45;

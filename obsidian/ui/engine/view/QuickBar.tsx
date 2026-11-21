@@ -71,17 +71,13 @@ export const QuickBar = memo(function QuickBar({ reach }: { readonly reach: read
 	const api = useScreenApi();
 	const { desk, layerRoot } = useHost();
 	const entry = useScreen((s) => s.entry);
-	const draft = useScreen((s) => s.draft);
-	const text = useScreen((s) => s.entryText);
-	/** The bar is the port's answer for the screen as read: a task written above the field may let it go a level in. */
-	useScreen((s) => s.read);
+	const bar = useScreen((s) => s.bar);
 	const panel = useScreen((s) => s.entryPanel);
 	const setPanel = (next: PanelKind | null) => api.getState().showEntryPanel(next);
 	const [anchors, setAnchors] = useState<Partial<Record<PanelKind, HTMLElement | null>>>({});
 	/** One ref callback per panel's button, kept across renders: a button gone clears its anchor, as a state setter used as a ref does. */
 	const holders = useRef<Partial<Record<PanelKind, (el: HTMLElement | null) => void>>>({});
-	if (!entry) return null;
-	const bar = api.getState().entryBar(entry, draft, text);
+	if (!entry || !bar) return null;
 	const toggle = (kind: PanelKind) => setPanel(panel === kind || (panel === "date" && kind === "where") || (panel === "projectName" && kind === "project") ? null : kind);
 	const close = () => setPanel(null);
 	const hold = (kind: PanelKind) => (holders.current[kind] ??= (el: HTMLElement | null) => setAnchors((was) => (was[kind] === el ? was : { ...was, [kind]: el })));

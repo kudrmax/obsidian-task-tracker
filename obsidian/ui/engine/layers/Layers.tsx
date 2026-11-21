@@ -1,6 +1,8 @@
 import { autoUpdate, flip, FloatingFocusManager, FloatingOverlay, FloatingPortal, hide, type Middleware, type MiddlewareState, offset, type Placement, useDismiss, useFloating, useInteractions, useRole, useTransitionStatus } from "@floating-ui/react";
-import { type CSSProperties, createContext, type MouseEvent as ReactMouseEvent, type MutableRefObject, type ReactNode, useContext, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, createContext, type MouseEvent as ReactMouseEvent, type MutableRefObject, type ReactNode, type RefObject, useContext, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { DESIGN, PROPERTY } from "../../design";
+import type { MenuFrom } from "../port";
+import { useScreenApi } from "../store";
 import { blockTop } from "./block";
 import { LAYER_MS } from "./motion";
 
@@ -11,19 +13,37 @@ import { LAYER_MS } from "./motion";
  * pop-out window draws its own (stage 0, «Integration findings» 11).
  */
 
-/** The element a layer opens from: the view hands it over as it opens one (a pressed card). */
-const AnchorContext = createContext<MutableRefObject<Element | null> | null>(null);
+/**
+ * What a calendar's task shows there besides a list's card (F91, F93, F94): its corner (its start in a stack, its length
+ * when shorter than the card), the moving edge's time on a pill while a dot is pulled, and the start written on its dashed
+ * place while carried. The menu's copy of a pressed block is drawn in the same look.
+ */
+export interface BlockLook {
+	readonly corner: readonly [string, string] | null;
+	readonly pill: string | null;
+	readonly clock: string;
+}
+
+/** Where the menu opened from: the element pressed, the copy standing over it, and a calendar block's look there. */
+export interface MenuOrigin {
+	readonly element: Element | null;
+	readonly look: BlockLook | null;
+}
+
+const NO_ORIGIN: MenuOrigin = { element: null, look: null };
+/** The one record of where the menu opened from, written only by `useMenuFrom`'s opener. */
+const OriginContext = createContext<MutableRefObject<MenuOrigin> | null>(null);
 /** The new task's field as it stands on the screen: the desktop's capsule stands by it. */
 const FieldContext = createContext<{ readonly field: Element | null; readonly setField: (el: Element | null) => void } | null>(null);
 
 export function Layers({ children }: { readonly children: ReactNode }) {
-	const anchor = useRef<Element | null>(null);
+	const origin = useRef<MenuOrigin>(NO_ORIGIN);
 	const [field, setField] = useState<Element | null>(null);
 	const fields = useMemo(() => ({ field, setField }), [field]);
 	return (
-		<AnchorContext.Provider value={anchor}>
+		<OriginContext.Provider value={origin}>
 			<FieldContext.Provider value={fields}>{children}</FieldContext.Provider>
-		</AnchorContext.Provider>
+		</OriginContext.Provider>
 	);
 }
 
@@ -43,12 +63,43 @@ export const secondaryClick = (event: ReactMouseEvent): boolean => {
 	return (event.nativeEvent as PointerEvent).pointerType !== "touch";
 };
 
-/** Where the next layer opens from. */
-export function useAnchor(): MutableRefObject<Element | null> {
-	const anchor = useContext(AnchorContext);
-	if (!anchor) throw new Error("a layer's anchor outside the screen's layers");
-	return anchor;
+function useOrigin(): MutableRefObject<MenuOrigin> {
+	const origin = useContext(OriginContext);
+	if (!origin) throw new Error("a menu's origin outside the screen's layers");
+	return origin;
 }
+
+/** Where the menu last opened from, for the menu to stand over it. */
+export function useMenuOrigin(): MenuOrigin {
+	return useOrigin().current;
+}
+
+/**
+ * The one way a menu opens (spec, «Layers and focus»): the task or event `id`, opened `from` there, standing over `element`
+ * (the pressed thing, found from the event's own target, never looked up in the document), a calendar block's copy drawn
+ * in its `look`; `reveal` for a tap, which brings a card partly out of its list's sight into it first.
+ */
+export function useMenuFrom(): (id: string, from: MenuFrom, element: Element, look?: BlockLook | null, reveal?: boolean) => void {
+	const origin = useOrigin();
+	const api = useScreenApi();
+	return useCallback(
+		(id, from, element, look = null, reveal = false) => {
+			origin.current = { element, look };
+			api.getState().openMenu(id, from, reveal);
+		},
+		[origin, api],
+	);
+}
+
+/** The element takes the keyboard's focus each time the store asks (`seq`, null: not asked): a card a rename ended on by a key (Decision 58). */
+export function useFocusWhen(node: RefObject<HTMLElement | null>, seq: number | null): void {
+	useEffect(() => {
+		if (seq !== null) node.current?.focus({ preventScroll: true });
+	}, [node, seq]);
+}
+
+/** The pressed thing marked `marker` around or inside `target` (a row's wrapper holds its card). */
+export const pressedIn = (target: Element, marker: string): Element => target.closest(marker) ?? target.querySelector(marker) ?? target;
 
 export interface MenuLayerProps {
 	readonly open: boolean;
@@ -78,6 +129,8 @@ export interface MenuLayerProps {
 	readonly keepWidth?: boolean;
 	/** The block stands higher than what was pressed, or right over it: what is pinned on the pressed thing goes or stays. */
 	readonly onLift?: (lifted: boolean) => void;
+	/** The menu closed has faded out, or was taken off before it had: what was tapped in it may happen now (F132). */
+	readonly onGone?: () => void;
 }
 
 
@@ -98,7 +151,7 @@ const motionClass = (status: string, ready: boolean) => (status === "open" && re
  * goes back down into the task. Another page grows or shrinks the panel in place (`scrollWithin`). The parts open and
  * close together (Floating UI's transition status keeps them mounted while they fade, `LAYER_MS`).
  */
-export function MenuLayer({ open, onClose, escapes = true, root, reference, label, over, groups, panelClass, page, shape, keepWidth = false, onLift }: MenuLayerProps) {
+export function MenuLayer({ open, onClose, escapes = true, root, reference, label, over, groups, panelClass, page, shape, keepWidth = false, onLift, onGone }: MenuLayerProps) {
 	const parts = useRef<{ upper: HTMLElement | null; lower: HTMLElement | null }>({ upper: null, lower: null });
 	/** The window less the phone's safe areas (`env(safe-area-inset-*)`, the plugin's `menuRoom`): every part stays inside it. */
 	const safe = useRef<HTMLElement | null>(null);
@@ -138,6 +191,12 @@ export function MenuLayer({ open, onClose, escapes = true, root, reference, labe
 		if (page !== firstPage.current && lower && !lower.contains(lower.ownerDocument.activeElement)) lower.focus({ preventScroll: true });
 	}, [page]);
 	const { isMounted, status } = useTransitionStatus(block.context, { duration: { open: LAYER_MS.open, close: LAYER_MS.close } });
+	const gone = useRef(onGone);
+	gone.current = onGone;
+	useEffect(() => {
+		if (!isMounted) gone.current?.();
+	}, [isMounted]);
+	useEffect(() => () => gone.current?.(), []);
 	const shownOnce = useRef(false);
 	/** Closed by the click, not the press: the finger's tap ends on the backdrop, never on a card under the fading menu. */
 	const dismiss = useDismiss(block.context, { escapeKey: escapes, outsidePressEvent: "click", outsidePress: (event) => !(event.target instanceof Element && (block.refs.floating.current?.contains(event.target) || event.target.closest(".tc-quick-bar, .tc-quick-panel"))) });
@@ -227,15 +286,15 @@ function blockIn(safe: MutableRefObject<HTMLElement | null>, parts: MutableRefOb
 	};
 }
 
-/** The window less its safe areas, in the floating element's own terms (Floating UI's measure of the level's safe room); the page's size without one. */
+/** The window less its safe areas, in the floating element's own terms (Floating UI's measure of the level's safe room); the viewport, by Floating UI's clipping measure, without one. */
 async function roomOf(state: MiddlewareState, safe: MutableRefObject<HTMLElement | null>): Promise<{ readonly top: number; readonly bottom: number; readonly left: number; readonly right: number }> {
 	const el = safe.current;
 	if (el) {
 		const r = (await state.platform.getElementRects({ reference: el, floating: state.elements.floating, strategy: state.strategy })).reference;
 		return { top: r.y, bottom: r.y + r.height, left: r.x, right: r.x + r.width };
 	}
-	const page = state.elements.floating.ownerDocument.documentElement;
-	return { top: 0, bottom: page.clientHeight, left: 0, right: page.clientWidth };
+	const view = await state.platform.getClippingRect({ element: state.elements.floating, boundary: "clippingAncestors", rootBoundary: "viewport", strategy: state.strategy });
+	return { top: view.y, bottom: view.y + view.height, left: view.x, right: view.x + view.width };
 }
 
 export interface PinnedProps {
@@ -248,6 +307,8 @@ export interface PinnedProps {
 	readonly along: number;
 	/** The element of the view's own document that holds the layer. */
 	readonly root: HTMLElement;
+	/** The element moves now (it glides, stretches, or the screen under it slides or zooms): followed every frame while it does; else on its own changes. */
+	readonly moving: boolean;
 	readonly children: ReactNode;
 }
 
@@ -255,15 +316,17 @@ export interface PinnedProps {
  * Something pinned onto an element of the screen and lying over every layer, a menu's backdrop too: a selected task's dots
  * (F102, F103), which stay where they can be pulled while the task's menu is open. Floating UI places it against the
  * element and follows it every frame (the element glides and stretches); hidden while the element is scrolled out of
- * sight (`hide`).
+ * sight (`hide`). Floating UI follows it every frame only while it moves (`moving`); standing, its own changes of size,
+ * scroll and place move the pins (`autoUpdate`'s observers).
  */
-export function Pinned({ reference, placement, into, along, root, children }: PinnedProps) {
-	const { refs, floatingStyles, middlewareData } = useFloating({
+export function Pinned({ reference, placement, into, along, root, moving, children }: PinnedProps) {
+	const { refs, floatingStyles, middlewareData, elements, update } = useFloating({
 		placement,
 		middleware: [offset({ mainAxis: -into, crossAxis: along }), hide()],
-		whileElementsMounted: (reference, floating, update) => autoUpdate(reference, floating, update, { animationFrame: true }),
 		elements: { reference },
 	});
+	/** Floating UI's `autoUpdate` called as its docs show for options that change: set up again when the pins start or stop following every frame. */
+	useEffect(() => (elements.floating ? autoUpdate(reference, elements.floating, update, { animationFrame: moving }) : undefined), [reference, elements.floating, update, moving]);
 	return (
 		<FloatingPortal root={root}>
 			<div ref={refs.setFloating} style={floatingStyles} className={`tc-pinned${middlewareData.hide?.referenceHidden ? " is-hidden" : ""}`}>

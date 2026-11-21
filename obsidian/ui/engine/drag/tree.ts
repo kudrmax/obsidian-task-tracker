@@ -132,7 +132,7 @@ export function finalOrder(ids: readonly string[], activeIndex: number, overInde
 }
 
 /** The room the rows before `id` take in `order`: where `id` stands, from the order's first row. */
-export function topIn(order: readonly string[], id: string, heightOf: (id: string) => number): number {
+function topIn(order: readonly string[], id: string, heightOf: (id: string) => number): number {
 	let sum = 0;
 	for (const other of order) {
 		if (other === id) return sum;
