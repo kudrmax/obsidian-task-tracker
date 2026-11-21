@@ -157,6 +157,12 @@ export function frameFaults(frames, { maxStep = Infinity, monotonic = null, foll
 	return faults;
 }
 
+/** Where the card of task `id` stood in each frame (its box and how visible it was), null in a frame that showed none. */
+export const trackOf = (frames, id) => frames.map((frame) => frame.items.find((item) => item.id === id && item.kind !== "copy") ?? null);
+
+/** How many times a value of the track changed by more than half a pixel the same way (`sign`: 1 up, -1 down): it glided, not jumped. */
+export const stepsOf = (values, sign) => values.filter((v, i) => i > 0 && (v - values[i - 1]) * sign > 0.5).length;
+
 /** A CDP screencast of the page into `dir`, every frame as a JPEG; `stop` gives the files and draws a contact sheet. */
 export class Screencast {
 	/** @param {import("./cdp.mjs").Cdp} cdp */

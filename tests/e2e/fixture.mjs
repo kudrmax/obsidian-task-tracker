@@ -74,6 +74,10 @@ async function scenarioTools(page, { platform, theme, out }) {
 		},
 		/** Records every frame while `gesture` runs (and `settleMs` after), then checks them: the faults found. */
 		async frames(gesture, { settleMs = 600, cast = null, ...checks } = {}) {
+			return frameFaults(await t.record(gesture, { settleMs, cast }), checks);
+		},
+		/** Every frame while `gesture` runs (and `settleMs` after), as the page painted it. */
+		async record(gesture, { settleMs = 600, cast = null } = {}) {
 			const recorder = new FrameRecorder(cdp);
 			const screencast = cast ? new Screencast(cdp, join(out, cast)) : null;
 			await screencast?.start();
@@ -83,7 +87,7 @@ async function scenarioTools(page, { platform, theme, out }) {
 			const frames = await recorder.stop();
 			await screencast?.stop();
 			writeFileSync(join(out, `${cast ?? "frames"}.json`), JSON.stringify(frames));
-			return frameFaults(frames, checks);
+			return frames;
 		},
 		/** The screen, or a region of it (`clip`: x, y, width, height) magnified three times. */
 		shot: (name, clip) => screenshot(cdp, join(out, `${name}.png`), clip),
