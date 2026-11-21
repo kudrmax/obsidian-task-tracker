@@ -1,6 +1,6 @@
 import { type CSSProperties, type MouseEvent, type PointerEvent, type TouchEvent, useEffect, useId, useRef } from "react";
 import { PROPERTY } from "../../design";
-import { Drag, type Grab, type Landing } from "../drag/Drag";
+import { Drag, type Grab, type Landing, useTouchPresses } from "../drag/Drag";
 import { Layers } from "../layers/Layers";
 import { Layout, type Place, reachOf } from "../layout/Layout";
 import { StoreContext, type ScreenStore, useScreen } from "../store";
@@ -81,6 +81,7 @@ const TYPING = ".tc-quick-row, .tc-quick-bar, .tc-quick-panel";
 function Root({ place, store }: { readonly place: Place; readonly store: ScreenStore }) {
 	/** A task typed: a new one, or one renamed in place (both the plugin's quick entry). */
 	const entering = useScreen((s) => s.entry !== null);
+	const touches = useTouchPresses();
 	useDrawn(store);
 	/**
 	 * A finger's tap elsewhere ends the typing and does only that (the audit's 17, as the menu's backdrop does, Decision 74):
@@ -98,7 +99,7 @@ function Root({ place, store }: { readonly place: Place; readonly store: ScreenS
 		if (s.entry && !s.entry.stack) s.commitEntry(s.entryText, false);
 	};
 	return (
-		<div className={`task-calendar is-engine is-${place}${entering ? " is-entering" : ""}`} onPointerDownCapture={pressed} onClickCapture={clicked} onTouchStart={keepTouch} onTouchMove={keepTouch} onTouchEnd={keepTouch} onClick={(event) => letSelectionGo(event, store)}>
+		<div className={`task-calendar is-engine is-${place}${entering ? " is-entering" : ""}`} onPointerDownCapture={pressed} onClickCapture={clicked} {...touches} onTouchStart={keepTouch} onTouchMove={keepTouch} onTouchEnd={keepTouch} onClick={(event) => letSelectionGo(event, store)}>
 			<Layout place={place} />
 			<QuickBar reach={reachOf(place)} />
 		</div>

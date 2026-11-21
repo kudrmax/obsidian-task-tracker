@@ -1,7 +1,7 @@
-import { closestCenter, type CollisionDetection, DndContext, defaultDropAnimationSideEffects, getClientRect, getFirstCollision, type MeasuringConfiguration, pointerWithin, rectIntersection, type UniqueIdentifier, useDndContext, useDroppable, type DragEndEvent, type DragMoveEvent, type DragOverEvent, DragOverlay, type DragStartEvent, type DropAnimation, MouseSensor, PointerSensor, TouchSensor, useDraggable, useSensor, useSensors } from "@dnd-kit/core";
+import { closestCenter, type CollisionDetection, DndContext, defaultDropAnimationSideEffects, getClientRect, getFirstCollision, type MeasuringConfiguration, pointerWithin, rectIntersection, type UniqueIdentifier, useDndContext, useDroppable, type DragEndEvent, type DragMoveEvent, type DragOverEvent, DragOverlay, type DragStartEvent, type DropAnimation, type MouseSensorOptions, useDraggable, useSensor, useSensors } from "@dnd-kit/core";
 import { arrayMove, SortableContext, type SortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS, getEventCoordinates } from "@dnd-kit/utilities";
-import { type CSSProperties, memo, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, type CSSProperties, memo, type ReactNode, type TouchEvent as ReactTouchEvent, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ROW_PX } from "../layout/columns";
 import type { Destination, ListId, Row } from "../port";
@@ -9,6 +9,7 @@ import { secondaryClick } from "../layers/Layers";
 import { cssEase, FLY } from "../layers/motion";
 import { useScreen, useScreenApi } from "../store";
 import { EdgeHeading } from "./edgeHeading";
+import { holdsPointer, LONG_PRESS_TOLERANCE_PX, NEW_SLOT, PLUS, PlusTouchSensor, type PressOptions, PressMouseSensor, PressTouchSensor, TouchPresses } from "./sensors";
 import { descendantsOf, finalOrder, levelAt, levelBetween, spotKey, shiftOf, type Slot, slotOf, SwipeLevel } from "./tree";
 
 /**
@@ -19,119 +20,32 @@ import { descendantsOf, finalOrder, levelAt, levelBetween, spotKey, shiftOf, typ
  * the carried card in its own list (`pointerWithin`, `closestCenter`).
  */
 
-/** The mouse lifts a card once it moved this far; the finger once it held still this long (the plugin's long press) within this tolerance. */
-const MOUSE_DISTANCE_PX = 4;
+export { PLUS } from "./sensors";
 
-/** The plus is carried by this id: on its button, and as a row of the list it is over. */
-export const PLUS = "plus";
 /** The plus, or the calendar's new place: either opens a new task's field where it is let go. */
 const isPlus = (id: UniqueIdentifier): boolean => id === PLUS || id === NEW_SLOT;
 
-/** Whether a touch starts on the plus: it moves at once, a card only after the long press. */
-const onPlus = (event: Event): boolean => (event.target as Element | null)?.closest?.("[data-plus]") != null;
+/** The touches the screen tells the drag of (`useTouchPresses`): the screen's root hears them, the sensors listen to nothing more. */
+const PressesContext = createContext<TouchPresses | null>(null);
 
 /**
- * Empty time on the calendar is carried as a new task's place (F101): a long press there (the mouse held still too) lifts
- * it at that minute, it follows the finger by the snap step, and let go the new task's field opens where it stands. A press on
- * something of its own there (a block, an event, a dot, a field) is that thing's.
+ * What the screen's root gives the drag of its touches, as React hears them: a finger landing beside one waiting out its
+ * long press forgets the press (a pinch); a touch that became a drag sends no click and no mouse after it, so a field it
+ * opened, let go unmoved, keeps the focus.
  */
-const NEW_SLOT = "new-slot";
-const ownPress = (event: Event, context: SensorContext | undefined): boolean => context?.active.id === NEW_SLOT && (event.target as Element | null)?.closest?.("[data-own-press]") != null;
-/** What dnd-kit tells a sensor's activator besides the event: the draggable it would lift. */
-type SensorContext = { readonly active: { readonly id: UniqueIdentifier } };
-
-/** A sensor's option of ours: whether another gesture holds the pointer now (a pinch, a resize), so nothing is lifted. */
-interface Gate {
-	readonly busy?: () => boolean;
-}
-const free = (options: unknown): boolean => !(options as Gate).busy?.();
-
-/** What a pointer sensor of dnd-kit keeps while a press waits to become a drag (its own fields, which its types keep private). */
-interface PendingSensor {
-	readonly activated: boolean;
-	readonly initialCoordinates: { readonly x: number; readonly y: number } | null;
-	timeoutId: ReturnType<typeof setTimeout> | null;
-	readonly documentListeners: { add(name: string, handler: (event: Event) => void, options?: AddEventListenerOptions): void };
-	handleStart(): void;
-	handleCancel(): void;
-}
-
-/**
- * Sensors as dnd-kit's custom sensors are made (a sensor's activators filter what may start it): nothing is lifted while a
- * pinch or a resize holds the pointer (`busy`). A card is lifted by the long press of a finger (touch events); a second
- * finger landing while it waits makes the press part of a pinch, and it is forgotten (the plugin's `LongPress`). The mouse
- * lifts a card once it moved, or once held still for the long press (then, let go unmoved, the card's menu opens, as the
- * plugin's mouse long tap does); on empty calendar time only the hold lifts the new task's place, as a finger's long
- * press. The plus moves at once under a finger (the old plugin's F175), started by the pointer events of a touch on it, so the sensors never listen to the same event
- * (dnd-kit keeps one listener per event name). A sensor's own listeners go through its own registry, removed with it.
- */
-class CardTouchSensor extends TouchSensor {
-	static override activators = TouchSensor.activators.map((activator) => ({ ...activator, handler: (event: Parameters<typeof activator.handler>[0], options: Parameters<typeof activator.handler>[1], context?: SensorContext) => free(options) && !onPlus(event.nativeEvent) && !ownPress(event.nativeEvent, context) && activator.handler(event, options) }));
-	constructor(props: ConstructorParameters<typeof TouchSensor>[0]) {
-		super(props);
-		const sensor = this as unknown as PendingSensor;
-		sensor.documentListeners.add(
-			"touchstart",
-			(event) => {
-				if (!sensor.activated && (event as TouchEvent).touches.length > 1) sensor.handleCancel();
+export function useTouchPresses(): { readonly onTouchStartCapture: (event: ReactTouchEvent) => void; readonly onTouchEndCapture: (event: ReactTouchEvent) => void } {
+	const presses = useContext(PressesContext);
+	if (!presses) throw new Error("touches outside the screen's drag");
+	return useMemo(
+		() => ({
+			onTouchStartCapture: (event: ReactTouchEvent) => presses.fingerDown(event.touches.length),
+			onTouchEndCapture: (event: ReactTouchEvent) => {
+				if (presses.carrying && event.cancelable) event.preventDefault();
 			},
-			{ capture: true, passive: true },
-		);
-		/** A touch that became a drag sends no click and no mouse after it: let go unmoved, the field it opened keeps the focus. */
-		sensor.documentListeners.add(
-			"touchend",
-			(event) => {
-				if (sensor.activated && event.cancelable) event.preventDefault();
-			},
-			{ capture: true, passive: false },
-		);
-	}
+		}),
+		[presses],
+	);
 }
-class CardMouseSensor extends MouseSensor {
-	static override activators = MouseSensor.activators.map((activator) => ({ ...activator, handler: (event: Parameters<typeof activator.handler>[0], options: Parameters<typeof activator.handler>[1], context?: SensorContext) => free(options) && !ownPress(event.nativeEvent, context) && activator.handler(event, options) }));
-	constructor(props: ConstructorParameters<typeof MouseSensor>[0]) {
-		super(props);
-		const sensor = this as unknown as PendingSensor;
-		/**
-		 * The plus is lifted by moving only, as under a finger: a mouse held still on it and let go is a click that opens
-		 * the field. A hold lifted it, and let go unmoved over its own place it opened nothing (a slow click; the e2e checks'
-		 * clicks under load, 330–730 ms between the press and the lift).
-		 */
-		if (props.active === PLUS && sensor.timeoutId !== null) {
-			clearTimeout(sensor.timeoutId);
-			sensor.timeoutId = null;
-		}
-		/**
-		 * Waiting out the hold, a mouse moved past the start distance lifts a card at once. Empty time is no thing to drag:
-		 * there only a hold lifts the new task's place, and a mouse that moves first is no long tap (the finger's tolerance).
-		 */
-		sensor.documentListeners.add(
-			"mousemove",
-			(event) => {
-				const from = sensor.initialCoordinates;
-				const at = getEventCoordinates(event);
-				if (sensor.activated || !from || !at) return;
-				const distance = Math.hypot(at.x - from.x, at.y - from.y);
-				if (props.active === NEW_SLOT) {
-					if (distance > LONG_PRESS_TOLERANCE_PX) sensor.handleCancel();
-					return;
-				}
-				if (distance <= MOUSE_DISTANCE_PX) return;
-				if (sensor.timeoutId !== null) clearTimeout(sensor.timeoutId);
-				sensor.timeoutId = null;
-				sensor.handleStart();
-			},
-			{ capture: true },
-		);
-	}
-}
-class PlusTouchSensor extends PointerSensor {
-	static override activators = PointerSensor.activators.map((activator) => ({ ...activator, handler: (event: Parameters<typeof activator.handler>[0], options: Parameters<typeof activator.handler>[1]) => free(options) && event.nativeEvent.pointerType === "touch" && onPlus(event.nativeEvent) && activator.handler(event, options) }));
-}
-const LONG_PRESS_MS = 250;
-const LONG_PRESS_TOLERANCE_PX = 5;
-/** Waiting out a mouse's hold, any move is fine: past the start distance it lifts at once (`CardMouseSensor`). */
-const HOLD_ANYWHERE = Number.POSITIVE_INFINITY;
 
 /**
  * The copy let go flies into the card's place: short, translation only (stage 0, round four). While it flies it takes the
@@ -200,15 +114,9 @@ export interface DragProps {
 
 export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 	const api = useScreenApi();
-	const busy = useCallback(() => {
-		const held = api.getState().gesture;
-		return held === "zoom" || held === "resize";
-	}, [api]);
-	const sensors = useSensors(
-		useSensor(CardMouseSensor, { activationConstraint: { delay: LONG_PRESS_MS, tolerance: HOLD_ANYWHERE }, busy }),
-		useSensor(CardTouchSensor, { activationConstraint: { delay: LONG_PRESS_MS, tolerance: LONG_PRESS_TOLERANCE_PX }, busy }),
-		useSensor(PlusTouchSensor, { activationConstraint: { distance: MOUSE_DISTANCE_PX }, busy }),
-	);
+	const [presses] = useState(() => new TouchPresses());
+	const options = useMemo((): PressOptions & MouseSensorOptions => ({ busy: () => holdsPointer(api.getState().gesture), presses }), [api, presses]);
+	const sensors = useSensors(useSensor(PressMouseSensor, options), useSensor(PressTouchSensor, options), useSensor(PlusTouchSensor, options));
 	const [active, setActive] = useState<string | null>(null);
 	/**
 	 * Whether what was lifted last has a copy that flies into its place when let go. The calendar's new place has none: its
@@ -544,6 +452,7 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 	/** Armed, the rooms may scroll; until then none does. dnd-kit's auto-scroll stays on so it keeps the pointer's heading (its scroll intent). */
 	const autoScroll = useMemo(() => ({ ...AUTO_SCROLL, canScroll: armed ? undefined : () => false }), [armed]);
 	return (
+		<PressesContext.Provider value={presses}>
 		<DndContext sensors={sensors} collisionDetection={collision} onDragStart={start} onDragMove={move} onDragOver={overList} onDragEnd={end} onDragCancel={cancel} autoScroll={autoScroll} measuring={MEASURING}>
 			{children}
 			{createPortal(
@@ -553,6 +462,7 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 				doc.body,
 			)}
 		</DndContext>
+		</PressesContext.Provider>
 	);
 }
 
