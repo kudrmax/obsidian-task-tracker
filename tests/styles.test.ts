@@ -242,6 +242,20 @@ describe("styles.css keeps to its design system", () => {
 		expect(missing).toEqual([]);
 	});
 
+	/**
+	 * A registered property (`@property`) changes how every element computes it: one shared with a token or with the old
+	 * screen's code (`--tc-list-width`, set on the old screen's root, registered for the engine with `inherits: false`) gave
+	 * the old screen's columns 0 px. A registered property is its own: no token, and no code outside its owner sets it.
+	 */
+	it("registers only properties of its own, never a token or one the old screen sets", () => {
+		const css = readFileSync(join(__dirname, "..", "styles.css"), "utf8");
+		const registered = [...css.matchAll(/@property\s+(--tc-[\w-]+)/g)].map((m) => m[1]);
+		const own = (path: string) => path.startsWith("ui/engine/") || path.startsWith("stand/");
+		const shared = registered.filter((name) => sheet.tokens.has(name) || sheet.lightTokens.has(name) || code.files.some(({ path, text }) => !own(path) && text.includes(`"${name}"`)));
+		expect(registered.length).toBeGreaterThan(0);
+		expect(shared).toEqual([]);
+	});
+
 	it("uses every token it defines, and every property the code sets", () => {
 		const used = sheet.used;
 		expect([...sheet.tokens.keys()].filter((name) => !used.has(name))).toEqual([]);

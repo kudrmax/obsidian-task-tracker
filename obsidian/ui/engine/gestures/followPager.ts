@@ -1,6 +1,15 @@
 /** A finger let go at least this fast, px/ms, goes one place its way, however little of the way it drew (the core's `SWIPE_FLICK_SPEED`). */
 export const FLICK_SPEED = 0.3;
 
+/**
+ * How the fingers' pixels become places: `width` px a place everywhere, or a mapping where places are drawn at different
+ * widths (`after`: the place `px` of fingers on from `base`).
+ */
+export type PlaceScale = number | { readonly after: (base: number, px: number) => number };
+
+const placesAfter = (scale: PlaceScale, base: number, px: number): number => (typeof scale === "number" ? base + (scale > 0 ? px / scale : 0) : scale.after(base, px));
+const widthOf = (scale: PlaceScale): number => (typeof scale === "number" ? scale : 1);
+
 /** Let go slowly, the nearest place: one on once the fingers drew past half a place (`drawn`, in places), else back. */
 const nearest = (drawn: number, width: number): -1 | 0 | 1 => (width <= 0 || Math.abs(drawn) * 2 < 1 ? 0 : drawn > 0 ? 1 : -1);
 
@@ -39,19 +48,19 @@ export class FollowPager {
 		this.base = at;
 	}
 
-	/** The fingers moved `px` (positive: on); where the columns stand now, `width` px a place. */
-	move(px: number, width: number): number {
+	/** The fingers moved `px` (positive: on); where the columns stand now, the pixels counted by `scale`. */
+	move(px: number, scale: PlaceScale): number {
 		this.moved += px;
-		return this.bounded(this.base + (width > 0 ? this.moved / width : 0));
+		return this.bounded(placesAfter(scale, this.base, this.moved));
 	}
 
 	/** The fingers let go with the columns at `at` and `speed` px/ms (positive: on): the place they land on. */
-	release(at: number, speed: number, width: number): number {
+	release(at: number, speed: number, scale: PlaceScale): number {
 		if (this.origin === null) return this.stop;
 		/** A flick the way this stroke drew goes one place that way, one against it springs back (the core's `swipeLanding`); slower, the nearest place. */
 		const drawn = Math.sign(this.moved);
 		const flick = Math.abs(speed) >= FLICK_SPEED ? Math.sign(speed) : 0;
-		const step = flick !== 0 ? (flick === drawn ? flick : 0) : nearest(at - this.stop, width);
+		const step = flick !== 0 ? (flick === drawn ? flick : 0) : nearest(at - this.stop, widthOf(scale));
 		this.stop = Math.min(this.last, Math.max(0, this.origin - 1, Math.min(this.origin + 1, this.stop + step)));
 		this.before = this.origin;
 		this.origin = null;

@@ -1,4 +1,5 @@
 import type { AllDayEvent, Block, CardFace, DayEvent, Destination, Edge, EntryBar, EntryCommit, EntryDraft, EntryField, EventPaint, FieldActionId, ListData, ListId, ListPlaceId, MenuAction, MenuFrom, MenuModel, MenuStatusId, Now, PlaceId, ProjectPage, ReminderKind, RenameStart, Row, ScreenData, ScreenPort } from "../ui/engine/port";
+import { dividerAt, LIST_BOUNDS, listShareOf, listWidths } from "./listWidths";
 import { type FieldFacts, fieldBar, type MenuFacts, menuLayout, menuPlaces } from "./actionTable";
 import { bgAlphaFor, eventColors } from "../ui/eventColors";
 import { addDays, CALENDAR_COLORS, DAY_START_HOUR, dateOf, dayOf, fileText, LIST_KEYS, LIST_NAMES, type ListKey, type MockFile, type MockSection, type MockTask, minuteOf, mockFile } from "./mockData";
@@ -12,6 +13,15 @@ export const ZOOM_KEY = "task-calendar-stand-zoom";
 export function keptZoom(load: () => unknown, save: (value: number | "wholeDay") => void): { readonly kept: number | "wholeDay" | null; keep(zoom: number | "wholeDay"): void; readonly most: number } {
 	const value = load();
 	return { kept: value === "wholeDay" || (typeof value === "number" && value > 0) ? value : null, keep: save, most: ZOOM_MOST };
+}
+
+/** Where the stand keeps the day list's share of the columns beside the calendar on the device. */
+export const LIST_SHARE_KEY = "task-calendar-stand-list-share";
+
+/** The list's share the divider was let go at, kept by `load` and `save`; null: none yet (the screen opens with the halves). */
+export function keptListShare(load: () => unknown, save: (share: number) => void): { readonly kept: number | null; keep(share: number): void } {
+	const value = load();
+	return { kept: typeof value === "number" && value > 0 && value < 1 ? value : null, keep: save };
 }
 
 /** The write delays the stand offers: none, a real write and its read-back, a slow one. */
@@ -58,6 +68,10 @@ const closed = (t: MockTask) => t.status === "x" || t.status === "-";
  * the core's rules win over these.
  */
 export class MockPort implements ScreenPort {
+	readonly listBounds = LIST_BOUNDS;
+	readonly listWidths = listWidths;
+	readonly listShareOf = listShareOf;
+	readonly dividerAt = dividerAt;
 	private file: MockFile;
 	/** The file with the writes not yet read back already made: what a preview and a refusal are drawn from. Null when none is in flight. */
 	private ahead: MockFile | null = null;

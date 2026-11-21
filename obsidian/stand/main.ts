@@ -8,7 +8,7 @@ import { detectHaptics, type HapticsHost } from "../ui/haptics";
 import { clearPriorityColors, showPriorityColors } from "../ui/priorityColors";
 import { addWindowDocument } from "../ui/windowDocuments";
 import type { ListKey } from "./mockData";
-import { keptZoom, MockPort, WRITE_DELAYS, type WriteDelay, ZOOM_KEY } from "./MockPort";
+import { keptListShare, keptZoom, LIST_SHARE_KEY, MockPort, WRITE_DELAYS, type WriteDelay, ZOOM_KEY } from "./MockPort";
 import { STAND_STEPS, type StandStep, WHOLE_SCREEN } from "./steps";
 
 /** The stand's own view type and code block language: never the plugin's. */
@@ -79,7 +79,7 @@ class StandView extends ItemView {
 		this.unmount();
 		this.contentEl.empty();
 		this.contentEl.addClass("tc-view");
-		this.screen = mountScreen(this.contentEl, { port: this.stand.port, place: "leaf", app: this.app, sourcePath: "", haptics: haptics(), zoom: this.stand.zoom(), markdown: markdownOf(this.app), desk: !Platform.isMobile, fingers: this.stand.fingers });
+		this.screen = mountScreen(this.contentEl, { port: this.stand.port, place: "leaf", app: this.app, sourcePath: "", haptics: haptics(), zoom: this.stand.zoom(), listShare: this.stand.listShare(), markdown: markdownOf(this.app), desk: !Platform.isMobile, fingers: this.stand.fingers });
 		this.screen.store.getState().setStop(this.stand.step.stop);
 		this.stand.screens.add(this.screen);
 	}
@@ -105,7 +105,7 @@ class StandBlock extends MarkdownRenderChild {
 
 	override onload(): void {
 		this.containerEl.addClass("tc-stand-block");
-		this.screen = mountScreen(this.containerEl, { port: this.stand.port, place: "note", app: this.stand.app, sourcePath: this.path, haptics: haptics(), zoom: this.stand.zoom(), markdown: markdownOf(this.stand.app), desk: !Platform.isMobile, fingers: this.stand.fingers });
+		this.screen = mountScreen(this.containerEl, { port: this.stand.port, place: "note", app: this.stand.app, sourcePath: this.path, haptics: haptics(), zoom: this.stand.zoom(), listShare: this.stand.listShare(), markdown: markdownOf(this.stand.app), desk: !Platform.isMobile, fingers: this.stand.fingers });
 		this.stand.screens.add(this.screen);
 	}
 
@@ -146,6 +146,14 @@ export default class TaskCalendarStand extends Plugin {
 		return keptZoom(
 			() => this.app.loadLocalStorage(ZOOM_KEY),
 			(value) => this.app.saveLocalStorage(ZOOM_KEY, value),
+		);
+	}
+
+	/** The day list's share beside the calendar, kept on this device by Obsidian's local storage. */
+	listShare() {
+		return keptListShare(
+			() => this.app.loadLocalStorage(LIST_SHARE_KEY),
+			(value) => this.app.saveLocalStorage(LIST_SHARE_KEY, value),
 		);
 	}
 

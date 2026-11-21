@@ -26,7 +26,11 @@ export default {
 			const title = (await t.oracle.cards("day"))[2];
 			const card = await cardBy(t, title, "day");
 			const opening = await menuFrames(t, () => tap(card), 900);
-			t.expect(openingFaults(opening, card).length === 0, `the menu opens from its card, each part placed before it shows: ${JSON.stringify(openingFaults(opening, card).slice(0, 6))}`);
+			/** The copy over its card, grown for its title as far left as the window makes it (Decision 120): it shows only where it stands sideways, on its way from the card up or down. */
+			const grown = opening.at(-1)?.copy;
+			const over = grown ? { ...card, left: grown.left } : card;
+			t.expect(!!grown && grown.left <= card.left + 1 && grown.left + grown.width >= card.left + card.width - 1, `the copy covers its card: ${JSON.stringify(grown)} over ${JSON.stringify(card)}`);
+			t.expect(openingFaults(opening, over).length === 0, `the menu opens from its card, each part placed before it shows: ${JSON.stringify(openingFaults(opening, over).slice(0, 6))}`);
 			const shownAt = opening.find((f) => f.panels.some((p) => p.o > 0.005));
 			const full = opening.find((f) => f.panels.length && f.panels.every((p) => p.o > 0.99));
 			t.expect(shownAt && shownAt.panels.every((p) => p.o < 0.7), `it shows first faint, not whole at once: ${JSON.stringify(shownAt?.panels)}`);
