@@ -69,11 +69,28 @@ async function scenarioTools(page, { platform, theme, out }) {
 			await t.input.move(1, 1);
 			await sleep(600);
 		},
-		/** The page's clock stopped at `hhmm` today (Date only; the timers and the frames run on), and the page opened afresh. */
+		/**
+		 * The page's clock stopped at `hhmm` today (Date only; the timers, the frames and `performance.now` run on), on every
+		 * page opened from now on, and the page opened afresh. Not Playwright's `page.clock`: on a page opened again after it
+		 * is installed, its `performance.now` runs ahead of the document's timeline by the time since, and Motion's animations
+		 * (started on the timeline at `performance.now`) wait that long (e8-calendar-event-hits on CorePort, 2026-11-21).
+		 */
 		async setClock(hhmm) {
 			const [h, m] = hhmm.split(":").map(Number);
 			const now = new Date();
-			await page.clock.setFixedTime(new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m));
+			const fixed = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m).getTime();
+			await page.addInitScript((at) => {
+				const Real = Date;
+				class Fixed extends Real {
+					constructor(...args) {
+						super(...(args.length === 0 ? [at] : args));
+					}
+					static now() {
+						return at;
+					}
+				}
+				window.Date = Fixed;
+			}, fixed);
 			await t.open();
 		},
 		/** Records every frame while `gesture` runs (and `settleMs` after), then checks them: the faults found. */
