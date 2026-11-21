@@ -1,5 +1,5 @@
 import { autoUpdate, flip, FloatingFocusManager, FloatingOverlay, FloatingPortal, hide, type Middleware, type MiddlewareState, offset, type Placement, useDismiss, useFloating, useInteractions, useRole, useTransitionStatus } from "@floating-ui/react";
-import { type CSSProperties, createContext, type MouseEvent as ReactMouseEvent, type MutableRefObject, type ReactNode, useContext, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, createContext, type MouseEvent as ReactMouseEvent, type MutableRefObject, type ReactNode, type RefObject, useContext, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { DESIGN, PROPERTY } from "../../design";
 import type { MenuFrom } from "../port";
 import { useScreenApi } from "../store";
@@ -89,6 +89,13 @@ export function useMenuFrom(): (id: string, from: MenuFrom, element: Element, lo
 		},
 		[origin, api],
 	);
+}
+
+/** The element takes the keyboard's focus each time the store asks (`seq`, null: not asked): a card a rename ended on by a key (Decision 58). */
+export function useFocusWhen(node: RefObject<HTMLElement | null>, seq: number | null): void {
+	useEffect(() => {
+		if (seq !== null) node.current?.focus({ preventScroll: true });
+	}, [node, seq]);
 }
 
 /** The pressed thing marked `marker` around or inside `target` (a row's wrapper holds its card). */
@@ -279,15 +286,15 @@ function blockIn(safe: MutableRefObject<HTMLElement | null>, parts: MutableRefOb
 	};
 }
 
-/** The window less its safe areas, in the floating element's own terms (Floating UI's measure of the level's safe room); the page's size without one. */
+/** The window less its safe areas, in the floating element's own terms (Floating UI's measure of the level's safe room); the viewport, by Floating UI's clipping measure, without one. */
 async function roomOf(state: MiddlewareState, safe: MutableRefObject<HTMLElement | null>): Promise<{ readonly top: number; readonly bottom: number; readonly left: number; readonly right: number }> {
 	const el = safe.current;
 	if (el) {
 		const r = (await state.platform.getElementRects({ reference: el, floating: state.elements.floating, strategy: state.strategy })).reference;
 		return { top: r.y, bottom: r.y + r.height, left: r.x, right: r.x + r.width };
 	}
-	const page = state.elements.floating.ownerDocument.documentElement;
-	return { top: 0, bottom: page.clientHeight, left: 0, right: page.clientWidth };
+	const view = await state.platform.getClippingRect({ element: state.elements.floating, boundary: "clippingAncestors", rootBoundary: "viewport", strategy: state.strategy });
+	return { top: view.y, bottom: view.y + view.height, left: view.x, right: view.x + view.width };
 }
 
 export interface PinnedProps {

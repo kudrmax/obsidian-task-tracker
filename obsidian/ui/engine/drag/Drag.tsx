@@ -5,7 +5,7 @@ import { createContext, type CSSProperties, memo, type ReactNode, type TouchEven
 import { createPortal } from "react-dom";
 import { ROW_PX } from "../layout/columns";
 import type { Destination, ListId, Row } from "../port";
-import { secondaryClick } from "../layers/Layers";
+import { secondaryClick, useFocusWhen } from "../layers/Layers";
 import { cssEase, FLY } from "../layers/motion";
 import { useScreen, useScreenApi } from "../store";
 import { EdgeHeading } from "./edgeHeading";
@@ -21,6 +21,9 @@ import { descendantsOf, finalOrder, levelAt, levelBetween, spotKey, shiftOf, typ
  */
 
 export { PLUS } from "./sensors";
+
+/** The gesture's own clock, a sideways swipe's pace (`SwipeLevel`): dnd-kit's move events carry no time, and this is no time of day. */
+const gestureNow = (): number => performance.now();
 
 /** The plus, or the calendar's new place: either opens a new task's field where it is let go. */
 const isPlus = (id: UniqueIdentifier): boolean => id === PLUS || id === NEW_SLOT;
@@ -195,7 +198,7 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 	const rowsOf = (list: string) => api.getState().shown.lists[list as ListId]?.rows ?? [];
 	/** The carried card's (or plus's) level on the place it stands at, by its sideways swipes there (`SwipeLevel`). */
 	const swipe = useRef(new SwipeLevel(null, 0, 0, 0));
-	const sideLevel = (event: { readonly activatorEvent: Event; readonly delta: { readonly x: number } }, spot: string, allowed: (wanted: number) => number): number => swipe.current.at((getEventCoordinates(event.activatorEvent)?.x ?? 0) + event.delta.x, performance.now(), spot, allowed);
+	const sideLevel = (event: { readonly activatorEvent: Event; readonly delta: { readonly x: number } }, spot: string, allowed: (wanted: number) => number): number => swipe.current.at((getEventCoordinates(event.activatorEvent)?.x ?? 0) + event.delta.x, gestureNow(), spot, allowed);
 	/** The level the carried plus's field would take where the plus stands now among its list's rows: drawn by its place. */
 	const plusLevel = (plus: Sortable, over: Sortable | null, wanted: number): number | null => {
 		const container = containerOf(plus);
@@ -359,7 +362,7 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 		carriedAt.current = null;
 		liftAt.current = null;
 		homeTop.current = null;
-		swipe.current = new SwipeLevel(null, 0, liftX, performance.now());
+		swipe.current = new SwipeLevel(null, 0, liftX, gestureNow());
 		setFlies(lifted.id !== NEW_SLOT);
 		if (isPlus(lifted.id)) {
 			screen.openEntry(null);
@@ -374,7 +377,7 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 		const own = rows.find((row) => row.id === String(lifted.id));
 		const depth = own?.kind === "task" ? own.depth : 0;
 		const under = descendantsOf(rows, String(lifted.id));
-		if (container !== null) swipe.current = new SwipeLevel(spotKey(container, itemsOf(lifted).filter((other) => !under.has(other)), String(lifted.id)), depth, liftX, performance.now());
+		if (container !== null) swipe.current = new SwipeLevel(spotKey(container, itemsOf(lifted).filter((other) => !under.has(other)), String(lifted.id)), depth, liftX, gestureNow());
 		const block = container === CALENDAR ? (screen.shown.day.blocks.find((b) => b.id === String(lifted.id)) ?? null) : null;
 		carriedAt.current = block?.start ?? null;
 		liftAt.current = block?.start ?? null;
@@ -621,10 +624,7 @@ export const SortableRow = memo(function SortableRow({ id, onTap, gap = false, p
 	const style: CSSProperties = placed ? {} : { transform: CSS.Translate.toString(transform), transition };
 	/** The card takes the focus back when the store asks (a rename ended by a key, Decision 58). */
 	const node = useRef<HTMLDivElement | null>(null);
-	const focusSeq = useScreen((s) => (carried && s.focusCard?.id === id ? s.focusCard.seq : null));
-	useEffect(() => {
-		if (focusSeq !== null) node.current?.focus({ preventScroll: true });
-	}, [focusSeq]);
+	useFocusWhen(node, useScreen((s) => (carried && s.focusCard?.id === id ? s.focusCard.seq : null)));
 	const hold = useCallback(
 		(el: HTMLDivElement | null) => {
 			node.current = el;

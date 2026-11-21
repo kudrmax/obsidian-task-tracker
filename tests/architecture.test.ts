@@ -520,7 +520,7 @@ const OWNERS: readonly Owner[] = [
 	/** Motion: the rows that move and the regions that slide; of the gestures, only the ribbon's own files: its landing spring, its strip and the calendar's day change (the table's gestures row). */
 	{ concern: "Rows that move, regions that slide: Motion", imports: (t) => t === "motion" || t.startsWith("motion/") || t === "framer-motion", owners: [`${ENGINE}view/MovingRow.tsx`, `${ENGINE}view/Slide.tsx`, ...RIBBON_MOTION] },
 	{ concern: "Long lists: TanStack Virtual", imports: (t) => t.startsWith("@tanstack/"), owners: [`${ENGINE}view/TaskList.tsx`] },
-	{ concern: "Text fields: Obsidian's editor", imports: (t) => t === "obsidian/ui/markdown/EmbeddedEditor.ts", owners: [`${ENGINE}view/ObsidianEditor.tsx`] },
+	{ concern: "Text fields: Obsidian's editor and its CodeMirror", imports: (t) => t === "obsidian/ui/markdown/EmbeddedEditor.ts" || t.startsWith("@codemirror/"), owners: [`${ENGINE}view/ObsidianEditor.tsx`] },
 	/** The overlay of a carried card goes in a portal (stage 0, «Integration findings» 1); the root is made by the mount. */
 	{ concern: "Portals and roots: react-dom", imports: (t) => t === "react-dom" || t === "react-dom/client", owners: [`${ENGINE}drag/`, `${ENGINE}mount.tsx`] },
 ];
@@ -536,14 +536,17 @@ const ENGINE_MAY_ALSO = ["obsidian/ui/kit/icons.ts", "obsidian/ui/design.ts", "o
 
 /**
  * Touching the page by hand, each with where the standard puts it instead: a library measures and listens, Motion animates,
- * the store's tick is the one timer, TanStack Virtual and the browser reveal.
+ * the store's minute tick is the one timer, the port's clock tells the time, the layers move the focus, TanStack Virtual
+ * and the browser reveal.
  */
 const BY_HAND: readonly { readonly name: string; readonly pattern: RegExp; readonly allowed: readonly string[] }[] = [
 	{ name: "a listener added by hand", pattern: /\baddEventListener\s*\(/, allowed: [] },
-	{ name: "a size read from the page", pattern: /\bgetBoundingClientRect\s*\(|\bgetClientRects\s*\(|\bgetComputedStyle\s*\(/, allowed: [] },
+	{ name: "a size read from the page", pattern: /\bgetBoundingClientRect\s*\(|\bgetClientRects\s*\(|\bgetComputedStyle\s*\(|\.(?:client|offset)(?:Width|Height|Top|Left)\b|\.scroll(?:Top|Left|Width|Height)\b(?!\s*=(?!=))/, allowed: [] },
 	{ name: "an animation frame", pattern: /\brequestAnimationFrame\s*\(/, allowed: [] },
 	{ name: "an animation by hand", pattern: /(?<![.\w])animate\s*\(|\.animate\s*\(/, allowed: [RIBBON_LANDING] },
-	{ name: "a timer", pattern: /\bset(?:Timeout|Interval)\s*\(/, allowed: [`${ENGINE}store/`] },
+	{ name: "a timer", pattern: /\bset(?:Timeout|Interval)\s*\(/, allowed: [] },
+	{ name: "a clock read by hand", pattern: /\bDate\.now\s*\(|\bperformance\.now\s*\(|\bnew Date\s*\(\s*\)/, allowed: [] },
+	{ name: "the focus moved outside the layers", pattern: /\.focus\s*\(/, allowed: [`${ENGINE}layers/`] },
 	{ name: "an observer", pattern: /\b(?:Resize|Mutation|Intersection)Observer\b/, allowed: [] },
 	{ name: "a scroll set by hand", pattern: /\.scrollTop\s*=(?!=)|\.scrollLeft\s*=(?!=)|\bscrollTo\s*\(|\bscrollBy\s*\(/, allowed: [] },
 	{ name: "a reveal that is not TanStack Virtual's or the browser's", pattern: /\bscrollIntoView\s*\(/, allowed: [`${ENGINE}view/Timeline.tsx`] },
@@ -551,16 +554,22 @@ const BY_HAND: readonly { readonly name: string; readonly pattern: RegExp; reado
 ];
 
 /**
- * The only exceptions to `BY_HAND`, each approved by Max in chat with the lead on 2026-11-19 (F97, F98), each one call in
- * one file: the calendar's zoom reads the calendar's top on the page once a pinch (to know the minute under the pointer)
- * and sets the calendar's scroll offset in one place (to keep that minute under the pointer, as every zoom does); and it
- * observes the calendar's own size with one `ResizeObserver` (to refit the whole day when the calendar's height changes).
- * No library the engine owns does either. Anything else of the same rule in that file, or a second such call, still fails.
+ * The only exceptions to `BY_HAND`, each named with why no library the engine owns does it, each counted in one file:
+ * anything else of the same rule in that file, or one call more than counted, still fails. The calendar's zoom's three
+ * were approved by Max in chat with the lead on 2026-11-19 (F97, F98); its two reads of its room's size and scroll are the
+ * same zoom's measure (part 1's review, finding 12, Decision 139).
  */
-const BY_HAND_EXCEPTIONS: readonly { readonly file: string; readonly rule: string; readonly call: RegExp; readonly most: number }[] = [
-	{ file: `${ENGINE}gestures/Zoom.ts`, rule: "a size read from the page", call: /\.getBoundingClientRect\s*\(\s*\)/g, most: 1 },
-	{ file: `${ENGINE}gestures/Zoom.ts`, rule: "a scroll set by hand", call: /\.scrollTop\s*=(?!=)/g, most: 1 },
-	{ file: `${ENGINE}gestures/Zoom.ts`, rule: "an observer", call: /\.ResizeObserver\s*\(/g, most: 1 },
+const BY_HAND_EXCEPTIONS: readonly { readonly file: string; readonly rule: string; readonly call: RegExp; readonly most: number; readonly why: string }[] = [
+	{ file: `${ENGINE}gestures/Zoom.ts`, rule: "a size read from the page", call: /\.getBoundingClientRect\s*\(\s*\)/g, most: 1, why: "the calendar's top on the page once a pinch, for the minute under the pointer (Max, F97)" },
+	{ file: `${ENGINE}gestures/Zoom.ts`, rule: "a scroll set by hand", call: /\.scrollTop\s*=(?!=)/g, most: 1, why: "the minute under the pointer kept there as the zoom draws (Max, F97)" },
+	{ file: `${ENGINE}gestures/Zoom.ts`, rule: "an observer", call: /\.ResizeObserver\s*\(/g, most: 1, why: "the whole day refitted to the calendar's height as it changes (Max, F98)" },
+	{ file: `${ENGINE}gestures/Zoom.ts`, rule: "a size read from the page", call: /\.clientHeight\b/g, most: 2, why: "the room's height and its foot's, for the whole day's fit, read by the observer above" },
+	{ file: `${ENGINE}gestures/Zoom.ts`, rule: "a size read from the page", call: /\.scrollTop\b(?!\s*=(?!=))/g, most: 1, why: "the calendar's scroll as a pinch begins, for the minute under the pointer" },
+	{ file: `${ENGINE}layout/columns.ts`, rule: "a size read from the page", call: /\.clientWidth\b/g, most: 2, why: "the ribbon's and its calendar's drawn widths as a gesture needs them, read in this one place (@use-gesture's pager example reads the window's)" },
+	{ file: `${ENGINE}store/screenStore.ts`, rule: "a timer", call: /\bsetTimeout\s*\(\s*tick\b/g, most: 1, why: "the store's one minute tick (spec, «Time»)" },
+	{ file: `${ENGINE}store/screenStore.ts`, rule: "a timer", call: /\bsetTimeout\s*\(\s*\(\)\s*=>\s*set\(\{\s*scrollArmed:/g, most: 1, why: "a carried card's quarter second at a room's edge before it scrolls (F162): dnd-kit's auto-scroll has no delay" },
+	{ file: `${ENGINE}store/screenStore.ts`, rule: "a clock read by hand", call: /\bDate\.now\s*\(\s*\)/g, most: 1, why: "the minute tick set on the clock's next minute: the port's clock tells minutes, not the milliseconds to the next" },
+	{ file: `${ENGINE}drag/Drag.tsx`, rule: "a clock read by hand", call: /\bperformance\.now\s*\(\s*\)/g, most: 1, why: "a sideways swipe's pace (`SwipeLevel`), the gesture's own time: dnd-kit's move events carry none" },
 ];
 
 /** The code a rule reads in `file`: its approved exception's one call taken out, unless there are more of them than approved. */
@@ -646,7 +655,29 @@ describe("the owners' guard itself", () => {
 		expect(byHandIn(RIBBON_LANDING, "animate(x, 1, spring)")).toEqual([]);
 		expect(byHandIn(`${ENGINE}gestures/Zoom.ts`, "animate(x, 1, spring)")).toEqual([`${ENGINE}gestures/Zoom.ts: an animation by hand`]);
 		expect(byHandIn(`${ENGINE}store/screenStore.ts`, "setTimeout(tick, 60000)")).toEqual([]);
-		expect(byHandIn(`${ENGINE}view/Card.tsx`, "// el.addEventListener('x', f)\nconst a = el.scrollTop === 3;")).toEqual([]);
+		expect(byHandIn(`${ENGINE}view/Card.tsx`, "// el.addEventListener('x', f)\nconst a = el.scrollTop === 3;")).toEqual([`${ENGINE}view/Card.tsx: a size read from the page`]);
+	});
+
+	it("finds a size read, a timer, a clock and the focus by hand, and leaves a scroll set to its own rule (review of part 1, finding 12)", () => {
+		const card = `${ENGINE}view/Card.tsx`;
+		expect(byHandIn(card, "const w = el.clientWidth; const h = el.offsetHeight; const y = room.scrollTop + 1;")).toEqual([`${card}: a size read from the page`]);
+		expect(byHandIn(card, "room.scrollTop = 4;")).toEqual([`${card}: a scroll set by hand`]);
+		expect(byHandIn(`${ENGINE}store/screenStore.ts`, "window.setTimeout(next, 10);")).toEqual([`${ENGINE}store/screenStore.ts: a timer`]);
+		expect(byHandIn(card, "const t = Date.now(); const p = performance.now(); const d = new Date();")).toEqual([`${card}: a clock read by hand`]);
+		expect(byHandIn(card, "const day = new Date(2026, 10, 1);")).toEqual([]);
+		expect(byHandIn(card, "el.focus({ preventScroll: true });")).toEqual([`${card}: the focus moved outside the layers`]);
+		expect(byHandIn(`${ENGINE}layers/Layers.tsx`, "el.focus();")).toEqual([]);
+		expect(byHandIn(`${ENGINE}store/screenStore.ts`, "timer = window.setTimeout(tick, 1); wait = window.setTimeout(() => set({ scrollArmed: true }), 250); const ms = Date.now();")).toEqual([]);
+		expect(byHandIn(`${ENGINE}store/screenStore.ts`, "timer = window.setTimeout(tick, 1); again = window.setTimeout(tick, 2);")).toEqual([`${ENGINE}store/screenStore.ts: a timer`]);
+		expect(byHandIn(`${ENGINE}layout/columns.ts`, "a.clientWidth; b.clientWidth; c.clientHeight;")).toEqual([`${ENGINE}layout/columns.ts: a size read from the page`]);
+	});
+
+	it("finds CodeMirror taken outside the text fields' owner", () => {
+		expect(ownerViolations([`${ENGINE}view/QuickAdd.tsx`, `${ENGINE}view/ObsidianEditor.tsx`], () => ["@codemirror/view"])).toEqual([`${ENGINE}view/QuickAdd.tsx → @codemirror/view (Text fields: Obsidian's editor and its CodeMirror: only ${ENGINE}view/ObsidianEditor.tsx)`]);
+	});
+
+	it("names why for every exception", () => {
+		expect(BY_HAND_EXCEPTIONS.filter((e) => e.why.trim() === "")).toEqual([]);
 	});
 
 	it("lets the zoom have its one approved call of each kind and nothing more (Max, 2026-11-19)", () => {
