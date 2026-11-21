@@ -76,9 +76,13 @@ export class Input {
 		await this.touch("touchEnd", []);
 	}
 
+	/**
+	 * A finger's tap: down and up sent together, so the browser takes them one right after the other. A pause between them
+	 * timed here stretched under a loaded machine past the long press (`longPressMs`), and the page rightly lifted the card
+	 * instead of opening its menu (e10, 2026-11-21: a 300 ms hold reproduces it exactly; a page busy 400 ms after the touch
+	 * still takes a quick tap as a tap).
+	 */
 	async tap(x, y) {
-		await this.touch("touchStart", [{ x, y }]);
-		await sleep(70);
-		await this.touch("touchEnd", []);
+		await Promise.all([this.touch("touchStart", [{ x, y }]), this.touch("touchEnd", [])]);
 	}
 }

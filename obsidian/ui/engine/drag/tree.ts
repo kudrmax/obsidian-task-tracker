@@ -58,6 +58,7 @@ export class SwipeLevel {
 			this.level = next;
 			this.moved -= way * SWIPE_STEP;
 		}
+		if (this.moved !== 0 && allowed(this.level + Math.sign(this.moved)) === this.level) this.moved = 0;
 		return this.level;
 	}
 }

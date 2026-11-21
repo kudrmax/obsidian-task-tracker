@@ -1,7 +1,7 @@
 import { DESIGN } from "../../design";
 import { createStore, type StoreApi } from "zustand/vanilla";
 import { LAYER_MS } from "../layers/motion";
-import type { Destination, Edge, EntryBar, EntryDraft, EntryField, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, MenuStatusId, ScreenData, ScreenPort } from "../port";
+import type { Destination, DividerStop, Edge, EntryBar, EntryDraft, EntryField, FieldActionId, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, MenuStatusId, ScreenData, ScreenPort } from "../port";
 import { share } from "./share";
 
 /** Where the ribbon stands: Inbox–Soon, Soon–the day, the day–its calendar. */
@@ -16,19 +16,19 @@ const STOP_OF: Readonly<Record<ListId, Stop>> = { inbox: "inbox", soon: "soon", 
 const NO_DRAFT: EntryDraft = { level: null, projects: [], descriptionLine: null, section: false };
 
 /** The one gesture that holds the pointer (spec, «Which gesture holds the pointer»). */
-export type Gesture = "drag" | "ribbon" | "resize" | "zoom";
+export type Gesture = "drag" | "ribbon" | "resize" | "zoom" | "divider";
 
 /** Where the calendar was zoomed to: an hour's height, or the whole day whatever the calendar's height. */
 export type Zoom = number | "wholeDay";
 
 /** A page of a task's menu: the menu itself, the month to pick a day in, the Reminder kinds. */
-export type MenuPage = "menu" | "picker" | "reminders";
+export type MenuPage = "menu" | "picker" | "reminders" | "projects" | "projectName";
 
 /** What a menu asks before it acts (Won't do, Stop, Delete), in place of what was pressed. */
 export type Asking = MenuStatusId | "delete";
 
-/** A panel of the field's bar: the flag's levels, the projects, the places, the month of Date. */
-export type BarPanelKind = "priority" | "project" | "where" | "date";
+/** A panel of the field's bar: the flag's levels, the projects (and «New project…»'s name in their place), the places, the month of Date. */
+export type BarPanelKind = "priority" | "project" | "projectName" | "where" | "date";
 
 /**
  * An open layer (spec, «Layers and focus»): the menu of a task or an event, with what the port offers in it, opened from a
@@ -86,6 +86,12 @@ export interface ScreenState {
 	readonly scrollArmed: boolean;
 	/** The calendar's zoom (spec, «Time scale»): kept on the device by the host. */
 	readonly zoom: Zoom;
+	/** The day list's share of the columns beside the calendar, as the divider set it (F51–F53): kept on the device by the host. */
+	readonly listShare: number;
+	/** The divider is dragged and no step into the middle or out of it glides now: the list's width follows the hand at once; else a change glides (F52). */
+	readonly listFollow: boolean;
+	/** The list's bounds on a phone (the port's): the stylesheet draws a kept share within them as the window changes. */
+	readonly listBounds: { readonly min: number; readonly max: number };
 	/** The calendar's selected task: its two dots show, to resize it (F102); a tap elsewhere lets it go. */
 	readonly selected: string | null;
 	/** The task being resized by a dot, and which: its moving edge's time shows on a pill. */
@@ -146,6 +152,10 @@ export interface ScreenActions {
 	 * happens on the screen under the menu, after it).
 	 */
 	pick(action: MenuAction): void;
+	/** A tap in the menu that leaves it on its page (a project's check): written, the menu showing the task as it then stands. */
+	actHere(action: MenuAction): void;
+	/** «New project…»'s name typed in the menu (F220): Enter makes it and gives it to the task, closing the menu; a name of nothing goes back to the projects. */
+	nameMenuProject(name: string): void;
 	/**
 	 * Rename from the menu (F117, F108): the menu closes and in the same tap the card (a list's, a calendar's block) becomes
 	 * the field, the new task's field with its bar; a card of a calendar menu's stack becomes it in the menu, which stays.
@@ -161,6 +171,11 @@ export interface ScreenActions {
 	setPlusAt(at: { readonly into: ListId; readonly index: number } | null): void;
 	setPlusMinute(minute: number | null): void;
 	setZoom(zoom: Zoom): void;
+	/** The list's width that puts the divider in the middle of a ribbon `viewWidth` wide (the port's rule). */
+	dividerMiddle(viewWidth: number): number;
+	/** The divider dragged to make the list `wanted` wide at `speed` px/ms: where the port's rule stands it, the share set to it. */
+	dragDivider(wanted: number, viewWidth: number, speed: number): DividerStop;
+	followList(follow: boolean): void;
 	/** The edge the carried card heads into (`room:edge`; null: none): a new one waits a quarter second before it may scroll. */
 	scrollToward(edge: string | null): void;
 	/** A minute of the day as the clock writes it (the port's): «14:15». */
@@ -193,6 +208,11 @@ export interface ScreenActions {
 	toggleProject(name: string): void;
 	/** No project: every project off. */
 	clearProjects(): void;
+	/**
+	 * «New project…»'s name on the bar ended (F220): Enter (`name`) makes it at the tree's top and the field takes it, the
+	 * panel closing; Escape (null) or a name of nothing goes back to the projects. The field takes the focus back either way.
+	 */
+	nameEntryProject(name: string | null): void;
 	/** Description on the bar: the line under the title opens, holding what the port says (a renamed task's own description). */
 	openDescription(): void;
 	/** The description's line typed. */
@@ -230,9 +250,11 @@ const LEFT_KEPT = 4;
 
 /** Gestures during which data that arrives waits (spec, principle 5): what the finger holds stays still under it. */
 const HOLDING: readonly (Gesture | null)[] = ["drag", "resize"];
+/** The share a device that kept none opens with: the divider in the middle, the day list and its calendar in halves. */
+const HALVES = 0.5;
 
 /** One store per mounted screen, over its port (spec, «Screen state»); `zoom`, the calendar's zoom the host kept. */
-export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx): ScreenStore {
+export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, listShare = HALVES): ScreenStore {
 	/** Writes of the screen's own not yet read back: their reads come together once the last is in. */
 	let writing = 0;
 	/** The screen as it stood when the carried task was lifted: its place's home, a drop's in-flight write drawn in it. */
@@ -275,6 +297,13 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 			const kept = Object.entries(left).filter(([day]) => Math.abs(Number(day) - dayOffset) <= LEFT_KEPT);
 			set({ left: { ...Object.fromEntries(kept), [from]: { shown, read } }, dayOffset, read: next, shown: drawn ? share(drawn.shown, next) : next, fresh: new Set() });
 		};
+		/** «New project…» on the bar being written: Enter or a tap away on the field waits for it (`commitEntry`). */
+		let naming: Promise<void> | null = null;
+		/** Whether the field's bar offers `id` now (the port's answer): Tab, Shift+Tab and ⌥Tab obey the same buttons. */
+		const offers = (id: FieldActionId): boolean => {
+			const { entry, draft, entryText } = get();
+			return !!entry && port.entryBar(entry, draft, entryText).bar.some((group) => group.actions.some((action) => action.id === id && !action.disabled));
+		};
 		/** The card `id` takes the focus back, as a menu closing gives it back (Decision 58). */
 		const focusOn = (id: string) => set({ focusCard: { id, seq: (get().focusCard?.seq ?? 0) + 1 } });
 
@@ -299,6 +328,21 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 			plusAt: null,
 			plusMinute: null,
 			zoom,
+			listShare,
+			listFollow: false,
+			listBounds: port.listBounds,
+			dividerMiddle(viewWidth) {
+				return port.listWidths(get().listShare, viewWidth, DESIGN.dividerWidth).center;
+			},
+			dragDivider(wanted, viewWidth, speed) {
+				const stop = port.dividerAt(wanted, port.listWidths(get().listShare, viewWidth, DESIGN.dividerWidth), speed);
+				const next = port.listShareOf(stop.width, viewWidth, DESIGN.dividerWidth);
+				if (next !== get().listShare) set({ listShare: next });
+				return stop;
+			},
+			followList(follow) {
+				if (get().listFollow !== follow) set({ listFollow: follow });
+			},
 			scrollArmed: false,
 			scrollToward(edge) {
 				if (edge === scrollEdge) return;
@@ -366,8 +410,8 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 			},
 			claim(gesture) {
 				const held = get().gesture;
-				/** A drag takes the pointer from the ribbon (its long press proved the ribbon still), never from a pinch or a resize. */
-				if (held !== null && held !== gesture && (gesture !== "drag" || held === "zoom" || held === "resize")) return false;
+				/** A drag takes the pointer from the ribbon (its long press proved the ribbon still), never from a pinch, a resize or the divider. */
+				if (held !== null && held !== gesture && (gesture !== "drag" || held !== "ribbon")) return false;
 				if (held !== gesture) set({ gesture });
 				return true;
 			},
@@ -442,6 +486,20 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 				write(new Promise<void>((resolve) => (done = resolve)));
 				window.setTimeout(() => void port.act(layer.id, action, layer.from, get().dayOffset).finally(done), LAYER_MS.close);
 			},
+			actHere(action) {
+				const layer = get().layer;
+				if (!layer) return;
+				/** The menu stays on its page with the task as the file now has it: the core's key is fresh after a write. */
+				const follow = (id: string | null) => {
+					const now = get().layer;
+					if (id !== null && now && now.id === layer.id && id !== layer.id) set({ layer: { ...now, id } });
+				};
+				write(port.act(layer.id, action, layer.from, get().dayOffset).then(follow));
+			},
+			nameMenuProject(name) {
+				if (port.blankProjectName(name)) get().menuPage("projects");
+				else get().pick({ kind: "newProject", name });
+			},
 			closeLayer() {
 				if (get().layer) set({ layer: null, ...(get().entry?.stack ? { entry: null, draft: NO_DRAFT, entryText: "", entryPanel: null } : {}) });
 			},
@@ -477,6 +535,20 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 			clearProjects() {
 				set({ draft: { ...get().draft, projects: [] } });
 			},
+			nameEntryProject(name) {
+				const back = name === null || port.blankProjectName(name);
+				set({ entryPanel: back ? "project" : null, entrySeq: get().entrySeq + 1 });
+				if (back) return;
+				const made = port.newProject(name).then((project) => {
+					const { entry, draft } = get();
+					if (project !== null && entry && !draft.projects.includes(project)) set({ draft: { ...draft, projects: [...draft.projects, project] } });
+				});
+				naming = made;
+				void made.finally(() => {
+					if (naming === made) naming = null;
+				});
+				write(made);
+			},
 			openDescription() {
 				const { entry, draft } = get();
 				if (entry && draft.descriptionLine === null) set({ draft: { ...draft, descriptionLine: port.entryDescription(entry) } });
@@ -487,6 +559,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 			},
 			toggleSection() {
 				const draft = get().draft;
+				if (!offers("newSection")) return;
 				set({ draft: { ...draft, section: !draft.section }, entryPanel: null });
 			},
 			entryPlace(choice, date, reach) {
@@ -508,13 +581,18 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 			},
 			indentEntry(by) {
 				const entry = get().entry;
-				const shift = by > 0 ? "indent" : "outdent";
-				const offered = entry ? port.entryBar(entry, get().draft, get().entryText).bar.some((group) => group.actions.some((action) => action.id === shift && !action.disabled)) : false;
-				if (entry && offered) set({ entry: { ...entry, at: { ...entry.at, under: undefined, depth: Math.max(0, (entry.at.depth ?? 0) + by) } } });
+				if (entry && offers(by > 0 ? "indent" : "outdent")) set({ entry: { ...entry, at: { ...entry.at, under: undefined, depth: Math.max(0, (entry.at.depth ?? 0) + by) } } });
 			},
 			commitEntry(text, next) {
 				const { entry, draft, shown } = get();
 				if (!entry) return;
+				/** A new project still being made for this field: the task is written once the field has it, by the field as it then stands. */
+				if (naming) {
+					void naming.then(() => {
+						if (get().entry === entry) get().commitEntry(text, next);
+					});
+					return;
+				}
 				const done = port.commit(entry, text, draft, next);
 				const face = done.face;
 				set({

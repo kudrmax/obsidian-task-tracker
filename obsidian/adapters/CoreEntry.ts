@@ -1,11 +1,14 @@
-import { type DayService, type DropColumn, type EntryList, type EntryState, type LocalDate, type Placement, type QuickEntryView, QuickEntrySession, type ScreenReader, type TaskItem, type TaskService, type WriteLine } from "../../core/application/contracts";
+import { type DayService, type DropColumn, type EntryList, type EntryState, type LocalDate, type MenuProject, type Placement, type QuickEntryView, QuickEntrySession, type ScreenReader, type TaskItem, type TaskService, type WriteLine } from "../../core/application/contracts";
 import { WriteQueue } from "../ui/quick/WriteQueue";
 import type { Destination, EntryBar, EntryCommit, EntryDraft, EntryField, ListId, MenuFrom, PlaceId, RenameStart } from "../ui/engine/port";
 import { ListCards } from "./ListCards";
+import { projectPageOf } from "./menuModel";
 import type { ScreenDrawing } from "./ScreenDrawing";
 
 const NO_DRAFT: EntryDraft = { level: null, projects: [], descriptionLine: null, section: false };
 const ENTRY_LISTS: readonly ListId[] = ["day", "soon", "inbox"];
+/** A field with no Project button of its own (a subtask's, a section's name): an empty page, never drawn. */
+const NO_PROJECT_PAGE: MenuProject = { current: null, options: [], none: true, noneLabel: "", value: "", disabled: true, newLabel: "" };
 
 /** The writes a session only asked where a field opens queues: none, it writes nothing. */
 const NO_WRITES: WriteLine = { push: () => undefined, idle: () => Promise.resolve() };
@@ -86,7 +89,7 @@ export class CoreEntry {
 			bar: state.bar,
 			levels: state.marks.tiles.levels.map((tile) => ({ prefix: tile.mark.prefix, color: tile.mark.color, on: tile.on })),
 			tint: state.marks.tint,
-			projects: (state.project?.page.options ?? []).map((option) => ({ name: option.project.name, depth: option.depth, on: option.checked, folder: option.project.folder })),
+			project: projectPageOf(state.project?.page ?? NO_PROJECT_PAGE),
 			where: state.place && { id: state.place.kind, title: this.core.tasks.placementTitle(state.place) },
 			places: state.places.map((choice) => ({ id: choice.kind, title: choice.kind === "date" ? null : this.core.tasks.listName(choice.kind), on: choice.on })),
 			date: { today: this.core.days.today(), picked: state.place && this.core.tasks.dayOfPlacement(state.place) },
@@ -114,13 +117,21 @@ export class CoreEntry {
 		const written = this.pushed > pushed;
 		const after = this.session.state;
 		const pending = this.session.renamed.find((rename) => rename.id === renamed?.id);
-		this.field = after ? this.fieldOf(after, field.at.dayOffset) : null;
+		this.field = after ? this.nextOf(field, after) : null;
 		return {
 			write: written ? this.queue.idle().then(() => this.refresh()) : null,
 			face: renamed && pending && written ? { ...this.drawing.face(renamed, null), title: pending.title, color: before.marks.tint } : null,
 			next: this.field,
 			draft: after ? this.draftOf(after) : NO_DRAFT,
 		};
+	}
+
+	/**
+	 * The field open after a commit: where the session stands; but a field kept where it stood while it writes elsewhere
+	 * (Backlog, a list out of reach) stays so, as the next one types to the same place.
+	 */
+	private nextOf(field: EntryField, after: EntryState): EntryField {
+		return field.at.backlog || field.at.away ? { ...field, renaming: after.renaming?.id ?? null } : this.fieldOf(after, field.at.dayOffset);
 	}
 
 	/** The field a place moved to: where the session now stands, or kept where it stood when the screen can't bring that list into sight. */

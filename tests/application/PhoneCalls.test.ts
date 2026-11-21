@@ -316,8 +316,11 @@ function doorAnswer(answer: DoorAnswer): { result: unknown; text: string | null;
 	return { result: answer.result, text: answer.tasks ?? null, steps: answer.step === true };
 }
 
+/** Every door method once, each over a fresh read of the file: a few hundred calls, far past vitest's 5 s on a busy machine. */
+const EVERY_METHOD_MS = 30_000;
+
 describe("the door's tasks.* calls", () => {
-	it("answer as TaskServiceImpl does over the same text, and write the same file", async () => {
+	it("answer as TaskServiceImpl does over the same text, and write the same file", { timeout: EVERY_METHOD_MS }, async () => {
 		const screen = await service().svc.screen(T);
 		for (const c of TASK_CASES) {
 			const door = callDoor(`tasks.${c.method}`, wire(c.args(screen)), context(c.text === undefined ? FILE : c.text));
@@ -803,7 +806,7 @@ function everyCall(screen: ScreenView): { method: string; args: unknown[]; conte
 }
 
 describe("every answer of the door", () => {
-	it("is plain JSON: it reads back from its text exactly as it was", async () => {
+	it("is plain JSON: it reads back from its text exactly as it was", { timeout: EVERY_METHOD_MS }, async () => {
 		const screen = await service().svc.screen(T);
 		const calls = everyCall(screen);
 		expect(new Set(calls.map((c) => c.method))).toEqual(new Set(doorMethods()));

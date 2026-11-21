@@ -1,5 +1,10 @@
-import type { GroupedList, LocalDate, TaskItem, TaskMenuActionId, TaskMenuModel as CoreMenuModel } from "../../core/application/contracts";
-import type { ListPlaceId, TaskMenuModel } from "../ui/engine/port";
+import type { GroupedList, LocalDate, MenuProject, TaskItem, TaskMenuActionId, TaskMenuModel as CoreMenuModel } from "../../core/application/contracts";
+import type { ListPlaceId, ProjectPage, TaskMenuModel } from "../ui/engine/port";
+
+/** A Project page in the engine's words, from the core's `MenuProject` as it is. */
+export function projectPageOf(page: MenuProject): ProjectPage {
+	return { options: page.options.map((option) => ({ name: option.project.name, depth: option.depth, on: option.checked, disabled: option.disabled })), none: page.none, noneLabel: page.noneLabel, newLabel: page.newLabel };
+}
 
 /** The words of Pick a date's list tiles: the lists' own names as the core's settings give them. */
 export type ListNames = (list: GroupedList) => string;
@@ -19,6 +24,7 @@ export function menuModelOf(item: TaskItem, model: CoreMenuModel<TaskMenuActionI
 		date: { today, picked: model.dueDate, removable: model.removeDue },
 		places: model.places.flatMap((choice) => (choice.kind === "date" ? [] : [{ id: choice.kind as ListPlaceId, title: names(choice.kind), on: choice.on }])),
 		reminders: model.reminders.map((row) => ({ kind: row.kind, checked: row.checked })),
+		project: projectPageOf(model.project),
 		peek: model.peek?.description ?? null,
 		subtasks,
 	};

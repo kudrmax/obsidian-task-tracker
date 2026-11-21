@@ -133,7 +133,9 @@ export function MenuLayer({ open, onClose, escapes = true, root, reference, labe
 	/** Another page (a subtask's menu in the same sheet too) takes the focus as the first did: a press on a stack's card gave it to nothing. */
 	const firstPage = useRef(page);
 	useEffect(() => {
-		if (page !== firstPage.current) parts.current.lower?.focus({ preventScroll: true });
+		const lower = parts.current.lower;
+		/** A page whose field took the focus as it mounted («New project…»'s name) keeps it. */
+		if (page !== firstPage.current && lower && !lower.contains(lower.ownerDocument.activeElement)) lower.focus({ preventScroll: true });
 	}, [page]);
 	const { isMounted, status } = useTransitionStatus(block.context, { duration: { open: LAYER_MS.open, close: LAYER_MS.close } });
 	const shownOnce = useRef(false);

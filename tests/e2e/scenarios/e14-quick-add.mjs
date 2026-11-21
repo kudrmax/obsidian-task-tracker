@@ -9,7 +9,7 @@
 export default {
 	name: "e14-quick-add",
 	features: ["E4: quick add (F174, F178–F182)"],
-	cases: ["day", "inbox", "levels", "escape and tap elsewhere"],
+	cases: ["day", "inbox", "levels", "escape and tap elsewhere", "slow click on the plus"],
 	async run(t, item) {
 		const tap = (p) => (t.platform === "phone" ? t.input.tap(p.x, p.y) : t.input.click(p.x, p.y));
 		const key = async (k, code, vk, shift = false) => {
@@ -118,6 +118,16 @@ export default {
 			await t.sleep(400);
 			t.expect((await t.file()).includes("Записать тапом мимо"), "a tap elsewhere writes what was typed");
 			t.expect((await field()) === null, "and ends typing");
+		}
+		if (item === "slow click on the plus" && t.platform === "desktop") {
+			/** A mouse held still on the plus is a click, as a finger's tap: it lifts the plus only once it moves (the loaded machine's 330–730 ms clicks opened nothing). */
+			await t.setStop("soon");
+			const plus = await t.oracle.rect(".task-calendar > button.tc-plus");
+			await t.cdp.send("Input.dispatchMouseEvent", { type: "mousePressed", x: plus.x, y: plus.y, button: "left", buttons: 1, clickCount: 1 });
+			await t.sleep(600);
+			await t.cdp.send("Input.dispatchMouseEvent", { type: "mouseReleased", x: plus.x, y: plus.y, button: "left", buttons: 0, clickCount: 1 });
+			await t.sleep(400);
+			t.expect((await field())?.text === "", `a slow click on the plus opens the new task's field: ${JSON.stringify(await field())}`);
 		}
 	},
 };

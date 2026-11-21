@@ -76,8 +76,12 @@ function menuAnswer(facts: MenuFacts, id: TaskMenuActionId): MenuAnswer {
 	return { offer: action.disabled ? "disabled" : "shown", asks: action.asks, status: action.status, day };
 }
 
+const MENU_COMBOS = every(MENU_VALUES);
+const FIELD_COMBOS = every(FIELD_VALUES);
+const RENAMED = { repeatable: itemOf({ ...MENU_COMBOS[0], repeatable: true }), fixed: itemOf({ ...MENU_COMBOS[0], repeatable: false }) };
+
 function fieldContext(facts: FieldFacts): FieldContext {
-	const renaming = facts.renaming === "none" ? null : { ...itemOf({ ...every(MENU_VALUES)[0], repeatable: facts.renaming === "repeatable" }) };
+	const renaming = facts.renaming === "none" ? null : RENAMED[facts.renaming];
 	return { task: facts.task, renaming, topLevel: facts.topLevel, place: facts.place, levels: LEVELS.length, labels: 0, indents: facts.indents, canIndent: facts.canIndent, canOutdent: facts.canOutdent, maySection: facts.maySection };
 }
 
@@ -86,24 +90,30 @@ const fieldOffer = (facts: FieldFacts, id: FieldActionId) => {
 	return action ? (action.disabled ? "disabled" : "shown") : "hidden";
 };
 
-/** The facts an answer depends on (flipping one changes it somewhere), and the answer for each of their values; it fails if the answer is not a function of them. */
+/** The facts an answer depends on (flipping one changes it somewhere), and the answer for each of their values; it fails if the answer is not a function of them. `combos` is `every(values)`, in its order. */
 function rowOf<F, A>(combos: readonly F[], values: { readonly [K in keyof F]: readonly F[K][] }, answer: (facts: F) => A): { facts: (keyof F)[]; answers: Record<string, A> } {
 	const names = Object.keys(values) as (keyof F)[];
-	const said = new Map(combos.map((facts) => [JSON.stringify(facts), JSON.stringify(answer(facts))]));
-	const facts = names.filter((name) => combos.some((combo) => values[name].some((value) => said.get(JSON.stringify({ ...combo, [name]: value })) !== said.get(JSON.stringify(combo)))));
+	const said = combos.map((facts) => JSON.stringify(answer(facts)));
+	const strides = names.map((_, n) => names.slice(n + 1).reduce((product, later) => product * values[later].length, 1));
+	const facts = names.filter((name, n) => {
+		const size = values[name].length;
+		return said.some((value, i) => {
+			const at = Math.floor(i / strides[n]) % size;
+			return values[name].some((_, v) => said[i + (v - at) * strides[n]] !== value);
+		});
+	});
 	const answers: Record<string, A> = {};
-	for (const combo of combos) {
+	combos.forEach((combo, i) => {
 		const key = facts.map((name) => String(combo[name])).join(",");
-		const value = said.get(JSON.stringify(combo))!;
-		if (key in answers && JSON.stringify(answers[key]) !== value) throw new Error(`the answer is not a function of ${String(facts)}`);
-		answers[key] = JSON.parse(value) as A;
-	}
+		if (key in answers && JSON.stringify(answers[key]) !== said[i]) throw new Error(`the answer is not a function of ${String(facts)}`);
+		answers[key] = JSON.parse(said[i]) as A;
+	});
 	return { facts, answers };
 }
 
 function generated(): { menu: MenuTable; field: FieldTable } {
-	const menuCombos = every(MENU_VALUES);
-	const fieldCombos = every(FIELD_VALUES);
+	const menuCombos = MENU_COMBOS;
+	const fieldCombos = FIELD_COMBOS;
 	const menuRows = TASK_ACTION_IDS.flatMap((id): TableRow<TaskMenuActionId, (typeof TASK_MENU_GROUPS)[number], keyof MenuFacts, MenuAnswer>[] => {
 		const cell = placementOf(id, "taskMenu");
 		if ("absent" in cell) return [];
@@ -135,6 +145,9 @@ function fileOf(table: { menu: MenuTable; field: FieldTable }): string {
 	].join("\n");
 }
 
+/** Every task the stand can describe is 15 360 menus laid out twice: far past vitest's 5 s on a busy machine. */
+const EVERY_TASK_MS = 30_000;
+
 describe("the stand's copy of the table of task actions", () => {
 	const table = generated();
 
@@ -144,9 +157,9 @@ describe("the stand's copy of the table of task actions", () => {
 		expect(readFileSync(FILE, "utf8"), "the stand's table drifted from the core's: UPDATE_STAND_TABLE=1 npx vitest run tests/ui/engine/standTable.test.ts").toBe(text);
 	});
 
-	it("lays out one task's menu as the core does, for every task the stand can describe", () => {
+	it("lays out one task's menu as the core does, for every task the stand can describe", { timeout: EVERY_TASK_MS }, () => {
 		const dayOf = (n: number) => addDays(TODAY, n);
-		for (const facts of every(MENU_VALUES)) {
+		for (const facts of MENU_COMBOS) {
 			const core = coreMenu(facts);
 			expect(menuLayout(facts, dayOf), JSON.stringify(facts)).toEqual(core.layout);
 			expect(menuPlaces(facts), JSON.stringify(facts)).toEqual(core.places.map((place) => place.kind));
@@ -155,7 +168,7 @@ describe("the stand's copy of the table of task actions", () => {
 
 	it("lays out the field's bar as the core does, for every field the stand can describe", () => {
 		const unlit = Object.fromEntries(TASK_ACTION_IDS.map((id) => [id, false])) as Record<FieldActionId, boolean>;
-		for (const facts of every(FIELD_VALUES)) {
+		for (const facts of FIELD_COMBOS) {
 			const core = fieldActions(fieldContext(facts)).map(({ group, actions }) => ({ group, actions: actions.map(({ id, disabled }) => ({ id, disabled, lit: false })) }));
 			expect(fieldBar(facts, unlit), JSON.stringify(facts)).toEqual(core);
 		}

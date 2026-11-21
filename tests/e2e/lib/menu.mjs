@@ -156,3 +156,8 @@ export function closingFaults(frames) {
 	if (last.panels.length || last.copy || last.backdrop !== null) faults.push(`still there at the end: ${JSON.stringify(last)}`);
 	return faults;
 }
+
+/** The centre of the first element `selector` finds, as a person aims at it; null while there is none. */
+export function centreOf(t, selector) {
+	return t.cdp.eval(`(() => { const e = document.querySelector(${JSON.stringify(selector)}); if (!e) return null; const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+}

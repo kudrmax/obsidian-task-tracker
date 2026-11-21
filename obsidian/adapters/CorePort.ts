@@ -1,4 +1,4 @@
-import { type CalendarService, type Clock, type DayEvents, type DayService, type DropColumn, type DroppedTask, type DropTo, type LocalDate, listCardMenuFrom, type MenuFrom as CoreMenuFrom, originOf, type ScreenReader, type ShownChange, type TaskItem, type TaskService } from "../../core/application/contracts";
+import { type CalendarService, dividerAt, type DividerStop, LIST_WIDTHS, listShareOf, type ListWidths, listWidths, type Clock, type DayEvents, type DayService, type DropColumn, type DroppedTask, type DropTo, type LocalDate, listCardMenuFrom, type MenuFrom as CoreMenuFrom, originOf, type ScreenReader, type ShownChange, type TaskItem, type TaskService } from "../../core/application/contracts";
 import type { Destination, Edge, EntryBar, EntryCommit, EntryDraft, EntryField, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, RenameStart, ScreenData, ScreenPort } from "../ui/engine/port";
 import { CoreEntry } from "./CoreEntry";
 import { ListCards } from "./ListCards";
@@ -124,6 +124,30 @@ export class CorePort implements ScreenPort {
 		await this.refresh();
 	}
 
+	readonly listBounds = LIST_WIDTHS;
+
+	listWidths(share: number, viewWidth: number, dividerWidth: number): ListWidths {
+		return listWidths(share, viewWidth, dividerWidth);
+	}
+
+	listShareOf(width: number, viewWidth: number, dividerWidth: number): number {
+		return listShareOf(width, viewWidth, dividerWidth);
+	}
+
+	dividerAt(wanted: number, widths: ListWidths, speed: number): DividerStop {
+		return dividerAt(wanted, widths, speed);
+	}
+
+	blankProjectName(name: string): boolean {
+		return this.core.tasks.isBlankProjectName(name);
+	}
+
+	async newProject(name: string): Promise<string | null> {
+		const made = await this.core.tasks.newProject(name, []);
+		await this.refresh();
+		return made && !made.folder ? made.name : null;
+	}
+
 	clockAt(minute: number): string {
 		return this.core.days.clockAt(minute);
 	}
@@ -169,10 +193,10 @@ export class CorePort implements ScreenPort {
 		return menuModelOf(item, model, from === "calendar" ? item.subtasks.map((sub) => sub.id) : [], (list) => this.core.tasks.listName(list), this.core.days.today());
 	}
 
-	async act(id: string, action: MenuAction, from: MenuFrom, dayOffset: number): Promise<void> {
-		if (action.kind === "row") return;
+	/** The core's ids stay through every write it makes (`TaskItem.id`): the task's own id, null once it is gone. */
+	async act(id: string, action: MenuAction, from: MenuFrom, dayOffset: number): Promise<string | null> {
 		const item = this.reader.item(id);
-		if (!item) return;
+		if (action.kind === "row" || !item) return item ? id : null;
 		const tasks = this.core.tasks;
 		const keys = [item.key];
 		switch (action.kind) {
@@ -196,10 +220,17 @@ export class CorePort implements ScreenPort {
 			case "reminder":
 				await tasks.setReminder(item.key, action.reminder);
 				break;
+			case "project":
+				await (action.name === null ? tasks.setProject(keys, null) : tasks.toggleProject(keys, action.name));
+				break;
+			case "newProject":
+				await tasks.newProject(action.name, keys);
+				break;
 			case "delete":
 				await tasks.remove(item.key);
 		}
 		await this.refresh();
+		return this.reader.item(id) ? id : null;
 	}
 
 	/** The day `dayOffset` days from today, as the core steps days. */

@@ -1,7 +1,7 @@
 import { CorePort } from "../adapters/CorePort";
 import { memoryCore, type MemoryTasksFile } from "../memoryCore";
 import type { ScreenPort } from "../ui/engine/port";
-import { dateOf, dayOf, fileText, LIST_NAMES, type ListKey, MOCK_PROJECTS, type MockFile, mockFile } from "./mockData";
+import { dateOf, dayOf, fileText, LIST_NAMES, type ListKey, type MockFile, mockFile } from "./mockData";
 import { MockPort, type WriteDelay } from "./MockPort";
 import { standEvents } from "./standEvents";
 
@@ -43,7 +43,7 @@ export function mockSource(port: MockPort = new MockPort()): StandSource {
 
 /** The made-up file as the core reads it: its lists, then the made-up projects' tree (`## Projects`, a folder marked 🗃️). */
 function coreText(file: MockFile, now: Date): string {
-	const tree = MOCK_PROJECTS.map((p) => `${"\t".repeat(p.depth)}- ${p.name}${p.folder ? " 🗃️" : ""}`);
+	const tree = file.projects.map((p) => `${"\t".repeat(p.depth)}- ${p.name}${p.folder ? " 🗃️" : ""}`);
 	return `${fileText(file, now)}\n## Projects\n\n${tree.join("\n")}\n`;
 }
 
