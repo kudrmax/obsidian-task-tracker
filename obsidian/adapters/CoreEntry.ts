@@ -149,8 +149,7 @@ export class CoreEntry {
 	/** The field a place moved to: where the session now stands, or kept where it stood when the screen can't bring that list into sight. */
 	private landed(field: EntryField, home: Destination, dayOffset: number, reach: readonly ListId[]): EntryField {
 		const at = this.fieldOf(this.session.state, dayOffset).at;
-		const { list } = at;
-		return reach.includes(list) ? { ...field, at } : { ...field, at: { ...home, away: { list, dayOffset } } };
+		return reach.includes(at.list) ? { ...field, at } : { ...field, at: { ...home, away: { list: at.list, dayOffset } } };
 	}
 
 	/**

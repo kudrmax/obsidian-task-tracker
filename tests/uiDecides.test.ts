@@ -17,6 +17,13 @@ function tested(field: string, compared = true): RegExp {
 	return new RegExp(forms.join("|"), "g");
 }
 
+/**
+ * The engine's places (`engine/port.ts`'s `Destination`, named `at`, `to` or `away` wherever the engine and its port
+ * read one): their `list` is a list of the screen the place stands in, not a task's list. A place's list is not a
+ * decision about a task; a task's `list` still is, whatever holds the task.
+ */
+const PLACE_NAMES = ["at", "to", "away"];
+
 const DECISIONS: readonly { readonly name: string; readonly pattern: RegExp }[] = [
 	{ name: "which list a task is in", pattern: /\.list\s*[!=]==/g },
 	{ name: "whether a task repeats", pattern: /\bitem\.repeat\b(?!\s*[,)\]}])/g },
@@ -33,7 +40,7 @@ const DECISIONS: readonly { readonly name: string; readonly pattern: RegExp }[] 
 	{ name: "a task's due date compared", pattern: /\.dueDate\s*[!=]==/g },
 	{ name: "a day compared with today", pattern: /[!=]==\s*(?:this\.)?(?:deps\.)?today\(\)|\btoday\(\)\s*[!=]==/g },
 	{ name: "a task's status switched on", pattern: /\bswitch\s*\(\s*[\w.]*\.status\s*\)/g },
-	{ name: "whether a task's list is one of these", pattern: /\.includes\(\s*[\w.]*\.list\s*\)/g },
+	{ name: "whether a task's list is one of these", pattern: new RegExp(`\\.includes\\(\\s*(?![\\w.]*\\b(?:${PLACE_NAMES.join("|")})\\.list\\b)[\\w.]*\\.list\\s*\\)`, "g") },
 	{ name: "whether a task is closed", pattern: /!\s*(?:\w+\.)*(?:item|task|subtask)\.open\b/g },
 	{ name: "whether a task is on a time", pattern: tested("slot") },
 	{ name: "a task's reminder compared", pattern: /\.reminder\s*[!=]==/g },
@@ -152,6 +159,8 @@ describe("the UI decides nothing", () => {
 		expect(hitsIn("listView(items, this.deps.grouped?.() ?? false, this.deps.sections?.() ?? []);")).toHaveLength(1);
 		expect(hitsIn("list: () => listView(host.ribbon.done(), false),")).toEqual([]);
 		expect(hitsIn("if (LISTS.includes(item.list)) go();")).toEqual(["1: whether a task's list is one of these"]);
+		expect(hitsIn("return reach.includes(at.list) ? a : b; if (shown.includes(field.at.list)) c(); if (x.includes(to.list)) d();")).toEqual([]);
+		expect(hitsIn("if (ENTRY_LISTS.includes(found.item.list)) a(); if (lists.includes(task.list)) b(); if (lists.includes(state.renaming.list)) c();")).toEqual(["1: whether a task's list is one of these", "1: whether a task's list is one of these", "1: whether a task's list is one of these"]);
 		expect(hitsIn("if (!item.open) go(); if (!this.panel.open) stay();")).toEqual(["1: whether a task is closed"]);
 		expect(hitsIn("const { list, status } = item;")).toEqual(["1: a task's fields taken apart to decide"]);
 		expect(hitsIn("const { day, onSubtask } = this.context;")).toEqual([]);
