@@ -37,8 +37,9 @@ export function NewProjectRow({ onPick }: { readonly onPick: () => void }) {
 }
 
 /**
- * «New project…»'s name, in place of the projects (F220; the plugin's `projectNamePage`): one line in a capsule ringed in
- * the accent, «Project name» while empty, the caret in it. Enter ends it with the name, Escape with none; it ends once.
+ * «New project…»'s name, in place of the projects (F220; the plugin's `projectNamePage`): the way back, then one line in a
+ * capsule ringed in the accent, «Project name» while empty, the caret in it. Enter ends it with the name, Escape and the
+ * way back with none; it ends once.
  * `onLeave`: the focus went elsewhere before it ended.
  */
 export function ProjectNameField({ onEnd, onLeave }: { readonly onEnd: (name: string | null) => void; readonly onLeave?: (event: FocusEvent<HTMLDivElement>) => void }) {
@@ -49,8 +50,14 @@ export function ProjectNameField({ onEnd, onLeave }: { readonly onEnd: (name: st
 		onEnd(name);
 	};
 	return (
-		<div className="tc-menu-group tc-project-name">
-			<ObsidianEditor text="" className="tc-quick-field tc-title-field tc-project-name-field" placeholder="Project name" onEnter={end} onEscape={() => end(null)} onLeave={onLeave ? (event) => (ended.current ? undefined : onLeave(event)) : undefined} />
+		<div>
+			<button type="button" role="menuitem" className="tc-btn tc-menu-back" onClick={() => end(null)}>
+				<Icon name="chevronLeft" />
+				New project
+			</button>
+			<div className="tc-menu-group tc-project-name">
+				<ObsidianEditor text="" className="tc-quick-field tc-title-field tc-project-name-field" placeholder="Project name" onEnter={end} onEscape={() => end(null)} onLeave={onLeave ? (event) => (ended.current ? undefined : onLeave(event)) : undefined} />
+			</div>
 		</div>
 	);
 }

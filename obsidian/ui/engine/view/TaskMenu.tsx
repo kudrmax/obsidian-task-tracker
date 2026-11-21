@@ -182,7 +182,6 @@ function taskGroups(layer: Layer, typing: boolean, model: TaskMenuModel, steps: 
 		];
 	if (layer.page === "projectName")
 		return [
-			<Row key="back" label="New project" icon="chevronLeft" className="tc-menu-back" lead onPick={() => steps.menuPage("projects")} />,
 			<ProjectNameField key="name" onEnd={(name) => (name === null ? steps.menuPage("projects") : steps.nameMenuProject(name))} />,
 		];
 	if (layer.page === "reminders")
