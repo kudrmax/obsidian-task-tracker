@@ -15,3 +15,23 @@ export function RibbonTrack({ at, className, width, share, children }: { readonl
 		</motion.div>
 	);
 }
+
+/** A column of the strip whose width goes with the ribbon's place (`widthAt`, the layout's): drawn by Motion each frame, React drawing nothing while it moves. */
+export function StripColumn({ at, widthAt, className, style, children }: { readonly at: MotionValue<number>; readonly widthAt: (at: number) => string; readonly className: string; readonly style: CSSProperties; readonly children: ReactNode }) {
+	const width = useTransform(at, widthAt);
+	return (
+		<motion.section className={className} style={{ ...style, width } as unknown as CSSProperties}>
+			{children}
+		</motion.section>
+	);
+}
+
+/** A divider of the strip that stands off its place by the ribbon's place (`leftAt`, the layout's): drawn by Motion each frame. */
+export function StripRule({ at, leftAt, children }: { readonly at: MotionValue<number>; readonly leftAt: (at: number) => string; readonly children: ReactNode }) {
+	const left = useTransform(at, leftAt);
+	return (
+		<motion.div className="tc-rule" style={{ left } as unknown as CSSProperties}>
+			{children}
+		</motion.div>
+	);
+}

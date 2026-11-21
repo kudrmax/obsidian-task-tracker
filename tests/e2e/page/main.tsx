@@ -1,5 +1,5 @@
 import type { App } from "obsidian";
-import { keptZoom, MockPort, type WriteDelay, ZOOM_KEY } from "../../../obsidian/stand/MockPort";
+import { keptListShare, keptZoom, LIST_SHARE_KEY, MockPort, type WriteDelay, ZOOM_KEY } from "../../../obsidian/stand/MockPort";
 import type { ListKey } from "../../../obsidian/stand/mockData";
 import { STAND_STEPS, type StandStep, WHOLE_SCREEN } from "../../../obsidian/stand/steps";
 import { KEYS, takesKeys } from "../../../obsidian/ui/engine/keys";
@@ -16,18 +16,18 @@ import { showPriorityColors } from "../../../obsidian/ui/priorityColors";
  * with `step(id)` for the stand's step commands and `openNote()` for the note's block.
  */
 
-/** The device's storage for the calendar's zoom, as Obsidian's local storage keeps it; a page whose storage is blocked keeps nothing. */
-const load = (): unknown => {
+/** The device's storage for the calendar's zoom and the list's share, as Obsidian's local storage keeps them; a page whose storage is blocked keeps nothing. */
+const load = (key: string): unknown => {
 	try {
-		const text = window.localStorage.getItem(ZOOM_KEY);
+		const text = window.localStorage.getItem(key);
 		return text === null ? null : JSON.parse(text);
 	} catch {
 		return null;
 	}
 };
-const save = (value: unknown): void => {
+const save = (key: string, value: unknown): void => {
 	try {
-		window.localStorage.setItem(ZOOM_KEY, JSON.stringify(value));
+		window.localStorage.setItem(key, JSON.stringify(value));
 	} catch {
 		/* kept for this page only */
 	}
@@ -117,7 +117,7 @@ class StandPage {
 	}
 
 	private mount(el: HTMLElement, place: Place, sourcePath: string): MountedScreen {
-		const screen = mountScreen(el, { port: this.port, place, app: this.app, sourcePath, haptics: this.haptics, zoom: keptZoom(load, save), markdown: plainMarkdown, desk: !document.body.classList.contains("is-mobile") });
+		const screen = mountScreen(el, { port: this.port, place, app: this.app, sourcePath, haptics: this.haptics, zoom: keptZoom(() => load(ZOOM_KEY), (value) => save(ZOOM_KEY, value)), listShare: keptListShare(() => load(LIST_SHARE_KEY), (value) => save(LIST_SHARE_KEY, value)), markdown: plainMarkdown, desk: !document.body.classList.contains("is-mobile") });
 		this.screens.add(screen);
 		return screen;
 	}

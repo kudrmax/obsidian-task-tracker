@@ -1,7 +1,7 @@
 import { DESIGN } from "../../design";
 import { createStore, type StoreApi } from "zustand/vanilla";
 import { LAYER_MS } from "../layers/motion";
-import type { Destination, Edge, EntryBar, EntryDraft, EntryField, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, MenuStatusId, ScreenData, ScreenPort } from "../port";
+import type { Destination, DividerStop, Edge, ListWidths, EntryBar, EntryDraft, EntryField, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, MenuStatusId, ScreenData, ScreenPort } from "../port";
 import { share } from "./share";
 
 /** Where the ribbon stands: Inbox–Soon, Soon–the day, the day–its calendar. */
@@ -16,7 +16,7 @@ const STOP_OF: Readonly<Record<ListId, Stop>> = { inbox: "inbox", soon: "soon", 
 const NO_DRAFT: EntryDraft = { level: null, projects: [], descriptionLine: null, section: false };
 
 /** The one gesture that holds the pointer (spec, «Which gesture holds the pointer»). */
-export type Gesture = "drag" | "ribbon" | "resize" | "zoom";
+export type Gesture = "drag" | "ribbon" | "resize" | "zoom" | "divider";
 
 /** Where the calendar was zoomed to: an hour's height, or the whole day whatever the calendar's height. */
 export type Zoom = number | "wholeDay";
@@ -86,6 +86,12 @@ export interface ScreenState {
 	readonly scrollArmed: boolean;
 	/** The calendar's zoom (spec, «Time scale»): kept on the device by the host. */
 	readonly zoom: Zoom;
+	/** The day list's share of the columns beside the calendar, as the divider set it (F51–F53): kept on the device by the host. */
+	readonly listShare: number;
+	/** The divider steps into the middle or out of it: the list's width glides there (F52) instead of following at once. */
+	readonly listGlide: boolean;
+	/** The list's bounds on a phone (the port's): the stylesheet draws a kept share within them as the window changes. */
+	readonly listBounds: { readonly min: number; readonly max: number };
 	/** The calendar's selected task: its two dots show, to resize it (F102); a tap elsewhere lets it go. */
 	readonly selected: string | null;
 	/** The task being resized by a dot, and which: its moving edge's time shows on a pill. */
@@ -161,6 +167,11 @@ export interface ScreenActions {
 	setPlusAt(at: { readonly into: ListId; readonly index: number } | null): void;
 	setPlusMinute(minute: number | null): void;
 	setZoom(zoom: Zoom): void;
+	/** The day list beside the calendar in a ribbon `viewWidth` wide, as the port's rule draws the share: its width, bounds and middle. */
+	listWidths(viewWidth: number): ListWidths;
+	/** The divider dragged to make the list `wanted` wide at `speed` px/ms: where the port's rule stands it, the share set to it. */
+	dragDivider(wanted: number, viewWidth: number, speed: number): DividerStop;
+	glideList(glide: boolean): void;
 	/** The edge the carried card heads into (`room:edge`; null: none): a new one waits a quarter second before it may scroll. */
 	scrollToward(edge: string | null): void;
 	/** A minute of the day as the clock writes it (the port's): «14:15». */
@@ -230,9 +241,11 @@ const LEFT_KEPT = 4;
 
 /** Gestures during which data that arrives waits (spec, principle 5): what the finger holds stays still under it. */
 const HOLDING: readonly (Gesture | null)[] = ["drag", "resize"];
+/** The share a device that kept none opens with: the divider in the middle, the day list and its calendar in halves. */
+const HALVES = 0.5;
 
 /** One store per mounted screen, over its port (spec, «Screen state»); `zoom`, the calendar's zoom the host kept. */
-export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx): ScreenStore {
+export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, listShare = HALVES): ScreenStore {
 	/** Writes of the screen's own not yet read back: their reads come together once the last is in. */
 	let writing = 0;
 	/** The screen as it stood when the carried task was lifted: its place's home, a drop's in-flight write drawn in it. */
@@ -299,6 +312,21 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 			plusAt: null,
 			plusMinute: null,
 			zoom,
+			listShare,
+			listGlide: false,
+			listBounds: port.listBounds,
+			listWidths(viewWidth) {
+				return port.listWidths(get().listShare, viewWidth, DESIGN.dividerWidth);
+			},
+			dragDivider(wanted, viewWidth, speed) {
+				const stop = port.dividerAt(wanted, port.listWidths(get().listShare, viewWidth, DESIGN.dividerWidth), speed);
+				const next = port.listShareOf(stop.width, viewWidth, DESIGN.dividerWidth);
+				if (next !== get().listShare) set({ listShare: next });
+				return stop;
+			},
+			glideList(glide) {
+				if (get().listGlide !== glide) set({ listGlide: glide });
+			},
 			scrollArmed: false,
 			scrollToward(edge) {
 				if (edge === scrollEdge) return;
@@ -366,8 +394,8 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 			},
 			claim(gesture) {
 				const held = get().gesture;
-				/** A drag takes the pointer from the ribbon (its long press proved the ribbon still), never from a pinch or a resize. */
-				if (held !== null && held !== gesture && (gesture !== "drag" || held === "zoom" || held === "resize")) return false;
+				/** A drag takes the pointer from the ribbon (its long press proved the ribbon still), never from a pinch, a resize or the divider. */
+				if (held !== null && held !== gesture && (gesture !== "drag" || held !== "ribbon")) return false;
 				if (held !== gesture) set({ gesture });
 				return true;
 			},

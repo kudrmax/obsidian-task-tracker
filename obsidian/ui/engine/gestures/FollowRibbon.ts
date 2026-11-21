@@ -1,7 +1,8 @@
 import { useGesture, useWheel } from "@use-gesture/react";
 import { animate, type AnimationPlaybackControls, type MotionValue, useMotionValue, useTransform } from "motion/react";
 import { createContext, type RefObject, useEffect, useRef, useState } from "react";
-import { CALENDAR, placeOf, standAt } from "../layout/columns";
+import { DESIGN } from "../../design";
+import { CALENDAR, landingWidth, type PlaceWidths, placeOf, standAt, strokeWidth } from "../layout/columns";
 import { useScreen, useScreenApi } from "../store";
 import { type ChangeTiming, changeLook, changeTiming, type DayChange } from "./dayChange";
 import { FollowPager, LANDING, landingAt, landingVelocity } from "./followPager";
@@ -120,6 +121,13 @@ export function useFollowRibbon(ribbon: RefObject<HTMLElement | null>, win: Wind
 
 	/** Half the ribbon: one column, the way a step goes (the browser's width of the ribbon, read as a stroke moves, as @use-gesture's pager example reads the window's). */
 	const column = () => (ribbon.current?.clientWidth ?? 0) / 2;
+	/** A place's width: a stop's step, and past the calendar the day list's column as the divider set it (its list and its half of the divider). */
+	const widths = (): PlaceWidths => {
+		const view = ribbon.current?.clientWidth ?? 0;
+		return { stop: view / 2, day: api.getState().listWidths(view).width + DESIGN.dividerWidth / 2 };
+	};
+	/** Where this stroke began, in places, and how far the fingers drew it, px on. */
+	const stroke = useRef({ base: 0, moved: 0 });
 
 	/**
 	 * The days to draw: those in sight now and those a finger can bring into sight from the place the ribbon stands at or
@@ -144,7 +152,7 @@ export function useFollowRibbon(ribbon: RefObject<HTMLElement | null>, win: Wind
 		settle();
 		const from = along.get();
 		const day = Math.max(0, to - CALENDAR);
-		const velocity = landingVelocity(from, to, speed, column());
+		const velocity = landingVelocity(from, to, speed, landingWidth(from, to, widths()));
 		const turn = day === shown.current ? null : { from: shown.current, to: day, way: Math.sign(day - shown.current) };
 		const spring = animate(along, to, { type: "spring", ...LANDING, velocity, restDelta: REST, restSpeed: REST });
 		glide.current = spring;
@@ -192,6 +200,7 @@ export function useFollowRibbon(ribbon: RefObject<HTMLElement | null>, win: Wind
 		landing.current = false;
 		settle();
 		pager.current.begin(along.get(), fresh);
+		stroke.current = { base: along.get(), moved: 0 };
 		standAt(screen, pager.current.stop);
 		draw(true);
 		return true;
@@ -199,7 +208,8 @@ export function useFollowRibbon(ribbon: RefObject<HTMLElement | null>, win: Wind
 
 	const move = (px: number) => {
 		if (!pager.current.following) return;
-		along.set(pager.current.move(px, column()));
+		stroke.current.moved += px;
+		along.set(pager.current.move(px, strokeWidth(stroke.current.base, stroke.current.moved, widths())));
 	};
 
 	const release = (speed: number) => {

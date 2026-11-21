@@ -1,11 +1,11 @@
-import type { EntryBarGroup, FieldActionId, FieldGroup, MenuActionGroup, MenuStatusId, TaskActionId, TaskMenuActionId, TaskMenuGroup } from "../../../core/application/contracts";
+import type { DividerStop, EntryBarGroup, FieldActionId, FieldGroup, ListWidths, MenuActionGroup, MenuStatusId, TaskActionId, TaskMenuActionId, TaskMenuGroup } from "../../../core/application/contracts";
 
 /**
  * The task actions are the core's (`core/application/taskActions.ts`, task actions spec): the ids, the groups and the
  * offered actions a surface lays out. The port answers with them; the engine keeps only each action's look and handler,
  * an exhaustive `Record` over the surface's ids. Types only: the engine runs no code of the core.
  */
-export type { EntryBarGroup, FieldActionId, FieldGroup, MenuActionGroup, MenuStatusId, TaskActionId, TaskMenuActionId, TaskMenuGroup };
+export type { DividerStop, EntryBarGroup, FieldActionId, FieldGroup, ListWidths, MenuActionGroup, MenuStatusId, TaskActionId, TaskMenuActionId, TaskMenuGroup };
 
 /**
  * The screen's one port (docs/superpowers/specs/2026-11-18-ui-engine.md, «The owners», «Data and writes»): what the screen
@@ -337,4 +337,10 @@ export interface ScreenPort {
 	menu(id: string, from: MenuFrom): MenuModel;
 	/** Writes what was tapped in the menu of `id` opened `from` there (a status tile of a folded block writes its step); resolves once written and read back. */
 	act(id: string, action: MenuAction, from?: MenuFrom): Promise<void>;
+	/** The day list's width beside the calendar (the core's `listWidth`, core audit pair E8): its bounds on a phone, the width `share` draws in a window `viewWidth` wide. */
+	readonly listBounds: { readonly min: number; readonly max: number };
+	listWidths(share: number, viewWidth: number, dividerWidth: number): ListWidths;
+	listShareOf(width: number, viewWidth: number, dividerWidth: number): number;
+	/** Where the divider dragged to make the list `wanted` wide stands, the finger moving at `speed` px/ms: held to the middle when brought there slowly. */
+	dividerAt(wanted: number, widths: ListWidths, speed: number): DividerStop;
 }

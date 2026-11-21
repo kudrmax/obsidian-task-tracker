@@ -7,7 +7,7 @@
  * looks, change its token, or add one here with a name that says what it is for.
  *
  * Properties the code sets per element (--tc-list-width, --tc-grab-x, --tc-grab-y, --tc-landing-level, --tc-landing-w, --tc-landing-h, --tc-hour, --tc-allday-extra-rows, --tc-y, --tc-stack-z, --tc-lanes-after, --tc-block-top, --tc-label-room, --tc-anchor-offset, --tc-event-bg-dark, --tc-event-bar-dark, --tc-event-text-dark, --tc-event-bg-light, --tc-event-bar-light, --tc-event-text-light,
- * --tc-len, --tc-x, --tc-level, --tc-pass, --tc-stack-end, --tc-room-top, --tc-room-bottom, --tc-scrolled, --tc-scrolled-below, --tc-event-bg, --tc-event-bar, --tc-event-text, and per priority colour --tc-priority-ink, --tc-priority-fill, --tc-priority-meta) carry a measure from the layout
+ * --tc-list-share, --tc-list-least, --tc-list-most, --tc-len, --tc-x, --tc-level, --tc-pass, --tc-stack-end, --tc-room-top, --tc-room-bottom, --tc-scrolled, --tc-scrolled-below, --tc-event-bg, --tc-event-bar, --tc-event-text, and per priority colour --tc-priority-ink, --tc-priority-fill, --tc-priority-meta) carry a measure from the layout
  * into these rules; the rules do the arithmetic.
  */
 body {
@@ -199,6 +199,8 @@ body {
 	--tc-half-column: calc((100% - var(--tc-stage-left) - var(--tc-divider)) / 2);
 	--tc-column-pad-near: 0 var(--tc-space-2) 0 var(--tc-space-10);
 	--tc-column-pad-far: 0 var(--tc-space-10) 0 var(--tc-space-2);
+	/* A column of the engine's ribbon holds half of the divider beside it: its near side's room, its far side's and that half. */
+	--tc-column-pad-ribbon: 0 calc(var(--tc-space-2) + var(--tc-divider) / 2) 0 var(--tc-space-10);
 	--tc-handle-w: 10px;
 	--tc-handle-h: 52px;
 	--tc-handle-top: 260px;
@@ -704,6 +706,8 @@ body {
 
 	/* Layers */
 	--tc-layer-block: 1;
+	/* A divider of the ribbon over the column after it, whose edge its strip straddles. */
+	--tc-layer-rule: 1;
 	/* The drop line lies over everything, the dragged card too. */
 	--tc-layer-drop: 1001;
 	/* The dots of the selected card lie over every card. */
@@ -1833,6 +1837,20 @@ button.tc-btn.tc-folder-btn:disabled { opacity: var(--tc-tile-off-opacity); curs
 .tc-ribbon-track { height: 100%; display: flex; }
 .tc-ribbon-track > .tc-stage-col { flex: none; }
 .tc-ribbon-track > .tc-stage-col:is(.is-day, .is-timeline) { overflow: clip; }
+/*
+ * The columns of the ribbon each stand between two dividers' middles (the design's halves: `(width − 16) / 2` and the
+ * divider): a list keeps its side's room and half of each divider beside it, the calendar starts past its half. The day
+ * list beside the calendar is `--tc-list-width`: the share the divider set, within the port's bounds, as the core's
+ * `listWidths` draws it; the calendar takes the rest of the window (`50%` of the strip is the window). A step of the
+ * divider into the middle or out of it glides.
+ */
+.tc-ribbon-track > .tc-stage-col:not(.is-timeline) :is(.tc-stage-head, .tc-stage-body) { padding: var(--tc-column-pad-ribbon); }
+.tc-ribbon-track > .tc-stage-col:is(.is-day, .is-timeline) { --tc-list-width: clamp(var(--tc-list-least), calc(var(--tc-list-share) * (50% - var(--tc-divider))), max(var(--tc-list-most), calc(50% - var(--tc-divider) - var(--tc-list-least)))); }
+.tc-ribbon-track > .tc-stage-col.is-timeline { width: calc(50% - var(--tc-list-width) - var(--tc-divider) / 2); padding-left: calc(var(--tc-divider) / 2); box-sizing: border-box; }
+.tc-ribbon-track > .tc-stage-col.is-gliding { transition: --tc-list-share var(--tc-duration-snap) var(--tc-ease-out); }
+.tc-rule { flex: none; width: 0; position: relative; z-index: var(--tc-layer-rule); }
+.tc-rule-strip { position: absolute; left: calc(-1 * var(--tc-divider) / 2); top: var(--tc-columns-head); bottom: 0; width: var(--tc-divider); display: flex; justify-content: center; pointer-events: none; }
+.tc-rule-strip.is-divider { pointer-events: auto; touch-action: none; cursor: col-resize; }
 /* A region that slides (the shown day's list and its calendar): one layer filling its column, the next sliding in beside it. */
 .tc-slide { position: absolute; inset: 0; display: flex; flex-direction: column; }
 .tc-slide > .tc-stage-body > .tc-timeline { top: 0; }
@@ -1983,6 +2001,8 @@ body.theme-light .tc-menu-over .tc-event { --tc-event-bg: var(--tc-event-bg-ligh
  * fraction of the size (`tc-tile-probe`) takes its width from the room beside it (`tc-tile-room`), the container units
  * read both, and the label's size is the room over the copy's width at full size.
  */
+@property --tc-list-share { syntax: "<number>"; inherits: false; initial-value: 0; }
+@property --tc-list-width { syntax: "<length-percentage>"; inherits: false; initial-value: 0px; }
 @property --tc-fit-whole { syntax: "<length>"; inherits: true; initial-value: 0px; }
 @property --tc-fit-left { syntax: "<length>"; inherits: true; initial-value: 0px; }
 .tc-menu-tile > .tc-tile-fit { --tc-tile-font: var(--tc-font-menu-tile); align-self: stretch; box-sizing: border-box; padding: 0 var(--tc-tile-room); display: flex; container-type: inline-size; }
