@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it } from "vitest";
 import type { TaskItem } from "../../core/application/contracts";
+import { listView } from "../../core/application/contracts";
 import { KeyedRows } from "../../obsidian/ui/motion/KeyedRows";
 import { TaskList } from "../../obsidian/ui/TaskList";
 import { RenamedTexts } from "../../obsidian/ui/RenamedTexts";
@@ -21,7 +22,7 @@ afterEach(() => document.body.replaceChildren());
 describe("a list's rows live as long as their tasks", () => {
 	it("keeps a task's card through a write that changes its line, filled anew in place", () => {
 		let items = [task("A", "1"), task("B", "2")];
-		const list = new TaskList(document.body.appendChild(document.createElement("div")), { items: () => items, day: () => null });
+		const list = new TaskList(document.body.appendChild(document.createElement("div")), { list: () => listView(items, false), day: () => null });
 		list.render();
 		const [a, b] = list.cards.map((entry) => entry.card);
 		items = [task("A done", "1"), task("B", "2")];
@@ -32,7 +33,7 @@ describe("a list's rows live as long as their tasks", () => {
 
 	it("moves the same card to a task's new place, and draws a new one only for a new task", () => {
 		let items = [task("A", "1"), task("B", "2")];
-		const list = new TaskList(document.body.appendChild(document.createElement("div")), { items: () => items, day: () => null });
+		const list = new TaskList(document.body.appendChild(document.createElement("div")), { list: () => listView(items, false), day: () => null });
 		list.render();
 		const [a, b] = list.cards.map((entry) => entry.card);
 		items = [task("B", "2"), task("C", "3"), task("A", "1")];
@@ -46,7 +47,7 @@ describe("a list's rows live as long as their tasks", () => {
 	it("hangs a card's listeners on a signal the next drawing aborts, so none is heard twice", () => {
 		let items = [task("A", "1")];
 		const signals: AbortSignal[] = [];
-		const list = new TaskList(document.body.appendChild(document.createElement("div")), { items: () => items, day: () => null, onCard: (_card, _item, _subtree, signal) => signals.push(signal) });
+		const list = new TaskList(document.body.appendChild(document.createElement("div")), { list: () => listView(items, false), day: () => null, onCard: (_card, _item, _subtree, signal) => signals.push(signal) });
 		list.render();
 		items = [task("A!", "1")];
 		list.render();
@@ -57,7 +58,7 @@ describe("a list's rows live as long as their tasks", () => {
 		let items: TaskItem[] = [task("A", "1")];
 		let pending = [{ text: "Bread", level: 0 }];
 		const list = new TaskList(document.body.appendChild(document.createElement("div")), {
-			items: () => items,
+			list: () => listView(items, false),
 			day: () => null,
 			entry: () => ({ at: { kind: "top" }, level: 0, pending, field: (row) => row }),
 		});
@@ -77,7 +78,7 @@ describe("a list's rows live as long as their tasks", () => {
 	it("draws a rename entered and not yet written under its new text, on the same card, and every card of the task anywhere", () => {
 		let renamed: { id: string; text: string; title: string }[] = [];
 		const stop = RenamedTexts.add(() => renamed);
-		const list = new TaskList(document.body.appendChild(document.createElement("div")), { items: () => [task("Old name", "3")], day: () => null });
+		const list = new TaskList(document.body.appendChild(document.createElement("div")), { list: () => listView([task("Old name", "3")], false), day: () => null });
 		list.render();
 		const card = list.cards[0].card;
 		renamed = [{ id: "3", text: "New name", title: "New name" }];
@@ -93,13 +94,12 @@ describe("a list's rows live as long as their tasks", () => {
 	it("keeps a section's header through a rename", () => {
 		let name = "Morning";
 		const list = new TaskList(document.body.appendChild(document.createElement("div")), {
-			items: () => [task("A", "1")],
+			list: () =>
+				listView([task("A", "1")], true, [
+					{ id: "none", name: null, empty: false },
+					{ id: "s1", name, empty: true },
+				]),
 			day: () => null,
-			grouped: () => true,
-			sections: () => [
-				{ id: "none", name: null, empty: false },
-				{ id: "s1", name, empty: true },
-			],
 		});
 		list.render();
 		const head = () => [...list.el.querySelectorAll(".tc-group-head")].find((h) => !h.classList.contains("is-ungrouped"));

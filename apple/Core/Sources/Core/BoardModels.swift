@@ -207,24 +207,6 @@ public struct TaskBlock: Decodable, Hashable, Sendable {
     }
 }
 
-public struct ListSection: Codable, Hashable, Sendable {
-    /// Who the section is (`ListSection.id`): the same through a rename and a move; `"none"` for No section.
-    public let id: String
-    public let name: String?
-    public let empty: Bool
-
-    private enum CodingKeys: String, CodingKey { case id, name, empty }
-
-    /// Handed back to the core with No section's name as `null`, never left out: the core tells No section by its null
-    /// name, and a missing one put an empty section before it (`rules.listView`).
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(id, forKey: .id)
-        try container.encode(name, forKey: .name)
-        try container.encode(empty, forKey: .empty)
-    }
-}
-
 public struct DayView: Decodable, Sendable {
     public let date: String
     public let list: [TaskItem]
@@ -238,7 +220,6 @@ public struct ScreenView: Decodable, Sendable {
     public let inbox: [TaskItem]
     public let backlog: [TaskItem]
     public let done: [TaskItem]
-    public let sections: [String: [ListSection]]
     public let offer: JSONValue
     public let missing: Bool
     public let calendars: Bool
@@ -247,6 +228,25 @@ public struct ScreenView: Decodable, Sendable {
     public let projectTree: JSONValue
     /// What a drop on each column's title means (`DropTo`), handed back to `tasks.drop` as it is.
     public let titleDrops: [String: JSONValue]
+    /// The screen as read, handed back to `tasks.columnView`, which groups a column's tasks in the screen's sections.
+    public let json: JSONValue
+
+    enum CodingKeys: String, CodingKey { case day, soon, inbox, backlog, done, offer, missing, calendars, projectTree, titleDrops }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        day = try c.decode(DayView.self, forKey: .day)
+        soon = try c.decode([TaskItem].self, forKey: .soon)
+        inbox = try c.decode([TaskItem].self, forKey: .inbox)
+        backlog = try c.decode([TaskItem].self, forKey: .backlog)
+        done = try c.decode([TaskItem].self, forKey: .done)
+        offer = try c.decode(JSONValue.self, forKey: .offer)
+        missing = try c.decode(Bool.self, forKey: .missing)
+        calendars = try c.decode(Bool.self, forKey: .calendars)
+        projectTree = try c.decode(JSONValue.self, forKey: .projectTree)
+        titleDrops = try c.decode([String: JSONValue].self, forKey: .titleDrops)
+        json = try JSONValue(from: decoder)
+    }
 }
 
 public struct ListRow: Decodable, Sendable {
@@ -286,6 +286,14 @@ public struct ListView: Decodable, Sendable {
         self.showsHeaders = showsHeaders
         self.groups = groups
     }
+}
+
+/// `ColumnList`: the list a column draws (`tasks.columnView`), its groups as `ListView` and whose sections it shows.
+public struct ColumnList: Decodable, Sendable {
+    public let showsHeaders: Bool
+    public let groups: [ListGroup]
+    /// Null for a column that shows no sections (a past day).
+    public let sections: ColumnSections?
 }
 
 /// `CardDue`: what a card's corner shows on a column's day.

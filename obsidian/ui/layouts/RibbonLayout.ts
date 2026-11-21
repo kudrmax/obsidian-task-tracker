@@ -1,4 +1,4 @@
-import { LIST_WIDTHS, type ViewLayout } from "../../../core/application/contracts";
+import { LIST_WIDTHS, listView, type ViewLayout } from "../../../core/application/contracts";
 import { ColumnHeaders } from "../ColumnHeaders";
 import { DURATION, PROPERTY, tokenMs } from "../design";
 import { Divider } from "../Divider";
@@ -51,7 +51,7 @@ export class RibbonLayout implements ModeLayout {
 		this.day = funnelList(host.lists, "day", { area: left, title: { el: () => shared.dayTitle, over: true } });
 		const doneEl = this.part(shared.timeline, (parent) => el(parent, "div", "tc-done"));
 		this.done = new TaskList(el(doneEl, "div"), {
-			items: () => host.ribbon.done(),
+			list: () => listView(host.ribbon.done(), false),
 			day: () => null,
 			onCard: (card, item, _subtree, signal) => host.ribbon.doneCard(card, item, signal),
 		});

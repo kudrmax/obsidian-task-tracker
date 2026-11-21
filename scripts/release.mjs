@@ -1,8 +1,8 @@
 // The only way to release: `npm run release -- "<notes>"`, from the main clone on master. Every check stops the release.
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdtempSync, readFileSync, statSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, statSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
 import path from "node:path";
 
 const ASSETS = ["main.js", "manifest.json", "styles.css"];
@@ -60,3 +60,12 @@ for (const asset of ASSETS) {
 	if (sha(path.join(downloaded, asset)) !== sha(asset)) fail(`the released ${asset} is not the one built here`);
 }
 console.log(`\nReleased ${version}: the assets on GitHub are this build.`);
+
+// The agents' program and its skill live in the vault, so an agent that sees only the vault (Cowork) has them; Sync carries them to every Mac.
+const SKILL_DIR = path.join(homedir(), "Obsidian", ".claude", "skills", "obsidian-task-calendar");
+mkdirSync(SKILL_DIR, { recursive: true });
+for (const [from, to] of [["agent/obsidian-task-calendar.mjs", "obsidian-task-calendar.mjs"], ["skills/obsidian-task-calendar/SKILL.md", "SKILL.md"]]) {
+	copyFileSync(from, path.join(SKILL_DIR, to));
+	if (sha(path.join(SKILL_DIR, to)) !== sha(from)) fail(`${to} in the vault is not the one built here`);
+}
+console.log(`The agents' program and skill are in ${SKILL_DIR}.`);

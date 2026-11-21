@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
 import type { TaskItem } from "../../core/application/contracts";
+import { listView } from "../../core/application/contracts";
 import type { PriorityColor } from "../../core/application/contracts";
 import type { PendingText } from "../../core/application/contracts";
 import { QuickField, type QuickKey } from "../../obsidian/ui/quick/QuickField";
@@ -168,7 +169,7 @@ const item = (text: string, subtasks: TaskItem[] = []): TaskItem => onDay({
 describe("TaskList with a task being typed", () => {
 	const list = (items: TaskItem[], index: number, level: number, pending: PendingText[] = [{ text: "Milk", level }]) => {
 		const l = new TaskList(document.createElement("div"), {
-			items: () => items,
+			list: () => listView(items, false),
 			day: () => null,
 			entry: (drawing) => ({
 				...spotted(drawing, { kind: "gap", index, level, group: null }),
@@ -237,7 +238,7 @@ describe("TaskList with a task being typed", () => {
 		const keyed = (text: string, path: number[]): TaskItem => ({ ...item(text), key: { section: "now", index: 0, path, raw: text } });
 		const last = keyed("A2", [1]);
 		const l = new TaskList(document.createElement("div"), {
-			items: () => [{ ...keyed("A", []), subtasks: [keyed("A1", [0]), last] }],
+			list: () => listView([{ ...keyed("A", []), subtasks: [keyed("A1", [0]), last] }], false),
 			day: () => null,
 			entry: (drawing) => ({ ...spotted(drawing, { kind: "gap", index: 2, level: 1, group: null }), pending: [], field: (parent) => parent }),
 			renaming: () => last.key,
@@ -258,9 +259,8 @@ describe("TaskList with a task being typed", () => {
 	it("stands at the end of its own section for a place past that section's cards", () => {
 		const grouped = [{ ...item("A"), group: "Home" }, { ...item("B"), group: "Work" }];
 		const l = new TaskList(document.createElement("div"), {
-			items: () => grouped,
+			list: () => listView(grouped, true),
 			day: () => null,
-			grouped: () => true,
 			entry: (drawing) => ({ ...spotted(drawing, { kind: "gap", index: 2, level: 0, group: "Home" }), pending: [], field: (parent) => parent }),
 		});
 		l.render();
@@ -271,7 +271,7 @@ describe("TaskList with a task being typed", () => {
 		let field: HTMLTextAreaElement | null = null;
 		const items = [item("A")];
 		const l = new TaskList(document.createElement("div"), {
-			items: () => items,
+			list: () => listView(items, false),
 			day: () => null,
 			entry: (drawing) => ({
 				...spotted(drawing, { kind: "gap", index: items.length, level: 0, group: null }),
@@ -295,9 +295,8 @@ describe("TaskList with a task being typed", () => {
 	it("stands in its section when the list has headers", () => {
 		const grouped = [{ ...item("A"), group: "Home" }, { ...item("B"), group: "Work" }];
 		const l = new TaskList(document.createElement("div"), {
-			items: () => grouped,
+			list: () => listView(grouped, true),
 			day: () => null,
-			grouped: () => true,
 			entry: (drawing) => ({ ...spotted(drawing, { kind: "gap", index: 1, level: 0, group: "Work" }), pending: [], field: (parent) => parent }),
 		});
 		l.render();

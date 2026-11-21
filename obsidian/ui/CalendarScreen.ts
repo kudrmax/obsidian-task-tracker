@@ -1,5 +1,5 @@
 import { type App, Component, MarkdownView, Notice, Platform, type Scope } from "obsidian";
-import { type CalendarEvent, type CalendarPoll, type CalendarService, type CarryEnd, type CarryStart, type DayBoundary, type DayChange, type DayService, type DropColumn, type EntryList, type FunnelView, funnelPlaceShowing, type GroupedList, type ListGroup, type ListSection, type MenuFrom, type ProjectFilter, projectNodeOf, type ProjectsCard, type ProjectsDrop, type ProjectsDropLanding, type ProjectsLanding, type ProjectsListRow, type ProjectsNodeId, type ListPlace, projectsPlusPlace, projectsTakes, type MenuScreen, endsSelection, sameTaskTree, StaleTaskError, type TaskItem, type TaskScreen, type TaskService, type UndoService, type Clock, viewEntryLists, type ViewChoice, type ViewMode, type ZoomLevel } from "../../core/application/contracts";
+import { type CalendarEvent, type CalendarPoll, type ColumnList, type ColumnSource, type DayView, type CalendarService, type CarryEnd, type CarryStart, type DayBoundary, type DayChange, type DayService, type EntryList, type FunnelView, funnelPlaceShowing, type GroupedList, type ListGroup, type MenuFrom, type ProjectFilter, projectNodeOf, type ProjectsCard, type ProjectsDrop, type ProjectsDropLanding, type ProjectsLanding, type ProjectsListRow, type ProjectsNodeId, type ListPlace, projectsPlusPlace, projectsTakes, type MenuScreen, endsSelection, sameTaskTree, StaleTaskError, type TaskItem, type TaskScreen, type TaskService, type UndoService, type Clock, viewEntryLists, type ViewChoice, type ViewMode, type ZoomLevel } from "../../core/application/contracts";
 import { type RightMode, type ShownSettings, type ShownSettingsStore } from "./viewSettings";
 import { renderAllDayRows } from "./AllDayRow";
 import { BottomCapsule } from "./BottomCapsule";
@@ -13,7 +13,7 @@ import { DayNav } from "./DayNav";
 import { ColumnSwitch } from "./ColumnSwitch";
 import { DragController } from "./drag/DragController";
 import { ListDrop } from "./drag/ListDrop";
-import { type ColumnSections, type DropResult, droppedTasks, type HeldOut, isProjectsDrop, type ListColumn, type TaskDragPayload } from "./drag/DropTarget";
+import { type DropResult, droppedTasks, type HeldOut, isProjectsDrop, type ListColumn, type TaskDragPayload } from "./drag/DropTarget";
 import { GroupDrag } from "./drag/GroupDrag";
 import { GroupMenu, ProjectMenu } from "./menu/GroupMenu";
 import { NoteSearch } from "./projects/NoteSearch";
@@ -401,7 +401,7 @@ export class CalendarScreen extends Component {
 			drag: this.drag,
 			titleField: this.titleField,
 			list: (column) => (column === "projects" ? (this.layout?.projects() ?? null) : this.listOf(column)),
-			sectioned: (column) => column !== "projects" && this.sectionsOf(column) !== null,
+			sectioned: (column) => column !== "projects" && this.columnList(column).sections !== null,
 			timeline: () => this.timeline,
 			task: (key) => this.deps.tasks.findIn(this.data.day?.slotted ?? [], key),
 			aside: () => this.projectsPlus(),
@@ -659,10 +659,8 @@ export class CalendarScreen extends Component {
 	/** What a funnel list reads of the screen, in whichever layout it stands. */
 	private listDeps(): FunnelListDeps {
 		return {
-			items: (column) => this.unnamed(this.itemsOf(column)),
+			column: (column) => this.columnList(column),
 			day: () => this.selectedDate,
-			sectionsOf: (column) => this.sectionsOf(column),
-			listSections: (column) => this.listSectionsOf(column),
 			naming: (column) => this.namingIn(column),
 			entry: (column, drawing) => this.quick?.entryIn(column, drawing) ?? null,
 			plate: (column) => this.view().plates[column],
@@ -754,10 +752,7 @@ export class CalendarScreen extends Component {
 			boundary: () => this.boundary(),
 			hourPx: () => this.hourPx,
 			now: () => this.deps.clock.now(),
-			sections: (date) => {
-				const shown = this.deps.tasks.columnSections("day", date);
-				return shown ? this.data.sections[shown.list] : null;
-			},
+			column: (date, read) => this.deps.tasks.columnView(this.columnSource(read ?? { date, list: [], slotted: [] }), "day"),
 			ungroupedName: () => this.settings.ungrouped,
 			listScroll: () => this.listOf("day")?.el.scrollTop ?? 0,
 			alignTimeline: (timeline) => this.timeline && timeline.alignWith(this.timeline),
@@ -1240,12 +1235,6 @@ export class CalendarScreen extends Component {
 		});
 	}
 
-	/** The groups of the list whose sections `column` shows, where its empty sections stand. */
-	private listSectionsOf(column: ListColumn): readonly ListSection[] {
-		const sections = this.sectionsOf(column);
-		return sections ? this.data.sections[sections.list] : [];
-	}
-
 	/** A tap on a card's folder mark opens the Projects screen on the task's project, in place of its menu; true when it did. */
 	private openProjectOf(item: TaskItem, target: EventTarget | null): boolean {
 		const project = item.project;
@@ -1293,9 +1282,15 @@ export class CalendarScreen extends Component {
 		await this.act(() => this.deps.tasks.selectProjectNode(node));
 	}
 
-	/** Whose sections a column shows on the selected day (`TaskService.columnSections`). */
-	private sectionsOf(column: ListColumn): ColumnSections | null {
-		return this.deps.tasks.columnSections(column, this.selectedDate);
+	/** The list `column` draws (`TaskService.columnView`), the card waiting for its section's name left out. */
+	private columnList(column: ListColumn): ColumnList {
+		return this.deps.tasks.columnView(this.columnSource(this.data.day ?? { date: this.selectedDate, list: [], slotted: [] }), column);
+	}
+
+	/** The lists as read, `day` the day's (the shown one, or the one a day change brings in), the card waiting for its section's name left out of each. */
+	private columnSource(day: DayView): ColumnSource {
+		const data = this.data;
+		return { day: { ...day, list: this.unnamed(day.list) }, soon: this.unnamed(data.soon), inbox: this.unnamed(data.inbox), backlog: this.unnamed(data.backlog), sections: data.sections };
 	}
 
 	/** The list column a card stands in, if any. */
@@ -1572,11 +1567,6 @@ export class CalendarScreen extends Component {
 	private dayName(): string {
 		const day = this.titleDay ?? this.selectedDate;
 		return dayTitle(day, this.deps.days.relation(day), this.today());
-	}
-
-	/** The tasks of a funnel's list as read. */
-	private itemsOf(column: DropColumn): readonly TaskItem[] {
-		return { day: this.data.day?.list ?? [], inbox: this.data.inbox, backlog: this.data.backlog, soon: this.data.soon }[column];
 	}
 
 	/** The by project mode's list, built in `area` by its layout: the node's tasks in its projects' parts, its cards a place to drop, as a list's. */

@@ -1,3 +1,4 @@
+import type { DayBoundary } from "./DayBoundary";
 import { addDays } from "./LocalDate";
 import type { Placement } from "./Placement";
 import type { LocalDate, SectionKey, Slot } from "./Task";
@@ -30,9 +31,12 @@ export function dayOfPlacement(placement: Placement, today: LocalDate): LocalDat
 	return placement.kind === "date" ? placement.date : null;
 }
 
-/** The day a task stands on: its slot's, today for Now, else its due date. `section` is its task's for a subtask. */
-export function dayOfTask(section: SectionKey, task: { readonly slot: Slot | null; readonly dueDate: LocalDate | null }, today: LocalDate): LocalDate | null {
-	if (task.slot) return task.slot.date;
+/**
+ * The day a task stands on: its slot's, by `boundary` as the timeline places it (00:30 after a day that starts at 5 is
+ * that day's night), today for Now, else its due date. `section` is its task's for a subtask.
+ */
+export function dayOfTask(section: SectionKey, task: { readonly slot: Slot | null; readonly dueDate: LocalDate | null }, today: LocalDate, boundary: DayBoundary): LocalDate | null {
+	if (task.slot) return boundary.dayOfSlot(task.slot);
 	return section === "now" ? today : task.dueDate;
 }
 

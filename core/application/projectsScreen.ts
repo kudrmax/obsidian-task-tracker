@@ -5,7 +5,6 @@ import { hasOwnTasks } from "../domain/ProjectWrites";
 import { isOpen, type LocalDate, type SectionKey } from "../domain/Task";
 import type { TaskDocument, TaskEntry } from "../domain/TaskDocument";
 import { projectName } from "../domain/Project";
-import { dayOf } from "../domain/operations";
 import type {
 	MenuFrom,
 	ProjectMenu,
@@ -26,6 +25,7 @@ import type {
 import { dueLabel } from "./dayLabels";
 import { NO_PROJECT, refOfPlaced } from "./projects";
 import { dropOf } from "./projectsLift";
+import { placeOfTask } from "./taskPlaces";
 
 /** The words of the Projects screen, the same in every frontend. */
 export const PROJECTS_WORDS = {
@@ -340,11 +340,11 @@ function stageOf(entry: TaskEntry): Stage {
 	return entry.section === "now" ? "today" : entry.section;
 }
 
+/** The stage's mark: where Max sees the task (`placeOfTask`), a day other than today by its date. */
 function stageMark(entry: TaskEntry, today: LocalDate, boundary: DayBoundary): ProjectsStage {
-	const stage = stageOf(entry);
-	const day = dayOf(entry.task, boundary);
-	if (stage === "soon" && day !== null && day !== today) return { kind: "date", date: day, label: dueLabel(day) };
-	return { kind: stage };
+	const place = placeOfTask(entry.section, entry.task, stageOf(entry) !== "done", today, boundary);
+	if (place.kind === "day") return { kind: "date", date: place.date, label: dueLabel(place.date) };
+	return { kind: place.kind };
 }
 
 function menuFromOf(entry: TaskEntry): MenuFrom {
@@ -413,9 +413,26 @@ function allSections(input: ProjectsInput, doc: TaskDocument, statusOf: (name: s
 	return shown([...parts, part("none", PROJECTS_WORDS.none, [], 0, loose, inInbox(null))], true);
 }
 
-/** A project's own tasks first, untitled, then each subproject's at any depth, in the tree's order; with Subprojects off its own alone (a folder's branch stays). */
-function projectSections(input: ProjectsInput, doc: TaskDocument, placed: PlacedProject, statusOf: (name: string) => ProjectStatus): ProjectsSection[] {
-	const closed = statusOf(placed.node.name) === "done";
+/**
+ * A live project's history (`TaskService.projectHistory`): its closed tasks By project, as a done project's screen draws
+ * them. None for a done project, whose screen shows them, and for a node of no project the tree has.
+ */
+export function projectHistory(input: ProjectsInput, node: ProjectsNodeId): ProjectsSection[] {
+	const name = projectOfNode(node);
+	const placed = name === null ? null : input.tree.find(name);
+	if (!placed || !input.doc) return [];
+	const statuses = projectStatuses(input.tree, input.doc);
+	const statusOf = (project: string): ProjectStatus => statuses.get(projectKey(project)) ?? "waiting";
+	if (statusOf(placed.node.name) === "done") return [];
+	return projectSections(input, input.doc, placed, statusOf, true);
+}
+
+/**
+ * A project's own tasks first, untitled, then each subproject's at any depth, in the tree's order; with Subprojects off its
+ * own alone (a folder's branch stays). A done project's, or `history`, its closed tasks.
+ */
+function projectSections(input: ProjectsInput, doc: TaskDocument, placed: PlacedProject, statusOf: (name: string) => ProjectStatus, history = false): ProjectsSection[] {
+	const closed = history || statusOf(placed.node.name) === "done";
 	const top = placed.path.length;
 	const whole = subprojectsOn(input.state) || placed.node.folder;
 	const branch = whole ? input.tree.all().filter((p) => p.path.length > top && p.path.slice(0, top).every((n, i) => projectKey(n) === projectKey(placed.path[i])) && (closed || statusOf(p.node.name) !== "done")) : [];

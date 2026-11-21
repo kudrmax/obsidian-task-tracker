@@ -1,4 +1,5 @@
 import { firstStepProjects, firstStepScreen } from "./firstStepTyping";
+import { dayNamed, daySide, daysFrom, weekdayName, weekOf } from "./dayWords";
 import type { DayBoundary } from "../domain/DayBoundary";
 import { GROUPED_LISTS } from "../domain/Lists";
 import { dayRelation } from "../domain/Days";
@@ -49,7 +50,7 @@ import { acceptsDrop, placesInGap } from "./drops";
 import { SourceProblemError } from "./EventSource";
 import { branchOf, carriedMiddle, gapBranch, levelAt, placeAt } from "./listDrop";
 import { grownStart, wholeWidth } from "./wholeCard";
-import { onTheDay, REPEAT_WORDS, repeatValue } from "./repeatWords";
+import { onTheDay, REPEAT_WORDS, repeatSentence, repeatValue } from "./repeatWords";
 import { canPick } from "./menus";
 import { allColumnsDividerAt, allColumnsShare, allColumnsWidthAt, allColumnsWidths, DIVIDER_SNAP, dividerAt, LIST_WIDTHS, listShareOf, listWidths } from "./listWidth";
 import { type LinkQuery, linkQuery, noteOfLink, noteSuggestions, type VaultNote, withNoteLink } from "./notes";
@@ -411,6 +412,13 @@ const TASKS: Readonly<Record<string, Handler>> = {
 	dayColumn: (c, [date]) => c.reads.dayColumn(date as string),
 	columnSections: (c, [column, date]) => c.reads.columnSections(column as A, date as string),
 	placementOfDay: (c, [date]) => c.reads.placementOfDay(date as string),
+	columnView: (c, [screen, column]) => c.reads.columnView(screen as A, column as A),
+	placeOf: (c, [item]) => c.reads.placeOf(KEPT(c), item as A),
+	ridesNow: (c, [item, day]) => c.reads.ridesNow(item as A, day as string),
+	storedLine: (c, [item, text]) => c.reads.storedLine(item as A, text as string),
+	projectNodeNamed: (c, [name]) => (c.hasTasks() ? c.reads.projectNodeNamed(KEPT(c), name as string) : { node: null, candidates: [] }),
+	openTasks: (c, [filter]) => c.ask(c.reads.openTasksRead(filter as A)),
+	projectHistory: (c, [node]) => c.ask(c.reads.projectHistoryRead(node as string)),
 	listName: (c, [list]) => c.reads.listName(list as A),
 	placementTitle: (c, [placement]) => c.reads.placementTitle(placement as A),
 	dayOfPlacement: (c, [placement]) => c.reads.dayOfPlacement(placement as A),
@@ -598,6 +606,11 @@ const DAYS: Readonly<Record<string, Handler>> = {
 	step: (_c, [date, days]) => addDays(date as string, days as number),
 	stepFunnel: (c, [from, shift]) => stepFunnel(from as FunnelAt, shift as -1 | 1, c.rules.today()),
 	openAt: (c, [date]) => dayOpening(date as string, boundaryOf(c), c.rules.today(), c.now, c.settings.scrollToHour),
+	week: (c, [which]) => weekOf(c.rules.today(), which === "next" ? "next" : "this"),
+	days: (_c, [from, count]) => daysFrom(from as string, count as number),
+	dayNamed: (c, [text]) => dayNamed(String(text), c.rules.today()),
+	weekday: (_c, [date]) => weekdayName(date as string),
+	side: (c, [date]) => daySide(date as string, c.rules.today()),
 	/** Where a day begins: the hour it starts at. The `boundary.*` calls place by it. */
 	boundary: (c) => ({ startHour: boundaryOf(c).startHour }),
 };
@@ -916,6 +929,7 @@ const RULES: Readonly<Record<string, (...args: A[]) => unknown>> = {
 	allColumnsDividerAt,
 	allColumnsWidthAt,
 	repeatValue,
+	repeatSentence,
 	onTheDay,
 	canPick,
 };

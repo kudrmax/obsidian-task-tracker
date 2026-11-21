@@ -9,10 +9,11 @@ import type { DueLabel } from "./dayLabels";
 import type { DayBoundary } from "../domain/DayBoundary";
 import type { SectionChoice, SectionOffer } from "./sections";
 import type { ListPlace } from "./nesting";
+import type { ListView } from "./sections";
 import type { ZoomLevel } from "./timelineZoom";
 import type { TreePlace } from "../domain/ProjectTree";
 
-export type { GroupName, ReminderKind, SectionKey };
+export type { GroupName, LocalDate, ReminderKind, SectionKey, TaskStatus };
 /** Where a project goes in the tree: among `parent`'s subprojects (null: the top level), right before `before` or last. */
 export type { TreePlace };
 /** What In progress or Stop progress sets on tasks of these statuses. */
@@ -407,6 +408,41 @@ export interface ColumnSections {
 	readonly date: LocalDate | null;
 }
 
+/**
+ * A column's list as it draws, the one read the Obsidian screen, the iPhone app and the agents' program take it from:
+ * whose sections it shows (`columnSections`; null for one that shows none) and its groups in `listView`'s order, the
+ * list's empty sections in it.
+ */
+export interface ColumnList extends ListView {
+	readonly sections: ColumnSections | null;
+}
+
+/** The lists a column's list is read from: a screen's (`screen(date, filter)`), filtered as it was read. */
+export type ColumnSource = Pick<ScreenView, "day" | "soon" | "inbox" | "backlog" | "sections">;
+
+/** Where Max sees a task: Inbox, Backlog, Soon (no date), today, a later or past day with its date, or Done. */
+export type { TaskPlace } from "./taskPlaces";
+import type { TaskPlace } from "./taskPlaces";
+
+/** A task's line in the file as it stands, untidied: its section, its line from 0, and the line. */
+export interface StoredLine {
+	readonly section: SectionKey;
+	readonly line: number;
+	readonly raw: string;
+}
+
+/** An open task and where Max sees it. */
+export interface PlacedTask {
+	readonly item: TaskItem;
+	readonly place: TaskPlace;
+}
+
+/** A project's node by its name as the core matches names: null for a name the tree lacks, then the closest names, best first. */
+export interface ProjectNodeMatch {
+	readonly node: ProjectsNodeId | null;
+	readonly candidates: readonly string[];
+}
+
 export interface DayView {
 	readonly date: LocalDate;
 	/** Left column, in file order: see spec §5. */
@@ -649,7 +685,7 @@ export interface MenuProjectOption {
 export type { RepeatRow } from "./repeatWords";
 import type { RepeatRow } from "./repeatWords";
 /** The words for a rule (`repeatValue`, `onTheDay`) and the repeat page's own (`REPEAT_WORDS`). */
-export { onTheDay, REPEAT_WORDS, repeatValue } from "./repeatWords";
+export { onTheDay, REPEAT_WORDS, repeatSentence, repeatValue } from "./repeatWords";
 
 /**
  * The Project page, several checks: every project of the tree in its order (a pick toggles it, `toggleProject`), No
@@ -1410,6 +1446,31 @@ export interface TaskService {
 	columnSections(column: DropColumn, date: LocalDate): ColumnSections | null;
 	/** The placement of a task for `date`: `now` for today, else `date`. */
 	placementOfDay(date: LocalDate): Placement;
+	/**
+	 * The list `column` of `screen` draws, in its sections (`ColumnList`): the column's tasks as the screen read them (its
+	 * filter's), grouped as `listView` groups them with the sections the column shows on the screen's day. Every frontend
+	 * draws a list column from this, never by chaining `columnSections` and `listView` itself.
+	 */
+	columnView(screen: ColumnSource, column: DropColumn): ColumnList;
+	/**
+	 * Where Max sees the task (a subtask: its task): Done when closed; Inbox and Backlog; Soon without a day; else the day
+	 * it stands on (`TaskItem.day`, a slot's by the day's start), today's as `today`. By project's stage mark says the same.
+	 */
+	placeOf(item: TaskItem): Promise<TaskPlace>;
+	/** A block of `day`'s timeline rides the now line (`shownSpan` puts it there): an open task of today whose start has passed. */
+	ridesNow(item: TaskItem, day: LocalDate): boolean;
+	/** The project node of `name`, matched as every project call matches names; none for a name the tree lacks, with the closest names. */
+	projectNodeNamed(name: string): Promise<ProjectNodeMatch>;
+	/**
+	 * Every open task once (a task of two projects too), the file tidied first, under `filter` as `screen` filters: Inbox,
+	 * Backlog, Soon, today (Now's, then Soon's, each in file order), then the later days by date, each with where Max sees it.
+	 */
+	openTasks(filter?: ProjectsNodeId | null): Promise<readonly PlacedTask[]>;
+	/**
+	 * A live project's history By project: its own closed tasks, then each subproject's (with Subprojects on), as the
+	 * Projects screen draws a done project's. None for a done project (`projectsScreen(node)` shows them) or a name the tree lacks.
+	 */
+	projectHistory(node: ProjectsNodeId): Promise<readonly ProjectsSection[]>;
 	/** The name a list goes by wherever the screens name a place, Done too: its section's name in the settings. A day is named by its date. */
 	listName(list: SectionKey): string;
 	/** A placement as the quick entry's place button names it: the list's name (`listName`), a day as `5 Nov`. */
@@ -1641,6 +1702,12 @@ export interface TaskService {
 	/** The task's line in the file, from 0, once the file is normalized: where Open in Obsidian puts the cursor. */
 	lineOf(key: TaskKey): Promise<number>;
 	/**
+	 * Where the task stands in `text`, the file as it is before today's tidy (on the disk, when no plugin has opened it
+	 * today): its section, its line from 0 and the line itself, found by who it is (`TaskItem.id`), wherever the tidy moved
+	 * or rewrote it. Null for a task the tidy made (a repeat's next copy) or one `text` lacks.
+	 */
+	storedLine(item: TaskItem, text: string): StoredLine | null;
+	/**
 	 * The task `key` names as the file now has it: its line at its place; moved, the one line like it anywhere; else the
 	 * task at its place whose text is `text`, its other fields changed there. Null when none of these is found.
 	 */
@@ -1790,6 +1857,9 @@ export type DayChange = "passed" | "moved";
 /** Where a day's timeline opens, minutes from the day's start: on the now line (today), or at an hour (another day). */
 export type DayOpening = { readonly kind: "now"; readonly minute: number } | { readonly kind: "hour"; readonly minute: number };
 
+/** A day before today, today, or one after it. */
+export type DaySide = "past" | "today" | "future";
+
 export interface DayService {
 	today(): LocalDate;
 	/** Where a day begins: the timeline places slots, events and now by it. */
@@ -1802,6 +1872,16 @@ export interface DayService {
 	stepFunnel(from: FunnelAtOf, shift: -1 | 1): FunnelAtOf | null;
 	/** Where the timeline of `date` opens: today on the now line, another day at the hour the settings name. */
 	openAt(date: LocalDate): DayOpening;
+	/** This week's days or the next's, Monday to Sunday, by today. */
+	week(which: "this" | "next"): readonly LocalDate[];
+	/** `count` days from `from` on, `from` first. */
+	days(from: LocalDate, count: number): readonly LocalDate[];
+	/** The day words name: `YYYY-MM-DD`, `today`, `tomorrow`, `yesterday`, `+N` or `-N` days from today; null for anything else. */
+	dayNamed(text: string): LocalDate | null;
+	/** The weekday's name in English: `Wednesday`. */
+	weekday(date: LocalDate): string;
+	/** Which side of today `date` is. */
+	side(date: LocalDate): DaySide;
 	/**
 	 * Fires when today changes. `passed` is checked once a minute while anyone listens, and the tasks file is normalized
 	 * before it fires; while a listener is not `ready` (a screen hidden or held by a gesture) the minute's check waits for
@@ -2152,6 +2232,10 @@ export interface SettingsService {
 	bindClientSecret(field: SecretField): void;
 	setWorkCalendarFile(path: string): Promise<void>;
 }
+
+/** The agents' program's answers (`Core.agent`), one method per command, in the program's words (agent CLI spec). */
+export type { AgentFilter, AgentReads, AgentServices, WeekAsk } from "./agent/AgentReads";
+export type { AgentErrorCode, WireAll, WireDay, WireError, WireHelp, WireList, WirePart, WirePlace, WireProject, WireProjectAnswer, WireProjects, WireSearch, WireSection, WireStatus, WireStep, WireTask, WireTaskAnswer, WireTime, WireWeek } from "./agent/agentWire";
 
 import type { ModelQuestion, ModelReply } from "./assistant/model";
 import type { AssistantPlace, AssistantTarget } from "./assistant/scope";

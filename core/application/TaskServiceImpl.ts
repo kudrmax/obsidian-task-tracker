@@ -6,6 +6,13 @@ import type { LabelLevel, PriorityLevel } from "../settings";
 import {
 	TasksFileMissingError,
 	type ColumnSections,
+	type ColumnList,
+	type StoredLine,
+	type ColumnSource,
+	type PlacedTask,
+	type ProjectNodeMatch,
+	type ProjectsSection,
+	type TaskPlace,
 	type DayColumn,
 	type DropColumn,
 	type SearchGroup,
@@ -432,6 +439,35 @@ export class TaskServiceImpl implements TaskService {
 
 	placementOfDay(date: LocalDate): Placement {
 		return this.reads.placementOfDay(date);
+	}
+
+	columnView(screen: ColumnSource, column: DropColumn): ColumnList {
+		return this.reads.columnView(screen, column);
+	}
+
+	async placeOf(item: TaskItem): Promise<TaskPlace> {
+		return this.reads.placeOf(await this.snapshot(), item);
+	}
+
+	storedLine(item: TaskItem, text: string): StoredLine | null {
+		return this.reads.storedLine(item, text);
+	}
+
+	ridesNow(item: TaskItem, day: LocalDate): boolean {
+		return this.reads.ridesNow(item, day);
+	}
+
+	async projectNodeNamed(name: string): Promise<ProjectNodeMatch> {
+		const s = await this.snapshotOrNull();
+		return s ? this.reads.projectNodeNamed(s, name) : { node: null, candidates: [] };
+	}
+
+	openTasks(filter?: ProjectsNodeId | null): Promise<readonly PlacedTask[]> {
+		return this.ask(this.reads.openTasksRead(filter));
+	}
+
+	projectHistory(node: ProjectsNodeId): Promise<readonly ProjectsSection[]> {
+		return this.ask(this.reads.projectHistoryRead(node));
 	}
 
 	listName(list: SectionKey): string {

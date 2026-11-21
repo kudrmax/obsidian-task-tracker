@@ -14,7 +14,7 @@ import { taskMenu } from "../../core/application/menus";
 import { dayColumn, dayOfPlacement, placementOfDay } from "../../core/domain/Days";
 import { TaskList } from "../../obsidian/ui/TaskList";
 import { Timeline } from "../../obsidian/ui/Timeline";
-import { DayBoundary, viewEntryLists } from "../../core/application/contracts";
+import { DayBoundary, listView, viewEntryLists } from "../../core/application/contracts";
 import { priorityTitles } from "../fakes/FakePriorityTitles";
 import { FakeTitleField } from "../fakes/FakeTitleField";
 import { onDay } from "../fakes/itemOnDay";
@@ -113,9 +113,8 @@ function setUp({ mode: startMode = "calendar", day: startDay = TODAY, items = {}
 	const titleFields: FakeTitleField[] = [];
 	for (const column of COLUMNS) {
 		lists[column] = new TaskList(root.appendChild(document.createElement("div")), {
-			items: () => items[column] ?? [],
+			list: () => listView(items[column] ?? [], column !== "day" || dayColumn(day, TODAY).sections),
 			day: () => null,
-			grouped: () => column !== "day" || dayColumn(day, TODAY).sections,
 			entry: (drawing) => controller?.entryIn(column, drawing) ?? null,
 			renaming: () => controller?.renaming() ?? null,
 		});

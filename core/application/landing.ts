@@ -7,9 +7,8 @@ export function landingOf(screen: ScreenView, id: string, day: LocalDate, timeli
 	const span = (item: TaskItem) => timeline.shown({ slot: item.slot!, open: item.open }, day);
 	const block = screen.day.slotted.find((item) => item.id === id);
 	if (block) {
-		const own = timeline.shown({ slot: block.slot!, open: false }, day);
 		const shown = span(block);
-		return { kind: "timeline", id, item: block, span: shown, ridesNow: shown.start !== own.start, slotted: screen.day.slotted.map((item) => ({ id: item.id, span: span(item) })) };
+		return { kind: "timeline", id, item: block, span: shown, ridesNow: timeline.ridesNow({ slot: block.slot!, open: block.open }, day), slotted: screen.day.slotted.map((item) => ({ id: item.id, span: span(item) })) };
 	}
 	const columns: readonly [LandingColumn, readonly TaskItem[]][] = [["day", screen.day.list], ["soon", screen.soon], ["inbox", screen.inbox], ["backlog", screen.backlog], ["done", screen.done]];
 	for (const [column, items] of columns) {

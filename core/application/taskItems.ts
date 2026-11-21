@@ -109,7 +109,7 @@ export function toItem(entry: TaskEntry, today: LocalDate, levels: ItemLevels = 
 		projects,
 		list: entry.section,
 		isSubtask: entry.path.length > 0,
-		day: dayOfTask(entry.section, entry.task, today),
+		day: dayOfTask(entry.section, entry.task, today, boundary),
 		repeatDay: repeatDay(dayOf(entry.task, boundary), today),
 		can: {
 			postpone: canPostpone(entry.section),

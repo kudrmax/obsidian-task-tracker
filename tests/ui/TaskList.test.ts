@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
 import type { TaskItem } from "../../core/application/contracts";
+import { listView } from "../../core/application/contracts";
 import { TaskList } from "../../obsidian/ui/TaskList";
 import { onDay } from "../fakes/itemOnDay";
 import { entryAt } from "../../core/application/QuickEntry";
@@ -30,7 +31,7 @@ describe("TaskList", () => {
 		const el = document.createElement("div");
 		Object.defineProperty(el, "scrollHeight", { get: () => 1000 });
 		Object.defineProperty(el, "clientHeight", { get: () => 400 });
-		const list = new TaskList(el, { items: () => [task("A", 0)], day: () => null });
+		const list = new TaskList(el, { list: () => listView([task("A", 0)], false), day: () => null });
 		list.render();
 		el.scrollTop = 100;
 		el.dispatchEvent(new Event("scroll"));
@@ -42,7 +43,7 @@ describe("TaskList", () => {
 	});
 
 	it("hands out the same cards until it draws again", () => {
-		const list = new TaskList(document.createElement("div"), { items: () => [task("A", 0), task("B", 1)], day: () => null });
+		const list = new TaskList(document.createElement("div"), { list: () => listView([task("A", 0), task("B", 1)], false), day: () => null });
 		list.render();
 		const cards = list.listCards;
 		expect(list.listCards).toBe(cards);
@@ -53,7 +54,7 @@ describe("TaskList", () => {
 
 	it("gives the cards it is about to draw, as listCards gives them once it has: sections, subtasks and all", () => {
 		let items = [task("A", 0)];
-		const list = new TaskList(document.createElement("div"), { items: () => items, day: () => null, grouped: () => true });
+		const list = new TaskList(document.createElement("div"), { list: () => listView(items, true), day: () => null });
 		list.render();
 		const sub = { ...task("A1", 0), key: { section: "now" as const, index: 1, path: [0], raw: "A1" }, group: "Morning" };
 		items = [task("Z", 0), { ...task("B", 1), group: "Morning", subtasks: [sub] }, task("C", 2)];
@@ -68,7 +69,7 @@ describe("TaskList", () => {
 		const sub = { ...task("A1", 0), key: { section: "now" as const, index: 0, path: [0], raw: "A1" } };
 		const subtrees: [string, number][] = [];
 		const list = new TaskList(document.createElement("div"), {
-			items: () => [{ ...task("A", 0), subtasks: [sub], progress: { done: 0, total: 1 }, collapsed: true }, { ...task("B", 1), subtasks: [{ ...sub, key: { ...sub.key, index: 1 } }] }],
+			list: () => listView([{ ...task("A", 0), subtasks: [sub], progress: { done: 0, total: 1 }, collapsed: true }, { ...task("B", 1), subtasks: [{ ...sub, key: { ...sub.key, index: 1 } }] }], false),
 			day: () => null,
 			onCard: (_card, item, subtree) => subtrees.push([item.text, subtree.length]),
 		});
@@ -83,10 +84,8 @@ describe("TaskList", () => {
 		const root = document.createElement("div");
 		const plates: string[] = [];
 		const list = new TaskList(root, {
-			items: () => [task("A", 0)],
+			list: () => listView([task("A", 0)], true, [{ id: "none", name: null, empty: false }, { id: "t1", name: "Evening", empty: true }]),
 			day: () => null,
-			grouped: () => true,
-			sections: () => [{ id: "none", name: null, empty: false }, { id: "t1", name: "Evening", empty: true }],
 			ungroupedName: () => "No section",
 			emptyLabel: () => "No tasks",
 			onPlate: (_plate, group) => plates.push(group.name ?? ""),
@@ -100,10 +99,8 @@ describe("TaskList", () => {
 
 	it("a field typed into an empty section stands in place of its plate", () => {
 		const list = new TaskList(document.createElement("div"), {
-			items: () => [task("A", 0)],
+			list: () => listView([task("A", 0)], true, [{ id: "none", name: null, empty: false }, { id: "t1", name: "Evening", empty: true }]),
 			day: () => null,
-			grouped: () => true,
-			sections: () => [{ id: "none", name: null, empty: false }, { id: "t1", name: "Evening", empty: true }],
 			entry: (drawing) => ({ at: entryAt(drawing, { kind: "gap", index: 1, level: 0, group: "Evening" }, false), level: 0, pending: [], field: (row) => row }),
 		});
 		list.render();

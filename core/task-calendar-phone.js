@@ -293,8 +293,8 @@ ${line}`;
     if (placement.kind === "now") return today;
     return placement.kind === "date" ? placement.date : null;
   }
-  function dayOfTask(section, task, today) {
-    if (task.slot) return task.slot.date;
+  function dayOfTask(section, task, today, boundary) {
+    if (task.slot) return boundary.dayOfSlot(task.slot);
     return section === "now" ? today : task.dueDate;
   }
   function canPostpone(section) {
@@ -2870,6 +2870,71 @@ ${e.calendar}`;
     return sections.every((section, i) => section === view.sections[i]) ? view : { ...view, sections };
   }
 
+  // core/application/repeatWords.ts
+  function capital(text) {
+    return text.charAt(0).toUpperCase() + text.slice(1);
+  }
+  function onTheDay(rule) {
+    return capital(repeatParts(rule).on ?? "");
+  }
+  function repeatValue(rule) {
+    const { every, on, days, afterDone } = repeatParts(rule);
+    if (afterDone) return `${capital(every)} after done`;
+    if (days) return null;
+    if (on) return rule.every === 1 ? capital(on) : `${capital(every)} ${on}`;
+    return capital(every);
+  }
+  function repeatSentence(rule) {
+    const { every, on } = repeatParts(rule);
+    return repeatValue(rule) ?? `${capital(every)} ${on}`;
+  }
+  var REPEAT_WORDS = {
+    kinds: { schedule: "Schedule", afterDone: "After done" },
+    every: "Every",
+    units: { day: "days", week: "weeks", month: "months" },
+    weekdays: [
+      { short: "Mon", name: "Monday", letter: "M" },
+      { short: "Tue", name: "Tuesday", letter: "T" },
+      { short: "Wed", name: "Wednesday", letter: "W" },
+      { short: "Thu", name: "Thursday", letter: "T" },
+      { short: "Fri", name: "Friday", letter: "F" },
+      { short: "Sat", name: "Saturday", letter: "S" },
+      { short: "Sun", name: "Sunday", letter: "S" }
+    ],
+    remove: "Remove repeat"
+  };
+  function repeatRow(rule) {
+    if (rule === null) return { value: "", days: null };
+    return { value: repeatValue(rule) ?? "", days: repeatParts(rule).days };
+  }
+
+  // core/application/dayWords.ts
+  var DAYS_IN_WEEK = 7;
+  var DATE_RE2 = /^\d{4}-\d{2}-\d{2}$/;
+  var SHIFT_RE = /^([+-])(\d{1,4})$/;
+  var NAMED = { today: 0, tomorrow: 1, yesterday: -1 };
+  function daysFrom(from, count) {
+    return Array.from({ length: Math.max(0, Math.floor(count)) }, (_, i) => addDays(from, i));
+  }
+  function weekOf(today, which) {
+    const monday = addDays(today, -weekdayOf(today) + (which === "next" ? DAYS_IN_WEEK : 0));
+    return daysFrom(monday, DAYS_IN_WEEK);
+  }
+  function dayNamed(text, today) {
+    const word = text.trim().toLowerCase();
+    if (word in NAMED) return addDays(today, NAMED[word]);
+    const shift = SHIFT_RE.exec(word);
+    if (shift) return addDays(today, (shift[1] === "-" ? -1 : 1) * Number(shift[2]));
+    return DATE_RE2.test(word) && isValidLocalDate(word) ? word : null;
+  }
+  function weekdayName(date) {
+    return REPEAT_WORDS.weekdays[weekdayOf(date)].name;
+  }
+  function daySide(date, today) {
+    if (date === today) return "today";
+    return date < today ? "past" : "future";
+  }
+
   // core/domain/RepeatDraft.ts
   var KINDS = ["schedule", "afterDone"];
   var UNITS = ["day", "week", "month"];
@@ -3709,6 +3774,20 @@ ${key.title}`.toLowerCase();
     return { key: item.key, from, lifted: liftedOf(item) };
   }
 
+  // core/application/taskPlaces.ts
+  function placeOfScreen(screen, today) {
+    if (screen.kind === "list") return { kind: screen.list };
+    return { kind: screen.date === today ? "today" : "day", date: screen.date };
+  }
+  function placeOfTask(section, task, open, today, boundary) {
+    if (!open) return { kind: "done" };
+    return placeOfScreen(taskScreen(section, dayOfTask(section, task, today, boundary)), today);
+  }
+  function funnelRank(place) {
+    const ranks = { inbox: "0", backlog: "1", soon: "2", today: "3", day: "4", done: "5" };
+    return "date" in place ? `${ranks[place.kind]}${place.date}` : ranks[place.kind];
+  }
+
   // core/application/projectsScreen.ts
   var PROJECTS_WORDS = {
     all: "All",
@@ -3933,10 +4012,9 @@ ${key.title}`.toLowerCase();
     return entry.section === "now" ? "today" : entry.section;
   }
   function stageMark(entry, today, boundary) {
-    const stage = stageOf(entry);
-    const day = dayOf(entry.task, boundary);
-    if (stage === "soon" && day !== null && day !== today) return { kind: "date", date: day, label: dueLabel(day) };
-    return { kind: stage };
+    const place = placeOfTask(entry.section, entry.task, stageOf(entry) !== "done", today, boundary);
+    if (place.kind === "day") return { kind: "date", date: place.date, label: dueLabel(place.date) };
+    return { kind: place.kind };
   }
   function menuFromOf(entry) {
     if (entry.section === "now") return "day";
@@ -3985,8 +4063,17 @@ ${key.title}`.toLowerCase();
     const loose = byStage(open.filter((entry) => entry.task.projects.length === 0)).map((e) => cardOf(input, e, null));
     return shown([...parts, part("none", PROJECTS_WORDS.none, [], 0, loose, inInbox(null))], true);
   }
-  function projectSections(input, doc, placed, statusOf3) {
-    const closed = statusOf3(placed.node.name) === "done";
+  function projectHistory(input, node) {
+    const name = projectOfNode(node);
+    const placed = name === null ? null : input.tree.find(name);
+    if (!placed || !input.doc) return [];
+    const statuses = projectStatuses(input.tree, input.doc);
+    const statusOf3 = (project) => statuses.get(projectKey(project)) ?? "waiting";
+    if (statusOf3(placed.node.name) === "done") return [];
+    return projectSections(input, input.doc, placed, statusOf3, true);
+  }
+  function projectSections(input, doc, placed, statusOf3, history = false) {
+    const closed = history || statusOf3(placed.node.name) === "done";
     const top = placed.path.length;
     const whole = subprojectsOn(input.state) || placed.node.folder;
     const branch = whole ? input.tree.all().filter((p) => p.path.length > top && p.path.slice(0, top).every((n, i) => projectKey(n) === projectKey(placed.path[i])) && (closed || statusOf3(p.node.name) !== "done")) : [];
@@ -4498,40 +4585,6 @@ ${key.title}`.toLowerCase();
   function groupPlaceOf(groups, lifted2, slot) {
     if (slot === lifted2 || slot === lifted2 + 1) return null;
     return slot >= groups.length ? "end" : { before: groups[slot] };
-  }
-
-  // core/application/repeatWords.ts
-  function capital(text) {
-    return text.charAt(0).toUpperCase() + text.slice(1);
-  }
-  function onTheDay(rule) {
-    return capital(repeatParts(rule).on ?? "");
-  }
-  function repeatValue(rule) {
-    const { every, on, days, afterDone } = repeatParts(rule);
-    if (afterDone) return `${capital(every)} after done`;
-    if (days) return null;
-    if (on) return rule.every === 1 ? capital(on) : `${capital(every)} ${on}`;
-    return capital(every);
-  }
-  var REPEAT_WORDS = {
-    kinds: { schedule: "Schedule", afterDone: "After done" },
-    every: "Every",
-    units: { day: "days", week: "weeks", month: "months" },
-    weekdays: [
-      { short: "Mon", name: "Monday", letter: "M" },
-      { short: "Tue", name: "Tuesday", letter: "T" },
-      { short: "Wed", name: "Wednesday", letter: "W" },
-      { short: "Thu", name: "Thursday", letter: "T" },
-      { short: "Fri", name: "Friday", letter: "F" },
-      { short: "Sat", name: "Saturday", letter: "S" },
-      { short: "Sun", name: "Sunday", letter: "S" }
-    ],
-    remove: "Remove repeat"
-  };
-  function repeatRow(rule) {
-    if (rule === null) return { value: "", days: null };
-    return { value: repeatValue(rule) ?? "", days: repeatParts(rule).days };
   }
 
   // core/application/placeChoices.ts
@@ -5107,7 +5160,7 @@ ${key.title}`.toLowerCase();
       projects,
       list: entry.section,
       isSubtask: entry.path.length > 0,
-      day: dayOfTask(entry.section, entry.task, today),
+      day: dayOfTask(entry.section, entry.task, today, boundary),
       repeatDay: repeatDay(dayOf(entry.task, boundary), today),
       can: {
         postpone: canPostpone(entry.section),
@@ -6675,6 +6728,17 @@ ${key.title}`.toLowerCase();
     if (bare.length === 1) return bare;
     return lower.length === 1 ? lower : char;
   }
+  function lettersApart(a, b) {
+    const x = [...folded(a.trim())];
+    const y = [...folded(b.trim())];
+    let row = Array.from({ length: y.length + 1 }, (_, j) => j);
+    for (let i = 1; i <= x.length; i++) {
+      const next = [i];
+      for (let j = 1; j <= y.length; j++) next.push(Math.min(row[j] + 1, next[j - 1] + 1, row[j - 1] + (x[i - 1] === y[j - 1] ? 0 : 1)));
+      row = next;
+    }
+    return row[y.length];
+  }
   function folded(text) {
     let out = "";
     for (let i = 0; i < text.length; i++) out += foldedChar(text.charAt(i));
@@ -6808,6 +6872,10 @@ ${key.title}`.toLowerCase();
       if (now === null || !task.open || own.start >= now) return own;
       return { start: now, end: own.end === null ? null : now + own.end - own.start };
     }
+    /** On today, an open task whose start has passed: its card rides the now line, off its own start (`shown`). */
+    ridesNow(task, day) {
+      return this.shown(task, day).start !== this.boundary.spanOf(task.slot, day).start;
+    }
     /**
      * The card while a dot is held at `minute`: the end no earlier than the start nor past the day; the start no earlier
      * than the day nor past the end, and on a task without a duration no later than its start, which becomes the end.
@@ -6903,6 +6971,10 @@ ${key.title}`.toLowerCase();
   function sectionsOf2(doc, list) {
     return doc.groups(list).filter((g) => g.heading || g.entries.length > 0).map((g) => ({ id: g.name === null || g.id === null ? NO_SECTION_ID : g.id, name: g.name, empty: g.name !== null && g.entries.length === 0 }));
   }
+  var OPEN_ORDER = ["inbox", "backlog", "now", "soon"];
+  var MOST_CANDIDATES = 5;
+  var MOST_TYPOS = 2;
+  var TYPO_SHARE = 4;
   var SEARCH_ORDER = ["inbox", "backlog", "soon", "now", "done"];
   function byQuality(a, b) {
     if (a.title === null !== (b.title === null)) return a.title ? -1 : 1;
@@ -7033,10 +7105,7 @@ ${key.title}`.toLowerCase();
     /** The screen of `date`, only the tasks `filter` lets through (`TaskService.screen`). */
     screen(s, date, filter) {
       const { doc, today, boundary } = s;
-      const tree = projectTreeOf(doc);
-      const node = filterNode(filter, tree);
-      const shows = node === null ? () => true : filterTest(node, tree, doc, this.subprojects());
-      const item = this.itemOf(today, doc, node === null || projectOfNode(node) === null);
+      const { shows, item } = this.filtered(s, filter);
       const shown3 = (entries) => entries.filter(shows).map(item);
       const day = { date, list: shown3(dayList(doc, date, today, boundary)), slotted: shown3(slottedOn(doc, date, boundary)) };
       const sections = this.listSections(s);
@@ -7167,9 +7236,9 @@ ${key.title}`.toLowerCase();
       }
       return groups;
     }
-    screenOf({ doc, today }, item) {
+    screenOf({ doc, today, boundary }, item) {
       const top = item.isSubtask ? doc.find(item.key.section, item.key.index, []) : void 0;
-      return top ? taskScreen(top.section, dayOfTask(top.section, top.task, today)) : taskScreen(item.list, item.day);
+      return top ? taskScreen(top.section, dayOfTask(top.section, top.task, today, boundary)) : taskScreen(item.list, item.day);
     }
     findIn(items, key) {
       for (const item of items) {
@@ -7188,12 +7257,12 @@ ${key.title}`.toLowerCase();
       return entry ? this.itemAt(doc, entry, today) : null;
     }
     /** The tasks the keys name as the file has them, in their order; throws StaleTaskError when one is gone. */
-    itemsAt({ doc, today }, keys) {
+    itemsAt({ doc, today, boundary }, keys) {
       const levels = this.itemLevels(new ProjectIndex(projectTreeOf(doc)));
       return keys.map((key) => {
         const entry = this.rules.entryOf(doc, key);
         const parent = key.path.length > 0 ? doc.find(key.section, key.index, key.path.slice(0, -1)) ?? null : null;
-        return toItem(entry, today, levels, parent);
+        return toItem(entry, today, levels, parent, boundary);
       });
     }
     /** The task at `place` in `doc` as the UI sees it, with the task it sits under; null when none stands there. */
@@ -7206,6 +7275,12 @@ ${key.title}`.toLowerCase();
     /** The task's line in the file once tidied for today, from 0. */
     lineOfRead(key) {
       return { reads: true, tidies: true, answer: (s) => this.lineOf(s.text, key) };
+    }
+    /** Where the task stands in `text` as it is, untidied: the line its id has there (`TaskService.storedLine`). */
+    storedLine(item, text) {
+      const doc = this.rules.parse(text);
+      const entry = flatten(doc.allTasks()).find((e) => e.id === item.id);
+      return entry ? { section: entry.section, line: doc.lineOf(entry), raw: entry.raw } : null;
     }
     /** The task's line in the file as it stands, unnormalized, from 0. */
     lineOf(text, key) {
@@ -7228,6 +7303,58 @@ ${key.title}`.toLowerCase();
     }
     placementOfDay(date) {
       return placementOfDay(date, this.today());
+    }
+    /** The list `column` of `screen` draws: its tasks as the screen read them, in the sections it shows on the screen's day. */
+    columnView(screen, column) {
+      const sections = this.columnSections(column, screen.day.date);
+      const items = column === "day" ? screen.day.list : screen[column];
+      return { sections, ...listView(items, sections !== null, sections ? screen.sections[sections.list] : []) };
+    }
+    /** Where Max sees the task, a subtask's its task's (`placeOfTask`), as the screens and By project's stage mark say it. */
+    placeOf({ doc, today, boundary }, item) {
+      const top = item.isSubtask ? doc.find(item.key.section, item.key.index, []) : void 0;
+      if (top) return placeOfTask(top.section, top.task, isOpen(top.task.status), today, boundary);
+      return placeOfTask(item.list, item, item.open, today, boundary);
+    }
+    /** A block of `day`'s timeline rides the now line. */
+    ridesNow(item, day) {
+      return this.timeline().ridesNow(slotted(item), day);
+    }
+    /**
+     * The node of the project `name` names; none with the closest names: those the search's match finds, best first, then
+     * those a typo or two apart (`lettersApart`), nearest first.
+     */
+    projectNodeNamed({ doc }, name) {
+      const tree = projectTreeOf(doc);
+      const found = tree.find(name);
+      if (found) return { node: projectNodeOf(found.node.name), candidates: [] };
+      const query = FuzzyQuery.of(name);
+      const names = tree.all().map((p) => p.node.name);
+      const matched = query === null ? [] : names.map((n) => ({ name: n, match: query.match(n) })).filter((s) => s.match !== null);
+      const fuzzy = matched.sort((a, b) => b.match.score - a.match.score).map((s) => s.name);
+      const typos = names.map((n) => ({ name: n, apart: lettersApart(name, n) })).filter((t) => t.apart <= Math.max(MOST_TYPOS, Math.floor(name.length / TYPO_SHARE)) && !fuzzy.includes(t.name)).sort((a, b) => a.apart - b.apart).map((t) => t.name);
+      return { node: null, candidates: [...fuzzy, ...typos].slice(0, MOST_CANDIDATES) };
+    }
+    /** Every open task once, under `filter`, in the funnel's order, each with its place. */
+    openTasksRead(filter) {
+      return { reads: true, tidies: true, missing: () => [], answer: (s) => this.openTasks(s, filter) };
+    }
+    openTasks(s, filter) {
+      const { doc, today, boundary } = s;
+      const { shows, item } = this.filtered(s, filter);
+      const open = OPEN_ORDER.flatMap((list) => doc.tasks(list)).filter((entry) => isOpen(entry.task.status) && shows(entry));
+      const placed = open.map((entry) => ({ item: item(entry), place: placeOfTask(entry.section, entry.task, true, today, boundary) }));
+      return placed.map((p, i) => ({ p, i, rank: funnelRank(p.place) })).sort((a, b) => a.rank < b.rank ? -1 : a.rank > b.rank ? 1 : a.i - b.i).map(({ p }) => p);
+    }
+    /** A live project's closed tasks By project; none for a done project or a name the tree lacks. */
+    projectHistoryRead(node) {
+      return { reads: true, tidies: true, missing: () => [], answer: (s) => this.projectHistory(s, node) };
+    }
+    projectHistory(s, node) {
+      const { doc, today, boundary } = s;
+      const tree = projectTreeOf(doc);
+      const levels = this.itemLevels(new ProjectIndex(tree), false);
+      return projectHistory({ doc, tree, today, boundary, state: this.source.screen(), item: (entry) => toItem(entry, today, levels, null, boundary), listName: (list) => this.listName(list), node }, node);
     }
     listName(list) {
       return this.settings.get().sections[list];
@@ -7267,6 +7394,16 @@ ${key.title}`.toLowerCase();
     /** The timeline's rules by the clock and the day's boundary now. */
     timeline() {
       return new TimelineSpans(this.rules.moment().boundary, this.clock.now());
+    }
+    /**
+     * What a read under `filter` shows (`TaskService.screen`'s filter): which tasks the node lets through, a subtask with its
+     * task, and how each is drawn, without the folder mark under a project.
+     */
+    filtered({ doc, today }, filter) {
+      const tree = projectTreeOf(doc);
+      const node = filterNode(filter, tree);
+      const shows = node === null ? () => true : filterTest(node, tree, doc, this.subprojects());
+      return { shows, item: this.itemOf(today, doc, node === null || projectOfNode(node) === null) };
     }
     /** The item of a task of `doc`, its subtasks below it, its projects as `doc`'s tree has them; `mark`, the card shows the folder mark. */
     itemOf(today, doc, mark = true) {
@@ -7973,9 +8110,8 @@ ${key.title}`.toLowerCase();
     const span = (item) => timeline.shown({ slot: item.slot, open: item.open }, day);
     const block = screen.day.slotted.find((item) => item.id === id);
     if (block) {
-      const own = timeline.shown({ slot: block.slot, open: false }, day);
       const shown3 = span(block);
-      return { kind: "timeline", id, item: block, span: shown3, ridesNow: shown3.start !== own.start, slotted: screen.day.slotted.map((item) => ({ id: item.id, span: span(item) })) };
+      return { kind: "timeline", id, item: block, span: shown3, ridesNow: timeline.ridesNow({ slot: block.slot, open: block.open }, day), slotted: screen.day.slotted.map((item) => ({ id: item.id, span: span(item) })) };
     }
     const columns = [["day", screen.day.list], ["soon", screen.soon], ["inbox", screen.inbox], ["backlog", screen.backlog], ["done", screen.done]];
     for (const [column, items] of columns) {
@@ -8811,6 +8947,13 @@ ${key.title}`.toLowerCase();
     dayColumn: (c, [date]) => c.reads.dayColumn(date),
     columnSections: (c, [column, date]) => c.reads.columnSections(column, date),
     placementOfDay: (c, [date]) => c.reads.placementOfDay(date),
+    columnView: (c, [screen, column]) => c.reads.columnView(screen, column),
+    placeOf: (c, [item]) => c.reads.placeOf(KEPT(c), item),
+    ridesNow: (c, [item, day]) => c.reads.ridesNow(item, day),
+    storedLine: (c, [item, text]) => c.reads.storedLine(item, text),
+    projectNodeNamed: (c, [name]) => c.hasTasks() ? c.reads.projectNodeNamed(KEPT(c), name) : { node: null, candidates: [] },
+    openTasks: (c, [filter]) => c.ask(c.reads.openTasksRead(filter)),
+    projectHistory: (c, [node]) => c.ask(c.reads.projectHistoryRead(node)),
     listName: (c, [list]) => c.reads.listName(list),
     placementTitle: (c, [placement]) => c.reads.placementTitle(placement),
     dayOfPlacement: (c, [placement]) => c.reads.dayOfPlacement(placement),
@@ -8982,6 +9125,11 @@ ${key.title}`.toLowerCase();
     step: (_c, [date, days]) => addDays(date, days),
     stepFunnel: (c, [from, shift]) => stepFunnel(from, shift, c.rules.today()),
     openAt: (c, [date]) => dayOpening(date, boundaryOf2(c), c.rules.today(), c.now, c.settings.scrollToHour),
+    week: (c, [which]) => weekOf(c.rules.today(), which === "next" ? "next" : "this"),
+    days: (_c, [from, count]) => daysFrom(from, count),
+    dayNamed: (c, [text]) => dayNamed(String(text), c.rules.today()),
+    weekday: (_c, [date]) => weekdayName(date),
+    side: (c, [date]) => daySide(date, c.rules.today()),
     /** Where a day begins: the hour it starts at. The `boundary.*` calls place by it. */
     boundary: (c) => ({ startHour: boundaryOf2(c).startHour })
   };
@@ -9244,6 +9392,7 @@ ${key.title}`.toLowerCase();
     allColumnsDividerAt,
     allColumnsWidthAt,
     repeatValue,
+    repeatSentence,
     onTheDay,
     canPick
   };

@@ -14,5 +14,5 @@
     "types": ["node"],
     "jsx": "react-jsx"
   },
-  "include": ["core/**/*.ts", "obsidian/**/*.ts", "obsidian/**/*.tsx", "tests/**/*.ts", "tests/**/*.tsx", "vitest.config.mts"]
+  "include": ["core/**/*.ts", "obsidian/**/*.ts", "obsidian/**/*.tsx", "agent/**/*.ts", "tests/**/*.ts", "tests/**/*.tsx", "vitest.config.mts"]
 }

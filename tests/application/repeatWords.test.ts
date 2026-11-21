@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RepeatRule } from "../../core/application/contracts";
-import { onTheDay, repeatRow, repeatValue } from "../../core/application/repeatWords";
+import { onTheDay, repeatRow, repeatSentence, repeatValue } from "../../core/application/repeatWords";
 
 const rule = (over: Partial<RepeatRule>): RepeatRule => ({ kind: "schedule", every: 1, unit: "day", days: [], dayOfMonth: null, from: null, ...over });
 
@@ -24,6 +24,15 @@ describe("repeatValue", () => {
 		expect(repeatValue(rule({ kind: "afterDone", every: 3, unit: "week" }))).toBe("Every 3 weeks after done");
 		expect(repeatValue(rule({ kind: "afterDone", unit: "day" }))).toBe("Every day after done");
 		expect(repeatValue(rule({ kind: "afterDone", every: 2, unit: "month" }))).toBe("Every 2 months after done");
+	});
+});
+
+describe("repeatSentence", () => {
+	it("is the row's value, and for weeks on a schedule their days in words", () => {
+		expect(repeatSentence(rule({ unit: "week", days: [0, 2] }))).toBe("Every week on Mon, Wed");
+		expect(repeatSentence(rule({ every: 3, unit: "week", days: [4], from: "2026-11-06" }))).toBe("Every 3 weeks on Fri");
+		expect(repeatSentence(rule({ every: 3, from: "2026-11-04" }))).toBe("Every 3 days");
+		expect(repeatSentence(rule({ kind: "afterDone", every: 3, unit: "day" }))).toBe("Every 3 days after done");
 	});
 });
 

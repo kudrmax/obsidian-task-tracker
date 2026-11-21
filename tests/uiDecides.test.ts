@@ -40,6 +40,7 @@ const DECISIONS: readonly { readonly name: string; readonly pattern: RegExp }[] 
 	{ name: "a task's section compared", pattern: /\.group\s*[!=]==|[!=]==\s*(?:\w+\.)*group\b(?!\s*\.)/g },
 	{ name: "whether a task's subtasks are folded", pattern: tested("collapsed") },
 	{ name: "whether a task has a due date", pattern: tested("dueDate", false) },
+	{ name: "a column's sections chained by hand (`TaskService.columnView` gives the list in them)", pattern: /\.columnSections\s*\(|\blistView\s*\((?![^;]*,\s*false\s*\))/g },
 	{ name: "a task's fields taken apart to decide", pattern: /\{[^}]*\b(?:list|status|priority|dueDate|isSubtask|open)\b[^}]*\}\s*=\s*(?:\w+\.)*(?:item|task)\b/g },
 ];
 
@@ -70,8 +71,16 @@ function hitsIn(text: string): string[] {
 		.flatMap((line, i) => DECISIONS.flatMap((d) => [...line.matchAll(d.pattern)].map(() => `${i + 1}: ${d.name}`)));
 }
 
+/**
+ * The frontends the tripwire watches: the Obsidian view, and the agents' program with its answers in the core
+ * (`core/application/agent/`), which only map the screens' reads into words (agent CLI spec, «The one rule»).
+ */
+const WATCHED = ["obsidian/ui", "agent", "core/application/agent"];
+const BUILT = ["agent/build.mjs", "agent/obsidian-task-calendar.mjs"];
+
 const HITS: Readonly<Record<string, string[]>> = Object.fromEntries(
-	files("obsidian/ui")
+	WATCHED.flatMap(files)
+		.filter((file) => !BUILT.includes(file))
 		.map((file) => [file, hitsIn(readFileSync(join(ROOT, file), "utf8"))] as const)
 		.filter(([, hits]) => hits.length > 0),
 );
@@ -93,6 +102,11 @@ describe("the UI decides nothing", () => {
 		expect(stale, "Lower these counts in BASELINE (delete a line at zero).").toEqual([]);
 	});
 
+	it("watches the program and its answers", () => {
+		const watched = WATCHED.flatMap(files);
+		expect(watched).toEqual(expect.arrayContaining(["agent/main.ts", "agent/compose.ts", "agent/nodePorts.ts", "core/application/agent/AgentReads.ts", "core/application/agent/agentWire.ts"]));
+	});
+
 	it("trips on the forms it watches and not on drawing", () => {
 		expect(hitsIn('if (item.list === "done") go();')).toEqual(["1: which list a task is in"]);
 		expect(hitsIn("const on = item.repeat !== null && item.repeatable;")).toHaveLength(1);
@@ -105,6 +119,9 @@ describe("the UI decides nothing", () => {
 		expect(hitsIn("if (date === this.today()) a(); if (this.deps.today() !== day) b();")).toEqual(["1: a day compared with today", "1: a day compared with today"]);
 		expect(hitsIn("this.select(this.today());")).toEqual([]);
 		expect(hitsIn("switch (item.status) {")).toEqual(["1: a task's status switched on"]);
+		expect(hitsIn('const shown = tasks.columnSections("day", date);')).toHaveLength(1);
+		expect(hitsIn("listView(items, this.deps.grouped?.() ?? false, this.deps.sections?.() ?? []);")).toHaveLength(1);
+		expect(hitsIn("list: () => listView(host.ribbon.done(), false),")).toEqual([]);
 		expect(hitsIn("if (LISTS.includes(item.list)) go();")).toEqual(["1: whether a task's list is one of these"]);
 		expect(hitsIn("if (!item.open) go(); if (!this.panel.open) stay();")).toEqual(["1: whether a task is closed"]);
 		expect(hitsIn("const { list, status } = item;")).toEqual(["1: a task's fields taken apart to decide"]);

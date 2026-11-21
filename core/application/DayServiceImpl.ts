@@ -3,7 +3,8 @@ import { type DayRelation, dayRelation } from "../domain/Days";
 import { addDays } from "../domain/LocalDate";
 import { type FunnelAt, stepFunnel } from "./screenPlaces";
 import type { LocalDate } from "../domain/Task";
-import type { DayChange, DayOpening, DayService, TaskService } from "./contracts";
+import type { DayChange, DayOpening, DayService, DaySide, TaskService } from "./contracts";
+import { daySide, dayNamed, daysFrom, weekdayName, weekOf } from "./dayWords";
 import { boundaryOf } from "./documentText";
 import type { Clock, SettingsStore, Ticker } from "./ports";
 
@@ -56,6 +57,26 @@ export class DayServiceImpl implements DayService {
 
 	openAt(date: LocalDate): DayOpening {
 		return dayOpening(date, this.boundary(), this.today(), this.clock.now(), this.settings.get().scrollToHour);
+	}
+
+	week(which: "this" | "next"): readonly LocalDate[] {
+		return weekOf(this.today(), which);
+	}
+
+	days(from: LocalDate, count: number): readonly LocalDate[] {
+		return daysFrom(from, count);
+	}
+
+	dayNamed(text: string): LocalDate | null {
+		return dayNamed(text, this.today());
+	}
+
+	weekday(date: LocalDate): string {
+		return weekdayName(date);
+	}
+
+	side(date: LocalDate): DaySide {
+		return daySide(date, this.today());
 	}
 
 	onDayChange(listener: Listener, ready: () => boolean = () => true): () => void {
