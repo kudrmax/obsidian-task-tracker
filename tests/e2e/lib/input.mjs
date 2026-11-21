@@ -33,25 +33,26 @@ export class Input {
 		await this.cdp.send("Input.dispatchMouseEvent", { type: "mouseReleased", x: to.x, y: to.y, button: "left", buttons: 0, clickCount: 1 });
 	}
 
-	wheel(x, y, dx, dy, ctrl = false) {
-		return this.cdp.send("Input.dispatchMouseEvent", { type: "mouseWheel", x, y, deltaX: dx, deltaY: dy, modifiers: ctrl ? 2 : 0 });
+	/** A wheel event; `at` (ms since the epoch): the moment the OS stamped it, as CDP's `timestamp` carries it to the page's `timeStamp`. */
+	wheel(x, y, dx, dy, ctrl = false, at = null) {
+		return this.cdp.send("Input.dispatchMouseEvent", { type: "mouseWheel", x, y, deltaX: dx, deltaY: dy, modifiers: ctrl ? 2 : 0, ...(at === null ? {} : { timestamp: at / 1000 }) });
 	}
 
 	/**
 	 * A two-finger trackpad swipe at (x, y): the fingers' push, rising deltas every 8 ms, then (unless `tail` is 0) the
 	 * momentum tail decaying by `decay` an event until it is under a pixel. `dir` 1 swipes on (the content moves left), -1 back.
+	 * Each event carries the moment macOS would stamp it, `stepMs` after the one before, as a real gesture's do: this loop
+	 * falling behind under load delays its events, as a busy page does, and never turns the gesture into another one.
 	 */
 	async stroke(x, y, dir, { push = [2, 8, 20, 40, 54, 60], tail = 1, decay = 0.035, stepMs = 8 } = {}) {
-		for (const d of push) {
-			void this.wheel(x, y, dir * d, 0);
-			await sleep(stepMs);
-		}
-		if (!tail) return;
-		let d = push[push.length - 1] * tail;
-		while (d >= 1) {
-			d *= 1 - decay;
-			void this.wheel(x, y, dir * d, 0);
-			await sleep(stepMs);
+		const deltas = [...push];
+		if (tail) for (let d = push[push.length - 1] * tail; d >= 1; ) deltas.push((d *= 1 - decay));
+		const start = Date.now();
+		for (const [i, d] of deltas.entries()) {
+			const at = start + i * stepMs;
+			const ahead = at - Date.now();
+			if (ahead > 0) await sleep(ahead);
+			void this.wheel(x, y, dir * d, 0, false, at);
 		}
 	}
 
