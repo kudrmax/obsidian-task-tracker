@@ -39,7 +39,7 @@ export interface FieldFacts {
 	readonly maySection: boolean;
 }
 
-export type Offer = "shown" | "disabled" | "hidden";
+type Offer = "shown" | "disabled" | "hidden";
 
 /** An action's answer in one task's menu: whether it is offered, whether it asks first, the status it writes, the day it writes (days from today). */
 export interface MenuAnswer {
@@ -59,7 +59,7 @@ export interface TableRow<Id, Group, Fact, Answer> {
 	readonly answers: Readonly<Record<string, Answer>>;
 }
 
-export interface SurfaceTable<Id, Group, Fact, Answer> {
+interface SurfaceTable<Id, Group, Fact, Answer> {
 	readonly groups: readonly Group[];
 	/** Groups drawn even when they offer nothing: one task's menu's copy. */
 	readonly kept: readonly Group[];

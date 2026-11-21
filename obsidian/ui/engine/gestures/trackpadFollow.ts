@@ -26,7 +26,7 @@ export interface TrackpadTuning {
 	readonly clockMs: number;
 }
 
-export const TRACKPAD: TrackpadTuning = { cutPx: 3, earlyMs: 30, clockMs: 0.25 };
+const TRACKPAD: TrackpadTuning = { cutPx: 3, earlyMs: 30, clockMs: 0.25 };
 
 /** The trackpad's own pace, one event every 8.3 ms: the shortest stretch a speed is read over. */
 const EVENT_MS = 1000 / 120;

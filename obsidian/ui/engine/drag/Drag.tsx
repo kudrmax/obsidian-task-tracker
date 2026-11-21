@@ -3,8 +3,10 @@ import { arrayMove, SortableContext, type SortingStrategy, useSortable } from "@
 import { CSS, getEventCoordinates } from "@dnd-kit/utilities";
 import { type CSSProperties, memo, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { ROW_PX } from "../layout/columns";
 import type { Destination, ListId, Row } from "../port";
 import { secondaryClick, useAnchor } from "../layers/Layers";
+import { cssEase, FLY } from "../layers/motion";
 import { useScreen, useScreenApi } from "../store";
 import { EdgeHeading } from "./edgeHeading";
 import { descendantsOf, finalOrder, levelAt, levelBetween, spotKey, shiftOf, type Slot, slotOf, SwipeLevel } from "./tree";
@@ -33,7 +35,7 @@ const onPlus = (event: Event): boolean => (event.target as Element | null)?.clos
  * it at that minute, it follows the finger by the snap step, and let go the new task's field opens where it stands. A press on
  * something of its own there (a block, an event, a dot, a field) is that thing's.
  */
-export const NEW_SLOT = "new-slot";
+const NEW_SLOT = "new-slot";
 const ownPress = (event: Event, context: SensorContext | undefined): boolean => context?.active.id === NEW_SLOT && (event.target as Element | null)?.closest?.("[data-own-press]") != null;
 /** What dnd-kit tells a sensor's activator besides the event: the draggable it would lift. */
 type SensorContext = { readonly active: { readonly id: UniqueIdentifier } };
@@ -137,8 +139,8 @@ const HOLD_ANYWHERE = Number.POSITIVE_INFINITY;
  * itself and nothing changes when it goes: dnd-kit's documented drop side effects; the card under it stays hidden meanwhile.
  */
 const DROP_ANIMATION: DropAnimation = {
-	duration: 180,
-	easing: "cubic-bezier(0.2, 0, 0, 1)",
+	duration: FLY.ms,
+	easing: cssEase(FLY.ease),
 	sideEffects: defaultDropAnimationSideEffects({ className: { dragOverlay: "is-dropping" }, styles: { active: { opacity: "0" } } }),
 };
 
@@ -606,7 +608,7 @@ const MEASURING: MeasuringConfiguration = {
 const AUTO_SCROLL = { threshold: { x: 0, y: 0.15 } };
 
 /** The calendar's blocks as dnd-kit's container: a carried block stands among them, and a card carried onto it joins them. */
-export const CALENDAR = "calendar";
+const CALENDAR = "calendar";
 /** The calendar's drop target: its canvas of hours, inside the room it scrolls in, so dnd-kit's auto-scroll scrolls that room. */
 const CALENDAR_TARGET = "calendar:";
 /** The room the calendar scrolls in, a droppable only for dnd-kit to measure it: it stands still on the screen while its hours scroll. */
@@ -739,9 +741,6 @@ export function CarriedPlus({ onTap, children, ring, hidden = false }: { readonl
 	);
 }
 
-/** A row counts as this tall while it is not mounted (a card and its gap at the default size). */
-const ROW_ESTIMATE_PX = 37;
-
 /**
  * dnd-kit's sorting strategy for a list, as its strategies are written (`SortingStrategy`): each row moves to where the
  * list's final order puts it once the carried card is let go where it stands (`finalOrder`), the rows in flow one under
@@ -761,7 +760,7 @@ function finalOrderStrategy(ids: readonly string[]): SortingStrategy {
 		const id = ids[index];
 		const heightOf = (other: string) => {
 			const at = ids.indexOf(other);
-			return rects[at]?.height ?? (at === activeIndex ? activeNodeRect?.height : undefined) ?? ROW_ESTIMATE_PX;
+			return rects[at]?.height ?? (at === activeIndex ? activeNodeRect?.height : undefined) ?? ROW_PX;
 		};
 		const y = shiftOf(id, ids, final, heightOf);
 		return y === 0 ? null : { x: 0, y, scaleX: 1, scaleY: 1 };

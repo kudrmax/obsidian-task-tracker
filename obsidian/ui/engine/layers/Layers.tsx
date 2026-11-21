@@ -78,6 +78,8 @@ export interface MenuLayerProps {
 	readonly keepWidth?: boolean;
 	/** The block stands higher than what was pressed, or right over it: what is pinned on the pressed thing goes or stays. */
 	readonly onLift?: (lifted: boolean) => void;
+	/** The menu closed has faded out, or was taken off before it had: what was tapped in it may happen now (F132). */
+	readonly onGone?: () => void;
 }
 
 
@@ -98,7 +100,7 @@ const motionClass = (status: string, ready: boolean) => (status === "open" && re
  * goes back down into the task. Another page grows or shrinks the panel in place (`scrollWithin`). The parts open and
  * close together (Floating UI's transition status keeps them mounted while they fade, `LAYER_MS`).
  */
-export function MenuLayer({ open, onClose, escapes = true, root, reference, label, over, groups, panelClass, page, shape, keepWidth = false, onLift }: MenuLayerProps) {
+export function MenuLayer({ open, onClose, escapes = true, root, reference, label, over, groups, panelClass, page, shape, keepWidth = false, onLift, onGone }: MenuLayerProps) {
 	const parts = useRef<{ upper: HTMLElement | null; lower: HTMLElement | null }>({ upper: null, lower: null });
 	/** The window less the phone's safe areas (`env(safe-area-inset-*)`, the plugin's `menuRoom`): every part stays inside it. */
 	const safe = useRef<HTMLElement | null>(null);
@@ -138,6 +140,12 @@ export function MenuLayer({ open, onClose, escapes = true, root, reference, labe
 		if (page !== firstPage.current && lower && !lower.contains(lower.ownerDocument.activeElement)) lower.focus({ preventScroll: true });
 	}, [page]);
 	const { isMounted, status } = useTransitionStatus(block.context, { duration: { open: LAYER_MS.open, close: LAYER_MS.close } });
+	const gone = useRef(onGone);
+	gone.current = onGone;
+	useEffect(() => {
+		if (!isMounted) gone.current?.();
+	}, [isMounted]);
+	useEffect(() => () => gone.current?.(), []);
 	const shownOnce = useRef(false);
 	/** Closed by the click, not the press: the finger's tap ends on the backdrop, never on a card under the fading menu. */
 	const dismiss = useDismiss(block.context, { escapeKey: escapes, outsidePressEvent: "click", outsidePress: (event) => !(event.target instanceof Element && (block.refs.floating.current?.contains(event.target) || event.target.closest(".tc-quick-bar, .tc-quick-panel"))) });

@@ -141,6 +141,7 @@ export const TaskMenu = memo(function TaskMenu() {
 			open={layer !== null}
 			onClose={() => api.getState().closeLayer()}
 			onLift={api.getState().liftMenu}
+			onGone={api.getState().layerGone}
 			escapes={typing === null}
 			root={layerRoot}
 			reference={shown.reference}

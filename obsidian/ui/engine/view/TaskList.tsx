@@ -4,14 +4,13 @@ import { PROPERTY } from "../../design";
 import { PLUS, SortableList, SortableRow, useListTarget } from "../drag/Drag";
 import { descendantsOf } from "../drag/tree";
 import { useAnchor } from "../layers/Layers";
+import { ROW_PX } from "../layout/columns";
 import type { EntryField as Field, ListId, Row } from "../port";
 import { DayContext, useData, useScreen, useScreenApi } from "../store";
 import { Card, PressedLook } from "./Card";
 import { MovingRow, MovingRows } from "./MovingRow";
 import { EntryField } from "./QuickAdd";
 
-/** A row counts as this tall until it is drawn and measured (a card and its gap at the default size). */
-const ESTIMATE_PX = 37;
 /** Rows drawn past each edge of the list's room. */
 const OVERSCAN = 6;
 
@@ -93,7 +92,7 @@ const ContextList = memo(function ContextList({ list, context }: { readonly list
 		rangeExtractor,
 		count: drawn.length,
 		getScrollElement: () => scroller,
-		estimateSize: useCallback(() => ESTIMATE_PX, []),
+		estimateSize: useCallback(() => ROW_PX, []),
 		getItemKey: useCallback((i: number) => drawn[i]?.id ?? i, [drawn]),
 		overscan: OVERSCAN,
 	});

@@ -30,7 +30,7 @@ export interface DayTurn {
 	readonly in: DayLookValues;
 }
 
-export interface DayLookValues {
+interface DayLookValues {
 	readonly x: MotionValue<number>;
 	readonly opacity: MotionValue<number>;
 }

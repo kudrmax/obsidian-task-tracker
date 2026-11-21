@@ -48,7 +48,7 @@ export const EntryField = memo(function EntryField({ depth, className = "" }: { 
 	const api = useScreenApi();
 	const { setField } = useField();
 	/** The field takes the colour of the level set on the bar or typed as a prefix (the port's `tint`). */
-	const tint = useScreen((s) => (s.entry ? s.entryBar(s.entry, s.draft, s.entryText).tint : null));
+	const tint = useScreen((s) => s.bar?.tint ?? null);
 	const renaming = useScreen((s) => s.entry?.renaming ?? null);
 	const inProgress = useScreen((s) => (renaming ? (s.shown.cards[renaming]?.inProgress ?? false) : false));
 	const describing = useScreen((s) => s.draft.descriptionLine !== null);

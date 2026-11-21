@@ -1,12 +1,23 @@
+import { DESIGN } from "../../design";
 import type { ListId } from "../port";
-import { type Screen, STOPS, type Stop } from "../store";
+import type { Screen } from "../store";
+
+/** Where the ribbon stands: Inbox–Soon, Soon–the day, the day–its calendar. */
+export type Stop = "inbox" | "soon" | "calendar";
+const STOPS: readonly Stop[] = ["inbox", "soon", "calendar"];
+
+/** Where a screen is mounted: Obsidian's leaf (the main screen, a pop-out) or a note's block. */
+export type Place = "leaf" | "note";
+
+/** A row counts as this tall until it is drawn and measured, by the virtualizer and the drag alike: a card and its gap at the default size. */
+export const ROW_PX = DESIGN.cardHeight + DESIGN.cardGap;
 
 /** The strip of columns the ribbon slides, left to right. */
 export type Column = ListId | "timeline";
-export const STRIP: readonly Column[] = ["inbox", "soon", "day", "timeline"];
+const STRIP: readonly Column[] = ["inbox", "soon", "day", "timeline"];
 
 /** The ribbon's window shows two columns side by side. */
-export const SHOWN = 2;
+const SHOWN = 2;
 
 /** The strip's width, in percent of the ribbon's window, and each column's, in percent of the strip. */
 export const STRIP_WIDTH = (STRIP.length / SHOWN) * 100;
@@ -16,6 +27,22 @@ export const COLUMN_SHARE = 100 / STRIP.length;
 export function shownAt(stop: Stop): readonly [Column, Column] {
 	const at = stop === "inbox" ? 0 : stop === "soon" ? 1 : 2;
 	return [STRIP[at], STRIP[at + 1]];
+}
+
+/** What each stop shows (the one place it is said): the lists a screen mounted at `place` shows at `stop`; a note's block shows its Inbox alone. */
+export function columnsOf(place: Place, stop: Stop): readonly ListId[] {
+	return place === "note" ? ["inbox"] : shownAt(stop).filter((column): column is ListId => column !== "timeline");
+}
+
+/** The lists a screen mounted at `place` can bring into sight: the ribbon turns to any; a note's block shows its Inbox. */
+export function reachOf(place: Place): readonly ListId[] {
+	return [...new Set(STOPS.flatMap((stop) => columnsOf(place, stop)))];
+}
+
+/** The stop that brings `list` into sight from `stop`: the same while it shows it, else the last of the lists' own stops (Inbox–Soon, Soon–day) that does. */
+export function stopShowing(stop: Stop, list: ListId): Stop {
+	if (columnsOf("leaf", stop).includes(list)) return stop;
+	return [...STOPS].reverse().find((other) => other !== "calendar" && columnsOf("leaf", other).includes(list)) ?? stop;
 }
 
 /** How far the strip stands from its start at a stop, in columns: where the ribbon's gestures take it. */

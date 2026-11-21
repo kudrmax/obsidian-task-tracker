@@ -2,6 +2,7 @@ import { type App, Component, Notice, FileSystemAdapter, ItemView, MarkdownRende
 import { MacTrackpadFingers } from "../infrastructure/trackpad/MacTrackpadFingers";
 import { TRACKPAD_MODULE } from "../infrastructure/trackpad/module";
 import { KEYS, takesKeys } from "../ui/engine/keys";
+import type { Place } from "../ui/engine/layout/Layout";
 import { type MountedScreen, mountScreen } from "../ui/engine/mount";
 import type { Stop } from "../ui/engine/store";
 import { detectHaptics, type HapticsHost } from "../ui/haptics";
@@ -79,14 +80,12 @@ class StandView extends ItemView {
 		this.unmount();
 		this.contentEl.empty();
 		this.contentEl.addClass("tc-view");
-		this.screen = mountScreen(this.contentEl, { port: this.stand.port, place: "leaf", app: this.app, sourcePath: "", haptics: haptics(), zoom: this.stand.zoom(), listShare: this.stand.listShare(), markdown: markdownOf(this.app), desk: !Platform.isMobile, notice: (text) => new Notice(text), fingers: this.stand.fingers });
+		this.screen = this.stand.mount(this.contentEl, "leaf", "");
 		this.screen.store.getState().setStop(this.stand.step.stop);
-		this.stand.screens.add(this.screen);
 	}
 
 	private unmount(): void {
-		if (this.screen) this.stand.screens.delete(this.screen);
-		this.screen?.unmount();
+		this.stand.unmount(this.screen);
 		this.screen = null;
 	}
 }
@@ -105,13 +104,11 @@ class StandBlock extends MarkdownRenderChild {
 
 	override onload(): void {
 		this.containerEl.addClass("tc-stand-block");
-		this.screen = mountScreen(this.containerEl, { port: this.stand.port, place: "note", app: this.stand.app, sourcePath: this.path, haptics: haptics(), zoom: this.stand.zoom(), listShare: this.stand.listShare(), markdown: markdownOf(this.stand.app), desk: !Platform.isMobile, notice: (text) => new Notice(text), fingers: this.stand.fingers });
-		this.stand.screens.add(this.screen);
+		this.screen = this.stand.mount(this.containerEl, "note", this.path);
 	}
 
 	override onunload(): void {
-		if (this.screen) this.stand.screens.delete(this.screen);
-		this.screen?.unmount();
+		this.stand.unmount(this.screen);
 		this.screen = null;
 	}
 }
@@ -157,6 +154,20 @@ export default class TaskCalendarStand extends Plugin {
 			() => this.app.loadLocalStorage(LIST_SHARE_KEY),
 			(value) => this.app.saveLocalStorage(LIST_SHARE_KEY, value),
 		);
+	}
+
+	/** The engine's screen mounted at `place` in `el`, over the stand's port, counted among the open screens. */
+	mount(el: HTMLElement, place: Place, sourcePath: string): MountedScreen {
+		const screen = mountScreen(el, { port: this.port, place, app: this.app, sourcePath, haptics: haptics(), zoom: this.zoom(), listShare: this.listShare(), markdown: markdownOf(this.app), desk: !Platform.isMobile, notice: (text) => new Notice(text), fingers: this.fingers });
+		this.screens.add(screen);
+		return screen;
+	}
+
+	/** A screen the stand mounted, taken off and no longer counted. */
+	unmount(screen: MountedScreen | null): void {
+		if (!screen) return;
+		this.screens.delete(screen);
+		screen.unmount();
 	}
 
 	/** Shows `step` in every open leaf, with its tasks. */

@@ -1,6 +1,6 @@
 import { AnimatePresence, motion, useIsPresent } from "motion/react";
 import { type CSSProperties, type ForwardedRef, forwardRef, type ReactNode, useCallback, useRef } from "react";
-import { EASE_OUT, LAYER_MS } from "../layers/motion";
+import { EASE_OUT, GLIDE, LAYER_MS } from "../layers/motion";
 
 /**
  * Rows that move (spec, «The owners»; principle 3): a row glides to its new place whatever moved it, a drag, a command,
@@ -95,8 +95,6 @@ export interface MovingRowProps {
 	readonly children: ReactNode;
 }
 
-/** Every row that changes place glides there the same way (stage 0's spring). */
-const GLIDE = { type: "spring", stiffness: 520, damping: 42, mass: 0.9 } as const;
 const COME_IN = { opacity: 0, scale: 0.96 };
 const FADED = { opacity: 0 };
 const SHOWN = { opacity: 1, scale: 1 };
