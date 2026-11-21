@@ -1,7 +1,8 @@
-import { type StoredLine, type ColumnList, type ColumnSource, listView, type PlacedTask, type ProjectNodeMatch, type ProjectsSection, type TaskPlace, type ColumnSections, DESCRIPTION_TEMPLATE, type DropColumn, type DaySpan, type DayView, type DraftMarks, type ResizeEdge, type StretchSpan, type CreatedTask, type DroppedTask, type DropFrom, type DropLanding, type DropOrigin, type DropPreview, type DropTo, type EndList, type FullTree, type GroupedList, type ListSection, type NewTaskPlace, type Placement, type RepeatRule, type ScreenView, type SearchGroup, type SectionKey, type SectionOffer, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type TaskMenuModel, type TaskMenuActionId, type BulkActionId, type TaskService, type MenuFrom, type MenuScreen, type MenuStatusId, type PickedTask, type ProjectsView, type ProjectsDropPreview, type FunnelView, type ViewChoice } from "../../core/application/contracts";
+import { type StoredLine, type ColumnList, type ColumnSource, listView, type PlacedTask, type ProjectNodeMatch, type ProjectsSection, type TaskPlace, type ColumnSections, DESCRIPTION_TEMPLATE, type DropColumn, type DaySpan, type DayView, type DraftMarks, type ResizeEdge, type StretchSpan, type CreatedTask, type DroppedTask, type DropFrom, type DropLanding, type DropOrigin, type DropPreview, type DropTo, type EndList, type FullTree, type GroupedList, type ListSection, type NewTaskPlace, type Placement, type RepeatRule, type ScreenView, type SearchGroup, type SectionKey, type SectionOffer, StaleTaskError, type TaskDraft, type TaskItem, type TaskKey, type TaskMenuModel, type TaskMenuActionId, type BulkActionId, type TaskService, type MenuFrom, type MenuScreen, type MenuStatusId, type PickedTask, type ProjectsView, type ProjectsDropPreview, type FunnelView, type ViewChoice, type ScreenReader } from "../../core/application/contracts";
 import { bulkMenuOf, carriedWith, menuOffer, oneTaskMenu, tileStatus, toggledPriority } from "../../core/application/menus";
 import type { Clock } from "../../core/application/ports";
-import { dropMoves, readDrop } from "../../core/application/drops";
+import { dropMoves, placesInGap, readDrop, takesDrop } from "../../core/application/drops";
+import { originOf } from "../../core/application/projectsLift";
 import { snapMinute } from "../../core/application/snapGrid";
 import { dayMonth } from "../../core/application/dayLabels";
 import { keyId } from "../../core/application/taskKeys";
@@ -816,6 +817,24 @@ export class DemoTaskService implements TaskService {
 	/** The demo keeps no file to try a drop over: each task lands away, where the screen finds it after the drop. */
 	async landing(tasks: readonly DroppedTask[]): Promise<readonly DropLanding[]> {
 		return tasks.map((t) => ({ kind: "away", id: keyId(t.key), item: null }));
+	}
+
+	async takes(origins: readonly DropOrigin[], to: DropTo): Promise<boolean> {
+		return takesDrop(origins, to, (parent) => originOf(this.item(parent.section, parent.index)));
+	}
+
+	opensGaps(origins: readonly DropOrigin[], column: DropColumn, day: LocalDate): boolean {
+		const grouped = this.columnSections(column, day) !== null;
+		return origins.every((from) => placesInGap(column, from, grouped));
+	}
+
+	resizedSlot(item: TaskItem, day: LocalDate, edge: ResizeEdge, minute: number, minDurationMin: number): Slot | null {
+		return this.timeline().resized({ slot: item.slot!, open: item.open }, day, edge, minute, minDurationMin);
+	}
+
+	/** The demo keeps no file to hold a read of: a screen over it reads through `screen`. */
+	async reader(): Promise<ScreenReader> {
+		throw new Error("The demo has no tasks file to hold a read of");
 	}
 
 	/** The demo keeps no file to try a drop over: its tasks land away, and the screen is the one it shows now. */

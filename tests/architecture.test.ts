@@ -377,6 +377,8 @@ const CONTRACT_RUNTIME: Readonly<Record<string, string>> = {
 	REPEAT_WORDS: "./repeatWords",
 	dayMonth: "./dayLabels",
 	canPick: "./menus",
+	listCardMenuFrom: "./menus",
+	originOf: "./projectsLift",
 };
 
 /**
