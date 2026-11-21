@@ -4,15 +4,8 @@ import type { Destination, EntryBar, EntryCommit, EntryDraft, EntryField, ListId
 import { ListCards } from "./ListCards";
 import type { ScreenDrawing } from "./ScreenDrawing";
 
-const DAY_MS = 86_400_000;
 const NO_DRAFT: EntryDraft = { level: null, projects: [], descriptionLine: null, section: false };
 const ENTRY_LISTS: readonly ListId[] = ["day", "soon", "inbox"];
-
-/** A day as a count of days from today: the engine names days so. */
-function offsetBetween(today: LocalDate, date: LocalDate): number {
-	const at = (d: LocalDate) => Date.UTC(Number(d.slice(0, 4)), Number(d.slice(5, 7)) - 1, Number(d.slice(8, 10)));
-	return Math.round((at(date) - at(today)) / DAY_MS);
-}
 
 /** The writes a session only asked where a field opens queues: none, it writes nothing. */
 const NO_WRITES: WriteLine = { push: () => undefined, idle: () => Promise.resolve() };
@@ -105,7 +98,7 @@ export class CoreEntry {
 		const move = this.session.choosePlace(this.placementOf(choice, date));
 		if (!move) return field;
 		const home = { ...field.at, backlog: undefined, away: undefined };
-		const dayOffset = move.day === null ? field.at.dayOffset : offsetBetween(this.core.days.today(), move.day);
+		const dayOffset = move.day === null ? field.at.dayOffset : this.core.days.offset(this.core.days.today(), move.day);
 		this.look.date = this.dateOf(dayOffset);
 		const moved = move.column === "backlog" ? { ...field, at: { ...home, backlog: true } } : this.landed(field, home, dayOffset, reach);
 		this.field = moved;

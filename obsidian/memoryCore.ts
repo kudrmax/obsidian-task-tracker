@@ -104,6 +104,7 @@ export interface MemoryCore {
 	readonly core: Core;
 	readonly file: MemoryTasksFile;
 	readonly events: MemoryEvents;
+	readonly settings: SettingsStore;
 	readonly clock: Clock;
 }
 
@@ -114,9 +115,10 @@ export interface MemoryCore {
 export function memoryCore(text: string, clock: Clock, settings: Partial<TaskCalendarSettings> = {}, events: readonly CalendarEvent[] = [], projectsScreen?: ProjectsScreenStore): MemoryCore {
 	const file = new MemoryTasksFile(text);
 	const calendar = new MemoryEvents(events, clock);
+	const store = new MemorySettings({ ...DEFAULT_SETTINGS, ...settings });
 	const core = composeCore({
 		tasksFile: file,
-		settings: new MemorySettings({ ...DEFAULT_SETTINGS, ...settings }),
+		settings: store,
 		clock,
 		ticker: { every: (ms, tick) => {
 			const id = setInterval(tick, ms);
@@ -129,5 +131,5 @@ export function memoryCore(text: string, clock: Clock, settings: Partial<TaskCal
 		isPhone: () => false,
 		...(projectsScreen && { projectsScreen }),
 	});
-	return { core, file, events: calendar, clock };
+	return { core, file, events: calendar, settings: store, clock };
 }

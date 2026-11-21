@@ -1,4 +1,4 @@
-import { type CalendarService, type Clock, type DayEvents, type DayService, type DropColumn, type DroppedTask, type DropTo, type LocalDate, listCardMenuFrom, type MenuFrom as CoreMenuFrom, originOf, type ScreenReader, type TaskItem, type TaskService } from "../../core/application/contracts";
+import { type CalendarService, type Clock, type DayEvents, type DayService, type DropColumn, type DroppedTask, type DropTo, type LocalDate, listCardMenuFrom, type MenuFrom as CoreMenuFrom, originOf, type ScreenReader, type ShownChange, type TaskItem, type TaskService } from "../../core/application/contracts";
 import type { Destination, Edge, EntryBar, EntryCommit, EntryDraft, EntryField, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, RenameStart, ScreenData, ScreenPort } from "../ui/engine/port";
 import { CoreEntry } from "./CoreEntry";
 import { ListCards } from "./ListCards";
@@ -50,7 +50,7 @@ export class CorePort implements ScreenPort {
 	) {
 		this.drawing = new ScreenDrawing(core.tasks, core.days, core.calendars);
 		this.entry = new CoreEntry(core, this.drawing, () => this.reader, () => this.refresh(), core.onError);
-		this.offs = [core.tasks.onChange(() => void this.refresh()), core.days.onDayChange(() => void this.refresh()), core.calendars.onChange(() => this.forgetEvents())];
+		this.offs = [core.tasks.onChange(() => void this.refresh()), core.tasks.onShownChange((change) => this.settingsChanged(change)), core.days.onDayChange(() => void this.refresh()), core.calendars.onChange(() => this.forgetEvents())];
 	}
 
 	/** The port over `core`, once the file is read. */
@@ -261,6 +261,12 @@ export class CorePort implements ScreenPort {
 			if (found) return found;
 		}
 		return null;
+	}
+
+	/** A setting the screen shows changed: the tasks are read anew by `onChange`; what is drawn straight from the settings is drawn anew here, the calendars' events fetched anew. */
+	private settingsChanged(change: ShownChange): void {
+		if (change.calendars) this.forgetEvents();
+		if (change.drawn || change.cards || change.timeline || change.gestures) void this.refresh();
 	}
 
 	private forgetEvents(): void {
