@@ -141,7 +141,7 @@ showPriorityColors([]);
 const leaf = document.createElement("div");
 leaf.className = "workspace-leaf-content";
 document.body.appendChild(leaf);
-void (params.get("port") === "core" ? coreSource() : Promise.resolve(mockSource())).then((source) => {
+void (params.get("port") === "core" ? coreSource((error) => console.error("write failed", error)) : Promise.resolve(mockSource())).then((source) => {
 	const stand = new StandPage(leaf, source);
 	window.addEventListener("keydown", stand.onKey);
 	(window as unknown as { __tcStand: ReturnType<StandPage["api"]> }).__tcStand = stand.api();

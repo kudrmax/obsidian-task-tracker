@@ -1,4 +1,4 @@
-import { bgAlphaFor, cardDue, type CalendarEvent, type CalendarService, type ColumnList, type DayEvents, type DayService, dayTitle, dueLabel, durationParts, eventColors, eventHex, type LocalDate, type ScreenView, type TaskItem, type TaskService, timeParts } from "../../core/application/contracts";
+import { bgAlphaFor, cardDue, type CalendarEvent, type CalendarService, type ColumnList, type DayEvents, type DayService, dayTitle, type DropColumn, dueLabel, durationParts, eventColors, eventHex, type LocalDate, type ScreenView, type TaskItem, type TaskService, timeParts } from "../../core/application/contracts";
 import type { AllDayEvent, Block, CardFace, DayEvent, EventPaint, ListData, ListId, Row, ScreenData } from "../ui/engine/port";
 
 /** What a screen of `date` is drawn from: the core's screen, its lists as `columnView` reads them, and the day's events. */
@@ -25,9 +25,13 @@ export class ScreenDrawing {
 		private readonly calendars: CalendarService,
 	) {}
 
+	/** A column of `screen` as it draws: the one way a list is read here (`TaskService.columnView`). */
+	column(screen: ScreenView, column: DropColumn): ColumnList {
+		return this.tasks.columnView(screen, column);
+	}
+
 	listsOf(screen: ScreenView): Readonly<Record<ListId, ColumnList>> {
-		const read = (id: ListId) => this.tasks.columnView(screen, LIST_COLUMNS[id]);
-		return { inbox: read("inbox"), soon: read("soon"), day: read("day") };
+		return { inbox: this.column(screen, LIST_COLUMNS.inbox), soon: this.column(screen, LIST_COLUMNS.soon), day: this.column(screen, LIST_COLUMNS.day) };
 	}
 
 	draw(source: ScreenSource): ScreenData {
@@ -53,7 +57,7 @@ export class ScreenDrawing {
 		};
 	}
 
-	dayTitle(date: LocalDate): string {
+	private dayTitle(date: LocalDate): string {
 		return dayTitle(date, this.days.relation(date), this.days.today());
 	}
 

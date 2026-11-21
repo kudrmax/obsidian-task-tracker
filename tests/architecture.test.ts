@@ -26,6 +26,8 @@ const ADAPTERS = "obsidian/adapters/";
 const MEMORY_CORE = "obsidian/memoryCore.ts";
 /** The engine's port, the one file of the engine the adapters see. */
 const ENGINE_PORT = "obsidian/ui/engine/port.ts";
+/** The plugin's one write queue (`WriteQueue`), which the quick entry's writes go through on every screen: no second queue. */
+const WRITE_QUEUE = "obsidian/ui/quick/WriteQueue.ts";
 
 /** The agents' program (`agent/`): its composition over Node's files, as `obsidian/compose.ts` is the plugin's. */
 const AGENT_ROOT = ["agent/compose.ts", "agent/nodePorts.ts"];
@@ -65,8 +67,8 @@ const MAY_IMPORT: Readonly<Record<Layer, (target: string) => boolean>> = {
 	agentMain: (t) => t === "core/application/contracts.ts",
 	settings: (t) => under(t, "domain"),
 	root: (t) => !under(t, "stand"),
-	/** `CorePort`: the contract and the engine's port, nothing else of the core or the engine. */
-	adapters: (t) => t.startsWith(ADAPTERS) || t === "core/application/contracts.ts" || t === ENGINE_PORT,
+	/** `CorePort`: the contract, the engine's port and the plugin's write queue; nothing else of the core, the engine or the old screen. */
+	adapters: (t) => t.startsWith(ADAPTERS) || t === "core/application/contracts.ts" || t === ENGINE_PORT || t === WRITE_QUEUE,
 	/**
 	 * The stand (`obsidian/stand`, docs/superpowers/specs/2026-11-18-ui-engine.md): the engine over `MockPort`, never the core;
 	 * nothing imports it. Of the infrastructure only the trackpad's native module, as the plugin gets it (Decision 126).

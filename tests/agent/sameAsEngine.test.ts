@@ -16,7 +16,9 @@ type WiredSection = { readonly tasks: readonly Wired[] };
 
 async function engineScreen() {
 	const { core, clock } = memoryCore(TASKS, { now: () => NOW }, settingsFrom(JSON.parse(SETTINGS)));
-	const port = await CorePort.open({ ...core, clock });
+	const port = await CorePort.open({ ...core, clock, onError: (error) => {
+		throw error;
+	} });
 	const reader = await core.tasks.reader(null);
 	const refOfId = (id: string) => refOf(reader.item(id)!.key);
 	return { port, refOfId };

@@ -18,10 +18,12 @@ interface Case {
 	readonly name: string;
 	readonly text: string;
 	readonly now: Date;
+	/** Written by the stand, not by the core: the core's own tidy text of it is the file compared byte for byte. */
+	readonly tidy?: boolean;
 }
 
 const CASES: Case[] = [
-	{ name: "the stand's made-up file", text: standText(NOW), now: NOW },
+	{ name: "the stand's made-up file", text: standText(NOW), now: NOW, tidy: true },
 	{ name: "the agents' fixture file", text: AGENT_TASKS, now: new Date(2026, 10, 18, 13, 5) },
 	...(process.env.TC_ROUND_TRIP_FILE ? [{ name: "a copy of Max's tasks file", text: readFileSync(process.env.TC_ROUND_TRIP_FILE, "utf8"), now: new Date() }] : []),
 ];
@@ -47,28 +49,35 @@ function homes(data: ScreenData): { readonly id: string; readonly home: Destinat
 	});
 }
 
-function drawAll(port: CorePort, data: ScreenData): void {
-	for (const list of ["inbox", "soon", "day"] as const) for (const row of data.lists[list].rows) if (row.kind === "task") port.menu(row.id, "list");
-	for (const block of data.day.blocks) port.menu(block.id, "calendar");
+function drawAll(port: CorePort, data: ScreenData, dayOffset: number): void {
+	for (const list of ["inbox", "soon", "day"] as const) for (const row of data.lists[list].rows) if (row.kind === "task") port.menu(row.id, "list", dayOffset);
+	for (const block of data.day.blocks) port.menu(block.id, "calendar", dayOffset);
 }
 
-describe.each(CASES)("$name through CorePort", ({ text, now }) => {
-	it("read, drawn on every day of a fortnight with every menu, is written back as the old screen leaves it", async () => {
+describe.each(CASES)("$name through CorePort", ({ text: given, now, tidy }) => {
+	it("read, drawn on every day of a fortnight with every menu, is written back byte for byte as it was", async () => {
+		const text = tidy ? ((await oldPathText(given, now)) ?? "") : given;
 		const { port, file } = await corePortOver(text, now);
-		for (let day = -7; day <= 7; day++) drawAll(port, port.read(day));
-		expect(file.text).toBe(await oldPathText(text, now));
+		for (let day = -7; day <= 7; day++) drawAll(port, port.read(day), day);
+		expect(file.text === text).toBe(true);
+	});
+
+	it("read and drawn, is written back as the old screen leaves it", async () => {
+		const { port, file } = await corePortOver(given, now);
+		for (let day = -7; day <= 7; day++) drawAll(port, port.read(day), day);
+		expect(file.text).toBe(await oldPathText(given, now));
 	});
 
 	it("a card let go where it was lifted writes nothing", async () => {
-		const { port, file } = await corePortOver(text, now);
+		const { port, file } = await corePortOver(given, now);
 		const before = file.text;
 		for (const { id, home } of homes(port.read(0))) await port.move(id, home);
 		expect(file.text).toBe(before);
 	});
 
 	it("a rename left as it was writes what the old screen's rename writes: the service's edit of the same draft", async () => {
-		const { port, file } = await corePortOver(text, now);
-		const old = memoryCore(text, { now: () => now });
+		const { port, file } = await corePortOver(given, now);
+		const old = memoryCore(given, { now: () => now });
 		await old.core.tasks.screen(old.core.days.today());
 		for (const { id } of homes(port.read(0))) {
 			const title = port.read(0).cards[id].title;
@@ -149,7 +158,7 @@ describe("each write the engine makes lands as the old screen's call of the same
 		const { engine, old, idOf, oldItem } = await pair();
 		const tasks = old.core.tasks;
 		const step = async (title: string, act: Parameters<CorePort["act"]>[1], call: (key: TaskItem["key"]) => Promise<unknown>, from: "list" | "calendar" = "list") => {
-			await engine.port.act(idOf(title), act, from);
+			await engine.port.act(idOf(title), act, from, 0);
 			await call((await oldItem(title)).key);
 			expect({ title, act, text: engine.file.text }).toEqual({ title, act, text: old.file.text });
 		};

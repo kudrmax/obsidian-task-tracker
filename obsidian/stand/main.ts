@@ -1,8 +1,9 @@
-import { type App, Component, FileSystemAdapter, ItemView, MarkdownRenderChild, MarkdownRenderer, Platform, Plugin, Scope, type TFile, type WorkspaceLeaf } from "obsidian";
+import { type App, Component, Notice, FileSystemAdapter, ItemView, MarkdownRenderChild, MarkdownRenderer, Platform, Plugin, Scope, type TFile, type WorkspaceLeaf } from "obsidian";
 import type { MacTrackpadFingers } from "../infrastructure/trackpad/MacTrackpadFingers";
 import { KEYS, takesKeys } from "../ui/engine/keys";
 import { type MountedScreen, mountScreen } from "../ui/engine/mount";
 import type { Stop } from "../ui/engine/store";
+import { failureText } from "../ui/failureText";
 import { detectHaptics, type HapticsHost } from "../ui/haptics";
 import { clearPriorityColors, showPriorityColors } from "../ui/priorityColors";
 import { addWindowDocument } from "../ui/windowDocuments";
@@ -162,7 +163,8 @@ export default class TaskCalendarStand extends Plugin {
 	/** The screen run on `kind`'s port from now on, every open leaf drawn again over it; a note's block takes it when drawn next. */
 	private async useSource(kind: StandPortKind): Promise<void> {
 		if (this.source.kind === kind) return;
-		this.source = kind === "core" ? await coreSource() : mockSource();
+		this.source.dispose();
+		this.source = kind === "core" ? await coreSource((error) => new Notice(failureText(error))) : mockSource();
 		this.remountLeaves();
 	}
 
@@ -196,6 +198,7 @@ export default class TaskCalendarStand extends Plugin {
 		});
 		showPriorityColors([]);
 		this.register(clearPriorityColors);
+		this.register(() => this.source.dispose());
 		this.followWindows();
 
 		this.registerView(STAND_VIEW, (leaf) => new StandView(leaf, this));

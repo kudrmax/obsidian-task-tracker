@@ -1,4 +1,4 @@
-import { type ColumnList, fitLevel, type GapPlace, type GroupName, type ListCard, type ListPlace, placeOfDrop, placeOfGap } from "../../core/application/contracts";
+import { type ColumnList, fitLevel, type GapPlace, type GroupName, type ListCard, type ListPlace, placeOfDrop } from "../../core/application/contracts";
 import type { Destination } from "../ui/engine/port";
 
 /**
@@ -45,22 +45,26 @@ export class ListCards {
 		this.lastGroup = column.groups.length ? column.groups[column.groups.length - 1].name : null;
 	}
 
-	/** The gap `to` names: before its card (its level by default), else the end of its section or of the last one; the level fitted. */
-	gapOf(to: Pick<Destination, "before" | "depth" | "section">): GapPlace {
+	/**
+	 * The gap `to` names: before its card (its level by default), else the end of its section (the last one when none is
+	 * named; the tasks outside any for null), the level fitted. Null for a section the list no longer has (removed since, or
+	 * never there): no place, the place refuses, as a drop on a header that is gone.
+	 */
+	gapOf(to: Pick<Destination, "before" | "depth" | "section">): GapPlace | null {
 		const at = to.before === null ? -1 : this.cards.findIndex((card) => card.id === to.before);
 		if (at >= 0) return fitLevel(this.cards, { kind: "gap", index: at, level: to.depth ?? this.cards[at].level, group: this.cards[at].group });
-		const group = to.section === undefined || to.section === null || !this.sectionNames.has(to.section) ? (to.section === null ? null : this.lastGroup) : this.sectionNames.get(to.section)!;
+		if (typeof to.section === "string" && !this.sectionNames.has(to.section)) return null;
+		const group = to.section === undefined ? this.lastGroup : to.section === null ? null : this.sectionNames.get(to.section)!;
 		return fitLevel(this.cards, { kind: "gap", index: this.ends.get(group) ?? this.cards.length, level: to.depth ?? 0, group });
 	}
 
-	/** What the gap means for the file (`placeOfGap`). */
-	placeOf(to: Pick<Destination, "before" | "depth" | "section">): ListPlace {
-		return placeOfGap(this.cards, this.gapOf(to));
-	}
-
-	/** What letting the card left out go at `to` means (`placeOfDrop`): null where it was lifted from, which changes nothing. */
-	dropOf(to: Pick<Destination, "before" | "depth" | "section">): ListPlace | null {
-		return placeOfDrop(this.cards, this.gapOf(to), this.home);
+	/**
+	 * What letting the card left out go at `to` means (`placeOfDrop`): `home` where it was lifted from, which changes
+	 * nothing; null for no place (`gapOf`).
+	 */
+	dropOf(to: Pick<Destination, "before" | "depth" | "section">): ListPlace | "home" | null {
+		const gap = this.gapOf(to);
+		return gap && (placeOfDrop(this.cards, gap, this.home) ?? "home");
 	}
 
 	/** The engine's words for a gap: the card it stands before, its depth, its section's id as its header is drawn (null: no header, the tasks outside any). */

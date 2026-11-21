@@ -253,7 +253,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 			const known = s.read.cards;
 			const fresh = new Set(Object.keys(next.cards).filter((id) => !(id in known)));
 			/** An open menu shows its task as it now stands (a subtask typed into its stack, F108). */
-			const layer = s.layer && s.layer.model.kind === "task" && next.cards[s.layer.id] ? { ...s.layer, model: port.menu(s.layer.id, s.layer.from) } : s.layer;
+			const layer = s.layer && s.layer.model.kind === "task" && next.cards[s.layer.id] ? { ...s.layer, model: port.menu(s.layer.id, s.layer.from, s.dayOffset) } : s.layer;
 			set({ read: next, shown: share(s.shown, next), pending: false, fresh: fresh.size === 0 && s.fresh.size === 0 ? s.fresh : fresh, layer });
 		};
 
@@ -407,7 +407,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 				if (reveal) set({ reveal: { id, seq: (get().reveal?.seq ?? 0) + 1 } });
 				const over = get().layer;
 				const stack = from !== "stack" || !over ? null : (over.stack ?? (over.model.kind === "task" ? { of: over.id, ids: over.model.subtasks } : null));
-				const model = port.menu(id, from);
+				const model = port.menu(id, from, get().dayOffset);
 				set({ layer: { kind: "menu", id, from, model, page: "menu", asking: null, asked: null, stack }, ...(from === "list" ? { selected: null } : {}) });
 			},
 			startRename() {
@@ -440,7 +440,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 				set({ layer: null });
 				let done: () => void = () => undefined;
 				write(new Promise<void>((resolve) => (done = resolve)));
-				window.setTimeout(() => void port.act(layer.id, action, layer.from).finally(done), LAYER_MS.close);
+				window.setTimeout(() => void port.act(layer.id, action, layer.from, get().dayOffset).finally(done), LAYER_MS.close);
 			},
 			closeLayer() {
 				if (get().layer) set({ layer: null, ...(get().entry?.stack ? { entry: null, draft: NO_DRAFT, entryText: "", entryPanel: null } : {}) });

@@ -66,6 +66,7 @@ const ENGINE = "obsidian/ui/engine";
  */
 const BASELINE: Readonly<Record<string, { readonly count: number; readonly removedBy: string }>> = {
 	"obsidian/ui/TaskCard.ts": { count: 4, removedBy: "none: these draw the card's marks (the description mark, the dot of a task in progress); they stay" },
+	"obsidian/adapters/ScreenDrawing.ts": { count: 2, removedBy: "none: the card's marks as `CardFace` flags, as TaskCard.ts draws them (the dot of a task in progress, the description mark); the core has no ready field for either" },
 	"obsidian/ui/full/FullScreen.ts": { count: 2, removedBy: "none: it draws a closed subtask, a done one crossed out (`mark`); it stays. The second hit is the closed one's, found once the guard watched `!item.open` too" },
 };
 
@@ -92,7 +93,7 @@ function hitsIn(text: string, engine = false): string[] {
  * The frontends the tripwire watches: the Obsidian view, and the agents' program with its answers in the core
  * (`core/application/agent/`), which only map the screens' reads into words (agent CLI spec, «The one rule»).
  */
-const WATCHED = ["obsidian/ui", "agent", "core/application/agent"];
+const WATCHED = ["obsidian/ui", "obsidian/adapters", "agent", "core/application/agent"];
 const BUILT = ["agent/build.mjs", "agent/obsidian-task-calendar.mjs"];
 
 const HITS: Readonly<Record<string, string[]>> = Object.fromEntries(

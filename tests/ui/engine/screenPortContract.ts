@@ -70,6 +70,30 @@ export function describeScreenPort(name: string, make: PortMaker): void {
 			});
 		}
 
+		for (const delay of CONTRACT_DELAYS) {
+			it(`writes two tasks typed in a row in their order, the second a level in under the first, its write not awaited (${delay} ms)`, async () => {
+				const port = await make(delay);
+				const draft = { level: null, projects: [], descriptionLine: null, section: false };
+				const first = { at: port.listEnd("inbox", 0), renaming: null, stack: false };
+				const typed = port.commit(first, "AAA", draft, true);
+				if (!typed.next) throw new Error("no next field");
+				await new Promise((resolve) => setTimeout(resolve, delay / 2));
+				const offered = port.entryBar(typed.next, typed.draft, "").bar.some((group) => group.actions.some((action) => action.id === "indent" && !action.disabled));
+				expect(offered).toBe(true);
+				const shifted = { ...typed.next, at: { ...typed.next.at, under: undefined, depth: (typed.next.at.depth ?? 0) + 1 } };
+				const second = port.commit(shifted, "BBB", typed.draft, false);
+				await Promise.all([typed.write, second.write]);
+				await new Promise((resolve) => setTimeout(resolve, delay + 50));
+				const data = port.read(0);
+				const rows = data.lists.inbox.rows.flatMap((row) => (row.kind === "task" ? [{ title: data.cards[row.id].title, depth: row.depth }] : []));
+				const at = rows.findIndex((row) => row.title === "AAA");
+				expect(rows.slice(at, at + 2)).toEqual([
+					{ title: "AAA", depth: rows[at]?.depth },
+					{ title: "BBB", depth: (rows[at]?.depth ?? 0) + 1 },
+				]);
+			});
+		}
+
 		it("stops telling a listener once it unsubscribes", async () => {
 			const port = await make(0);
 			let told = 0;
@@ -95,11 +119,11 @@ export function describeScreenPort(name: string, make: PortMaker): void {
 		it("offers a task's menu and an event's", async () => {
 			const port = await make(0);
 			const data = port.read(0);
-			const menu = port.menu(firstTask(data, "inbox"), "list");
+			const menu = port.menu(firstTask(data, "inbox"), "list", 0);
 			expect(menu.kind).toBe("task");
 			if (menu.kind === "task") expect(menu.layout.length).toBeGreaterThan(0);
 			const event = data.day.events[0];
-			if (event) expect(port.menu(event.id, "calendar")).toEqual({ kind: "event", title: event.title });
+			if (event) expect(port.menu(event.id, "calendar", 0)).toEqual({ kind: "event", title: event.title });
 		});
 
 		it("opens the plus's field in the day's list while it shows, else in Inbox", async () => {

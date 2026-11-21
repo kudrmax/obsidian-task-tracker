@@ -24,6 +24,8 @@ export interface StandSource {
 	addFromOutside(list: ListKey, title: string): void;
 	/** A task moved from outside: the one titled `title` before the one titled `before` (null: its list's first section's end). */
 	moveFromOutside(title: string, list: ListKey, before: string | null): void;
+	/** Lets go of what the port holds: the stand switched ports, or unloads. */
+	dispose(): void;
 }
 
 export function mockSource(port: MockPort = new MockPort()): StandSource {
@@ -35,6 +37,7 @@ export function mockSource(port: MockPort = new MockPort()): StandSource {
 		setDelay: (delay) => (port.delay = delay),
 		addFromOutside: (list, title) => port.addFromOutside(list, title),
 		moveFromOutside: (title, list, before) => port.moveFromOutside(title, list, before),
+		dispose: () => undefined,
 	};
 }
 
@@ -45,10 +48,10 @@ function coreText(file: MockFile, now: Date): string {
 }
 
 /** The core over the stand's made-up file as a tasks file in memory, its calendar the stand's events; the screen on `CorePort`. */
-export async function coreSource(clock: () => Date = () => new Date()): Promise<StandSource> {
+export async function coreSource(onError: (error: unknown) => void, clock: () => Date = () => new Date()): Promise<StandSource> {
 	const now = clock();
 	const { core, file, events } = memoryCore(coreText(mockFile(now), now), { now: clock }, {}, standEvents(mockFile(now), now));
-	const port = await CorePort.open({ ...core, clock: { now: clock } });
+	const port = await CorePort.open({ ...core, clock: { now: clock }, onError });
 	return {
 		kind: "core",
 		port,
@@ -61,6 +64,7 @@ export async function coreSource(clock: () => Date = () => new Date()): Promise<
 		setDelay: (delay) => (file.delay = delay),
 		addFromOutside: (list, title) => file.replace(withLine(file, list, `- [ ] ${title}${list === "now" ? ` 📅 ${dateOf(dayOf(clock()))}` : ""}`)),
 		moveFromOutside: (title, list, before) => file.replace(movedLine(file, title, list, before)),
+		dispose: () => port.dispose(),
 	};
 }
 

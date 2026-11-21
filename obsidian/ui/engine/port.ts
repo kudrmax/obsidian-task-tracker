@@ -211,7 +211,8 @@ export interface EntryBar {
 	readonly projects: readonly { readonly name: string; readonly depth: number; readonly on: boolean; readonly folder: boolean }[];
 	/** What the place button shows, and the places its panel offers. */
 	readonly where: { readonly id: PlaceId; readonly title: string } | null;
-	readonly places: readonly { readonly id: PlaceId; readonly title: string; readonly on: boolean }[];
+	/** `title` null: Date, whose word is the bar's own look. */
+	readonly places: readonly { readonly id: PlaceId; readonly title: string | null; readonly on: boolean }[];
 	/** The month page of Date: today, and the day the field stands on (`YYYY-MM-DD`). */
 	readonly date: { readonly today: string; readonly picked: string | null };
 }
@@ -333,8 +334,8 @@ export interface ScreenPort {
 	rename(id: string, from: MenuFrom, dayOffset: number): RenameStart;
 	/** Enter (`next`) or a tap elsewhere on `field` holding `text`: what is written and which field opens next. */
 	commit(field: EntryField, text: string, draft: EntryDraft, next: boolean): EntryCommit;
-	/** What the menu of the task or event `id` offers, opened `from` there. */
-	menu(id: string, from: MenuFrom): MenuModel;
-	/** Writes what was tapped in the menu of `id` opened `from` there (a status tile of a folded block writes its step); resolves once written and read back. */
-	act(id: string, action: MenuAction, from?: MenuFrom): Promise<void>;
+	/** What the menu of the task or event `id` offers, opened `from` there on the screen of the day `dayOffset` days from today. */
+	menu(id: string, from: MenuFrom, dayOffset: number): MenuModel;
+	/** Writes what was tapped in the menu of `id` opened `from` there on the day `dayOffset` (a status tile of a folded block writes its step); resolves once written and read back. */
+	act(id: string, action: MenuAction, from: MenuFrom, dayOffset: number): Promise<void>;
 }

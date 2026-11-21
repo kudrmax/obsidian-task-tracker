@@ -3,7 +3,7 @@ import type { Destination, Edge, EntryBar, EntryCommit, EntryDraft, EntryField, 
 import { CoreEntry } from "./CoreEntry";
 import { ListCards } from "./ListCards";
 import { menuModelOf } from "./menuModel";
-import { ScreenDrawing } from "./ScreenDrawing";
+import { ScreenDrawing, type ScreenSource } from "./ScreenDrawing";
 
 /** The core's services `CorePort` forwards to, as `composeCore` gives them. */
 export interface CorePortServices {
@@ -11,16 +11,18 @@ export interface CorePortServices {
 	readonly days: DayService;
 	readonly calendars: CalendarService;
 	readonly clock: Clock;
+	/** A write that failed: the host says so, as the old screen does (a notice). */
+	readonly onError: (error: unknown) => void;
 }
 
-/** A drop as the core takes it: the task and where it was dragged from, where it is let go, and the day the screen shows. */
-interface CoreDrop {
-	readonly tasks: readonly DroppedTask[];
-	readonly to: DropTo;
-	readonly day: LocalDate;
-	/** Let go where it was lifted from: nothing changes, nothing is written. */
-	readonly home: boolean;
-}
+/**
+ * A move as the core takes it: a drop (the task and where it was dragged from, where it is let go, the screen's day), a
+ * time written as it is (a let-go dot's `at` and `end`), or none at all (let go where it was lifted).
+ */
+type CoreMove =
+	| { readonly kind: "drop"; readonly tasks: readonly DroppedTask[]; readonly to: DropTo; readonly day: LocalDate }
+	| { readonly kind: "slot"; readonly key: TaskItem["key"]; readonly slot: NonNullable<TaskItem["slot"]>; readonly day: LocalDate }
+	| { readonly kind: "home" };
 
 const COLUMNS: Readonly<Record<ListId, DropColumn>> = { inbox: "inbox", soon: "soon", day: "day" };
 
@@ -47,7 +49,7 @@ export class CorePort implements ScreenPort {
 		private reader: ScreenReader,
 	) {
 		this.drawing = new ScreenDrawing(core.tasks, core.days, core.calendars);
-		this.entry = new CoreEntry(core, this.drawing, () => this.reader, () => this.refresh());
+		this.entry = new CoreEntry(core, this.drawing, () => this.reader, () => this.refresh(), core.onError);
 		this.offs = [core.tasks.onChange(() => void this.refresh()), core.days.onDayChange(() => void this.refresh()), core.calendars.onChange(() => this.forgetEvents())];
 	}
 
@@ -69,7 +71,7 @@ export class CorePort implements ScreenPort {
 			if (this.cache.size > 16) this.cache.clear();
 			const date = this.dateOf(dayOffset);
 			const screen = this.reader.screen(date);
-			data = this.drawing.draw({ date, screen, lists: this.listsOf(date), events: this.eventsOf(date) });
+			data = this.drawing.draw({ date, screen, lists: this.drawing.listsOf(screen), events: this.eventsOf(date) });
 			this.cache.set(key, data);
 		}
 		return data;
@@ -86,23 +88,24 @@ export class CorePort implements ScreenPort {
 	}
 
 	preview(id: string, to: Destination): ScreenData {
-		const drop = this.dropOf(id, to);
+		const move = this.moveOf(id, to);
 		const date = this.dateOf(to.dayOffset);
-		if (!drop || drop.home) return this.read(to.dayOffset);
-		const { screen } = this.reader.dropPreview(drop.tasks, drop.to, drop.day);
+		if (!move || move.kind === "home") return this.read(to.dayOffset);
+		if (move.kind === "slot") return this.drawn(date, { id, ...this.core.days.boundary().spanOf(move.slot, date) });
+		const { screen } = this.reader.dropPreview(move.tasks, move.to, move.day);
 		return this.drawing.draw({ date, screen, lists: this.drawing.listsOf(screen), events: this.eventsOf(date) });
 	}
 
 	takes(id: string, to: Destination): boolean {
-		const drop = this.dropOf(id, to);
-		return drop !== null && this.reader.takes(drop.tasks.map((task) => task.from), drop.to);
+		const move = this.moveOf(id, to);
+		if (!move) return false;
+		return move.kind !== "drop" || this.reader.takes(move.tasks.map((task) => task.from), move.to);
 	}
 
 	stretched(id: string, dayOffset: number, edge: Edge, minute: number): ScreenData {
 		const date = this.dateOf(dayOffset);
 		const span = this.reader.stretch(id, date, edge, minute);
-		const screen = this.reader.screen(date);
-		return this.drawing.draw({ date, screen, lists: this.listsOf(date), events: this.eventsOf(date), ...(span && { held: { id, start: span.start, end: span.end > span.start ? span.end : null } }) });
+		return this.drawn(date, span && { id, start: span.start, end: span.end > span.start ? span.end : null });
 	}
 
 	resized(id: string, dayOffset: number, edge: Edge, minute: number, least: number): Destination | null {
@@ -114,15 +117,10 @@ export class CorePort implements ScreenPort {
 	}
 
 	async move(id: string, to: Destination): Promise<void> {
-		const item = this.reader.item(id);
-		if (!item) return;
-		const day = this.dateOf(to.dayOffset);
-		if (to.at !== undefined && to.end !== undefined) await this.core.tasks.setSlot(item.key, this.core.days.boundary().slotAt(day, to.at, to.end));
-		else {
-			const drop = this.dropOf(id, to);
-			if (!drop || drop.home) return;
-			await this.core.tasks.drop(drop.tasks, drop.to, drop.day);
-		}
+		const move = this.moveOf(id, to);
+		if (!move || move.kind === "home") return;
+		if (move.kind === "slot") await this.core.tasks.setSlot(move.key, move.slot);
+		else await this.core.tasks.drop(move.tasks, move.to, move.day);
 		await this.refresh();
 	}
 
@@ -162,17 +160,16 @@ export class CorePort implements ScreenPort {
 		return this.entry.commit(field, text, draft, next);
 	}
 
-	menu(id: string, from: MenuFrom): MenuModel {
+	menu(id: string, from: MenuFrom, dayOffset: number): MenuModel {
 		const event = this.eventNamed(id);
 		if (event) return { kind: "event", title: event.title };
 		const item = this.itemOf(id);
-		const day = item.day ?? this.core.days.today();
-		const model = this.reader.menu(id, this.coreFrom(item, from), day);
+		const model = this.reader.menu(id, this.coreFrom(item, from), this.dateOf(dayOffset));
 		if (!model) throw new Error(`no task ${id}`);
 		return menuModelOf(item, model, from === "calendar" ? item.subtasks.map((sub) => sub.id) : [], (list) => this.core.tasks.listName(list), this.core.days.today());
 	}
 
-	async act(id: string, action: MenuAction, from: MenuFrom = "list"): Promise<void> {
+	async act(id: string, action: MenuAction, from: MenuFrom, dayOffset: number): Promise<void> {
 		if (action.kind === "row") return;
 		const item = this.reader.item(id);
 		if (!item) return;
@@ -180,7 +177,7 @@ export class CorePort implements ScreenPort {
 		const keys = [item.key];
 		switch (action.kind) {
 			case "status": {
-				const model = this.reader.menu(id, this.coreFrom(item, from), item.day ?? this.core.days.today());
+				const model = this.reader.menu(id, this.coreFrom(item, from), this.dateOf(dayOffset));
 				await tasks.pickStatus((model?.statusTasks ?? [item]).map((task) => task.key), action.id);
 				break;
 			}
@@ -210,8 +207,10 @@ export class CorePort implements ScreenPort {
 		return this.core.days.step(this.core.days.today(), dayOffset);
 	}
 
-	private listsOf(date: LocalDate) {
-		return { inbox: this.reader.columnView("inbox", date), soon: this.reader.columnView("soon", date), day: this.reader.columnView("day", date) };
+	/** The held read's screen of `date`, a task held by a dot drawn at `held`. */
+	private drawn(date: LocalDate, held: ScreenSource["held"] | null): ScreenData {
+		const screen = this.reader.screen(date);
+		return this.drawing.draw({ date, screen, lists: this.drawing.listsOf(screen), events: this.eventsOf(date), ...(held && { held }) });
 	}
 
 	private itemOf(id: string): TaskItem {
@@ -224,18 +223,23 @@ export class CorePort implements ScreenPort {
 		return from === "calendar" ? "timeline" : from === "stack" ? "stack" : listCardMenuFrom(item);
 	}
 
-	/** What the core takes for the task `id` let go at `to`: a minute of a day's calendar, or a list's gap; null for a task it can't carry. */
-	private dropOf(id: string, to: Destination): CoreDrop | null {
+	/**
+	 * What the core takes for the task `id` let go at `to`: a time written as it is (a let-go dot), a minute of a day's
+	 * calendar, or a list's gap; none for a task it can't carry or a place that is gone (`ListCards.gapOf`).
+	 */
+	private moveOf(id: string, to: Destination): CoreMove | null {
 		const item = this.reader.item(id);
 		const from = item && originOf(item);
 		if (!item || !from) return null;
 		const day = this.dateOf(to.dayOffset);
+		if (to.at !== undefined && to.end !== undefined) return { kind: "slot", key: item.key, slot: this.core.days.boundary().slotAt(day, to.at, to.end), day };
 		const tasks = [{ key: item.key, from }];
-		if (to.at !== undefined) return { tasks, to: { kind: "time", start: to.at }, day, home: false };
+		if (to.at !== undefined) return { kind: "drop", tasks, to: { kind: "time", start: to.at }, day };
 		const column = COLUMNS[to.list];
-		if (!this.core.tasks.opensGaps([from], column, day)) return { tasks, to: { kind: "place", column, place: null }, day, home: false };
-		const place = new ListCards(this.reader.columnView(column, day), id).dropOf(to);
-		return { tasks, to: { kind: "place", column, place }, day, home: place === null };
+		if (!this.core.tasks.opensGaps([from], column, day)) return { kind: "drop", tasks, to: { kind: "place", column, place: null }, day };
+		const place = new ListCards(this.drawing.column(this.reader.screen(day), column), id).dropOf(to);
+		if (place === null) return null;
+		return place === "home" ? { kind: "home" } : { kind: "drop", tasks, to: { kind: "place", column, place }, day };
 	}
 
 	private eventsOf(date: LocalDate): DayEvents | null {

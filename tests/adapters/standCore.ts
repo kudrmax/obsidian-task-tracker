@@ -13,6 +13,8 @@ export const standText = (now: Date): string => fileText(mockFile(now), now);
 export async function corePortOver(text: string, now: Date = NOW, delay = 0, settings: Partial<TaskCalendarSettings> = {}): Promise<MemoryCore & { readonly port: CorePort }> {
 	const made = memoryCore(text, { now: () => now }, settings, standEvents(mockFile(now), now));
 	made.file.delay = delay;
-	const port = await CorePort.open({ ...made.core, clock: made.clock });
+	const port = await CorePort.open({ ...made.core, clock: made.clock, onError: (error) => {
+		throw error;
+	} });
 	return { ...made, port };
 }
