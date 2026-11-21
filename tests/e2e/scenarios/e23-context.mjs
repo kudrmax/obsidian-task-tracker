@@ -20,6 +20,9 @@ function projectTitles(file, project) {
 	return titles;
 }
 
+/** How many of the cards in sight in `list` (as the oracle counts them) a person sees: not hidden, not faded. */
+const seen = (t, list) => t.cdp.eval(`(() => { const el = document.querySelector('.task-calendar [data-list="${list}"]'); const box = el.getBoundingClientRect(); const view = document.querySelector(".task-calendar").getBoundingClientRect(); return [...el.querySelectorAll(".tc-card")].filter((c) => { const r = c.getBoundingClientRect(); return r.bottom > Math.max(box.top, view.top) && r.top < Math.min(box.bottom, view.bottom) && r.right > view.left && r.left < view.right && c.checkVisibility({ visibilityProperty: true, opacityProperty: true }); }).length; })()`);
+
 /** The blocks' titles on the calendar, as drawn now. */
 const blocks = (t) => t.cdp.eval(`[...document.querySelectorAll(".task-calendar .tc-block-card .tc-card-title")].map((e) => e.textContent).sort()`);
 
@@ -58,6 +61,7 @@ export default {
 		for (const list of lists) {
 			const cards = await t.oracle.cards(list);
 			t.expect(cards.length > 0 && cards.every((title) => mine.has(title)), `${list} shows only «${PROJECT}»'s tasks: ${JSON.stringify(cards)}`);
+			t.expect((await seen(t, list)) === cards.length, `every one of them is seen: ${await seen(t, list)} of ${cards.length}`);
 		}
 		const own = blocksBefore.filter((title) => mine.has(title));
 		t.expect(JSON.stringify(await blocks(t)) === JSON.stringify(own), `the calendar too: ${JSON.stringify(await blocks(t))}, want ${JSON.stringify(own)}`);
@@ -67,6 +71,7 @@ export default {
 		const noneMoves = moved(none);
 		t.expect(noneMoves.length === 0, `choosing none moves and fades no card: ${JSON.stringify(noneMoves.slice(0, 4))}`);
 		const all = await t.oracle.cards(lists[0]);
+		t.expect((await seen(t, lists[0])) === all.length, `every card is seen again: ${await seen(t, lists[0])} of ${all.length}`);
 		t.expect(all.some((title) => !mine.has(title)), `every task again: ${JSON.stringify(all)}`);
 		t.expect(JSON.stringify(await blocks(t)) === JSON.stringify(blocksBefore), `every block again: ${JSON.stringify(await blocks(t))}`);
 	},

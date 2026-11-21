@@ -227,7 +227,7 @@ export interface ScreenActions {
 	 * level out, a new task under a renamed one); a renamed card shows its new name at once (F298).
 	 */
 	commitEntry(text: string, next: boolean): void;
-	/** Another context (a project chosen, or none): read again and drawn in place, the days beside the shown one read anew. */
+	/** Another context (a project chosen, or none): the shown day and the days drawn beside it read again in it, drawn in place. */
 	setContext(context: ScreenContext): void;
 	/** Undo, the button or ⌘Z (F267): the port takes its last write back, and the cards move as any change moves them. */
 	undo(): void;
@@ -557,7 +557,8 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 				const s = get();
 				if (s.context.project === context.project) return;
 				const next = port.read(s.dayOffset, context);
-				set({ context, contextSeq: s.contextSeq + 1, read: next, shown: next, left: {}, fresh: new Set(), gone: new Set(), selected: null });
+				const left = Object.fromEntries(Object.keys(s.left).map((day) => [day, { shown: port.read(Number(day), context), read: port.read(Number(day), context) }]));
+				set({ context, contextSeq: s.contextSeq + 1, read: next, shown: next, left, fresh: new Set(), gone: new Set(), selected: null });
 			},
 			undo() {
 				if (port.canUndo()) write(port.undo());
