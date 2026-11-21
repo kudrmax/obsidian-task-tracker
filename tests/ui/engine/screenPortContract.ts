@@ -94,6 +94,33 @@ export function describeScreenPort(name: string, make: PortMaker): void {
 			});
 		}
 
+		it("keeps a task's id through a move, a rename, a status and a drop onto the calendar; a new task never takes an old id", async () => {
+			const port = await make(0);
+			const titleOf = (id: string) => {
+				for (let day = 0; day <= 1; day++) {
+					const card = port.read(day).cards[id];
+					if (card) return card.title;
+				}
+				return null;
+			};
+			const before = port.read(0);
+			const id = firstTask(before, "inbox");
+			const seen = new Set([...Object.keys(before.cards), ...Object.keys(port.read(1).cards)]);
+			await port.move(id, toSoon());
+			expect(port.read(0).lists.soon.rows.some((row) => row.id === id)).toBe(true);
+			const rename = port.rename(id, "list", 0);
+			await port.commit(rename.field, "Переименована", rename.draft, false).write;
+			expect(titleOf(id)).toBe("Переименована");
+			await port.act(id, { kind: "status", id: "inProgress" }, "list", 0);
+			expect(port.read(0).cards[id]?.inProgress).toBe(true);
+			await port.move(id, { list: "day", before: null, dayOffset: 0, at: 23 * 60 });
+			expect(port.read(0).day.blocks.some((block) => block.id === id)).toBe(true);
+			const typed = port.commit({ at: port.listEnd("inbox", 0), renaming: null, stack: false }, "Совсем новая", { level: null, projects: [], descriptionLine: null, section: false }, false);
+			await typed.write;
+			const fresh = Object.keys(port.read(0).cards).find((key) => port.read(0).cards[key].title === "Совсем новая");
+			expect(fresh !== undefined && !seen.has(fresh)).toBe(true);
+		});
+
 		it("stops telling a listener once it unsubscribes", async () => {
 			const port = await make(0);
 			let told = 0;
