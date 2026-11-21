@@ -1,4 +1,4 @@
-import { type DayService, type DropColumn, type EntryList, type EntryState, type LocalDate, type MenuProject, type Placement, type QuickEntryView, QuickEntrySession, type ScreenReader, type TaskItem, type TaskService, type WriteLine } from "../../core/application/contracts";
+import { type DayService, type DropColumn, type EntryList, type EntryState, type LocalDate, type MenuProject, type ProjectsNodeId, type Placement, type QuickEntryView, QuickEntrySession, type ScreenReader, type TaskItem, type TaskService, type WriteLine } from "../../core/application/contracts";
 import { WriteQueue } from "../ui/quick/WriteQueue";
 import type { Destination, EntryBar, EntryCommit, EntryDraft, EntryField, ListId, MenuFrom, PlaceId, RenameStart } from "../ui/engine/port";
 import { ListCards } from "./ListCards";
@@ -42,6 +42,7 @@ export class CoreEntry {
 		private readonly reader: () => ScreenReader,
 		private readonly refresh: () => Promise<void>,
 		onError: (error: unknown) => void,
+		private readonly filter: () => { readonly node: ProjectsNodeId; readonly project: string | null } | null = () => null,
 	) {
 		this.queue = new WriteQueue(onError);
 		this.look = { date: core.days.today(), shown: ENTRY_LISTS };
@@ -260,6 +261,7 @@ export class CoreEntry {
 				beforeShow?.(cards);
 			},
 			onChange: () => undefined,
+			filter: () => this.filter(),
 		};
 	}
 
