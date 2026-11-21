@@ -7,6 +7,8 @@ import { type Asking, type Layer, useScreen, useScreenApi } from "../store";
 import { type BlockLook, CardInsides, PressedLook } from "./Card";
 import { useHost } from "./host";
 import { Icon } from "./Icon";
+import { Row, RowGroup } from "./MenuRows";
+import { NewProjectRow, ProjectNameField, ProjectRows } from "./Projects";
 import { EntryField } from "./QuickAdd";
 import { paintStyle } from "./Timeline";
 
@@ -32,6 +34,8 @@ interface MenuSteps {
 	startSubtask(): void;
 	startNotes(): void;
 	pick(action: MenuAction): void;
+	actHere(action: MenuAction): void;
+	nameMenuProject(name: string): void;
 }
 
 interface ActionLook {
@@ -68,7 +72,7 @@ const MENU_ACTIONS: Readonly<Record<TaskMenuActionId, ActionLook | { readonly ti
 	reminder: { label: "Reminder", icon: "reminder", onPick: (_, steps) => steps.menuPage("reminders") },
 	rename: { label: "Rename", icon: "rename", onPick: (_, steps) => steps.startRename() },
 	description: { label: "Notes", icon: "description", onPick: (_, steps) => steps.startNotes() },
-	project: { label: "Project", icon: "project", onPick: leave },
+	project: { label: "Project", icon: "project", onPick: (_, steps) => steps.menuPage("projects") },
 	section: { label: "Section", icon: "section", onPick: leave },
 	subtask: { label: "Subtask", icon: "subtask", onPick: (_, steps) => steps.startSubtask(), tile: "steps" },
 	firstStep: { label: "First step", icon: "firstStep", onPick: leave, tile: "steps" },
@@ -160,7 +164,7 @@ export const TaskMenu = memo(function TaskMenu() {
 	);
 });
 
-/** The groups of a task's menu on its page (the menu itself, Pick a date, the Reminder kinds), all under its copy. */
+/** The groups of a task's menu on its page (the menu itself, Pick a date, the Reminder kinds, the projects and a new one's name), all under its copy. */
 function taskGroups(layer: Layer, typing: boolean, model: TaskMenuModel, steps: MenuSteps): readonly ReactNode[] {
 	const { pick } = steps;
 	/** Typing in the menu: the panel gives its room to the field (the plugin's `giveToField`). */
@@ -170,6 +174,16 @@ function taskGroups(layer: Layer, typing: boolean, model: TaskMenuModel, steps: 
 			...(model.places.length > 0 ? [<TileGroup key="places" kind="is-place" rows={[model.places.map((list) => ({ label: list.title, icon: PLACE_ICONS[list.id], on: list.on, onPick: () => pick({ kind: "sendTo", list: list.id }) }))]} />] : []),
 			<MonthPage key={`month-${layer.id}`} model={model} pick={pick} />,
 			...(model.date.removable ? [<Row key="remove" label="Remove due date" icon="removeDue" className="tc-picker-remove" onPick={() => pick({ kind: "date", date: null })} />] : []),
+		];
+	if (layer.page === "projects")
+		return [
+			<Row key="back" label="Project" icon="chevronLeft" className="tc-menu-back" lead onPick={() => steps.menuPage("menu")} />,
+			<ProjectRows key="projects" page={model.project} onToggle={(name) => steps.actHere({ kind: "project", name })} onNone={() => pick({ kind: "project", name: null })} />,
+			<NewProjectRow key="new" label={model.project.newLabel} onPick={() => steps.menuPage("projectName")} />,
+		];
+	if (layer.page === "projectName")
+		return [
+			<ProjectNameField key="name" onEnd={(name) => (name === null ? steps.menuPage("projects") : steps.nameMenuProject(name))} />,
 		];
 	if (layer.page === "reminders")
 		return [
@@ -277,50 +291,6 @@ export function TileGroup({ kind, rows }: { readonly kind: string; readonly rows
 				</div>
 			))}
 		</div>
-	);
-}
-
-export interface RowSpec {
-	readonly label: string;
-	readonly icon?: IconName;
-	readonly value?: string;
-	readonly disabled?: boolean;
-	/** One of a list to choose from: its check in the accent. */
-	readonly choice?: boolean;
-	readonly quiet?: boolean;
-	/** Takes the focus as it mounts: what asked a question taken back by Cancel. */
-	readonly focus?: boolean;
-	readonly onPick: () => void;
-}
-
-export function RowGroup({ rows }: { readonly rows: readonly RowSpec[] }) {
-	return (
-		<div className="tc-menu-group">
-			{rows.map((row) => (
-				<Row key={row.label} {...row} />
-			))}
-		</div>
-	);
-}
-
-/** A row: the label, a value beside it, the icon on the right; or, as the way back, the icon leading the label. */
-function Row({ label, icon, value, disabled, choice, quiet, focus, onPick, className = "", lead = false }: RowSpec & { readonly className?: string; readonly lead?: boolean }) {
-	const root = className.includes("tc-menu-back") ? className : `tc-menu-row ${className}`;
-	return (
-		<button type="button" role="menuitem" className={`tc-btn ${root}${choice ? " is-choice" : ""}${quiet ? " is-quiet" : ""}`.trim()} disabled={disabled} autoFocus={focus} onClick={onPick}>
-			{lead ? (
-				<>
-					{icon ? <Icon name={icon} /> : null}
-					{label}
-				</>
-			) : (
-				<>
-					<span className="tc-menu-label">{label}</span>
-					{value ? <span className="tc-menu-value">{value}</span> : null}
-					{icon ? <Icon name={icon} /> : null}
-				</>
-			)}
-		</button>
 	);
 }
 

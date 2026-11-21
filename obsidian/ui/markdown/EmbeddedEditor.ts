@@ -1,6 +1,7 @@
 import { Prec, type Extension } from "@codemirror/state";
 import { type EditorView, keymap, type ViewUpdate } from "@codemirror/view";
-import type { App, Editor, TFile } from "obsidian";
+import type { App, Editor, Scope, TFile } from "obsidian";
+import { FieldScope, type FieldHotkey } from "./fieldScope";
 import { lineCommandKeys } from "./lineCommands";
 
 /** The parts of Obsidian's own markdown editor in use here; Obsidian doesn't publish them. */
@@ -44,6 +45,12 @@ export interface EditorHooks {
 	readonly keys?: readonly EditorKey[];
 	/** More of CodeMirror's extensions, after Obsidian's own and before the keys. */
 	readonly extensions?: readonly Extension[];
+	/**
+	 * The field's own scope over Obsidian's hotkeys while it has the focus (`FieldScope`, Decision 133): its `hotkeys` run
+	 * first, the line commands and the keys that type reach no command; it stands over `parent` (Obsidian's own scope when
+	 * none is given). Without it the field takes no scope (the old screen's fields push their own).
+	 */
+	readonly ownScope?: { readonly parent?: Scope; readonly hotkeys: readonly FieldHotkey[] };
 	onChange?(): void;
 }
 
@@ -55,6 +62,7 @@ export class EmbeddedEditor {
 	private static editorClass: ObsidianEditorClass | null = null;
 	private readonly owner: EditorOwner;
 	private readonly editor: ObsidianEditor;
+	private readonly scope: FieldScope | null;
 
 	constructor(app: App, private readonly host: EditorHost, sourcePath: string, container: HTMLElement, text: string, hooks: EditorHooks = {}) {
 		this.owner = {
@@ -71,6 +79,12 @@ export class EmbeddedEditor {
 		this.owner.editor = this.editor.editor;
 		this.editor.set(text);
 		this.contentDOM.addEventListener("focus", () => (this.host.activeEditor = this.owner));
+		this.scope = hooks.ownScope ? new FieldScope(app, hooks.ownScope.parent ?? app.scope, hooks.ownScope.hotkeys) : null;
+		if (this.scope) {
+			const scope = this.scope;
+			this.contentDOM.addEventListener("focus", () => scope.hold(true));
+			this.contentDOM.addEventListener("blur", () => scope.hold(false));
+		}
 	}
 
 	get value(): string {
@@ -106,6 +120,7 @@ export class EmbeddedEditor {
 	}
 
 	destroy(): void {
+		this.scope?.hold(false);
 		if (this.host.activeEditor === this.owner) this.host.activeEditor = null;
 		this.editor.unload();
 		this.editor.cm.destroy();

@@ -1897,6 +1897,12 @@ export interface TaskService {
 
 	/** Fires after the file changed, by the plugin or by hand. Returns the unsubscribe. */
 	onChange(listener: () => void): () => void;
+	/**
+	 * Fires once per change of the settings that changes what the screen shows, with what it changes (`ShownChange`); a
+	 * setting no screen shows (the assistant, Google's token) fires nothing. The one subscription a screen needs to the
+	 * settings; `onChange` fires as well when the tasks read anew. Returns the unsubscribe.
+	 */
+	onShownChange(listener: (change: ShownChange) => void): () => void;
 }
 
 /** How today changed: `passed`, the clock passed the hour the day starts at; `moved`, the setting moved that hour. */
@@ -1935,6 +1941,8 @@ export interface DayService {
 	clockAt(minute: number): string;
 	/** The labels of the timeline's hour lines, from the hour the day starts at: `"05"`, `"06"`, …, `"04"`. */
 	hourLabels(): readonly string[];
+	/** Whole days from `from` to `to`, negative for an earlier `to`: `offset("2026-11-05", "2026-11-08")` → 3. */
+	offset(from: LocalDate, to: LocalDate): number;
 	/**
 	 * Fires when today changes. `passed` is checked once a minute while anyone listens, and the tasks file is normalized
 	 * before it fires; while a listener is not `ready` (a screen hidden or held by a gesture) the minute's check waits for
@@ -2158,6 +2166,22 @@ export interface ScreenSettings extends ScreenBehaviour {
 export interface SizeBounds {
 	readonly min: number;
 	readonly max: number;
+}
+
+/** What a change of the settings changes on the screen, part by part: each part true is drawn anew. */
+export interface ShownChange {
+	/** The tasks read anew: the file, the sections' names, the marks, the levels and labels (`onChange` fires too). */
+	readonly tasks: boolean;
+	/** What the screen draws straight from the settings: a list's name, No section's, the preset sections, the file's path, the levels, the labels and how a card of several is painted. */
+	readonly drawn: boolean;
+	/** A card's height or the gap between two cards: the lists and the timeline's stacks lay out anew. */
+	readonly cards: boolean;
+	/** The timeline's hours: the hour the day starts at (its clock and hour lines), the zoom's levels, the hour another day opens at. */
+	readonly timeline: boolean;
+	/** When a touch becomes a drag. */
+	readonly gestures: boolean;
+	/** The calendars shown and their sources: the hidden ones, the work file, when a source counts as stale. */
+	readonly calendars: boolean;
 }
 
 /** The shared settings as a screen sees them. */

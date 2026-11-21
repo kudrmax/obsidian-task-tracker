@@ -1,6 +1,6 @@
 import type { DayBoundary } from "../domain/DayBoundary";
 import { type DayRelation, dayRelation } from "../domain/Days";
-import { addDays } from "../domain/LocalDate";
+import { addDays, daysBetween } from "../domain/LocalDate";
 import { type FunnelAt, stepFunnel } from "./screenPlaces";
 import type { LocalDate } from "../domain/Task";
 import type { DayChange, DayOpening, DayService, DaySide, TaskService } from "./contracts";
@@ -85,6 +85,10 @@ export class DayServiceImpl implements DayService {
 
 	hourLabels(): readonly string[] {
 		return hourLabels(this.boundary());
+	}
+
+	offset(from: LocalDate, to: LocalDate): number {
+		return daysBetween(from, to);
 	}
 
 	onDayChange(listener: Listener, ready: () => boolean = () => true): () => void {

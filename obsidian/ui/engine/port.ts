@@ -208,12 +208,28 @@ export interface EntryBar {
 	readonly levels: readonly LevelTile[];
 	readonly tint: string | null;
 	/** The Project page: the tree, each project checked while the field has it, folders not to be chosen. */
-	readonly projects: readonly { readonly name: string; readonly depth: number; readonly on: boolean; readonly folder: boolean }[];
+	readonly project: ProjectPage;
 	/** What the place button shows, and the places its panel offers. */
 	readonly where: { readonly id: PlaceId; readonly title: string } | null;
 	readonly places: readonly { readonly id: PlaceId; readonly title: string; readonly on: boolean }[];
 	/** The month page of Date: today, and the day the field stands on (`YYYY-MM-DD`). */
 	readonly date: { readonly today: string; readonly picked: string | null };
+}
+
+/** A project of a Project page (the bar's and the menu's), the tree in its order (the core's `MenuProjectOption`): how deep, whether the task has it, whether it can't be picked (a folder it hasn't). */
+export interface ProjectChoice {
+	readonly name: string;
+	readonly depth: number;
+	readonly on: boolean;
+	readonly disabled: boolean;
+}
+
+/** A Project page as the core's `MenuProject` offers it: the choices, whether No project is checked, the words of No project and «New project…». */
+export interface ProjectPage {
+	readonly options: readonly ProjectChoice[];
+	readonly none: boolean;
+	readonly noneLabel: string;
+	readonly newLabel: string;
 }
 
 /** Where a task's menu is opened from: a list's card, a calendar's block, a card of a block's stack in its menu (F107). */
@@ -254,6 +270,8 @@ export interface TaskMenuModel {
 	readonly date: { readonly today: string; readonly picked: string | null; readonly removable: boolean };
 	/** Pick a date's list tiles above the month (the core's `places`), each on while the task goes there; none for a subtask. */
 	readonly places: readonly { readonly id: ListPlaceId; readonly title: string; readonly on: boolean }[];
+	/** The Project page (F122, F123): the tree, each project checked while the task has it, folders not to be chosen. */
+	readonly project: ProjectPage;
 	/** The Reminder page's kinds, the task's own checked. */
 	readonly reminders: readonly { readonly kind: ReminderKind; readonly checked: boolean }[];
 	/** The start of the task's description, over its copy (markdown); null without one. */
@@ -280,8 +298,12 @@ export type MenuAction =
 	/** A list tile of Pick a date's page: the task goes there as it is (the core's `sendTo`). */
 	| { readonly kind: "sendTo"; readonly list: ListPlaceId }
 	| { readonly kind: "reminder"; readonly reminder: ReminderKind }
+	/** A project of the Project page: on beside the task's others, or off (the core's `toggleProject`); null: No project, all off. */
+	| { readonly kind: "project"; readonly name: string | null }
+	/** «New project…» named `name` (F220): made at the tree's top unless the tree has it, and the task gets it (the core's `newProject`). */
+	| { readonly kind: "newProject"; readonly name: string }
 	| { readonly kind: "delete" }
-	/** An action whose own screen is part 2's (Repeat, Description, Project, Section, First step, the opens, Open in Calendar): on the stand it closes the menu and writes nothing. */
+	/** An action whose own screen is part 2's (Repeat, Section, First step, the opens, Open in Calendar): on the stand it closes the menu and writes nothing. */
 	| { readonly kind: "row"; readonly id: TaskActionId | "calendar" };
 
 /**
@@ -341,12 +363,24 @@ export interface ScreenPort {
 	rename(id: string, from: MenuFrom, dayOffset: number): RenameStart;
 	/** Enter (`next`) or a tap elsewhere on `field` holding `text`: what is written and which field opens next. */
 	commit(field: EntryField, text: string, draft: EntryDraft, next: boolean): EntryCommit;
+	/** Whether a project's name as typed names nothing (the core's `isBlankProjectName`): «New project…» then makes none and goes back to the projects. */
+	blankProjectName(name: string): boolean;
+	/**
+	 * «New project…» on the bar (F220): the project named `name` made at the tree's top unless the tree has it (any case),
+	 * no task given it yet (the core's `newProject(name, [])`); resolves to the project the field may take, null for none
+	 * (a name of nothing, a folder's).
+	 */
+	newProject(name: string): Promise<string | null>;
 	/** What the menu of the task or event `id` offers, opened `from` there. */
 	menu(id: string, from: MenuFrom): MenuModel;
 	/** Whether Undo has a step of the screen's own to take back (F267): it is dim without one. */
 	canUndo(): boolean;
 	/** Takes the screen's last write back (F267, F269); resolves once written and read back. */
 	undo(): Promise<void>;
-	/** Writes what was tapped in the menu of `id` opened `from` there (a status tile of a folded block writes its step); resolves once written and read back. */
-	act(id: string, action: MenuAction, from?: MenuFrom): Promise<void>;
+	/**
+	 * Writes what was tapped in the menu of `id` opened `from` there (a status tile of a folded block writes its step);
+	 * resolves once written and read back, to the task's id as the file now has it (the core's key is fresh after a
+	 * write, so a menu left open on its page goes on with it), null once it is gone.
+	 */
+	act(id: string, action: MenuAction, from?: MenuFrom): Promise<string | null>;
 }

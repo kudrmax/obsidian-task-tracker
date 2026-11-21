@@ -24,8 +24,11 @@ interface Phone {
 	oneLine(text: string): string;
 }
 
+/** The build runs in a Node process of its own: slow to start on a busy machine. */
+const BUILD_MS = 30_000;
+
 describe(BUNDLE, () => {
-	it("is the build of core/phone: run `node core/build.mjs` after changing it", () => {
+	it("is the build of core/phone: run `node core/build.mjs` after changing it", { timeout: BUILD_MS }, () => {
 		expect(execFileSync("node", ["core/build.mjs", "--stdout"], { encoding: "utf8" })).toBe(committed);
 	});
 

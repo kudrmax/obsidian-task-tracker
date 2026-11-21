@@ -129,12 +129,13 @@ export class TaskWrites {
 		return nothing(this.rules.firstStep(key, text));
 	}
 
-	edit(key: TaskKey, draft: TaskDraft): Write<TaskItem | null> {
+	edit(s: Snapshot, key: TaskKey, draft: TaskDraft): Write<TaskItem | null> {
 		const edit = this.rules.edit(key, draft);
+		if (!edit || !this.rules.editChanges(s, key, draft)) return { operation: null, answer: () => null };
 		return {
-			operation: edit?.operation ?? null,
+			operation: edit.operation,
 			answer: (change) => {
-				const place = edit?.place() ?? null;
+				const place = edit.place();
 				if (!change || !place || change.before.serialize() === change.after.serialize()) return null;
 				return this.reads.itemAt(change.after, place, this.rules.today());
 			},

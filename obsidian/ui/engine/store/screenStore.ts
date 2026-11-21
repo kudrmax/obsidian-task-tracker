@@ -1,7 +1,7 @@
 import { DESIGN } from "../../design";
 import { createStore, type StoreApi } from "zustand/vanilla";
 import { LAYER_MS } from "../layers/motion";
-import type { Destination, Edge, ScreenContext, EntryBar, EntryDraft, EntryField, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, MenuStatusId, ScreenData, ScreenPort } from "../port";
+import type { Destination, Edge, ScreenContext, EntryBar, EntryDraft, EntryField, FieldActionId, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, MenuStatusId, ScreenData, ScreenPort } from "../port";
 import { share } from "./share";
 
 /** Where the ribbon stands: Inbox–Soon, Soon–the day, the day–its calendar. */
@@ -23,13 +23,13 @@ export type Gesture = "drag" | "ribbon" | "resize" | "zoom";
 export type Zoom = number | "wholeDay";
 
 /** A page of a task's menu: the menu itself, the month to pick a day in, the Reminder kinds. */
-export type MenuPage = "menu" | "picker" | "reminders";
+export type MenuPage = "menu" | "picker" | "reminders" | "projects" | "projectName";
 
 /** What a menu asks before it acts (Won't do, Stop, Delete), in place of what was pressed. */
 export type Asking = MenuStatusId | "delete";
 
-/** A panel of the field's bar: the flag's levels, the projects, the places, the month of Date. */
-export type BarPanelKind = "priority" | "project" | "where" | "date";
+/** A panel of the field's bar: the flag's levels, the projects (and «New project…»'s name in their place), the places, the month of Date. */
+export type BarPanelKind = "priority" | "project" | "projectName" | "where" | "date";
 
 /**
  * An open layer (spec, «Layers and focus»): the menu of a task or an event, with what the port offers in it, opened from a
@@ -158,6 +158,10 @@ export interface ScreenActions {
 	 * happens on the screen under the menu, after it).
 	 */
 	pick(action: MenuAction): void;
+	/** A tap in the menu that leaves it on its page (a project's check): written, the menu showing the task as it then stands. */
+	actHere(action: MenuAction): void;
+	/** «New project…»'s name typed in the menu (F220): Enter makes it and gives it to the task, closing the menu; a name of nothing goes back to the projects. */
+	nameMenuProject(name: string): void;
 	/**
 	 * Rename from the menu (F117, F108): the menu closes and in the same tap the card (a list's, a calendar's block) becomes
 	 * the field, the new task's field with its bar; a card of a calendar menu's stack becomes it in the menu, which stays.
@@ -205,6 +209,11 @@ export interface ScreenActions {
 	toggleProject(name: string): void;
 	/** No project: every project off. */
 	clearProjects(): void;
+	/**
+	 * «New project…»'s name on the bar ended (F220): Enter (`name`) makes it at the tree's top and the field takes it, the
+	 * panel closing; Escape (null) or a name of nothing goes back to the projects. The field takes the focus back either way.
+	 */
+	nameEntryProject(name: string | null): void;
 	/** Description on the bar: the line under the title opens, holding what the port says (a renamed task's own description). */
 	openDescription(): void;
 	/** The description's line typed. */
@@ -293,6 +302,13 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 			const next = drawn ? share(drawn.read, fresh) : fresh;
 			const kept = Object.entries(left).filter(([day]) => Math.abs(Number(day) - dayOffset) <= LEFT_KEPT);
 			set({ left: { ...Object.fromEntries(kept), [from]: { shown, read } }, dayOffset, read: next, shown: drawn ? share(drawn.shown, next) : next, fresh: new Set(), gone: new Set() });
+		};
+		/** «New project…» on the bar being written: Enter or a tap away on the field waits for it (`commitEntry`). */
+		let naming: Promise<void> | null = null;
+		/** Whether the field's bar offers `id` now (the port's answer): Tab, Shift+Tab and ⌥Tab obey the same buttons. */
+		const offers = (id: FieldActionId): boolean => {
+			const { entry, draft, entryText } = get();
+			return !!entry && port.entryBar(entry, draft, entryText).bar.some((group) => group.actions.some((action) => action.id === id && !action.disabled));
 		};
 		/** The card `id` takes the focus back, as a menu closing gives it back (Decision 58). */
 		const focusOn = (id: string) => set({ focusCard: { id, seq: (get().focusCard?.seq ?? 0) + 1 } });
@@ -465,6 +481,20 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 				write(new Promise<void>((resolve) => (done = resolve)));
 				window.setTimeout(() => void port.act(layer.id, action, layer.from).finally(done), LAYER_MS.close);
 			},
+			actHere(action) {
+				const layer = get().layer;
+				if (!layer) return;
+				/** The menu stays on its page with the task as the file now has it: the core's key is fresh after a write. */
+				const follow = (id: string | null) => {
+					const now = get().layer;
+					if (id !== null && now && now.id === layer.id && id !== layer.id) set({ layer: { ...now, id } });
+				};
+				write(port.act(layer.id, action, layer.from).then(follow));
+			},
+			nameMenuProject(name) {
+				if (port.blankProjectName(name)) get().menuPage("projects");
+				else get().pick({ kind: "newProject", name });
+			},
 			closeLayer() {
 				if (get().layer) set({ layer: null, ...(get().entry?.stack ? { entry: null, draft: NO_DRAFT, entryText: "", entryPanel: null } : {}) });
 			},
@@ -500,6 +530,20 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 			clearProjects() {
 				set({ draft: { ...get().draft, projects: [] } });
 			},
+			nameEntryProject(name) {
+				const back = name === null || port.blankProjectName(name);
+				set({ entryPanel: back ? "project" : null, entrySeq: get().entrySeq + 1 });
+				if (back) return;
+				const made = port.newProject(name).then((project) => {
+					const { entry, draft } = get();
+					if (project !== null && entry && !draft.projects.includes(project)) set({ draft: { ...draft, projects: [...draft.projects, project] } });
+				});
+				naming = made;
+				void made.finally(() => {
+					if (naming === made) naming = null;
+				});
+				write(made);
+			},
 			openDescription() {
 				const { entry, draft } = get();
 				if (entry && draft.descriptionLine === null) set({ draft: { ...draft, descriptionLine: port.entryDescription(entry) } });
@@ -510,6 +554,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 			},
 			toggleSection() {
 				const draft = get().draft;
+				if (!offers("newSection")) return;
 				set({ draft: { ...draft, section: !draft.section }, entryPanel: null });
 			},
 			entryPlace(choice, date, reach) {
@@ -531,13 +576,18 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 			},
 			indentEntry(by) {
 				const entry = get().entry;
-				const shift = by > 0 ? "indent" : "outdent";
-				const offered = entry ? port.entryBar(entry, get().draft, get().entryText).bar.some((group) => group.actions.some((action) => action.id === shift && !action.disabled)) : false;
-				if (entry && offered) set({ entry: { ...entry, at: { ...entry.at, under: undefined, depth: Math.max(0, (entry.at.depth ?? 0) + by) } } });
+				if (entry && offers(by > 0 ? "indent" : "outdent")) set({ entry: { ...entry, at: { ...entry.at, under: undefined, depth: Math.max(0, (entry.at.depth ?? 0) + by) } } });
 			},
 			commitEntry(text, next) {
 				const { entry, draft, shown } = get();
 				if (!entry) return;
+				/** A new project still being made for this field: the task is written once the field has it, by the field as it then stands. */
+				if (naming) {
+					void naming.then(() => {
+						if (get().entry === entry) get().commitEntry(text, next);
+					});
+					return;
+				}
 				const done = port.commit(entry, text, draft, next);
 				const face = done.face;
 				set({

@@ -91,6 +91,15 @@ class CardMouseSensor extends MouseSensor {
 		super(props);
 		const sensor = this as unknown as PendingSensor;
 		/**
+		 * The plus is lifted by moving only, as under a finger: a mouse held still on it and let go is a click that opens
+		 * the field. A hold lifted it, and let go unmoved over its own place it opened nothing (a slow click; the e2e checks'
+		 * clicks under load, 330–730 ms between the press and the lift).
+		 */
+		if (props.active === PLUS && sensor.timeoutId !== null) {
+			clearTimeout(sensor.timeoutId);
+			sensor.timeoutId = null;
+		}
+		/**
 		 * Waiting out the hold, a mouse moved past the start distance lifts a card at once. Empty time is no thing to drag:
 		 * there only a hold lifts the new task's place, and a mouse that moves first is no long tap (the finger's tolerance).
 		 */

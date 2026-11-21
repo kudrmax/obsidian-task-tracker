@@ -18,6 +18,10 @@ function unkeyed<S extends { readonly id: string }>(lists: Readonly<Record<strin
 	return Object.fromEntries(Object.entries(lists).map(([list, sections]) => [list, sections.map(({ id: _id, ...rest }) => rest)]));
 }
 
+function withHomeLabel(): FakeSettingsStore {
+	return new FakeSettingsStore({ ...DEFAULT_SETTINGS, labels: [{ name: "home", color: "green" }] });
+}
+
 function setup(text: string | null, settings = new FakeSettingsStore()) {
 	const store = new InMemoryTaskFileStore(text);
 	const svc = new TaskServiceImpl(store, settings, clock);
@@ -264,6 +268,43 @@ describe("the task sheet", () => {
 		const moved = await svc.edit(renamed!.key, { text: "A3", placement: { kind: "soon" }, priority: null });
 		expect([moved?.text, moved?.key]).toEqual(["A3", { section: "soon", index: 1, path: [], raw: "- [ ] A3", id: renamed?.id }]);
 		expect(await svc.edit(moved!.key, { text: "A3", placement: { kind: "soon" }, priority: null })).toBeNull();
+	});
+
+	it("tells once what another setting changes on the screen, and nothing for a setting it does not show", async () => {
+		const settings = new FakeSettingsStore();
+		const { svc } = setup(FULL, settings);
+		const told: unknown[] = [];
+		const off = svc.onShownChange((change) => told.push(change));
+		await settings.update({ labelPaint: "blend" });
+		await settings.update({ google: { ...DEFAULT_SETTINGS.google, refreshToken: "token" } });
+		await settings.update({ cardHeight: DEFAULT_SETTINGS.cardHeight + 4 });
+		off();
+		await settings.update({ labelPaint: "stripes" });
+		const none = { tasks: false, drawn: false, cards: false, timeline: false, gestures: false, calendars: false };
+		expect(told).toEqual([
+			{ ...none, drawn: true },
+			{ ...none, cards: true },
+		]);
+	});
+
+	it("edit or rename to the same title writes nothing: the line keeps its markers in the order Max wrote them", async () => {
+		for (const line of ["- [ ] A 🗂️ Work #label/home", "- [ ] A #label/home 🗂️ Work"]) {
+			const text = `## Inbox\n\n## Projects\n\n- Work\n\n## Now\n\n${line}\n- [ ] B\n\n## Soon\n\n## Backlog\n\n## Done\n`;
+			const { store, svc } = setup(text, withHomeLabel());
+			const view = await svc.dayView(T);
+			expect(await svc.edit(view.list[0].key, { text: "A", placement: { kind: "now" }, priority: null })).toBeNull();
+			expect(await svc.rename(view.list[0].key, "A")).toBeNull();
+			expect(store.text).toBe(text);
+			expect(store.writes).toBe(0);
+		}
+	});
+
+	it("edit that moves a task without changing its line carries the line as Max wrote it", async () => {
+		const text = "## Inbox\n\n- [ ] A #label/home 🗂️ Work\n\n## Projects\n\n- Work\n\n## Now\n\n## Soon\n\n## Backlog\n\n## Done\n";
+		const { store, svc } = setup(text, withHomeLabel());
+		const [a] = await svc.inboxView();
+		await svc.edit(a.key, { text: "A", placement: { kind: "backlog" }, priority: null });
+		expect(store.text).toBe("## Inbox\n\n## Projects\n\n- Work\n\n## Now\n\n## Soon\n\n## Backlog\n\n- [ ] A #label/home 🗂️ Work\n\n## Done\n");
 	});
 
 	it("edit of a title that is only a priority's prefix writes nothing, as create and rename", async () => {

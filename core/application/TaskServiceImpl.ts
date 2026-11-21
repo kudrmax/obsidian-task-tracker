@@ -61,6 +61,7 @@ import {
 	type MenuScreen,
 	type MenuStatusId,
 	type PickedTask,
+	type ShownChange,
 	type TaskService,
 	type TaskStep,
 } from "./contracts";
@@ -72,7 +73,7 @@ import { toggledSubprojects, withMode } from "./viewModes";
 import { carriedAt, carryEnded, carryStarted, gestureGone, nameEnded } from "./projectsCarry";
 import { funnelPlaceOf, type FunnelPlace } from "./screenPlaces";
 import { ProjectTree, type TreePlace } from "../domain/ProjectTree";
-import { readsAnew } from "./readingSettings";
+import { readsAnew, shownChange } from "./readingSettings";
 import { type Moment, type Operation, TaskRules, type TextChange } from "./TaskRules";
 import { type Read, type Snapshot, TaskReads } from "./TaskReads";
 import { type DocChange, TaskWrites, type Write } from "./TaskWrites";
@@ -423,8 +424,8 @@ export class TaskServiceImpl implements TaskService {
 		return firstStepProjects(view, key);
 	}
 
-	edit(key: TaskKey, draft: TaskDraft): Promise<TaskItem | null> {
-		return this.run(this.writes.edit(key, draft));
+	async edit(key: TaskKey, draft: TaskDraft): Promise<TaskItem | null> {
+		return this.run(this.writes.edit(await this.snapshot(), key, draft));
 	}
 
 	placementOf(item: TaskItem): Placement {
@@ -750,6 +751,16 @@ export class TaskServiceImpl implements TaskService {
 				this.unsubscribeProjects = null;
 			}
 		};
+	}
+
+	onShownChange(listener: (change: ShownChange) => void): () => void {
+		let seen = this.settings.get();
+		return this.settings.onChange(() => {
+			const now = this.settings.get();
+			const change = shownChange(seen, now);
+			seen = now;
+			if (change) listener(change);
+		});
 	}
 
 	/** Settings that change how the file reads change what it says: the listeners read it anew. */
