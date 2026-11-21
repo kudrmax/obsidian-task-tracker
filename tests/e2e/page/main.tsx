@@ -1,6 +1,7 @@
 import type { App } from "obsidian";
-import { keptZoom, MockPort, type WriteDelay, ZOOM_KEY } from "../../../obsidian/stand/MockPort";
+import { keptZoom, type WriteDelay, ZOOM_KEY } from "../../../obsidian/stand/MockPort";
 import type { ListKey } from "../../../obsidian/stand/mockData";
+import { coreSource, mockSource, type StandSource } from "../../../obsidian/stand/standSource";
 import { STAND_STEPS, type StandStep, WHOLE_SCREEN } from "../../../obsidian/stand/steps";
 import { KEYS, takesKeys } from "../../../obsidian/ui/engine/keys";
 import type { Place } from "../../../obsidian/ui/engine/layout/Layout";
@@ -10,8 +11,8 @@ import { detectHaptics, type HapticsHost } from "../../../obsidian/ui/haptics";
 import { showPriorityColors } from "../../../obsidian/ui/priorityColors";
 
 /**
- * The end-to-end checks' page: the stand (obsidian/stand) off Obsidian. The engine over `MockPort` in a leaf's content
- * element, Obsidian's body classes for the theme and the platform (`?theme=dark|light&platform=desktop|phone`), the
+ * The end-to-end checks' page: the stand (obsidian/stand) off Obsidian. The engine over `MockPort` (or, with `?port=core`,
+ * over `CorePort` and the core over the made-up tasks file in memory) in a leaf's content element, Obsidian's body classes for the theme and the platform (`?theme=dark|light&platform=desktop|phone`), the
  * screen's key table on the window as the stand's view scope has it, and `window.__tcStand` as the stand plugin gives it,
  * with `step(id)` for the stand's step commands and `openNote()` for the note's block.
  */
@@ -46,13 +47,15 @@ const plainMarkdown = (text: string, el: HTMLElement): (() => void) => {
 const NOTE_PATH = "Заметка о доме.md";
 
 class StandPage {
-	readonly port = new MockPort();
 	private readonly screens = new Set<MountedScreen>();
 	private leafScreen: MountedScreen | null = null;
 	private readonly app = {} as App;
 	private readonly haptics = detectHaptics(window as unknown as HapticsHost);
 
-	constructor(private readonly leaf: HTMLElement) {}
+	constructor(
+		private readonly leaf: HTMLElement,
+		private readonly source: StandSource,
+	) {}
 
 	showLeaf(step: StandStep): void {
 		this.clear();
@@ -66,7 +69,7 @@ class StandPage {
 	showStep(id: string): void {
 		const step = STAND_STEPS.find((s) => s.id === id);
 		if (!step) throw new Error(`no stand step ${id}`);
-		this.port.reset(step.file?.());
+		this.source.reset(step.file?.());
 		this.showLeaf(step);
 	}
 
@@ -98,13 +101,14 @@ class StandPage {
 	};
 
 	api() {
-		const port = this.port;
+		const source = this.source;
 		return {
-			fileText: () => port.fileText(),
-			reset: () => port.reset(),
-			setDelay: (delay: WriteDelay) => (port.delay = delay),
-			addFromOutside: (list: ListKey, title: string) => port.addFromOutside(list, title),
-			moveFromOutside: (title: string, list: ListKey, before: string | null) => port.moveFromOutside(title, list, before),
+			port: source.kind,
+			fileText: () => source.fileText(),
+			reset: () => source.reset(),
+			setDelay: (delay: WriteDelay) => source.setDelay(delay),
+			addFromOutside: (list: ListKey, title: string) => source.addFromOutside(list, title),
+			moveFromOutside: (title: string, list: ListKey, before: string | null) => source.moveFromOutside(title, list, before),
 			setStop: (stop: Stop) => this.screens.forEach((screen) => screen.store.getState().setStop(stop)),
 			debug: () =>
 				[...this.screens].map((screen) => {
@@ -117,7 +121,7 @@ class StandPage {
 	}
 
 	private mount(el: HTMLElement, place: Place, sourcePath: string): MountedScreen {
-		const screen = mountScreen(el, { port: this.port, place, app: this.app, sourcePath, haptics: this.haptics, zoom: keptZoom(load, save), markdown: plainMarkdown, desk: !document.body.classList.contains("is-mobile") });
+		const screen = mountScreen(el, { port: this.source.port, place, app: this.app, sourcePath, haptics: this.haptics, zoom: keptZoom(load, save), markdown: plainMarkdown, desk: !document.body.classList.contains("is-mobile") });
 		this.screens.add(screen);
 		return screen;
 	}
@@ -137,7 +141,9 @@ showPriorityColors([]);
 const leaf = document.createElement("div");
 leaf.className = "workspace-leaf-content";
 document.body.appendChild(leaf);
-const stand = new StandPage(leaf);
-window.addEventListener("keydown", stand.onKey);
-(window as unknown as { __tcStand: ReturnType<StandPage["api"]> }).__tcStand = stand.api();
-stand.showLeaf(WHOLE_SCREEN);
+void (params.get("port") === "core" ? coreSource() : Promise.resolve(mockSource())).then((source) => {
+	const stand = new StandPage(leaf, source);
+	window.addEventListener("keydown", stand.onKey);
+	(window as unknown as { __tcStand: ReturnType<StandPage["api"]> }).__tcStand = stand.api();
+	stand.showLeaf(WHOLE_SCREEN);
+});

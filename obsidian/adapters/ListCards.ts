@@ -9,6 +9,7 @@ import type { Destination } from "../ui/engine/port";
 export class ListCards {
 	readonly cards: readonly ListCard[];
 	private readonly sectionNames: ReadonlyMap<string, GroupName>;
+	/** The ids of the sections whose headers the column draws, the tasks outside any too once the column shows headers. */
 	private readonly sectionIds: ReadonlyMap<GroupName, string>;
 	/** Where each section's cards end among all the cards: its end's gap. */
 	private readonly ends: ReadonlyMap<GroupName, number>;
@@ -23,7 +24,7 @@ export class ListCards {
 		const ends = new Map<GroupName, number>();
 		for (const group of column.groups) {
 			names.set(group.id, group.name);
-			ids.set(group.name, group.id);
+			if (group.header) ids.set(group.name, group.id);
 			let skipBelow: number | null = null;
 			for (const { item, level } of group.rows) {
 				if (skipBelow !== null && level > skipBelow) continue;
@@ -62,8 +63,8 @@ export class ListCards {
 		return placeOfDrop(this.cards, this.gapOf(to), this.home);
 	}
 
-	/** The engine's words for a gap: the card it stands before, its depth, its section's id (null: outside any). */
+	/** The engine's words for a gap: the card it stands before, its depth, its section's id as its header is drawn (null: no header, the tasks outside any). */
 	destinationOf(gap: GapPlace): Pick<Destination, "before" | "depth" | "section"> {
-		return { before: this.cards[gap.index]?.id ?? null, depth: gap.level, section: gap.group === null ? null : (this.sectionIds.get(gap.group) ?? null) };
+		return { before: this.cards[gap.index]?.id ?? null, depth: gap.level, section: this.sectionIds.get(gap.group) ?? null };
 	}
 }

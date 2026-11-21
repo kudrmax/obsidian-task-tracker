@@ -160,7 +160,9 @@ export function fileText(file: MockFile, clock: Date): string {
 		return `${pad(Math.floor(clockMinute / 60) % 24)}:${pad(clockMinute % 60)}`;
 	};
 	const line = (t: MockTask, depth: number): string[] => {
-		const slot = (due: string, s: NonNullable<MockTask["slot"]>) => ` 📌 ${due} ${time(s.start)}${s.end === null ? "" : `-${time(s.end)}`}`;
+		/** The date a slot's start falls on by the clock: past midnight the calendar's next date (docs/plugin/file.md). */
+		const slotDate = (due: string, start: number) => (DAY_START_HOUR * 60 + start >= 24 * 60 ? dateOf(addDays(new Date(`${due}T00:00`), 1)) : due);
+		const slot = (due: string, s: NonNullable<MockTask["slot"]>) => ` 📌 ${slotDate(due, s.start)} ${time(s.start)}${s.end === null ? "" : `-${time(s.end)}`}`;
 		const fields = [t.level ? `${t.level} ` : "", t.title, t.due ? ` 📅 ${t.due}` : "", t.slot ? slot(t.due ?? dateOf(day), t.slot) : "", (t.projects ?? []).map((name) => ` 🗂️ ${name}`).join(""), t.folded ? " 📁" : ""].join("");
 		const own = `${"\t".repeat(depth)}- [${t.status}] ${fields}`;
 		const description = t.description ? t.description.split("\n").map((line) => `${"\t".repeat(depth + 1)}- ${line}`) : [];

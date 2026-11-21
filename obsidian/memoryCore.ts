@@ -68,16 +68,42 @@ class MemorySettings implements SettingsStore {
 	}
 }
 
-/** A calendar's file in memory: the events given, written now, covering every day. */
-function eventFile(name: EventFile["name"], events: readonly CalendarEvent[], clock: Clock): EventFile {
-	const calendars = [...new Map(events.filter((e) => e.source === name).map((e) => [e.calendar, { title: e.calendar, account: e.account, calendarId: e.calendarId, color: e.color }])).values()];
-	const file: CalendarFile = { events: events.filter((e) => e.source === name), calendars, exportedAt: clock.now(), device: null, from: null, to: null, validUntil: null };
-	return { name, read: async () => file, onChange: () => () => undefined };
+/** The calendars' events in memory, every source's file over them: replaced, each file says it changed, as a writer's new file does. */
+export class MemoryEvents {
+	private readonly listeners = new Set<() => void>();
+
+	constructor(
+		private events: readonly CalendarEvent[],
+		private readonly clock: Clock,
+	) {}
+
+	replace(events: readonly CalendarEvent[]): void {
+		this.events = events;
+		for (const listener of this.listeners) listener();
+	}
+
+	/** The file of `name`: its events, written now, covering every day. */
+	file(name: EventFile["name"]): EventFile {
+		return {
+			name,
+			read: async () => {
+				const own = this.events.filter((e) => e.source === name);
+				const calendars = [...new Map(own.map((e) => [e.calendar, { title: e.calendar, account: e.account, calendarId: e.calendarId, color: e.color }])).values()];
+				const file: CalendarFile = { events: own, calendars, exportedAt: this.clock.now(), device: null, from: null, to: null, validUntil: null };
+				return file;
+			},
+			onChange: (listener) => {
+				this.listeners.add(listener);
+				return () => this.listeners.delete(listener);
+			},
+		};
+	}
 }
 
 export interface MemoryCore {
 	readonly core: Core;
 	readonly file: MemoryTasksFile;
+	readonly events: MemoryEvents;
 	readonly clock: Clock;
 }
 
@@ -87,6 +113,7 @@ export interface MemoryCore {
  */
 export function memoryCore(text: string, clock: Clock, settings: Partial<TaskCalendarSettings> = {}, events: readonly CalendarEvent[] = [], projectsScreen?: ProjectsScreenStore): MemoryCore {
 	const file = new MemoryTasksFile(text);
+	const calendar = new MemoryEvents(events, clock);
 	const core = composeCore({
 		tasksFile: file,
 		settings: new MemorySettings({ ...DEFAULT_SETTINGS, ...settings }),
@@ -96,11 +123,11 @@ export function memoryCore(text: string, clock: Clock, settings: Partial<TaskCal
 			return () => clearInterval(id);
 		} },
 		timers: { set: (fn, ms) => setTimeout(fn, ms) as unknown as number, clear: (id) => clearTimeout(id) },
-		calendarFiles: { google: eventFile("google", events, clock), iphone: eventFile("iphone", events, clock), work: eventFile("work", events, clock) },
+		calendarFiles: { google: calendar.file("google"), iphone: calendar.file("iphone"), work: calendar.file("work") },
 		feeds: [],
 		work: { export: () => undefined },
 		isPhone: () => false,
 		...(projectsScreen && { projectsScreen }),
 	});
-	return { core, file, clock };
+	return { core, file, events: calendar, clock };
 }

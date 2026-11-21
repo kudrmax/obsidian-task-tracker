@@ -87,8 +87,9 @@ export class ScreenDrawing {
 	private block(item: TaskItem, date: LocalDate, cards: Record<string, CardFace>, held: ScreenSource["held"]): Block {
 		cards[item.id] = this.face(item, date);
 		for (const sub of item.subtasks) cards[sub.id] = this.face(sub, date);
-		const shown = held?.id === item.id ? held : this.tasks.shownSpan(item, date);
-		const own = this.days.boundary().spanOf(item.slot!, date);
+		const holding = held?.id === item.id ? held : null;
+		const shown = holding ?? this.tasks.shownSpan(item, date);
+		const own = holding ?? this.days.boundary().spanOf(item.slot!, date);
 		const length = shown.end === null ? null : shown.end - shown.start;
 		return {
 			id: item.id,
