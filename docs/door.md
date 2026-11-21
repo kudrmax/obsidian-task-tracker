@@ -766,7 +766,9 @@ vault folder (`Projects/Alpha.md`); caret offsets count UTF-16 code units, as `N
 The steps live with the host. Every write that is a step answers `history`; hand it in again in the next context.
 `undo()` and `redo()` take the last step back or do it again over `context.tasks` and answer `"done"` (with `tasks`),
 `"nothing"` or `"conflict"` (its lines were edited since: the step is dropped, the file stays), with the new `history`.
-`canUndo()`, `canRedo()`. The plugin keeps 100 steps; a new step clears the steps to do again.
+`canUndo()`, `canRedo()`. The plugin keeps 100 steps; a new step clears the steps to do again. The notice after a step
+is `rules.undoNotice(step, outcome)` (`step` `"undo"` or `"redo"`): `"Can’t undo: the tasks file changed"` or `"Can’t
+redo: …"` for `"conflict"`, `null` for any other outcome; the app shows these words, never its own.
 
 ### `entry.*`: the quick entry
 
@@ -1015,6 +1017,8 @@ Open full screen and Open in Obsidian are its own rows, outside the model.
 - `WorkCalendarSetup` (`scriptableLoader`, `export`): the Scriptable script and the Shortcuts export are the Obsidian
   plugin's fallback on the iPhone; an app writes `calendar/iphone.json` itself (`iphoneCalendarText`).
 - `ScreenReader` (`TaskService.reader`): a read held across calls; the door reads the text handed in on every call.
+  Its `within(filter)`, the same read under another project filter, has nothing to hold either: the door takes the
+  filter with each call.
 - `DayEventsAsk`, `PolledScreen`, `CalendarPoll`, `SecretField`: the halves of `events`' fetch, `keepFresh` and
   `bindClientSecret`, which are the host's.
 

@@ -63,6 +63,10 @@ export class SnapshotReader implements ScreenReader {
 		return item && this.reads.resizedSlot(item, day, edge, minute, minDurationMin);
 	}
 
+	within(filter: ProjectsNodeId | null): ScreenReader {
+		return filter === this.filter ? this : new SnapshotReader(this.reads, this.writes, this.answer, filter, this.carry);
+	}
+
 	private slotted(id: string): TaskItem | null {
 		const item = this.item(id);
 		return item?.slot ? item : null;

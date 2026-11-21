@@ -79,6 +79,7 @@ import type { PatchIds } from "../domain/TextPatch";
 import { snapMinute } from "./snapGrid";
 import { dayOpening } from "./DayServiceImpl";
 import { shownChange } from "./readingSettings";
+import { undoNotice } from "./undoNotice";
 import { repeatPageEnd } from "./RepeatPage";
 import { descriptionOpen, descriptionRead, descriptionSave, descriptionTyped } from "./DescriptionDraft";
 
@@ -943,6 +944,7 @@ const RULES: Readonly<Record<string, (...args: A[]) => unknown>> = {
 	listCardMenuFrom,
 	originOf,
 	shownChange: (before: string, after: string) => shownChange(settingsOf(before), settingsOf(after)),
+	undoNotice,
 };
 
 /** contracts.ts's runtime constants, as the UI reads them. */

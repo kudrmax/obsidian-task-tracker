@@ -6385,6 +6385,12 @@ ${key.title}`.toLowerCase();
     return { kind: "away", id, item: null };
   }
 
+  // core/application/undoNotice.ts
+  function undoNotice(step, outcome) {
+    if (outcome !== "conflict") return null;
+    return step === "undo" ? "Can’t undo: the tasks file changed" : "Can’t redo: the tasks file changed";
+  }
+
   // core/application/contracts.ts
   var StaleTaskError = class extends Error {
     constructor() {
@@ -9498,7 +9504,8 @@ ${key.title}`.toLowerCase();
     canPick,
     listCardMenuFrom,
     originOf,
-    shownChange: (before, after) => shownChange(settingsOf(before), settingsOf(after))
+    shownChange: (before, after) => shownChange(settingsOf(before), settingsOf(after)),
+    undoNotice
   };
   var CONSTANTS = { PROJECTS_HOVER_MS, PROJECTS_INDENT, REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, CLEAR_COLOR, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS, DEFAULT_ZOOM_LEVELS, DEFAULT_ZOOM_HOUR, SHOWN_LISTS, FUNNEL_PLACES, ROW_LISTS, VIEW_WORDS, SWIPE_FLICK_SPEED, CARD_HEIGHTS, CARD_GAPS, DEFAULT_CARD_SIZE, LIST_WIDTHS, REPEAT_WORDS, DIVIDER_SNAP, MOST_CARD_COLORS, NO_DAY_EVENTS };
   var TIMELINE = {

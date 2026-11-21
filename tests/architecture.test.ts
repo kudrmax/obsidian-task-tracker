@@ -318,6 +318,7 @@ const CONTRACT_RUNTIME: Readonly<Record<string, string>> = {
 	cardDue: "./cardDue",
 	DESCRIPTION_TEMPLATE: "../domain/description",
 	textParts: "../domain/TaskText",
+	undoNotice: "./undoNotice",
 	LINE_BREAK: "../domain/TaskTitle",
 	oneLine: "../domain/TaskTitle",
 	sameLevels: "../settings",
