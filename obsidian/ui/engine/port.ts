@@ -1,11 +1,11 @@
-import type { DividerStop, EntryBarGroup, FieldActionId, FieldGroup, ListWidths, MenuActionGroup, MenuStatusId, TaskActionId, TaskMenuActionId, TaskMenuGroup } from "../../../core/application/contracts";
+import type { DividerStop, EntryBarGroup, FieldActionId, FieldGroup, ListWidths, MenuActionGroup, MenuStatusId, TaskActionId, TaskMenuActionId, TaskMenuGroup, UndoOutcome } from "../../../core/application/contracts";
 
 /**
  * The task actions are the core's (`core/application/taskActions.ts`, task actions spec): the ids, the groups and the
  * offered actions a surface lays out. The port answers with them; the engine keeps only each action's look and handler,
  * an exhaustive `Record` over the surface's ids. Types only: the engine runs no code of the core.
  */
-export type { DividerStop, EntryBarGroup, FieldActionId, FieldGroup, ListWidths, MenuActionGroup, MenuStatusId, TaskActionId, TaskMenuActionId, TaskMenuGroup };
+export type { DividerStop, EntryBarGroup, FieldActionId, FieldGroup, ListWidths, MenuActionGroup, MenuStatusId, TaskActionId, TaskMenuActionId, TaskMenuGroup, UndoOutcome };
 
 /**
  * The screen's one port (docs/superpowers/specs/2026-11-18-ui-engine.md, «The owners», «Data and writes»): what the screen
@@ -306,9 +306,20 @@ export type MenuAction =
 	/** An action whose own screen is part 2's (Repeat, Section, First step, the opens, Open in Calendar): on the stand it closes the menu and writes nothing. */
 	| { readonly kind: "row"; readonly id: TaskActionId | "calendar" };
 
+/**
+ * What the screen is drawn in besides the day: the chosen project (null: every task). Another one is a change of context,
+ * drawn in place (spec, principle 3; F23). The view mode joins it when the modes come (Decision 132).
+ */
+export interface ScreenContext {
+	readonly project: string | null;
+}
+
+/** Every task: no project chosen. */
+export const EVERY_TASK: ScreenContext = { project: null };
+
 export interface ScreenPort {
-	/** The screen for the day `dayOffset` days from today. */
-	read(dayOffset: number): ScreenData;
+	/** The screen for the day `dayOffset` days from today, in `context` (every task when absent). */
+	read(dayOffset: number, context?: ScreenContext): ScreenData;
 	/** Fires after the data changed: a write, an edit from outside. Returns the unsubscribe. The screen reads again each minute too: what rides the now line and what is past changes with the clock. */
 	subscribe(listener: () => void): () => void;
 	/** The present minute from today's start and the clock's time as the now line writes it: «14:20». */
@@ -317,7 +328,7 @@ export interface ScreenPort {
 	 * The screen as it will stand once `move(id, to)` is written: drawn while the task is carried and at the drop, before
 	 * the write's read-back. Writes made and not yet read back are in it already.
 	 */
-	preview(id: string, to: Destination): ScreenData;
+	preview(id: string, to: Destination, context?: ScreenContext): ScreenData;
 	/** Whether `to` takes the task: a place that refuses opens no place for it, and the card's place stays where it was. */
 	takes(id: string, to: Destination): boolean;
 	/**
@@ -325,7 +336,7 @@ export interface ScreenPort {
 	 * task drawn stretched as far as the rules let it (the end no earlier than the start; the start no later than the end,
 	 * and on a task without a length no later than its start, which becomes its end).
 	 */
-	stretched(id: string, dayOffset: number, edge: Edge, minute: number): ScreenData;
+	stretched(id: string, dayOffset: number, edge: Edge, minute: number, context?: ScreenContext): ScreenData;
 	/**
 	 * Where the task goes once its `edge` dot is let go at `minute`; null when nothing changes. Stretched no longer than
 	 * `least` minutes it keeps no length; the bottom dot changes only how long it lasts (a task riding the now line keeps its
@@ -365,6 +376,18 @@ export interface ScreenPort {
 	newProject(name: string): Promise<string | null>;
 	/** What the menu of the task or event `id` offers, opened `from` there. */
 	menu(id: string, from: MenuFrom): MenuModel;
+	/**
+	 * The screen's own steps taken back and done again, as the core's `UndoService` keeps them (F267–F270): one action one
+	 * step, an edit from outside none. Whether there is one to take back (Undo is dim without one) or to do again; a change
+	 * of either fires `subscribe`.
+	 */
+	canUndo(): boolean;
+	canRedo(): boolean;
+	/** Takes the screen's last step back; resolves once written and read back: done, nothing to take back, or refused because the file changed under it. */
+	undo(): Promise<UndoOutcome>;
+	redo(): Promise<UndoOutcome>;
+	/** What the notice says after `step` came out as `outcome` («Can’t undo: the tasks file changed»); null: no notice. */
+	undoNotice(step: "undo" | "redo", outcome: UndoOutcome): string | null;
 	/**
 	 * Writes what was tapped in the menu of `id` opened `from` there (a status tile of a folded block writes its step);
 	 * resolves once written and read back, to the task's id as the file now has it (the core's key is fresh after a

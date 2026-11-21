@@ -51,6 +51,8 @@ class StandPage {
 	private leafScreen: MountedScreen | null = null;
 	private readonly app = {} as App;
 	private readonly haptics = detectHaptics(window as unknown as HapticsHost);
+	/** The notices shown, in order, as Obsidian's `Notice` would show them. */
+	private readonly notices: string[] = [];
 
 	constructor(private readonly leaf: HTMLElement) {}
 
@@ -87,10 +89,11 @@ class StandPage {
 		this.mount(block, "note", NOTE_PATH);
 	}
 
-	/** A key of the screen's table, as the stand's view scope runs it: only while the screen takes keys. */
+	/** A key of the screen's table, as the stand's view scope runs it (`Mod` is ⌘ or Ctrl): only while the screen takes keys. */
 	onKey = (event: KeyboardEvent): void => {
-		if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
-		const key = KEYS.find((k) => k.key === event.key && k.modifiers.length === 0);
+		if (event.defaultPrevented) return;
+		const held = [...(event.metaKey || event.ctrlKey ? ["Mod"] : []), ...(event.shiftKey ? ["Shift"] : []), ...(event.altKey ? ["Alt"] : [])];
+		const key = KEYS.find((k) => k.key.toLowerCase() === event.key.toLowerCase() && k.modifiers.length === held.length && k.modifiers.every((m) => held.includes(m)));
 		const screen = this.leafScreen?.store.getState();
 		if (!key || !screen || !takesKeys(screen)) return;
 		key.run(screen);
@@ -106,18 +109,20 @@ class StandPage {
 			addFromOutside: (list: ListKey, title: string) => port.addFromOutside(list, title),
 			moveFromOutside: (title: string, list: ListKey, before: string | null) => port.moveFromOutside(title, list, before),
 			setStop: (stop: Stop) => this.screens.forEach((screen) => screen.store.getState().setStop(stop)),
+			setProject: (project: string | null) => this.screens.forEach((screen) => screen.store.getState().setContext({ project })),
 			debug: () =>
 				[...this.screens].map((screen) => {
 					const { stop, gesture, lifted, layer, entry, pending, dayOffset } = screen.store.getState();
 					return { stop, gesture, lifted, layer: layer?.kind ?? null, entry, pending, dayOffset };
 				}),
 			step: (id: string) => this.showStep(id),
+			notices: () => [...this.notices],
 			openNote: () => this.openNote(),
 		};
 	}
 
 	private mount(el: HTMLElement, place: Place, sourcePath: string): MountedScreen {
-		const screen = mountScreen(el, { port: this.port, place, app: this.app, sourcePath, haptics: this.haptics, zoom: keptZoom(() => load(ZOOM_KEY), (value) => save(ZOOM_KEY, value)), listShare: keptListShare(() => load(LIST_SHARE_KEY), (value) => save(LIST_SHARE_KEY, value)), markdown: plainMarkdown, desk: !document.body.classList.contains("is-mobile") });
+		const screen = mountScreen(el, { port: this.port, place, app: this.app, sourcePath, haptics: this.haptics, zoom: keptZoom(() => load(ZOOM_KEY), (value) => save(ZOOM_KEY, value)), listShare: keptListShare(() => load(LIST_SHARE_KEY), (value) => save(LIST_SHARE_KEY, value)), markdown: plainMarkdown, notice: (text: string) => void this.notices.push(text), desk: !document.body.classList.contains("is-mobile") });
 		this.screens.add(screen);
 		return screen;
 	}

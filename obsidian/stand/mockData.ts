@@ -103,14 +103,16 @@ export function mockFile(clock: Date): MockFile {
 	const task = (name: string, more: Partial<MockTask> = {}): MockTask => ({ id: `t${++k}`, title: name, level: null, status: " ", due: null, slot: null, description: null, children: [], ...more });
 	const section = (name: string | null, tasks: MockTask[]): MockSection => ({ id: `s${++s}`, name, tasks });
 
-	const inbox = [section(null, Array.from({ length: 40 }, (_, i) => task(title(), { level: i % 11 === 0 ? "p1" : null }))), section("Идеи", Array.from({ length: 30 }, () => task(title())))];
+	/** Every few tasks belong to a project, so the stand can choose one (a change of context, F23). */
+	const home = (i: number, every: number): Partial<MockTask> => (i % every === every - 1 ? { projects: ["Дом"] } : {});
+	const inbox = [section(null, Array.from({ length: 40 }, (_, i) => task(title(), { level: i % 11 === 0 ? "p1" : null, ...home(i, 5) }))), section("Идеи", Array.from({ length: 30 }, () => task(title())))];
 
 	const nowTasks: MockTask[] = [
 		task("Длинная задача, у которой название не помещается в колонку и уходит за правый край карточки", { status: "/", due: today }),
 		task("Задача с описанием", { due: today, description: "первая строка описания" }),
 	];
 	for (let i = 0; i < 28; i++) {
-		const t = task(title(), { status: i % 9 === 0 ? "/" : " ", level: i % 7 === 0 ? "p2" : null, due: today });
+		const t = task(title(), { status: i % 9 === 0 ? "/" : " ", level: i % 7 === 0 ? "p2" : null, due: today, ...home(i, 4) });
 		if (i % 10 === 3) t.children = [task(`шаг ${title()}`, { children: [task(`подшаг ${title()}`)] }), task(`шаг ${title()}`, { status: "x" }), task(`шаг ${title()}`)];
 		nowTasks.push(t);
 	}
@@ -127,12 +129,12 @@ export function mockFile(clock: Date): MockFile {
 	];
 	for (const [offset, minutes, name] of timed) {
 		const start = quarter(at + offset);
-		if (start >= 0 && start + minutes <= 24 * 60) nowTasks.push(task(name, { due: today, slot: { start, end: start + minutes } }));
+		if (start >= 0 && start + minutes <= 24 * 60) nowTasks.push(task(name, { due: today, slot: { start, end: start + minutes }, ...(minutes === 120 ? { projects: ["Дом"] } : {}) }));
 	}
 	const now = [section(null, nowTasks), section("Вечер", Array.from({ length: 6 }, () => task(title(), { due: today })))];
 
 	const soon = [
-		section(null, Array.from({ length: 50 }, (_, i) => task(title(), { due: i % 3 === 0 ? dateOf(addDays(day, 1 + (i % 10))) : null }))),
+		section(null, Array.from({ length: 50 }, (_, i) => task(title(), { due: i % 3 === 0 ? dateOf(addDays(day, 1 + (i % 10))) : null, ...home(i, 6) }))),
 		section("Поездка", Array.from({ length: 20 }, () => task(title()))),
 		section("Пустая секция", []),
 	];
@@ -151,7 +153,7 @@ export function mockFile(clock: Date): MockFile {
 const noEventsAndTheTree = (): Pick<MockFile, "events" | "allDay" | "projects"> => ({ events: [], allDay: [], projects: mockProjects() });
 
 /** The made-up projects, the tree in its order. */
-const MOCK_PROJECTS: readonly MockProject[] = [
+export const MOCK_PROJECTS: readonly MockProject[] = [
 	{ name: "Дом", depth: 0, folder: false },
 	{ name: "Ремонт", depth: 1, folder: false },
 	{ name: "Работа", depth: 0, folder: true },

@@ -1,8 +1,9 @@
-import { createContext, type CSSProperties, memo } from "react";
+import { createContext, type CSSProperties, memo, useRef } from "react";
 import { PROPERTY } from "../../design";
 import type { CardFace } from "../port";
 import { useData } from "../store";
 import { Icon } from "./Icon";
+import { useLeaving } from "./MovingRow";
 
 /**
  * What a task's card shows on the calendar besides what it shows in a list (F91, F93, F94): its corner (its start in a stack, its length when shorter than the card), the moving edge's
@@ -30,10 +31,15 @@ export interface CardProps {
 /**
  * A task's card, by its id, the one face of a task in a list and on the calendar (F91): drawn again only when its own face
  * changes (a memoized face over a selector, spec principle 8). The dot of a task in progress, the title fading out on the
- * right, the counter and the description's mark, the date in a list; on the calendar, its look there (`BlockLook`).
+ * right, the counter and the description's mark, the date in a list; on the calendar, its look there (`BlockLook`). A card
+ * whose task has left the screen keeps its last face while its row fades (`MovingRows`).
  */
 export const Card = memo(function Card({ id, depth = 0, copy = false, block }: CardProps) {
-	const face = useData((d) => d.cards[id]);
+	const read = useData((d) => d.cards[id]);
+	const leaving = useLeaving();
+	const last = useRef(read);
+	if (read) last.current = read;
+	const face = read ?? (leaving ? last.current : undefined);
 	if (!face) return null;
 	const marked = copy ? { "data-copy": id } : block ? { "data-block": id, "data-own-press": "" } : { "data-id": id };
 	return (

@@ -1,7 +1,8 @@
 import { DESIGN } from "../../design";
 import { createStore, type StoreApi } from "zustand/vanilla";
 import { LAYER_MS } from "../layers/motion";
-import type { Destination, DividerStop, Edge, EntryBar, EntryDraft, EntryField, FieldActionId, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, MenuStatusId, ScreenData, ScreenPort } from "../port";
+import { EVERY_TASK } from "../port";
+import type { Destination, DividerStop, Edge, ScreenContext, UndoOutcome, EntryBar, EntryDraft, EntryField, FieldActionId, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, MenuStatusId, ScreenData, ScreenPort } from "../port";
 import { share } from "./share";
 
 /** Where the ribbon stands: Inbox–Soon, Soon–the day, the day–its calendar. */
@@ -13,6 +14,8 @@ export const STOP_LISTS: Readonly<Record<Stop, readonly ListId[]>> = { inbox: ["
 const SHOWS: Readonly<Record<Stop, Readonly<Record<ListId, boolean>>>> = { inbox: { inbox: true, soon: true, day: false }, soon: { inbox: false, soon: true, day: true }, calendar: { inbox: false, soon: false, day: true } };
 const STOP_OF: Readonly<Record<ListId, Stop>> = { inbox: "inbox", soon: "soon", day: "soon" };
 
+/** Nothing came or went: one object, so a selector of it draws nothing again. */
+const NONE: ReadonlySet<string> = new Set();
 const NO_DRAFT: EntryDraft = { level: null, projects: [], descriptionLine: null, section: false };
 
 /** The one gesture that holds the pointer (spec, «Which gesture holds the pointer»). */
@@ -105,8 +108,27 @@ export interface ScreenState {
 	readonly menuLifted: boolean;
 	/** Counts the fields opened: each new one (after Enter) is a fresh, empty field. */
 	readonly entrySeq: number;
-	/** Tasks new in the last read: their rows come in; a row merely scrolled into sight does not. */
+	/** Counts the reads that changed what the screen shows: the screen says when it has drawn one (`drawn`). */
+	readonly readSeq: number;
+	/**
+	 * Tasks new in the last read, until the screen has drawn it (`drawn`): their rows come in as they mount then; a row
+	 * mounted later (scrolled into sight, carried onto the calendar) does not.
+	 */
 	readonly fresh: ReadonlySet<string>;
+	/** Tasks gone from the screen in the last read (done, deleted, sent where it doesn't show them): their rows fade out (Decision 132). */
+	readonly gone: ReadonlySet<string>;
+	/** What the screen is drawn in besides the day: the chosen project (Decision 132). */
+	readonly context: ScreenContext;
+	/**
+	 * Counts the contexts: each region of rows is keyed by it, so a new context mounts in place, without motion (spec,
+	 * principle 3); a task's row of another context is another row (`MovingRow`'s layout id).
+	 */
+	readonly contextSeq: number;
+	/** Whether Undo has a step to take back and Redo one to do again (the port's answers, read with the data): Undo is dim without one (F267). */
+	readonly canUndo: boolean;
+	readonly canRedo: boolean;
+	/** A notice to show once per `seq` (the port's words): «Can’t undo: the tasks file changed». */
+	readonly notice: { readonly text: string; readonly seq: number } | null;
 	/** A card to take the keyboard's focus, once per `seq`: the one a rename ended on by a key (Decision 58). */
 	readonly focusCard: { readonly id: string; readonly seq: number } | null;
 	/** A task to bring into sight in its list, once per `seq`. */
@@ -235,6 +257,14 @@ export interface ScreenActions {
 	 * level out, a new task under a renamed one); a renamed card shows its new name at once (F298).
 	 */
 	commitEntry(text: string, next: boolean): void;
+	/** Another context (a project chosen, or none): the shown day and the days drawn beside it read again in it, drawn in place. */
+	setContext(context: ScreenContext): void;
+	/** Undo, the button or ⌘Z (F267): the port takes its last step back, and the cards move as any change moves them. */
+	undo(): void;
+	/** ⌘⇧Z (F268): the step last taken back, done again. */
+	redo(): void;
+	/** The screen has drawn the read `seq`: what came in it no longer comes in. */
+	drawn(seq: number): void;
 	/** Starts following the port and the clock; returns the stop. Called by the screen as it mounts. */
 	start(): () => void;
 }
@@ -262,6 +292,8 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 	/** The edge a carried card heads into, and the wait before its room may scroll. */
 	let scrollEdge: string | null = null;
 	let scrollWait = 0;
+	/** A context chosen while a drag or a resize held the screen still: set as it ends. */
+	let waitingContext: ScreenContext | null = null;
 	const first = port.read(0);
 	return createStore<Screen>()((set, get) => {
 		/** The port's data again; held while a drag or a drop's write keeps the screen still (spec, principle 5). */
@@ -271,19 +303,25 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 				if (!s.pending) set({ pending: true });
 				return;
 			}
-			const next = share(s.read, port.read(s.dayOffset));
+			const next = share(s.read, port.read(s.dayOffset, s.context));
 			const known = s.read.cards;
-			const fresh = new Set(Object.keys(next.cards).filter((id) => !(id in known)));
+			/** A read that changed nothing (a write's read-back after its own change came) keeps what came and went in the last one. */
+			const same = next === s.read;
+			const came = Object.keys(next.cards).filter((id) => !(id in known));
+			const went = Object.keys(known).filter((id) => !(id in next.cards));
 			/** An open menu shows its task as it now stands (a subtask typed into its stack, F108). */
 			const layer = s.layer && s.layer.model.kind === "task" && next.cards[s.layer.id] ? { ...s.layer, model: port.menu(s.layer.id, s.layer.from) } : s.layer;
-			set({ read: next, shown: share(s.shown, next), pending: false, fresh: fresh.size === 0 && s.fresh.size === 0 ? s.fresh : fresh, layer });
+			const undo = { canUndo: port.canUndo(), canRedo: port.canRedo() };
+			if (same) return set({ shown: share(s.shown, next), pending: false, layer, ...undo });
+			set({ read: next, shown: share(s.shown, next), pending: false, readSeq: s.readSeq + 1, fresh: came.length === 0 ? NONE : new Set(came), gone: went.length === 0 ? NONE : new Set(went), layer, ...undo });
 		};
 
 		const write = (done: Promise<unknown>) => {
 			writing++;
 			void done.finally(() => {
 				writing--;
-				refresh();
+				if (writing === 0 && waitingContext) get().setContext(waitingContext);
+				else refresh();
 			});
 		};
 
@@ -292,10 +330,10 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 			const { dayOffset: from, shown, read, left } = get();
 			if (dayOffset === from) return;
 			const drawn = left[dayOffset];
-			const fresh = port.read(dayOffset);
+			const fresh = port.read(dayOffset, get().context);
 			const next = drawn ? share(drawn.read, fresh) : fresh;
 			const kept = Object.entries(left).filter(([day]) => Math.abs(Number(day) - dayOffset) <= LEFT_KEPT);
-			set({ left: { ...Object.fromEntries(kept), [from]: { shown, read } }, dayOffset, read: next, shown: drawn ? share(drawn.shown, next) : next, fresh: new Set() });
+			set({ left: { ...Object.fromEntries(kept), [from]: { shown, read } }, dayOffset, read: next, shown: drawn ? share(drawn.shown, next) : next, fresh: NONE, gone: NONE });
 		};
 		/** «New project…» on the bar being written: Enter or a tap away on the field waits for it (`commitEntry`). */
 		let naming: Promise<void> | null = null;
@@ -303,6 +341,16 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 		const offers = (id: FieldActionId): boolean => {
 			const { entry, draft, entryText } = get();
 			return !!entry && port.entryBar(entry, draft, entryText).bar.some((group) => group.actions.some((action) => action.id === id && !action.disabled));
+		};
+		/** Undo or Redo through the port, one more write; a step the file changed under is refused with the port's notice. */
+		const retrace = (step: "undo" | "redo") => {
+			if (!(step === "undo" ? port.canUndo() : port.canRedo())) return;
+			write(
+				(step === "undo" ? port.undo() : port.redo()).then((outcome: UndoOutcome) => {
+					const text = port.undoNotice(step, outcome);
+					if (text) set({ notice: { text, seq: (get().notice?.seq ?? 0) + 1 } });
+				}),
+			);
 		};
 		/** The card `id` takes the focus back, as a menu closing gives it back (Decision 58). */
 		const focusOn = (id: string) => set({ focusCard: { id, seq: (get().focusCard?.seq ?? 0) + 1 } });
@@ -370,12 +418,12 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 				set({ resizing: { id, edge }, layer: null });
 			},
 			resizeTo(id, edge, minute) {
-				set({ shown: share(get().shown, port.stretched(id, get().dayOffset, edge, minute)) });
+				set({ shown: share(get().shown, port.stretched(id, get().dayOffset, edge, minute, get().context)) });
 			},
 			endResize(id, edge, minute, least) {
 				const to = minute === null ? null : port.resized(id, get().dayOffset, edge, minute, least);
 				if (to) {
-					set({ shown: share(get().shown, port.preview(id, to)) });
+					set({ shown: share(get().shown, port.preview(id, to, get().context)) });
 					write(port.move(id, to));
 				} else get().carryHome();
 				home = null;
@@ -388,7 +436,14 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 				if (was === at || (was && at && was.into === at.into && was.index === at.index)) return;
 				set({ plusAt: at });
 			},
-			fresh: new Set(),
+			readSeq: 0,
+			fresh: NONE,
+			gone: NONE,
+			canUndo: port.canUndo(),
+			canRedo: port.canRedo(),
+			notice: null,
+			context: EVERY_TASK,
+			contextSeq: 0,
 			reveal: null,
 			focusCard: null,
 
@@ -402,7 +457,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 					.filter((day) => day !== dayOffset)
 					.map((day): [number, { shown: ScreenData; read: ScreenData }] => {
 						const had = left[day];
-						const data = had ? share(had.read, port.read(day)) : port.read(day);
+						const data = had ? share(had.read, port.read(day, get().context)) : port.read(day, get().context);
 						return [day, had && had.read === data && had.shown === data ? had : { shown: data, read: data }];
 					});
 				if (read.every(([day, kept]) => left[day] === kept)) return;
@@ -419,7 +474,8 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 				if (get().gesture !== gesture) return;
 				if (gesture === "drag") get().scrollToward(null);
 				set({ gesture: null });
-				if (get().pending) refresh();
+				if (waitingContext) get().setContext(waitingContext);
+				else if (get().pending) refresh();
 			},
 			lift(id) {
 				home = get().shown;
@@ -436,11 +492,11 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 				if (get().shown !== back) set({ shown: back });
 			},
 			carryInto(id, to) {
-				set({ shown: share(get().shown, port.preview(id, to)) });
+				set({ shown: share(get().shown, port.preview(id, to, get().context)) });
 			},
 			drop(id, to) {
 				if (to) {
-					set({ shown: share(get().shown, port.preview(id, to)) });
+					set({ shown: share(get().shown, port.preview(id, to, get().context)) });
 					write(port.move(id, to));
 				} else get().carryHome();
 				home = null;
@@ -607,6 +663,28 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 				});
 				if (done.write) write(done.write);
 				if (next && entry.renaming && !entry.stack && !done.next) focusOn(entry.renaming);
+			},
+			setContext(context) {
+				const s = get();
+				/** What the finger holds stays still under it (principle 5): another context waits for the drag or the resize, and its write, to end. */
+				if (HOLDING.includes(s.gesture) || writing > 0) return void (waitingContext = context);
+				waitingContext = null;
+				if (s.context.project === context.project) return void (s.pending && refresh());
+				const next = port.read(s.dayOffset, context);
+				const left = Object.fromEntries(Object.keys(s.left).map((day) => [day, ((data) => ({ shown: data, read: data }))(port.read(Number(day), context))]));
+				/** A menu whose task the new context doesn't show closes with it. */
+				const layer = s.layer && s.layer.model.kind === "task" && !(s.layer.id in next.cards) ? null : s.layer;
+				set({ context, contextSeq: s.contextSeq + 1, read: next, shown: next, left, pending: false, readSeq: s.readSeq + 1, fresh: NONE, gone: NONE, selected: null, layer });
+			},
+			undo() {
+				retrace("undo");
+			},
+			redo() {
+				retrace("redo");
+			},
+			drawn(seq) {
+				const s = get();
+				if (seq === s.readSeq && s.fresh !== NONE) set({ fresh: NONE });
 			},
 			start() {
 				const off = port.subscribe(refresh);

@@ -1,4 +1,5 @@
-import type { AllDayEvent, Block, CardFace, DayEvent, Destination, Edge, EntryBar, EntryCommit, EntryDraft, EntryField, EventPaint, FieldActionId, ListData, ListId, ListPlaceId, MenuAction, MenuFrom, MenuModel, MenuStatusId, Now, PlaceId, ProjectPage, ReminderKind, RenameStart, Row, ScreenData, ScreenPort } from "../ui/engine/port";
+import { EVERY_TASK } from "../ui/engine/port";
+import type { AllDayEvent, ScreenContext, Block, CardFace, DayEvent, Destination, Edge, EntryBar, EntryCommit, EntryDraft, EntryField, EventPaint, FieldActionId, ListData, ListId, ListPlaceId, MenuAction, MenuFrom, MenuModel, MenuStatusId, Now, PlaceId, ProjectPage, ReminderKind, RenameStart, Row, ScreenData, ScreenPort, UndoOutcome } from "../ui/engine/port";
 import { dividerAt, LIST_BOUNDS, listShareOf, listWidths } from "./listWidths";
 import { type FieldFacts, fieldBar, type MenuFacts, menuLayout, menuPlaces } from "./actionTable";
 import { bgAlphaFor, eventColors } from "../ui/eventColors";
@@ -53,6 +54,8 @@ const LEVELS = [
 /** The file's mark each status tile writes. */
 const STATUS_MARKS: Readonly<Record<MenuStatusId, MockTask["status"]>> = { done: "x", inProgress: "/", stopProgress: " ", wontDo: "-", stop: " " };
 const REMINDERS: readonly ReminderKind[] = ["live", "notification", "alarm", "none"];
+/** Steps Undo keeps, as the plugin's history does (F267). */
+const UNDO_STEPS = 100;
 /** A draft with nothing set: the field as a new task's opens. */
 const NO_DRAFT: EntryDraft = { level: null, projects: [], descriptionLine: null, section: false };
 /** What makes two projects one: their names, case aside (the core's `projectKey`). */
@@ -67,6 +70,12 @@ const closed = (t: MockTask) => t.status === "x" || t.status === "-";
  * appear, writes that wait `delay` ms as a real write and read-back do. Its state reads as a tasks file's text. In part 2
  * the core's rules win over these.
  */
+/** A step Undo or Redo writes back: the file as it stood, and the edits from outside counted then. */
+interface Step {
+	readonly file: MockFile;
+	readonly outside: number;
+}
+
 export class MockPort implements ScreenPort {
 	readonly listBounds = LIST_BOUNDS;
 	readonly listWidths = listWidths;
@@ -80,6 +89,11 @@ export class MockPort implements ScreenPort {
 	/** Reads by day, as of the clock's minute: what rides the now line and what is past changes with it. */
 	private readonly cache = new Map<string, ScreenData>();
 	private added = 0;
+	/** The screen's steps to take back, the last last, and those taken back, to do again (F267, F268). */
+	private undos: Step[] = [];
+	private redos: Step[] = [];
+	/** Counts the edits from outside: a step older than the last one can't be taken back or done again (F270). */
+	private outside = 0;
 	delay: WriteDelay = 30;
 
 	constructor(private readonly clock: () => Date = () => new Date()) {
@@ -96,13 +110,15 @@ export class MockPort implements ScreenPort {
 	reset(file: MockFile = mockFile(this.clock())): void {
 		this.file = file;
 		this.ahead = null;
+		this.undos = [];
+		this.redos = [];
 		this.changed();
 	}
 
 	/** A task added at the top of `list` from outside the screen, as a hand edit or Sync brings it. */
 	addFromOutside(list: ListKey, title: string): void {
 		this.file[list][0].tasks.unshift(this.newTask(title, list === "now" ? dateOf(this.day()) : null));
-		this.changed();
+		this.editedOutside();
 	}
 
 	/** A task moved from outside: the one titled `title` before the one titled `before` (null: its list's first section's end). */
@@ -114,17 +130,17 @@ export class MockPort implements ScreenPort {
 		if (!into) throw new Error(`no task «${before}»`);
 		const at = before === null ? into.length : into.findIndex((t) => t.title === before);
 		into.splice(at, 0, found.task);
-		this.changed();
+		this.editedOutside();
 	}
 
 	// The port.
 
-	read(dayOffset: number): ScreenData {
-		const key = `${dayOffset}@${minuteOf(this.clock())}`;
+	read(dayOffset: number, context: ScreenContext = EVERY_TASK): ScreenData {
+		const key = `${dayOffset}@${minuteOf(this.clock())}#${context.project ?? ""}`;
 		let data = this.cache.get(key);
 		if (!data) {
 			if (this.cache.size > 16) this.cache.clear();
-			data = this.screenOf(this.file, dayOffset);
+			data = this.screenOf(this.file, dayOffset, null, context);
 			this.cache.set(key, data);
 		}
 		return data;
@@ -140,10 +156,10 @@ export class MockPort implements ScreenPort {
 		return { minute: minuteOf(clock), label: `${pad(clock.getHours())}:${pad(clock.getMinutes())}` };
 	}
 
-	preview(id: string, to: Destination): ScreenData {
+	preview(id: string, to: Destination, context: ScreenContext = EVERY_TASK): ScreenData {
 		const file = structuredClone(this.ahead ?? this.file);
 		this.apply(file, id, to);
-		return this.screenOf(file, to.dayOffset);
+		return this.screenOf(file, to.dayOffset, null, context);
 	}
 
 	/** The stand refuses nothing (Decision 27): every list and every day's calendar takes a task; the refusal stays for part 2's project mode (F161). */
@@ -151,13 +167,13 @@ export class MockPort implements ScreenPort {
 		return this.findBy(this.ahead ?? this.file, (t) => t.id === id) !== null;
 	}
 
-	stretched(id: string, dayOffset: number, edge: Edge, minute: number): ScreenData {
+	stretched(id: string, dayOffset: number, edge: Edge, minute: number, context: ScreenContext = EVERY_TASK): ScreenData {
 		const file = structuredClone(this.ahead ?? this.file);
 		const task = this.findBy(file, (t) => t.id === id)?.task;
-		if (!task?.slot) return this.screenOf(file, dayOffset);
+		if (!task?.slot) return this.screenOf(file, dayOffset, null, context);
 		const span = this.stretchedSpan(task, dayOffset, edge, minute);
 		task.slot = { start: span.start, end: span.end > span.start ? span.end : null };
-		return this.screenOf(file, dayOffset, id);
+		return this.screenOf(file, dayOffset, id, context);
 	}
 
 	/** The plugin's rule (the core's `TimelineSpans.resized`), the simplest form of it. */
@@ -633,16 +649,71 @@ export class MockPort implements ScreenPort {
 		sections[sections.length - 1].tasks.push(task);
 	}
 
+	canUndo(): boolean {
+		return this.undos.length > 0;
+	}
+
+	canRedo(): boolean {
+		return this.redos.length > 0;
+	}
+
+	/** The file as it stood before the screen's last step, written back; the step kept to do again. */
+	undo(): Promise<UndoOutcome> {
+		return this.retrace(this.undos, this.redos);
+	}
+
+	/** The step last taken back, done again. */
+	redo(): Promise<UndoOutcome> {
+		return this.retrace(this.redos, this.undos);
+	}
+
+	/** The plugin's notices (`CalendarScreen`'s): a step the file changed under is dropped, and says so. */
+	undoNotice(step: "undo" | "redo", outcome: UndoOutcome): string | null {
+		if (outcome !== "conflict") return null;
+		return step === "undo" ? "Can’t undo: the tasks file changed" : "Can’t redo: the tasks file changed";
+	}
+
+	/** The last step of `from` written back, the file as it stood before it kept on `to`; a step an edit from outside came after is dropped. */
+	private async retrace(from: Step[], to: Step[]): Promise<UndoOutcome> {
+		const step = from.pop();
+		if (!step) return "nothing";
+		if (step.outside !== this.outside) {
+			this.changed();
+			return "conflict";
+		}
+		to.push({ file: structuredClone(this.ahead ?? this.file), outside: this.outside });
+		await this.write((file) => Object.assign(file, structuredClone(step.file)), false);
+		return "done";
+	}
+
 	// Writes.
 
-	/** A write made at once in `ahead` (previews see it), and in the file after `delay`, as a real write is read back. */
-	private async write(change: (file: MockFile) => void): Promise<void> {
+	/**
+	 * A write made at once in `ahead` (previews see it), and in the file after `delay`, as a real write is read back; a
+	 * step of the screen's own (`step`) keeps the file as it stood before it for Undo, up to the plugin's hundred steps,
+	 * and leaves nothing to do again.
+	 */
+	private async write(change: (file: MockFile) => void, step = true): Promise<void> {
 		this.ahead ??= structuredClone(this.file);
+		if (step) {
+			this.undos = [...this.undos, { file: structuredClone(this.ahead), outside: this.outside }].slice(-UNDO_STEPS);
+			this.redos = [];
+		}
 		change(this.ahead);
 		this.inFlight++;
 		if (this.delay > 0) await new Promise((resolve) => window.setTimeout(resolve, this.delay));
 		change(this.file);
 		if (--this.inFlight === 0) this.ahead = null;
+		this.changed();
+	}
+
+	/**
+	 * A hand edit or Sync: not the screen's to take back, and the steps before it would write over it. The stand can't tell
+	 * which lines it touched, so each of them is refused when its turn comes, with the notice (the core refuses only the
+	 * steps whose lines changed, F270).
+	 */
+	private editedOutside(): void {
+		this.outside++;
 		this.changed();
 	}
 
@@ -789,22 +860,26 @@ export class MockPort implements ScreenPort {
 
 	// Reads.
 
-	/** The screen as `file` says; `held`, a task held by a dot, drawn where it is stretched to, not riding the now line. */
-	private screenOf(file: MockFile, dayOffset: number, held: string | null = null): ScreenData {
+	/**
+	 * The screen as `file` says; `held`, a task held by a dot, drawn where it is stretched to, not riding the now line;
+	 * `context`, the chosen project: only its tasks shown (with their subtasks), every event still.
+	 */
+	private screenOf(file: MockFile, dayOffset: number, held: string | null = null, context: ScreenContext = EVERY_TASK): ScreenData {
 		const shown = dateOf(addDays(this.day(), dayOffset));
 		const cards: Record<string, CardFace> = {};
 		const today = dayOffset === 0;
+		const mine = (shows: (t: MockTask) => boolean) => (t: MockTask) => (context.project === null || (t.projects ?? []).includes(context.project)) && shows(t);
 		return {
 			lists: {
-				inbox: this.listData("Inbox", file.inbox, cards, null, () => true),
-				soon: this.listData("Soon", file.soon, cards, null, (t) => t.due === null),
-				day: this.listData(this.titleOf(dayOffset), this.listOf(file, "day", dayOffset), cards, shown, today ? (t) => t.slot === null : (t) => t.due === shown && t.slot === null),
+				inbox: this.listData("Inbox", file.inbox, cards, null, mine(() => true)),
+				soon: this.listData("Soon", file.soon, cards, null, mine((t) => t.due === null)),
+				day: this.listData(this.titleOf(dayOffset), this.listOf(file, "day", dayOffset), cards, shown, mine(today ? (t) => t.slot === null : (t) => t.due === shown && t.slot === null)),
 			},
 			cards,
 			day: {
 				title: this.titleOf(dayOffset),
 				isToday: today,
-				blocks: this.blocksOf(file, cards, shown, today, held),
+				blocks: this.blocksOf(file, cards, shown, today, held, mine(() => true)),
 				events: this.eventsOf(file, dayOffset),
 				allDay: file.allDay.map((e): AllDayEvent => ({ id: e.id, title: e.title, past: dayOffset < 0, paint: paintOf(e.color) })),
 				hours: Array.from({ length: 24 }, (_, i) => pad((DAY_START_HOUR + i) % 24)),
@@ -850,13 +925,13 @@ export class MockPort implements ScreenPort {
 	 * the present minute, its length kept, its time in the file as it was (the design's «Едет за линией»; at its very minute
 	 * it still stands). A folded task's block is named by its next open step (its card's `step`).
 	 */
-	private blocksOf(file: MockFile, cards: Record<string, CardFace>, shown: string, today: boolean, held: string | null = null): Block[] {
+	private blocksOf(file: MockFile, cards: Record<string, CardFace>, shown: string, today: boolean, held: string | null, shows: (t: MockTask) => boolean): Block[] {
 		const present = minuteOf(this.clock());
 		const blocks: Block[] = [];
 		for (const key of ["now", "soon"] as const)
 			for (const s of file[key])
 				for (const t of s.tasks) {
-					if (!t.slot || closed(t) || t.due !== shown) continue;
+					if (!t.slot || closed(t) || t.due !== shown || !shows(t)) continue;
 					for (const c of t.children) if (!closed(c)) cards[c.id] = this.faceOf(c, shown);
 					cards[t.id] = this.faceOf(t, shown);
 					const { start: from, end } = t.slot;

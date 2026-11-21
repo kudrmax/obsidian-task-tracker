@@ -7,7 +7,7 @@ import { StoreContext, type ScreenStore, useScreen } from "../store";
 import { type BlockLook, Card, PressedLook } from "./Card";
 import { QuickBar } from "./QuickBar";
 import { Icon } from "./Icon";
-import { HostContext, type ScreenHost } from "./host";
+import { HostContext, type ScreenHost, useHost } from "./host";
 
 /** Touches stay the screen's: Obsidian's drawers never take a swipe meant for it (stage 0, «Integration findings» 8). */
 const keepTouch = (event: TouchEvent) => event.stopPropagation();
@@ -59,6 +59,20 @@ export function TaskScreen({ store, host, place }: { readonly store: ScreenStore
 	);
 }
 
+/**
+ * What the screen tells its store once a read is on the page (Decision 132): the read drawn, so what came in it no longer
+ * comes in; and the port's notice shown once.
+ */
+function useDrawn(store: ScreenStore) {
+	const { notice: show } = useHost();
+	const readSeq = useScreen((s) => s.readSeq);
+	const notice = useScreen((s) => s.notice);
+	useEffect(() => store.getState().drawn(readSeq), [store, readSeq]);
+	useEffect(() => {
+		if (notice) show(notice.text);
+	}, [notice, show]);
+}
+
 /** Where a press keeps the typing going: the field itself, its bar and the bar's panels. */
 const TYPING = ".tc-quick-row, .tc-quick-bar, .tc-quick-panel";
 
@@ -66,6 +80,7 @@ const TYPING = ".tc-quick-row, .tc-quick-bar, .tc-quick-panel";
 function Root({ place, store }: { readonly place: Place; readonly store: ScreenStore }) {
 	/** A task typed: a new one, or one renamed in place (both the plugin's quick entry). */
 	const entering = useScreen((s) => s.entry !== null);
+	useDrawn(store);
 	/**
 	 * A finger's tap elsewhere ends the typing and does only that (the audit's 17, as the menu's backdrop does, Decision 74):
 	 * the text is written and the card tapped opens no menu. A scroll is no tap: it ends nothing.

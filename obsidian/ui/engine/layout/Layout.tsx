@@ -5,6 +5,7 @@ import { DayTurnContext, type FollowGestures, useFollowRibbon } from "../gesture
 import { RibbonTrack, StripColumn, StripRule } from "../gestures/RibbonTrack";
 import type { ListId } from "../port";
 import { DayContext, type Stop, STOP_LISTS, useData, useScreen } from "../store";
+import { Capsule } from "../view/Capsule";
 import { useHost } from "../view/host";
 import { PlusButton } from "../view/QuickAdd";
 import { DaySlide } from "../view/Slide";
@@ -36,6 +37,7 @@ export const Layout = memo(function Layout({ place }: { readonly place: Place })
 		<>
 			{place === "leaf" ? <RibbonColumns /> : <NoteColumn />}
 			<PlusButton shown={place === "note" ? ["inbox"] : STOP_LISTS[stop]} />
+			<Capsule />
 			<TaskMenu />
 		</>
 	);

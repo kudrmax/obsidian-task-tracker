@@ -7,7 +7,7 @@ import { useAnchor } from "../layers/Layers";
 import type { EntryField as Field, ListId, Row } from "../port";
 import { DayContext, useData, useScreen, useScreenApi } from "../store";
 import { Card, PressedLook } from "./Card";
-import { MovingRow } from "./MovingRow";
+import { MovingRow, MovingRows } from "./MovingRow";
 import { EntryField } from "./QuickAdd";
 
 /** A row counts as this tall until it is drawn and measured (a card and its gap at the default size). */
@@ -19,9 +19,16 @@ const OVERSCAN = 6;
  * The one list component (spec, «Long lists»): a list scrolls natively in its own room and mounts only the rows in sight,
  * as TanStack Virtual's dynamic list draws them (the rows in flow inside one block translated to the first one's start,
  * each measured; a carried card's row kept mounted). Every task's id stays in the list's `SortableContext`, mounted or not (stage 0, second round); every row
- * is a `MovingRow`. A task the store asks to reveal is scrolled into sight by the virtualizer's `scrollToIndex`.
+ * is a `MovingRow`. A task the store asks to reveal is scrolled into sight by the virtualizer's `scrollToIndex`. The
+ * screen's context is the list's React key (spec, principle 3): another project mounts the list anew, drawn in place, its
+ * rows coming in without motion and its scroll at the top.
  */
 export const TaskList = memo(function TaskList({ list }: { readonly list: ListId }) {
+	const context = useScreen((s) => s.contextSeq);
+	return <ContextList key={context} list={list} context={context} />;
+});
+
+const ContextList = memo(function ContextList({ list, context }: { readonly list: ListId; readonly context: number }) {
 	const api = useScreenApi();
 	const allRows = useData((d) => d.lists[list].rows);
 	const readRows = useData((d) => d.lists[list].rows, true);
@@ -50,6 +57,7 @@ export const TaskList = memo(function TaskList({ list }: { readonly list: ListId
 	/** The rows drawn: the list's, with the new task's field standing in its slot when it is in this list. */
 	const drawn = useMemo(() => withEntry(withPlus, list, entry), [withPlus, list, entry]);
 	const fresh = useScreen((s) => s.fresh);
+	const gone = useScreen((s) => s.gone);
 	const reveal = useScreen((s) => s.reveal);
 	const order = useMemo(() => readRows.map((row) => row.id).join(" "), [readRows]);
 	/** Every row is in the sortable list: headers move aside like cards; a card goes after a header into its section. */
@@ -122,11 +130,12 @@ export const TaskList = memo(function TaskList({ list }: { readonly list: ListId
 			<div className="tc-list-items" style={{ height: virtualizer.getTotalSize() }}>
 				<div className="tc-list-block" style={{ transform: `translateY(${items[0]?.start ?? 0}px)` }}>
 					<SortableList list={list} ids={ids}>
+						<MovingRows gone={gone}>
 							{items.map((item) => {
 								const row = drawn[item.index];
 								if (row.kind === "plus")
 									return (
-										<MovingRow key={row.id} id={row.id} index={item.index} ref={virtualizer.measureElement} order={order} carried fresh={false} className="tc-list-item">
+										<MovingRow key={row.id} id={row.id} context={context} index={item.index} measure={virtualizer.measureElement} order={order} carried fresh={false} className="tc-list-item">
 											<SortableRow id={row.id} gap>
 												<div className="tc-card" style={{ [PROPERTY.level]: String(liftedDepth ?? 0) } as CSSProperties} />
 											</SortableRow>
@@ -134,16 +143,17 @@ export const TaskList = memo(function TaskList({ list }: { readonly list: ListId
 									);
 								if (row.kind === "entry")
 									return (
-										<MovingRow key={row.id} id={row.id} index={item.index} ref={virtualizer.measureElement} order={order} carried={false} fresh={false} className="tc-list-item">
+										<MovingRow key={row.id} id={row.id} context={context} index={item.index} measure={virtualizer.measureElement} order={order} carried={false} fresh={false} className="tc-list-item">
 											<EntryField key={entrySeq} depth={row.depth} />
 										</MovingRow>
 									);
 								return (
-									<MovingRow key={row.id} id={row.id} index={item.index} ref={virtualizer.measureElement} order={order} carried={lifted === row.id} fresh={fresh.has(row.id)} className="tc-list-item">
+									<MovingRow key={row.id} id={row.id} context={context} index={item.index} measure={virtualizer.measureElement} order={order} carried={lifted === row.id} fresh={fresh.has(row.id)} className="tc-list-item">
 										<RowFace row={row.kind === "task" && row.id === lifted && liftedDepth !== null ? { ...row, depth: liftedDepth } : row} />
 									</MovingRow>
 								);
 							})}
+						</MovingRows>
 					</SortableList>
 				</div>
 			</div>

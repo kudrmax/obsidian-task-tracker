@@ -11,7 +11,7 @@ import type { AllDayEvent, Block, DayData, DayEvent, EventPaint, Now } from "../
 import { DayContext, useData, useScreen, useScreenApi } from "../store";
 import { Card, PressedLook } from "./Card";
 import { useHost } from "./host";
-import { MovingRow } from "./MovingRow";
+import { MovingRow, MovingRows } from "./MovingRow";
 import { EntryField } from "./QuickAdd";
 import { type DayOffset, DaySlide } from "./Slide";
 
@@ -100,9 +100,11 @@ export const Timeline = memo(function Timeline() {
 	const nearNow = (minute: number) => todayDrawn && Math.abs(scale.y(minute) - scale.y(now.minute)) < TimeScale.NEAR_NOW;
 	const marks = useMemo(() => scale.marks(), [scale]);
 	const canvas = { [PROPERTY.hour]: px(scale.hourPx), [PROPERTY.stackEnd]: px(end) } as CSSProperties;
+	/** The context is the day's region's React key too: another project draws the calendar's tasks in place (principle 3). */
+	const context = useScreen((s) => s.contextSeq);
 	const layers = change
-		? [<DayItems key={change.from} day={change.from} turn={turn} offset={outOffset} scale={scale} shown={false} now={now} />, <DayItems key={change.to} day={change.to} turn={turn} offset={inOffset} scale={scale} shown now={now} />]
-		: [<DayItems key={shownDay} day={shownDay} turn={turn} offset={null} scale={scale} shown now={now} />];
+		? [<DayItems key={`${change.from}:${context}`} day={change.from} turn={turn} offset={outOffset} scale={scale} shown={false} now={now} />, <DayItems key={`${change.to}:${context}`} day={change.to} turn={turn} offset={inOffset} scale={scale} shown now={now} />]
+		: [<DayItems key={`${shownDay}:${context}`} day={shownDay} turn={turn} offset={null} scale={scale} shown now={now} />];
 	return (
 		<CalendarBlocks ids={ids}>
 			<AllDayBand days={change ? [[change.from, outOffset], [change.to, inOffset]] : [[shownDay, null]]} turn={turn} />
@@ -174,15 +176,18 @@ function DayItemsOf({ day: dayOf, offset, scale, shown, now }: { readonly day: n
 	const order = useMemo(() => day.blocks.map((b) => `${b.id}@${b.start}+${b.length}`).join(" "), [day.blocks]);
 	const top = events.length + boxes.length;
 	const shades = useShades(boxes, day.blocks, events.length, top, plusMinute === null);
+	const gone = useScreen((s) => s.gone);
 	return (
 		<>
 			<DaySlide day={dayOf} at={null} offset={offset} window="own" className="tc-items">
 				{day.events.map((event, i) => (
 					<EventItem key={event.id} event={event} box={events[i]} scale={scale} />
 				))}
-				{drawn.map(({ block, box }) => (
-					<BlockItem key={block.id} block={block} box={box} shades={shades.get(block.id) ?? NO_SHADES} order={order} z={events.length + box.rank} top={top} scale={scale} />
-				))}
+				<MovingRows gone={gone}>
+					{drawn.map(({ block, box }) => (
+						<BlockItem key={block.id} block={block} box={box} shades={shades.get(block.id) ?? NO_SHADES} order={order} z={events.length + box.rank} top={top} scale={scale} />
+					))}
+				</MovingRows>
 				{extra === null ? null : <NewPlace minute={extra} box={boxes[boxes.length - 1]} z={top} field={plusMinute === null} />}
 			</DaySlide>
 			{day.isToday ? (
@@ -347,6 +352,7 @@ const EventItem = memo(function EventItem({ event, box, scale }: { readonly even
  */
 const BlockItem = memo(function BlockItem({ block, box, shades, order, z, top, scale }: { readonly block: Block; readonly box: TaskBox; readonly shades: readonly Shade[]; readonly order: string; readonly z: number; readonly top: number; readonly scale: TimeScale }) {
 	const lifted = useScreen((s) => s.lifted === block.id);
+	const fresh = useScreen((s) => s.fresh.has(block.id));
 	const selected = useScreen((s) => s.selected === block.id);
 	const resizing = useScreen((s) => (s.resizing?.id === block.id ? s.resizing.edge : null));
 	const renaming = useScreen((s) => s.entry !== null && s.entry.renaming === block.id && !s.entry.stack && s.entry.at.at !== undefined);
@@ -362,7 +368,7 @@ const BlockItem = memo(function BlockItem({ block, box, shades, order, z, top, s
 	const className = `tc-block${selected ? " is-selected" : ""}${resizing ? " is-resizing" : ""}${renaming ? " is-renaming" : ""}`;
 	const look = { corner: box.stacked ? block.startParts : box.shortLength ? block.lengthParts : null, pill: resizing === "start" ? block.clock : resizing === "end" ? (block.endClock ?? block.clock) : null, clock: block.clock };
 	return (
-		<MovingRow ref={setElement} id={block.id} order={order} carried={lifted} fresh={false} placed className={className} style={boxStyle(box, selected || resizing ? top : z)}>
+		<MovingRow ref={setElement} id={block.id} order={order} carried={lifted} fresh={fresh} placed className={className} style={boxStyle(box, selected || resizing ? top : z)}>
 			<SortableRow
 				id={block.id}
 				placed

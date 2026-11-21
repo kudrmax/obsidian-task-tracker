@@ -905,7 +905,7 @@ body.is-mobile .task-calendar.is-entering > .tc-fade { height: calc(var(--tc-bar
 .task-calendar > button.tc-plus, .task-calendar > .tc-plus-ring { right: var(--tc-space-16); touch-action: none; }
 /* The controls of the foot never vanish in a frame: one going (the plus while a card is carried, Undo + ⋯ while tasks are selected) fades and shrinks, one coming grows back, on the overlay's curve. */
 .task-calendar > :is(button.tc-plus, .tc-capsule, button.tc-select-btn, .tc-seg) { transition: opacity var(--tc-duration-collapse) var(--tc-ease-out), transform var(--tc-duration-collapse) var(--tc-ease-out), visibility 0s linear 0s; }
-.task-calendar > button.tc-plus.is-hidden, .task-calendar > button.tc-plus.is-hidden ~ .tc-capsule, .task-calendar:not(.is-selecting) > :is(button.tc-select-btn, .tc-select-capsule), .task-calendar.is-dragging > :is(button.tc-select-btn, .tc-select-capsule), .task-calendar.is-selecting > :is(button.tc-plus, .tc-capsule:not(.tc-select-capsule)), .task-calendar.is-entering > .tc-seg { opacity: 0; transform: scale(var(--tc-menu-scale)); visibility: hidden; pointer-events: none; transition: opacity var(--tc-duration-collapse) var(--tc-ease-out), transform var(--tc-duration-collapse) var(--tc-ease-out), visibility 0s linear var(--tc-duration-collapse); }
+.task-calendar > button.tc-plus.is-hidden, .task-calendar > button.tc-plus.is-hidden ~ .tc-capsule, .task-calendar > .tc-capsule.is-hidden, .task-calendar:not(.is-selecting) > :is(button.tc-select-btn, .tc-select-capsule), .task-calendar.is-dragging > :is(button.tc-select-btn, .tc-select-capsule), .task-calendar.is-selecting > :is(button.tc-plus, .tc-capsule:not(.tc-select-capsule)), .task-calendar.is-entering > .tc-seg { opacity: 0; transform: scale(var(--tc-menu-scale)); visibility: hidden; pointer-events: none; transition: opacity var(--tc-duration-collapse) var(--tc-ease-out), transform var(--tc-duration-collapse) var(--tc-ease-out), visibility 0s linear var(--tc-duration-collapse); }
 .task-calendar > .tc-capsule { left: var(--tc-space-16); }
 .tc-capsule { height: var(--tc-plus-size); border-radius: var(--tc-radius-capsule); background: var(--tc-track-bg); box-shadow: var(--tc-shadow-control); display: flex; overflow: hidden; }
 .tc-capsule button.tc-btn.is-icon { width: var(--tc-capsule-btn); height: 100%; border-radius: 0; color: var(--tc-text); }
@@ -1866,6 +1866,8 @@ button.tc-btn.tc-folder-btn:disabled { opacity: var(--tc-tile-off-opacity); curs
 .tc-list-items { position: relative; flex: none; }
 .tc-list-block { position: absolute; top: 0; left: 0; right: 0; }
 .tc-list-item { display: flow-root; padding-bottom: var(--tc-card-gap); }
+/* A row leaving (Decision 132): it fades where it stands and takes no press. */
+.task-calendar .is-leaving { pointer-events: none; }
 .tc-list-item > .tc-group-head, .tc-list-item > .tc-drag-source > .tc-group-head { margin-top: var(--tc-section-gap); }
 /* The calendar's tasks and events lie over each other in the stack's order (--tc-stack-z), inside the items: the now line stays over them all. */
 .task-calendar.is-engine .tc-items { isolation: isolate; }
