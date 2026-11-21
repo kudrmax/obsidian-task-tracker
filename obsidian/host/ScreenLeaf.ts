@@ -12,11 +12,23 @@ export interface LeafLook {
 }
 
 /**
+ * A host's leaf for `look`: Obsidian asks a view its type while constructing it, before a field of the leaf is set, so
+ * each host's leaf is a class that knows its type.
+ */
+export function leafFor(look: LeafLook): new (leaf: WorkspaceLeaf, host: ScreenHost) => ScreenLeaf {
+	return class extends ScreenLeaf {
+		override getViewType(): string {
+			return look.type;
+		}
+	};
+}
+
+/**
  * `TaskScreen` in a leaf of its own (F1–F3, F5): mounted when the leaf opens (in the main window or a pop-out, each in its
  * own document), the key table on the leaf's `Scope`, the bottom row standing over Obsidian's desktop status bar while
  * the leaf is open.
  */
-export class ScreenLeaf extends ItemView {
+export abstract class ScreenLeaf extends ItemView {
 	private screen: MountedScreen | null = null;
 	private letStatusBarGo: (() => void) | null = null;
 
@@ -27,10 +39,6 @@ export class ScreenLeaf extends ItemView {
 		super(leaf);
 		this.scope = new Scope(this.app.scope);
 		for (const key of KEYS) this.scope.register([...key.modifiers], key.key, () => this.runKey(key.id));
-	}
-
-	override getViewType(): string {
-		return this.host.look.type;
 	}
 
 	override getDisplayText(): string {

@@ -10,7 +10,7 @@ import { clearCardSize, showCardSize } from "../ui/paint/cardSize";
 import { clearPriorityColors, showLabelPaint, showPriorityColors } from "../ui/paint/priorityColors";
 import { addWindowDocument } from "../ui/paint/windowDocuments";
 import { detectHaptics, type HapticsHost } from "./haptics";
-import { type LeafLook, ScreenLeaf } from "./ScreenLeaf";
+import { type LeafLook, leafFor, ScreenLeaf } from "./ScreenLeaf";
 import { ScreenMounts } from "./ScreenMounts";
 
 /** What a host's screens draw from: the port and what the device keeps, opened once, at the first screen. */
@@ -51,7 +51,8 @@ export class ScreenHost {
 		const plugin = this.plugin;
 		this.paint();
 		this.followWindows();
-		plugin.registerView(this.look.type, (leaf) => new ScreenLeaf(leaf, this));
+		const Leaf = leafFor(this.look);
+		plugin.registerView(this.look.type, (leaf) => new Leaf(leaf, this));
 		for (const key of KEYS) plugin.addCommand({ id: key.id, name: key.name, checkCallback: (checking) => this.onActiveLeaf(checking, (leaf) => leaf.runKey(key.id)) });
 		plugin.register(() => this.end());
 	}
