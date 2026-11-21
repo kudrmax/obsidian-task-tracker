@@ -4,8 +4,8 @@ import { describe, expect, it } from "vitest";
 import { FLICK_SPEED, FollowPager } from "../../../obsidian/ui/engine/gestures/followPager";
 import { WheelFollow } from "../../../obsidian/ui/engine/gestures/wheelFollow";
 import { COLUMN_SHARE, offsetOf, placeOf, shownAt, standAt, STRIP_WIDTH } from "../../../obsidian/ui/engine/layout/columns";
-import { MockPort } from "../../../obsidian/stand/MockPort";
 import { createScreenStore, type ScreenStore } from "../../../obsidian/ui/engine/store";
+import { standPort } from "./standPort";
 
 const NOW = new Date(2026, 10, 18, 14, 20);
 const RECORDINGS = join(__dirname, "..", "..", "e2e", "recordings");
@@ -30,10 +30,8 @@ function ribbon(store: ScreenStore) {
 	};
 }
 
-function screen() {
-	const port = new MockPort(() => NOW);
-	port.delay = 0;
-	return createScreenStore(port);
+async function screen() {
+	return createScreenStore((await standPort(NOW)).port);
 }
 
 /**
@@ -51,8 +49,8 @@ describe("one swipe, one place (Max)", () => {
 		expect(swipeStep(-20, 195, -1)).toBe(-1);
 	});
 
-	it("the first step after the screen opens moves the ribbon one stop", () => {
-		const store = screen();
+	it("the first step after the screen opens moves the ribbon one stop", async () => {
+		const store = await screen();
 		const { step } = ribbon(store);
 		expect(store.getState().stop).toBe("calendar");
 		step(-1);
@@ -63,8 +61,8 @@ describe("one swipe, one place (Max)", () => {
 		expect(store.getState().stop).toBe("inbox");
 	});
 
-	it("past the day's calendar a step turns the day, and back on today returns to Soon", () => {
-		const store = screen();
+	it("past the day's calendar a step turns the day, and back on today returns to Soon", async () => {
+		const store = await screen();
 		const { step } = ribbon(store);
 		step(1);
 		expect(store.getState()).toMatchObject({ stop: "calendar", dayOffset: 1 });

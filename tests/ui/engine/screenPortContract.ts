@@ -24,7 +24,7 @@ const toSoon = (): Destination => ({ list: "soon", before: null, dayOffset: 0, d
 
 /**
  * The `ScreenPort` contract (spec 2026-11-18, «Data and writes»; the plan's step 5): what every port answers, whatever
- * rules sit behind it. The stand's `MockPort` and `CorePort` both run it.
+ * rules sit behind it. `CorePort` runs it (tests/adapters/corePortContract.test.ts).
  */
 export function describeScreenPort(name: string, make: PortMaker): void {
 	describe(`${name} keeps the ScreenPort contract`, () => {

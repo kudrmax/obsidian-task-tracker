@@ -1,21 +1,21 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
-import { MockPort } from "../../../obsidian/stand/MockPort";
+import type { ScreenData } from "../../../obsidian/ui/engine/port";
 import { createScreenStore } from "../../../obsidian/ui/engine/store";
+import { standPort } from "./standPort";
 
 const NOW = new Date(2026, 10, 21, 14, 20);
 
-function screen() {
-	const port = new MockPort(() => NOW);
-	port.delay = 0;
+async function screen() {
+	const { port } = await standPort(NOW);
 	return { port, store: createScreenStore(port) };
 }
 
-const titles = (data: ReturnType<MockPort["read"]>) => data.lists.day.rows.flatMap((row) => (row.kind === "task" ? [data.cards[row.id].title] : []));
+const titles = (data: ScreenData) => data.lists.day.rows.flatMap((row) => (row.kind === "task" ? [data.cards[row.id].title] : []));
 
-describe("a change of context (F23, Decision 132)", () => {
-	it("reads the day pages drawn beside the shown one in the new context: none is left to draw the shown day's rows a second time", () => {
-		const { port, store } = screen();
+describe("a change of context (F23, Decision 132)", async () => {
+	it("reads the day pages drawn beside the shown one in the new context: none is left to draw the shown day's rows a second time", async () => {
+		const { port, store } = await screen();
 		store.getState().peekDays([0, 1]);
 		expect(Object.keys(store.getState().left)).toEqual(["1"]);
 		store.getState().setContext({ project: "Дом" });
@@ -26,8 +26,8 @@ describe("a change of context (F23, Decision 132)", () => {
 		expect(titles(read)).toEqual(titles(port.read(0, { project: "Дом" })));
 	});
 
-	it("counts the contexts and starts with nothing come or gone: the new context draws in place", () => {
-		const { store } = screen();
+	it("counts the contexts and starts with nothing come or gone: the new context draws in place", async () => {
+		const { store } = await screen();
 		const seq = store.getState().contextSeq;
 		store.getState().setContext({ project: "Дом" });
 		expect(store.getState().contextSeq).toBe(seq + 1);
@@ -37,8 +37,8 @@ describe("a change of context (F23, Decision 132)", () => {
 		expect(store.getState().contextSeq).toBe(seq + 1);
 	});
 
-	it("waits for a drag to end: what the finger holds stays still under it (principle 5)", () => {
-		const { store } = screen();
+	it("waits for a drag to end: what the finger holds stays still under it (principle 5)", async () => {
+		const { store } = await screen();
 		store.getState().claim("drag");
 		store.getState().setContext({ project: "Дом" });
 		expect(store.getState().context.project).toBeNull();
@@ -46,8 +46,8 @@ describe("a change of context (F23, Decision 132)", () => {
 		expect(store.getState().context.project).toBe("Дом");
 	});
 
-	it("closes a menu whose task the new context doesn't show, and keeps one whose task it does", () => {
-		const { port, store } = screen();
+	it("closes a menu whose task the new context doesn't show, and keeps one whose task it does", async () => {
+		const { port, store } = await screen();
 		const day = port.read(0);
 		const home = port.read(0, { project: "Дом" });
 		const theirs = day.lists.day.rows.find((row) => row.kind === "task" && row.id in home.cards)!.id;

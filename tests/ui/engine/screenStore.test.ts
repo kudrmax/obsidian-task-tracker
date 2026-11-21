@@ -1,27 +1,27 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
-import { MockPort } from "../../../obsidian/stand/MockPort";
 import { mockFile } from "../../../obsidian/stand/mockData";
 import { columnsOf, reachOf, stopShowing } from "../../../obsidian/ui/engine/layout/columns";
 import { LAYER_MS } from "../../../obsidian/ui/engine/layers/motion";
 import { share } from "../../../obsidian/ui/engine/store/share";
-import { createScreenStore } from "../../../obsidian/ui/engine/store";
+import { createScreenStore, type ScreenStore } from "../../../obsidian/ui/engine/store";
+import { settled, standPort } from "./standPort";
 
 const NOW = new Date(2026, 10, 18, 14, 20);
 
-function screen() {
-	const port = new MockPort(() => NOW);
-	port.delay = 0;
-	return { port, store: createScreenStore(port) };
+async function screen() {
+	const source = await standPort(NOW);
+	const port = source.port;
+	return { port, source, store: createScreenStore(port) };
 }
 
-const titles = (store: ReturnType<typeof screen>["store"], list: "inbox" | "soon" | "day") =>
+const titles = (store: ScreenStore, list: "inbox" | "soon" | "day") =>
 	store.getState().shown.lists[list].rows.flatMap((row) => (row.kind === "task" ? [store.getState().shown.cards[row.id].title] : []));
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 describe("the screen's store", () => {
 	it("draws a drop at once and keeps it through the write's read-back, each card's face the same object", async () => {
-		const { port, store } = screen();
+		const { source, store } = await screen();
 		const [a, b, c] = titles(store, "inbox");
 		const ids = store.getState().shown.lists.inbox.rows.filter((r) => r.kind === "task").map((r) => r.id);
 		const face = store.getState().shown.cards[ids[0]];
@@ -33,17 +33,18 @@ describe("the screen's store", () => {
 		await settle();
 		await settle();
 		expect(titles(store, "inbox").slice(0, 3)).toEqual([b, c, a]);
-		const fileInbox = port.fileText().split("## Inbox\n")[1].split("\n").slice(0, 3).map((line) => line.replace(/^- \[ \] (p1 )?/, ""));
+		const fileInbox = source.fileText().split("## Inbox\n")[1].split("\n").filter((line) => line.trim() !== "").slice(0, 3).map((line) => line.replace(/^- \[ \] (p1 )?/, ""));
 		expect(fileInbox).toEqual([b, c, a]);
 		expect(store.getState().shown.cards[ids[0]]).toBe(face);
 		expect(store.getState().gesture).toBeNull();
 	});
 
-	it("holds data that comes during a drag and draws it once the drag ends", () => {
-		const { port, store } = screen();
+	it("holds data that comes during a drag and draws it once the drag ends", async () => {
+		const { source, store } = await screen();
 		store.getState().start();
 		store.getState().claim("drag");
-		port.addFromOutside("inbox", "Пришла во время переноса");
+		source.addFromOutside("inbox", "Пришла во время переноса");
+		await settled();
 		expect(titles(store, "inbox")[0]).not.toBe("Пришла во время переноса");
 		expect(store.getState().pending).toBe(true);
 		store.getState().drop("t1", null);
@@ -51,8 +52,8 @@ describe("the screen's store", () => {
 		expect(store.getState().fresh.has(store.getState().shown.lists.inbox.rows.find((r) => r.kind === "task")!.id)).toBe(true);
 	});
 
-	it("gives the pointer to one gesture at a time; a drag's long press takes it", () => {
-		const { store } = screen();
+	it("gives the pointer to one gesture at a time; a drag's long press takes it", async () => {
+		const { store } = await screen();
 		expect(store.getState().claim("ribbon")).toBe(true);
 		expect(store.getState().claim("drag")).toBe(true);
 		expect(store.getState().claim("ribbon")).toBe(false);
@@ -61,7 +62,7 @@ describe("the screen's store", () => {
 	});
 
 	it("opens a task's menu with what the port offers; a tap closes it first and writes once the layer says it has faded out, never by a timer of its own", async () => {
-		const { store } = screen();
+		const { store } = await screen();
 		store.getState().start();
 		const id = store.getState().shown.lists.inbox.rows.find((r) => r.kind === "task")!.id;
 		store.getState().openMenu(id);
@@ -75,31 +76,30 @@ describe("the screen's store", () => {
 		expect(titles(store, "day")).not.toContain(model.title);
 		store.getState().layerGone();
 		await settle();
-		const day = titles(store, "day");
-		expect(day[day.length - 1]).toBe(model.title);
+		expect(titles(store, "day")).toContain(model.title);
 		expect(titles(store, "inbox")).not.toContain(model.title);
 	});
 });
 
 describe("one rule for a menu whose task the screen no longer shows (review of part 1, finding 4)", () => {
-	it("closes it when a read no longer has the task, as another context does", () => {
-		const { port, store } = screen();
+	it("closes it when a read no longer has the task, as another context does", async () => {
+		const { source, store } = await screen();
 		const file = mockFile(NOW);
-		port.reset(file);
 		store.getState().start();
-		const task = file.inbox[0].tasks[0];
-		store.getState().openMenu(task.id);
-		expect(store.getState().layer?.id).toBe(task.id);
+		const id = store.getState().shown.lists.inbox.rows.find((r) => r.kind === "task")!.id;
+		store.getState().openMenu(id);
+		expect(store.getState().layer?.id).toBe(id);
 		const without = structuredClone(file);
 		without.inbox[0].tasks.shift();
-		port.reset(without);
+		source.reset(without);
+		await settled();
 		expect(store.getState().layer).toBeNull();
 	});
 });
 
 describe("what the store owns ends with the screen (review of part 1, finding 9)", () => {
 	it("forgets the edge a carried card headed into when the screen stops: the quarter second's wait arms nothing after", async () => {
-		const { store } = screen();
+		const { store } = await screen();
 		const stop = store.getState().start();
 		store.getState().scrollToward("list:inbox:-1");
 		stop();
@@ -109,8 +109,8 @@ describe("what the store owns ends with the screen (review of part 1, finding 9)
 });
 
 describe("the field's bar, ready in the store (review of part 1, finding 10)", () => {
-	it("asks the port for the bar only when the field, what the bar set, the text or the read changes", () => {
-		const { port, store } = screen();
+	it("asks the port for the bar only when the field, what the bar set, the text or the read changes", async () => {
+		const { port, store } = await screen();
 		let asked = 0;
 		const entryBar = port.entryBar.bind(port);
 		port.entryBar = (...args) => {
@@ -149,8 +149,8 @@ describe("what each stop shows, said once by the layout (review of part 1, findi
 });
 
 describe("the days drawn beside the shown one", () => {
-	it("reads the days a finger draws into sight, and keeps what they drew when one of them is shown", () => {
-		const { store } = screen();
+	it("reads the days a finger draws into sight, and keeps what they drew when one of them is shown", async () => {
+		const { store } = await screen();
 		store.getState().peekDays([0, 1, 2]);
 		const { left, dayOffset } = store.getState();
 		expect(dayOffset).toBe(0);

@@ -2,7 +2,8 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { MockPort } from "../../../obsidian/stand/MockPort";
+import type { CorePort } from "../../../obsidian/adapters/CorePort";
+import type { WriteDelay } from "../../../obsidian/stand/standSource";
 import { calendarFile, mockFile } from "../../../obsidian/stand/mockData";
 import { LAYER_MS } from "../../../obsidian/ui/engine/layers/motion";
 import { blockTop } from "../../../obsidian/ui/engine/layers/block";
@@ -10,31 +11,36 @@ import { monthGrid, monthOf, monthTitle } from "../../../obsidian/ui/engine/layo
 import type { EntryBar, TaskMenuModel } from "../../../obsidian/ui/engine/port";
 import { createScreenStore } from "../../../obsidian/ui/engine/store";
 import { tileRows } from "../../../obsidian/ui/engine/view/TaskMenu";
+import { settled, standPort } from "./standPort";
 
 const NOW = new Date(2026, 10, 18, 14, 20);
 
-function port(file = mockFile(NOW)) {
-	const p = new MockPort(() => NOW);
-	p.delay = 0;
-	p.reset(file);
-	return p;
+/** `CorePort` over the stand's made-up file, with the file's text to read back. */
+type StandScreen = CorePort & { fileText(): string };
+
+async function port(file = mockFile(NOW), delay: WriteDelay = 0, now = NOW): Promise<StandScreen> {
+	const source = await standPort(now, file, delay);
+	return Object.assign(source.port, { fileText: () => source.fileText() });
 }
-const taskMenu = (p: MockPort, title: string, from: "list" | "calendar" | "stack" = "list"): TaskMenuModel => {
-	const data = p.read(0);
-	const id = Object.values(data.cards).find((c) => c.title === title)?.id;
+const idOf = (p: StandScreen, title: string): string => {
+	const id = Object.values(p.read(0).cards).find((c) => c.title === title)?.id;
 	if (!id) throw new Error(`no card «${title}»`);
-	const model = p.menu(id, from);
+	return id;
+};
+const menuOf = (p: StandScreen, id: string, from: "list" | "calendar" | "stack" = "list"): TaskMenuModel => {
+	const model = p.menu(id, from, 0);
 	if (model.kind !== "task") throw new Error("not a task's menu");
 	return model;
 };
+const taskMenu = (p: StandScreen, title: string, from: "list" | "calendar" | "stack" = "list"): TaskMenuModel => menuOf(p, idOf(p, title), from);
 
 const shape = (model: TaskMenuModel) => model.layout.map(({ group, actions }) => [group, actions.map((a) => a.id)]);
 const ids = (model: TaskMenuModel, group: string) => model.layout.find((g) => g.group === group)?.actions.map((a) => a.id) ?? [];
 const barOf = (bar: EntryBar) => bar.bar.map(({ group, actions }) => [group, actions.map((a) => `${a.id}${a.disabled ? " off" : ""}${a.lit ? " lit" : ""}`)]);
 
 describe("the stand's task menu, read from the core's table (task actions spec)", () => {
-	it("stands statuses, levels, the copy, When, Edit, the rows and Delete, top to bottom, as Max ordered them", () => {
-		const p = port();
+	it("stands statuses, levels, the copy, When, Edit, the rows and Delete, top to bottom, as Max ordered them", async () => {
+		const p = await port();
 		expect(shape(taskMenu(p, "Задача с описанием"))).toEqual([
 			["statuses", ["done", "progress", "wontDo"]],
 			["levels", ["level"]],
@@ -46,8 +52,8 @@ describe("the stand's task menu, read from the core's table (task actions spec)"
 		]);
 	});
 
-	it("names the progress tile for what it sets, and lets Won't do and Delete ask", () => {
-		const p = port();
+	it("names the progress tile for what it sets, and lets Won't do and Delete ask", async () => {
+		const p = await port();
 		const open = taskMenu(p, "Задача с описанием").layout[0].actions;
 		expect(open.map((a) => [a.status, a.asks])).toEqual([
 			["done", false],
@@ -59,8 +65,8 @@ describe("the stand's task menu, read from the core's table (task actions spec)"
 		expect(taskMenu(p, "Задача с описанием").layout[taskMenu(p, "Задача с описанием").layout.length - 1].actions[0]).toMatchObject({ id: "delete", asks: true });
 	});
 
-	it("offers no day tile for the day a task stands on, each tile with the day it writes; Remove due date only off today", () => {
-		const p = port();
+	it("offers no day tile for the day a task stands on, each tile with the day it writes; Remove due date only off today", async () => {
+		const p = await port();
 		const today = taskMenu(p, "Задача с описанием");
 		expect(ids(today, "when")).toEqual(["tomorrow", "pickDate", "repeat"]);
 		expect(today.layout.find((g) => g.group === "when")!.actions[0].date).toBe("2026-11-19");
@@ -69,30 +75,31 @@ describe("the stand's task menu, read from the core's table (task actions spec)"
 		expect(ids(inbox, "when")).toEqual(["today", "tomorrow", "pickDate", "repeat"]);
 	});
 
-	it("offers Reminder on a timed task, Description on one without, Section where the column shows sections", () => {
-		const p = port(calendarFile(NOW));
+	it("offers Reminder on a timed task, Description on one without, Section where the column shows sections", async () => {
+		const p = await port(calendarFile(NOW));
 		const timed = taskMenu(p, "Тренировка", "calendar");
 		expect(ids(timed, "when")).toContain("reminder");
 		expect(ids(timed, "edit")).toEqual(["rename", "project"]);
 		expect(ids(timed, "rows")).toContain("subtask");
-		expect(timed.peek).toBe("разминка, потом зал");
+		expect(timed.peek).toBe("- разминка, потом зал");
 		expect(ids(taskMenu(p, "Купить подарок"), "edit")).toContain("description");
-		const inbox = port();
+		const inbox = await port();
 		const first = inbox.read(0).lists.inbox.rows.find((r) => r.kind === "task")!.id;
-		expect(ids(inbox.menu(first, "list") as TaskMenuModel, "edit")).toContain("section");
-		expect(ids(inbox.menu(first, "calendar") as TaskMenuModel, "edit")).not.toContain("section");
+		expect(ids(menuOf(inbox, first, "list"), "edit")).toContain("section");
+		expect(ids(menuOf(inbox, first, "calendar"), "edit")).not.toContain("section");
 	});
 
-	it("shows a calendar task's open subtasks in its menu (F107); a stack's card offers no Subtask, and its Project is off", () => {
-		const p = port(calendarFile(NOW));
-		expect(taskMenu(p, "Переезд", "calendar").subtasks).toEqual(["k10", "k11"]);
-		const sub = p.menu("k10", "stack") as TaskMenuModel;
+	it("shows a calendar task's open subtasks in its menu (F107); a stack's card offers no Subtask, and its Project is off", async () => {
+		const p = await port(calendarFile(NOW));
+		const subtasks = taskMenu(p, "Переезд", "calendar").subtasks;
+		expect(subtasks.map((id) => menuOf(p, id, "stack").title)).toEqual(["Упаковать книги", "Заказать машину"]);
+		const sub = menuOf(p, subtasks[0], "stack");
 		expect(ids(sub, "rows")).not.toContain("subtask");
 		expect(sub.layout.find((g) => g.group === "edit")!.actions.find((a) => a.id === "project")?.disabled).toBe(true);
 	});
 
-	it("offers Pick a date's lists above the month, the task's own on; none for a subtask", () => {
-		const p = port();
+	it("offers Pick a date's lists above the month, the task's own on; none for a subtask", async () => {
+		const p = await port();
 		const inbox = taskMenu(p, p.read(0).cards[p.read(0).lists.inbox.rows.find((r) => r.kind === "task")!.id].title);
 		expect(inbox.places.map((place) => [place.id, place.on])).toEqual([
 			["inbox", true],
@@ -100,36 +107,42 @@ describe("the stand's task menu, read from the core's table (task actions spec)"
 			["soon", false],
 			["now", false],
 		]);
-		expect((port(calendarFile(NOW)).menu("k10", "stack") as TaskMenuModel).places).toEqual([]);
+		const moving = await port(calendarFile(NOW));
+		expect(menuOf(moving, taskMenu(moving, "Переезд", "calendar").subtasks[0], "stack").places).toEqual([]);
 	});
 
 	it("writes what was tapped: a day, a level on and off, a day picked, a list, Delete, a status", async () => {
-		const p = port(calendarFile(NOW));
-		await p.act("g1", { kind: "date", date: "2026-11-18" });
+		const p = await port(calendarFile(NOW));
+		await p.act(idOf(p, "Купить подарок"), { kind: "date", date: "2026-11-18" }, "list", 0);
 		expect(p.fileText()).toMatch(/Купить подарок 📅 2026-11-18\n(?![\s\S]*## Soon[\s\S]*Купить подарок)/);
-		await p.act("g2", { kind: "priority", prefix: "p1" });
+		await p.act(idOf(p, "Сдать отчёт"), { kind: "priority", prefix: "p1" }, "list", 0);
 		expect(p.fileText()).toContain("p1 Сдать отчёт");
-		await p.act("g2", { kind: "priority", prefix: "p1" });
+		await p.act(idOf(p, "Сдать отчёт"), { kind: "priority", prefix: "p1" }, "list", 0);
 		expect(p.fileText()).not.toContain("p1 Сдать отчёт");
-		await p.act("g3", { kind: "date", date: "2026-11-25" });
+		await p.act(idOf(p, "Написать письмо"), { kind: "date", date: "2026-11-25" }, "list", 0);
 		expect(p.fileText()).toContain("Написать письмо 📅 2026-11-25");
-		await p.act("g3", { kind: "sendTo", list: "backlog" });
+		const letter = Object.values(p.read(7).cards).find((c) => c.title === "Написать письмо")!.id;
+		await p.act(letter, { kind: "sendTo", list: "backlog" }, "list", 7);
 		expect(p.fileText()).toMatch(/## Backlog[\s\S]*- \[ \] Написать письмо\n/);
-		await p.act("g4", { kind: "delete" });
+		await p.act(idOf(p, "Забрать посылку"), { kind: "delete" }, "list", 0);
 		expect(p.fileText()).not.toContain("Забрать посылку");
-		await p.act("g5", { kind: "status", id: "wontDo" });
+		await p.act(idOf(p, "Обновить резюме"), { kind: "status", id: "wontDo" }, "list", 0);
 		expect(p.fileText()).toContain("- [-] Обновить резюме");
 		expect(Object.values(p.read(0).cards).map((c) => c.title)).not.toContain("Обновить резюме");
 	});
 
-	it("an event's menu is its one row", () => {
-		expect(port(calendarFile(NOW)).menu("ev2", "calendar")).toEqual({ kind: "event", title: "Встреча с дизайнером" });
+	it("an event's menu is its one row", async () => {
+		const p = await port(calendarFile(NOW));
+		p.read(0);
+		await settled(5);
+		const event = p.read(0).day.events.find((e) => e.title === "Встреча с дизайнером")!;
+		expect(p.menu(event.id, "calendar", 0)).toEqual({ kind: "event", title: "Встреча с дизайнером" });
 	});
 });
 
 describe("the menu's layout", () => {
 	/** Max, 2026-11-20: the menu is one piece under its task's copy, as iOS's context menu; never split around the copy. */
-	it("stands the block over its task; higher where the room under it can't take the panel; the copy no higher than the window's top", () => {
+	it("stands the block over its task; higher where the room under it can't take the panel; the copy no higher than the window's top", async () => {
 		const room = { top: 0, bottom: 800 };
 		expect(blockTop(100, 35, 400, 12, room, 10)).toBe(100);
 		expect(blockTop(600, 35, 400, 12, room, 10)).toBe(800 - 10 - 400 - 12 - 35);
@@ -137,13 +150,13 @@ describe("the menu's layout", () => {
 		expect(blockTop(600, 35, 0, 12, room, 10)).toBe(600);
 	});
 
-	it("lays tiles in rows of at most three, as even as they go", () => {
+	it("lays tiles in rows of at most three, as even as they go", async () => {
 		expect(tileRows([1, 2, 3, 4]).map((r) => r.length)).toEqual([2, 2]);
 		expect(tileRows([1, 2, 3, 4, 5]).map((r) => r.length)).toEqual([3, 2]);
 		expect(tileRows([1, 2]).map((r) => r.length)).toEqual([2]);
 	});
 
-	it("draws a month as six weeks from Monday", () => {
+	it("draws a month as six weeks from Monday", async () => {
 		const cells = monthGrid(monthOf("2026-11-18"));
 		expect(cells).toHaveLength(42);
 		expect(cells[0]).toEqual({ date: "2026-10-26", day: 26, other: true });
@@ -151,7 +164,7 @@ describe("the menu's layout", () => {
 		expect(monthTitle(monthOf("2026-11-18", 2))).toBe("January 2027");
 	});
 
-	it("keeps a layer mounted as long as the design's motion tokens say", () => {
+	it("keeps a layer mounted as long as the design's motion tokens say", async () => {
 		const css = readFileSync(join(process.cwd(), "styles.css"), "utf8");
 		expect(css).toContain(`--tc-duration-menu: ${LAYER_MS.open}ms;`);
 		expect(css).toContain(`--tc-duration-collapse: ${LAYER_MS.close}ms;`);
@@ -160,16 +173,16 @@ describe("the menu's layout", () => {
 
 describe("the menu's fields and the plus, in the store", () => {
 	const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
-	const screen = () => {
-		const p = port();
+	const screen = async () => {
+		const p = await port();
 		const store = createScreenStore(p);
 		store.getState().start();
 		return { p, store };
 	};
 	const firstInbox = (store: ReturnType<typeof createScreenStore>) => store.getState().shown.lists.inbox.rows.find((r) => r.kind === "task")!.id;
 
-	it("the plus opens the field at the end of the day's list while it shows, else of Inbox's last section (F174)", () => {
-		const { store } = screen();
+	it("the plus opens the field at the end of the day's list while it shows, else of Inbox's last section (F174)", async () => {
+		const { store } = await screen();
 		store.getState().plusTap(["soon", "day"]);
 		expect(store.getState().entry).toMatchObject({ at: { list: "day", before: null, depth: 0 }, renaming: null, stack: false });
 		store.getState().plusTap(["inbox", "soon"]);
@@ -179,8 +192,8 @@ describe("the menu's fields and the plus, in the store", () => {
 	});
 
 	/** Max, 2026-11-20: «Rename and creating a task are literally one interface». */
-	it("Rename is the new task's field: the card's place, the title in it, the bar as the plugin's rename has it (quick-add spec §4.8)", () => {
-		const { store } = screen();
+	it("Rename is the new task's field: the card's place, the title in it, the bar as the plugin's rename has it (quick-add spec §4.8)", async () => {
+		const { store } = await screen();
 		const id = firstInbox(store);
 		store.getState().openMenu(id);
 		store.getState().startRename();
@@ -200,8 +213,8 @@ describe("the menu's fields and the plus, in the store", () => {
 		expect(store.getState().entry!.at.depth).toBe(0);
 	});
 
-	it("a subtask's rename has no place and no project; a block's has no shifts and no place; a stack card's neither shifts, project nor place", () => {
-		const lists = screen().store;
+	it("a subtask's rename has no place and no project; a block's has no shifts and no place; a stack card's neither shifts, project nor place", async () => {
+		const lists = (await screen()).store;
 		const sub = (["inbox", "soon", "day"] as const).flatMap((l) => lists.getState().shown.lists[l].rows).find((r) => r.kind === "task" && r.depth > 0)!.id;
 		lists.getState().openMenu(sub);
 		lists.getState().startRename();
@@ -211,18 +224,20 @@ describe("the menu's fields and the plus, in the store", () => {
 			["flag", ["level"]],
 			["marks", ["repeat", "description"]],
 		]);
-		const store = createScreenStore(port(calendarFile(NOW)));
+		const cal = await port(calendarFile(NOW));
+		const moving = idOf(cal, "Переезд");
+		const store = createScreenStore(cal);
 		store.getState().start();
-		store.getState().openMenu("k8", "calendar");
+		store.getState().openMenu(moving, "calendar");
 		store.getState().startRename();
 		s = store.getState();
-		expect(s.entry).toMatchObject({ renaming: "k8", stack: false });
+		expect(s.entry).toMatchObject({ renaming: moving, stack: false });
 		expect(barOf(s.bar!)).toEqual([
 			["flag", ["level"]],
 			["marks", ["project", "repeat", "description"]],
 		]);
 		store.getState().openEntry(null);
-		store.getState().openMenu("k8", "calendar");
+		store.getState().openMenu(moving, "calendar");
 		const child = (store.getState().layer!.model as { subtasks: readonly string[] }).subtasks[0];
 		store.getState().openMenu(child, "stack");
 		store.getState().startRename();
@@ -236,7 +251,7 @@ describe("the menu's fields and the plus, in the store", () => {
 	});
 
 	it("Enter on a rename shows the new name at once, writes it and opens a new task's field right under it (F117, F298)", async () => {
-		const { p, store } = screen();
+		const { p, store } = await screen();
 		const rows = store.getState().shown.lists.inbox.rows;
 		const id = firstInbox(store);
 		const after = rows[rows.findIndex((r) => r.id === id) + 1];
@@ -245,13 +260,12 @@ describe("the menu's fields and the plus, in the store", () => {
 		store.getState().commitEntry("Новое имя", true);
 		expect(store.getState().shown.cards[id].title).toBe("Новое имя");
 		expect(store.getState().entry).toMatchObject({ renaming: null, at: { list: "inbox", before: after?.kind === "task" ? after.id : null } });
-		await settle();
-		await settle();
+		await settled(20);
 		expect(p.fileText()).toContain("Новое имя");
 	});
 
 	it("an empty or unchanged name writes nothing; the port decides, not the store", async () => {
-		const { p, store } = screen();
+		const { p, store } = await screen();
 		const id = firstInbox(store);
 		const title = store.getState().shown.cards[id].title;
 		const before = p.fileText();
@@ -267,8 +281,8 @@ describe("the menu's fields and the plus, in the store", () => {
 	});
 
 	/** Max, 2026-11-20: waiting out a double click felt like lag; double click is withdrawn, a click opens the menu at once. */
-	it("a click opens the task's menu at once; a second click does nothing more: rename is the menu's", () => {
-		const { store } = screen();
+	it("a click opens the task's menu at once; a second click does nothing more: rename is the menu's", async () => {
+		const { store } = await screen();
 		const id = firstInbox(store);
 		store.getState().openMenu(id, "list", false);
 		expect(store.getState().layer?.id).toBe(id);
@@ -277,8 +291,8 @@ describe("the menu's fields and the plus, in the store", () => {
 		expect(store.getState().entry).toBeNull();
 	});
 
-	it("Escape with a bar's panel open closes the panel alone; a new field opens with none (the audit's 6, 7)", () => {
-		const { store } = screen();
+	it("Escape with a bar's panel open closes the panel alone; a new field opens with none (the audit's 6, 7)", async () => {
+		const { store } = await screen();
 		store.getState().plusTap(["soon", "day"]);
 		store.getState().typeEntry("Флажок");
 		store.getState().showEntryPanel("where");
@@ -294,7 +308,7 @@ describe("the menu's fields and the plus, in the store", () => {
 	});
 
 	it("a place the layout can't show keeps the field where it stands and writes there (the audit's 9)", async () => {
-		const { store } = screen();
+		const { store } = await screen();
 		store.getState().plusTap(["soon", "day"]);
 		const at = store.getState().entry!.at;
 		store.getState().entryPlace("inbox", null, ["soon", "day"]);
@@ -302,13 +316,12 @@ describe("the menu's fields and the plus, in the store", () => {
 		expect(field.at).toMatchObject({ list: at.list, away: { list: "inbox" } });
 		expect(store.getState().bar!.where?.id).toBe("inbox");
 		store.getState().commitEntry("В инбокс", true);
-		await settle();
-		await settle();
+		await settled(20);
 		expect(store.getState().shown.lists.inbox.rows.some((r) => store.getState().shown.cards[r.id]?.title === "В инбокс")).toBe(true);
 	});
 
-	it("a day picked for the field from Soon turns the ribbon past the calendar, where the days turn (Decision 129)", () => {
-		const store = createScreenStore(port());
+	it("a day picked for the field from Soon turns the ribbon past the calendar, where the days turn (Decision 129)", async () => {
+		const store = createScreenStore(await port());
 		store.getState().start();
 		store.getState().setStop("soon");
 		store.getState().plusTap(["soon", "day"]);
@@ -317,9 +330,8 @@ describe("the menu's fields and the plus, in the store", () => {
 		expect(store.getState().entry!.at).toMatchObject({ list: "day", dayOffset: 9 });
 	});
 
-	it("a task just typed lets the next field under it go a level in, before its write is read back (the audit's 8)", () => {
-		const p = port();
-		p.delay = 300;
+	it("a task just typed lets the next field under it go a level in, before its write is read back (the audit's 8)", async () => {
+		const p = await port(mockFile(NOW), 300);
 		const store = createScreenStore(p);
 		store.getState().start();
 		store.getState().plusTap(["soon", "day"]);
@@ -332,30 +344,29 @@ describe("the menu's fields and the plus, in the store", () => {
 	});
 
 	it("Add subtask in a list opens the field under the task's last subtask, written as its last subtask (F124)", async () => {
-		const p = port(calendarFile(NOW));
+		const p = await port(calendarFile(NOW));
 		const store = createScreenStore(p);
 		store.getState().start();
-		store.getState().openMenu("g1");
+		const gift = idOf(p, "Купить подарок");
+		store.getState().openMenu(gift);
 		store.getState().startSubtask();
-		expect(store.getState().entry).toMatchObject({ at: { list: "soon", depth: 1, under: "g1" }, stack: false });
+		expect(store.getState().entry).toMatchObject({ at: { list: "soon", depth: 1, under: gift }, stack: false });
 		store.getState().commitEntry("Шаг", true);
-		await settle();
-		await settle();
+		await settled(20);
 		expect(p.fileText()).toMatch(/Купить подарок\n\t- \[ \] Шаг/);
 	});
 
 	it("Add subtask on the calendar types into the menu's stack, a subtask each Enter, the menu showing it (F108)", async () => {
-		const p = port(calendarFile(NOW));
+		const p = await port(calendarFile(NOW));
 		const store = createScreenStore(p);
 		store.getState().start();
-		store.getState().openMenu("k8", "calendar");
+		store.getState().openMenu(idOf(p, "Переезд"), "calendar");
 		store.getState().startSubtask();
 		expect(store.getState().entry).toMatchObject({ stack: true, renaming: null });
 		store.getState().indentEntry(1);
 		expect(store.getState().entry!.at.depth).toBeUndefined();
 		store.getState().commitEntry("Отключить интернет", true);
-		await settle();
-		await settle();
+		await settled(20);
 		const model = store.getState().layer?.model;
 		expect(model?.kind === "task" && model.subtasks.length).toBe(3);
 		expect(store.getState().entry).toMatchObject({ stack: true });
@@ -366,23 +377,26 @@ describe("the menu's fields and the plus, in the store", () => {
 });
 
 describe("the stand's calendar at any hour of its day (verifier, 2026-11-20)", () => {
-	const blocksAt = (h: number, m: number) => {
+	const blocksAt = async (h: number, m: number) => {
 		const clock = new Date(2026, 10, 20, h, m);
-		const p = new MockPort(() => clock);
-		p.reset(calendarFile(clock));
-		return { blocks: p.read(0).day.blocks, now: p.now().minute, events: p.read(0).day.events };
+		const p = await port(calendarFile(clock), 0, clock);
+		p.read(0);
+		await settled(5);
+		const shown = p.read(0);
+		const late = Object.values(shown.cards).find((c) => c.title === "Прошедшая по времени")?.id;
+		return { blocks: shown.day.blocks.filter((b) => b.id !== late), now: p.now().minute, events: shown.day.events };
 	};
 
-	it("at noon the plan stands as before: an hour after the present hour, over eight hours", () => {
-		const { blocks, now } = blocksAt(12, 0);
-		const starts = blocks.filter((b) => b.id !== "k12").map((b) => b.start);
+	it("at noon the plan stands as before: an hour after the present hour, over eight hours", async () => {
+		const { blocks, now } = await blocksAt(12, 0);
+		const starts = blocks.map((b) => b.start);
 		expect(Math.min(...starts)).toBe(Math.floor(now / 60) * 60 + 60);
 		expect(Math.max(...starts) - Math.min(...starts)).toBe(420);
 	});
 
-	it("after midnight (the stand's day starts at 05:00) the plan still stands ahead of the now line, inside the day", () => {
-		const { blocks, now, events } = blocksAt(0, 12);
-		const ahead = blocks.filter((b) => b.id !== "k12");
+	it("after midnight (the stand's day starts at 05:00) the plan still stands ahead of the now line, inside the day", async () => {
+		const { blocks, now, events } = await blocksAt(0, 12);
+		const ahead = blocks;
 		expect(ahead.every((b) => b.start > now)).toBe(true);
 		expect(ahead.every((b) => b.start + (b.length ?? 30) <= 24 * 60)).toBe(true);
 		expect(new Set(ahead.map((b) => b.start)).size).toBeGreaterThan(5);
@@ -391,16 +405,15 @@ describe("the stand's calendar at any hour of its day (verifier, 2026-11-20)", (
 });
 
 describe("the field's description, projects and new section (task actions spec, Decisions 101–103)", () => {
-	const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
-	const screen = (file = mockFile(NOW)) => {
-		const p = port(file);
+	const screen = async (file = mockFile(NOW)) => {
+		const p = await port(file);
 		const store = createScreenStore(p);
 		store.getState().start();
 		return { p, store };
 	};
 
 	it("Description opens a line under the title; Enter writes both, and the next field opens without one", async () => {
-		const { p, store } = screen();
+		const { p, store } = await screen();
 		store.getState().plusTap(["soon", "day"]);
 		store.getState().openDescription();
 		expect(store.getState().draft.descriptionLine).toBe("");
@@ -409,31 +422,29 @@ describe("the field's description, projects and new section (task actions spec, 
 		expect(bar.bar.flatMap((g) => g.actions).find((a) => a.id === "description")?.lit).toBe(true);
 		store.getState().commitEntry("С описанием", true);
 		expect(store.getState().draft.descriptionLine).toBeNull();
-		await settle();
-		await settle();
-		expect(p.fileText()).toMatch(/- \[ \] С описанием[^\n]*\n\t- с подробностями/);
+		await settled(20);
+		expect(p.fileText()).toMatch(/- \[ \] С описанием[^\n]*\n\tс подробностями/);
 	});
 
 	it("a rename's Description opens holding the task's own; only a changed one is written, an emptied one taken off", async () => {
-		const { p, store } = screen(calendarFile(NOW));
+		const { p, store } = await screen(calendarFile(NOW));
 		const id = Object.values(store.getState().shown.cards).find((c) => c.title === "Тренировка")!.id;
 		store.getState().openMenu(id, "calendar");
 		store.getState().startRename();
 		store.getState().openDescription();
-		expect(store.getState().draft.descriptionLine).toBe("разминка, потом зал");
+		expect(store.getState().draft.descriptionLine).toBe("- разминка, потом зал");
 		store.getState().typeDescription("");
 		store.getState().commitEntry("Тренировка", false);
-		await settle();
-		await settle();
+		await settled(20);
 		expect(p.fileText()).not.toContain("разминка, потом зал");
-		store.getState().openMenu("g1");
+		store.getState().openMenu(idOf(p, "Купить подарок"));
 		store.getState().startRename();
 		store.getState().openDescription();
 		expect(store.getState().draft.descriptionLine).toBe("");
 	});
 
 	it("Project is several checks: each toggles beside the others and is written with the task; No project takes all off", async () => {
-		const { p, store } = screen();
+		const { p, store } = await screen();
 		store.getState().plusTap(["soon", "day"]);
 		store.getState().toggleProject("Дом");
 		store.getState().toggleProject("Отпуск");
@@ -443,14 +454,12 @@ describe("the field's description, projects and new section (task actions spec, 
 		expect(store.getState().draft.projects).toEqual(["Дом", "Отпуск"]);
 		store.getState().clearProjects();
 		expect(store.getState().draft.projects).toEqual([]);
-		await settle();
-		await settle();
-		expect(p.fileText()).toContain("Два проекта 📅");
-		expect(p.fileText()).toMatch(/Два проекта[^\n]* 🗂️ Дом 🗂️ Отпуск/);
+		await settled(20);
+		expect(p.fileText()).toMatch(/- \[ \] Два проекта 🗂️ Дом 🗂️ Отпуск 📅/);
 	});
 
 	it("New section, where the column shows sections, makes the field write a section's name there", async () => {
-		const { store } = screen();
+		const { store } = await screen();
 		store.getState().plusTap(["inbox", "soon"]);
 		const bar = store.getState().bar!;
 		expect(bar.bar[0]).toMatchObject({ group: "mode", actions: [{ id: "newSection", lit: false }] });
@@ -459,13 +468,12 @@ describe("the field's description, projects and new section (task actions spec, 
 		expect(section.bar.map((g) => g.group)).toEqual(["mode"]);
 		store.getState().commitEntry("Новый раздел", true);
 		expect(store.getState().entry).toBeNull();
-		await settle();
-		await settle();
+		await settled(20);
 		expect(store.getState().shown.lists.inbox.rows.some((r) => r.kind === "section" && r.title === "Новый раздел")).toBe(true);
 	});
 
-	it("Repeat is on the calendar's field too", () => {
-		const { store } = screen(calendarFile(NOW));
+	it("Repeat is on the calendar's field too", async () => {
+		const { store } = await screen(calendarFile(NOW));
 		store.getState().openEntry({ list: "day", before: null, dayOffset: 0, at: 600 });
 		const bar = store.getState().bar!;
 		expect(bar.bar.flatMap((g) => g.actions).map((a) => a.id)).toContain("repeat");
@@ -474,11 +482,11 @@ describe("the field's description, projects and new section (task actions spec, 
 
 describe("the Project page and «New project…» (Decision 134), ⌥Tab's offer (Decision 133)", () => {
 	const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-	const firstTask = (p: MockPort) => Object.values(p.read(0).cards).find((c) => !/шаг/.test(c.title))!;
-	const lineOf = (p: MockPort, title: string) => p.fileText().split("\n").find((l) => l.includes(title)) ?? "";
+	const firstTask = (p: StandScreen) => Object.values(p.read(0).cards).find((c) => !/шаг/.test(c.title))!;
+	const lineOf = (p: StandScreen, title: string) => p.fileText().split("\n").find((l) => l.includes(title)) ?? "";
 
 	it("a project's check writes and leaves the menu on its page, the task's check on it", async () => {
-		const p = port();
+		const p = await port();
 		const store = createScreenStore(p);
 		const task = firstTask(p);
 		store.getState().openMenu(task.id);
@@ -493,38 +501,22 @@ describe("the Project page and «New project…» (Decision 134), ⌥Tab's offer
 	});
 
 	it("follows the task's fresh id after a check, so the next check finds it (the core's key changes on a write)", async () => {
-		/** As the core does: the task written reads back under its fresh key. */
-		class FreshIds extends MockPort {
-			private written: string | null = null;
-			override async act(...args: Parameters<MockPort["act"]>): Promise<string | null> {
-				await super.act(...args);
-				this.written = args[0];
-				return `${args[0]}'`;
-			}
-			override read(...args: Parameters<MockPort["read"]>): ReturnType<MockPort["read"]> {
-				const data = super.read(...args);
-				const id = this.written;
-				if (id === null || !data.cards[id]) return data;
-				const { [id]: card, ...rest } = data.cards;
-				return { ...data, cards: { ...rest, [`${id}'`]: { ...card, id: `${id}'` } } };
-			}
-			override menu(id: string, from: Parameters<MockPort["menu"]>[1]): ReturnType<MockPort["menu"]> {
-				return super.menu(id.replace(/'$/, ""), from);
-			}
-		}
-		const p = new FreshIds(() => NOW);
-		p.delay = 0;
+		const p = await port();
 		const store = createScreenStore(p);
 		const task = firstTask(p);
 		store.getState().openMenu(task.id);
 		store.getState().menuPage("projects");
 		store.getState().actHere({ kind: "project", name: "Дом" });
 		await wait(5);
-		expect(store.getState().layer?.id).toBe(`${task.id}'`);
+		const id = store.getState().layer?.id;
+		expect(id && p.read(0).cards[id]?.title).toBe(task.title);
+		store.getState().actHere({ kind: "project", name: "Отпуск" });
+		await wait(5);
+		expect(lineOf(p, task.title)).toMatch(/🗂️ Дом.*🗂️ Отпуск|🗂️ Отпуск.*🗂️ Дом/);
 	});
 
 	it("New project in the menu: a name of nothing goes back to the projects; a name closes the menu and gives the task the project", async () => {
-		const p = port();
+		const p = await port();
 		const store = createScreenStore(p);
 		const task = firstTask(p);
 		store.getState().openMenu(task.id);
@@ -539,8 +531,7 @@ describe("the Project page and «New project…» (Decision 134), ⌥Tab's offer
 	});
 
 	it("New project on the bar: Escape and a name of nothing go back to the projects; a name is the field's, even with Enter right after it", async () => {
-		const p = port();
-		p.delay = 30;
+		const p = await port(mockFile(NOW), 30);
 		const store = createScreenStore(p);
 		store.getState().plusTap(["soon", "day"]);
 		store.getState().showEntryPanel("projectName");
@@ -558,8 +549,8 @@ describe("the Project page and «New project…» (Decision 134), ⌥Tab's offer
 		expect(store.getState().draft.projects).toEqual(["Дача"]);
 	});
 
-	it("⌥Tab, like the bar's switch, makes no new section where the bar offers none (a rename)", () => {
-		const p = port();
+	it("⌥Tab, like the bar's switch, makes no new section where the bar offers none (a rename)", async () => {
+		const p = await port();
 		const store = createScreenStore(p);
 		const task = firstTask(p);
 		store.getState().openMenu(task.id);

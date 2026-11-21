@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DESIGN, LAYOUT } from "../../../obsidian/ui/design";
+import { DESIGN, LAYOUT } from "../../../obsidian/ui/shared/design";
 import { EdgeHeading } from "../../../obsidian/ui/engine/drag/edgeHeading";
 import { edgeMinute, leastLength } from "../../../obsidian/ui/engine/gestures/Resize";
 import { hourOf, roomMeasure, zoomAfterPinch } from "../../../obsidian/ui/engine/gestures/Zoom";
