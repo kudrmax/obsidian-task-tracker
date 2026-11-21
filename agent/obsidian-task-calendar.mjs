@@ -2042,7 +2042,10 @@ function indentWidth(line) {
   return INDENT_RE2.exec(line)[0].length;
 }
 function sameTask(a, b) {
-  return a.status === b.status && a.statusChar === b.statusChar && a.text === b.text && a.dueDate === b.dueDate && a.priority === b.priority && a.labels.length === b.labels.length && a.labels.every((label, i) => label === b.labels[i]) && (a.repeat?.format() ?? null) === (b.repeat?.format() ?? null) && a.slot?.date === b.slot?.date && a.slot?.start === b.slot?.start && a.slot?.end === b.slot?.end && a.reminder === b.reminder && a.collapsed === b.collapsed && sameLines(a.projects, b.projects) && sameLines(a.children, b.children);
+  return sameOwnLine(a, b) && sameLines(a.children, b.children);
+}
+function sameOwnLine(a, b) {
+  return a.status === b.status && a.statusChar === b.statusChar && a.text === b.text && a.dueDate === b.dueDate && a.priority === b.priority && a.labels.length === b.labels.length && a.labels.every((label, i) => label === b.labels[i]) && (a.repeat?.format() ?? null) === (b.repeat?.format() ?? null) && a.slot?.date === b.slot?.date && a.slot?.start === b.slot?.start && a.slot?.end === b.slot?.end && a.reminder === b.reminder && a.collapsed === b.collapsed && sameLines(a.projects, b.projects);
 }
 function tagNumber(tag) {
   return Number(tag.slice(1));
@@ -2243,17 +2246,19 @@ var TaskDocument = class _TaskDocument {
   }
   /**
    * Each entry of this document becomes its task, as `replace` one after another would, in one rewrite. Only the task's
-   * own line changes unless its description and subtasks do; those rewritten lines may not hold another change.
+   * own line changes unless its description and subtasks do; those rewritten lines may not hold another change. With
+   * `asRead`, the entry as it was read before: a task whose own line says what it said then gets that line back as it was.
    */
   replaceAll(changes) {
     const edits = [];
     const mint = this.mint();
-    for (const [entry, task] of changes) {
+    for (const [entry, task, asRead] of changes) {
       const span = this.spanOf(entry);
       if (sameTask(entry.task, task)) continue;
+      const line = asRead && sameOwnLine(asRead.task, task) && asRead.indent === entry.indent && asRead.bullet === entry.bullet ? asRead.raw : formatTaskLine({ indent: entry.indent, bullet: entry.bullet, task }, this.markers);
       const own = sameLines(entry.task.children, task.children);
       edits.push(
-        own ? { line: span.line, count: 1, rows: this.rewritten({ line: span.line, lineCount: 1 }, [formatTaskLine({ indent: entry.indent, bullet: entry.bullet, task }, this.markers)], mint) } : { line: span.line, count: span.lineCount, rows: this.rewritten(span, this.linesOf(entry.indent, entry.bullet, task), mint) }
+        own ? { line: span.line, count: 1, rows: this.rewritten({ line: span.line, lineCount: 1 }, [line], mint) } : { line: span.line, count: span.lineCount, rows: this.rewritten(span, [line, ...task.children], mint) }
       );
     }
     if (edits.length === 0) return this;
@@ -7781,18 +7786,14 @@ function readsAnew(before, after) {
 var MARK = 57344;
 var FIRST = 57345;
 var EntryTags = class _EntryTags {
-  constructor(count) {
-    this.count = count;
+  constructor(asRead) {
+    this.asRead = asRead;
   }
   /** Tags `entries` in their order: the n-th is found again as `find(doc, n)`. */
   static tag(doc, entries) {
-    const tagged = doc.replaceAll(
-      entries.map((entry, n) => {
-        const same = doc.find(entry.section, entry.index, entry.path);
-        return [same, { ...same.task, text: same.task.text + markOf(n) }];
-      })
-    );
-    return { doc: tagged, tags: new _EntryTags(entries.length) };
+    const asRead = entries.map((entry) => doc.find(entry.section, entry.index, entry.path));
+    const tagged = doc.replaceAll(asRead.map((same, n) => [same, { ...same.task, text: same.task.text + markOf(n) }]));
+    return { doc: tagged, tags: new _EntryTags(asRead) };
   }
   /** `text` with the n-th mark: written in place of a tagged task's text, it keeps the task tagged. */
   static marked(text, n) {
@@ -7811,12 +7812,13 @@ var EntryTags = class _EntryTags {
     };
     return search(doc.allTasks());
   }
+  /** Takes every mark off: a task the operations left as it was gets its line back as it was read, wherever it now stands. */
   untag(doc) {
     const changes = [];
-    for (let n = 0; n < this.count; n++) {
+    this.asRead.forEach((asRead, n) => {
       const entry = this.find(doc, n);
-      if (entry) changes.push([entry, { ...entry.task, text: entry.task.text.slice(0, -markOf(n).length) }]);
-    }
+      if (entry) changes.push([entry, { ...entry.task, text: entry.task.text.slice(0, -markOf(n).length) }, asRead]);
+    });
     return doc.replaceAll(changes);
   }
 };
@@ -8051,6 +8053,11 @@ var TaskRules = class {
       return tags.untag(edited);
     };
     return { operation, place: () => place };
+  }
+  /** Whether `edit` writes anything on the snapshot `s`: not for a blank title, nor for the task as it stands and where. */
+  editChanges(s, key, draft) {
+    const edit = this.edit(key, draft);
+    return edit !== null && edit.operation(s.doc, s.today, this.settings.get(), s.boundary).serialize() !== s.doc.serialize();
   }
   setStatus(key, status) {
     return (doc) => setStatus(doc, this.entryOf(doc, key), status);
@@ -9237,12 +9244,13 @@ var TaskWrites = class {
   firstStep(key, text) {
     return nothing(this.rules.firstStep(key, text));
   }
-  edit(key, draft) {
+  edit(s, key, draft) {
     const edit = this.rules.edit(key, draft);
+    if (!edit || !this.rules.editChanges(s, key, draft)) return { operation: null, answer: () => null };
     return {
-      operation: edit?.operation ?? null,
+      operation: edit.operation,
       answer: (change) => {
-        const place = edit?.place() ?? null;
+        const place = edit.place();
         if (!change || !place || change.before.serialize() === change.after.serialize()) return null;
         return this.reads.itemAt(change.after, place, this.rules.today());
       }
@@ -10074,8 +10082,8 @@ var TaskServiceImpl = class {
   firstStepProjects(view, key) {
     return firstStepProjects(view, key);
   }
-  edit(key, draft) {
-    return this.run(this.writes.edit(key, draft));
+  async edit(key, draft) {
+    return this.run(this.writes.edit(await this.snapshot(), key, draft));
   }
   placementOf(item) {
     return this.reads.placementOf(item);
@@ -10916,7 +10924,7 @@ var TASKS = {
   firstStep: (c, [key, text]) => c.run(c.writes.firstStep(key, text)),
   firstStepScreen: (_c, [view, key]) => firstStepScreen(view, key),
   firstStepProjects: (_c, [view, key]) => firstStepProjects(view, key),
-  edit: (c, [key, draft]) => c.run(c.writes.edit(key, draft)),
+  edit: (c, [key, draft]) => c.run(c.writes.edit(KEPT(c), key, draft)),
   placementOf: (c, [item]) => c.reads.placementOf(item),
   dayColumn: (c, [date]) => c.reads.dayColumn(date),
   columnSections: (c, [column, date]) => c.reads.columnSections(column, date),

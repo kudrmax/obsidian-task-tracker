@@ -423,8 +423,8 @@ export class TaskServiceImpl implements TaskService {
 		return firstStepProjects(view, key);
 	}
 
-	edit(key: TaskKey, draft: TaskDraft): Promise<TaskItem | null> {
-		return this.run(this.writes.edit(key, draft));
+	async edit(key: TaskKey, draft: TaskDraft): Promise<TaskItem | null> {
+		return this.run(this.writes.edit(await this.snapshot(), key, draft));
 	}
 
 	placementOf(item: TaskItem): Placement {
