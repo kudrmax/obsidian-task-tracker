@@ -12,7 +12,7 @@ import { DaySlide } from "../view/Slide";
 import { TaskList } from "../view/TaskList";
 import { TaskMenu } from "../view/TaskMenu";
 import { Timeline } from "../view/Timeline";
-import { COLUMN_SHARE, columnsOf, dayColumnWidth, type Place, ruleShift, type Stop, STRIP_WIDTH } from "./columns";
+import { COLUMN_SHARE, columnsOf, dayColumnWidth, drawnWidths, type Place, ruleShift, type Stop, STRIP_WIDTH } from "./columns";
 
 export { type Place, reachOf } from "./columns";
 
@@ -140,8 +140,8 @@ function ListDivider({ at, ribbon, calendar }: { readonly at: RibbonAt; readonly
 	const { haptics } = useHost();
 	/** The list as the browser draws it: all the ribbon but the calendar and the divider's half beside it. */
 	const drawn = () => {
-		const view = ribbon.current?.clientWidth ?? 0;
-		return { view, list: view - (calendar.current?.clientWidth ?? 0) - DESIGN.dividerWidth / 2 };
+		const { view, calendar: beside } = drawnWidths(ribbon.current, calendar.current);
+		return { view, list: view - beside - DESIGN.dividerWidth / 2 };
 	};
 	const bind = useDivider(drawn, () => haptics.tap());
 	const handlers = bind();

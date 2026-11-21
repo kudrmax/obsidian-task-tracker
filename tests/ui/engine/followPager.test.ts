@@ -185,3 +185,18 @@ describe("the gallery's rule", () => {
 		expect(pager.release(0, -3, width)).toBe(0);
 	});
 });
+
+describe("the ribbon's drag, on @use-gesture's documented options (review of part 1, finding 18)", () => {
+	const source = readFileSync(join(__dirname, "..", "..", "..", "obsidian", "ui", "engine", "gestures", "FollowRibbon.ts"), "utf8").replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, "");
+
+	it("leaves taps unfiltered by not asking for the filter, never by taking off a handler by the library's internal name", () => {
+		expect(source).not.toMatch(/onClickCapture/);
+		expect(source).not.toMatch(/filterTaps\s*:\s*true/);
+		expect(source).toMatch(/threshold:/);
+	});
+
+	it("reads the drawn widths through the layout's one reader", () => {
+		expect(source).not.toMatch(/clientWidth/);
+		expect(source).toMatch(/drawnWidths\(/);
+	});
+});

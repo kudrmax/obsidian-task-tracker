@@ -85,6 +85,15 @@ export const ruleShift =
 	(at: number): string =>
 		`calc(${Math.min(1, Math.max(-1, offsetOf(stop) - at))} * var(--tc-divider) / 2)`;
 
+/**
+ * The ribbon's and its calendar's widths as the browser draws them, read as a gesture needs them (as @use-gesture's pager
+ * example reads the window's): the one place the screen reads them. Before the calendar is drawn, half the ribbon.
+ */
+export function drawnWidths(ribbon: HTMLElement | null, calendar: HTMLElement | null): { readonly view: number; readonly calendar: number } {
+	const view = ribbon?.clientWidth ?? 0;
+	return { view, calendar: calendar?.clientWidth ?? view / 2 };
+}
+
 /** How wide a place is drawn, px: a stop's step is half the ribbon; past the calendar a day is the day list's column. */
 export interface PlaceWidths {
 	readonly stop: number;

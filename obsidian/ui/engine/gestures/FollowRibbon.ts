@@ -1,7 +1,7 @@
 import { useGesture, useWheel } from "@use-gesture/react";
 import { animate, type AnimationPlaybackControls, type MotionValue, useMotionValue, useTransform } from "motion/react";
 import { createContext, type RefObject, useEffect, useRef, useState } from "react";
-import { CALENDAR, landingWidth, type PlaceWidths, placeOf, placesAfter, standAt } from "../layout/columns";
+import { CALENDAR, drawnWidths, landingWidth, type PlaceWidths, placeOf, placesAfter, standAt } from "../layout/columns";
 import { useScreen, useScreenApi } from "../store";
 import { type ChangeTiming, changeLook, changeTiming, type DayChange } from "./dayChange";
 import { FollowPager, LANDING, landingAt, landingVelocity } from "./followPager";
@@ -39,14 +39,13 @@ interface DayLookValues {
 type GestureHandlers = ReturnType<ReturnType<typeof useGesture>>;
 
 /**
- * The ribbon's handlers without @use-gesture's click filter (`filterTaps` takes the click after a drag that was no tap):
- * its flag outlived a drag cancelled because another gesture held the pointer (a block's dot pulled, F103) or a mouse's
- * pull it never followed, and ate the next tap on a task. A swipe gives no click to filter: a finger that moved past the
- * browser's slop makes none, and a mouse or the trackpad never moves the ribbon by a drag.
+ * Where the ribbon's drag begins, px: @use-gesture's tap threshold, as `filterTaps` set it. The taps themselves are not
+ * filtered (`filterTaps` off, its documented default): its click filter outlived a drag cancelled because another gesture
+ * held the pointer (a block's dot pulled, F103) or a mouse's pull it never followed, and ate the next tap on a task. A
+ * swipe gives no click to filter: a finger that moved past the browser's slop makes none, and a mouse or the trackpad
+ * never moves the ribbon by a drag.
  */
-function withoutClickFilter(handlers: GestureHandlers): GestureHandlers {
-	return Object.fromEntries(Object.entries(handlers).filter(([name]) => name !== "onClickCapture")) as GestureHandlers;
-}
+const DRAG_THRESHOLD_PX = 3;
 
 export const DayTurnContext = createContext<DayTurn | null>(null);
 
@@ -123,8 +122,8 @@ export function useFollowRibbon(ribbon: RefObject<HTMLElement | null>, calendar:
 	 * column, all the ribbon but the calendar, which keeps its width at the calendar all the way (Decision 131).
 	 */
 	const widths = (): PlaceWidths => {
-		const view = ribbon.current?.clientWidth ?? 0;
-		return { stop: view / 2, day: view - (calendar.current?.clientWidth ?? view / 2) };
+		const drawn = drawnWidths(ribbon.current, calendar.current);
+		return { stop: drawn.view / 2, day: drawn.view - drawn.calendar };
 	};
 	/** The fingers' pixels as places, each place as wide as it is drawn. */
 	const scale = () => {
@@ -278,7 +277,7 @@ export function useFollowRibbon(ribbon: RefObject<HTMLElement | null>, calendar:
 				/** The pointer is followed on the view's window, not captured by the card under the finger: a long press there can hand it to the drag mid-swipe, and the ribbon's gesture still ends. */
 				pointer: { capture: false },
 				axis: "x",
-				filterTaps: true,
+				threshold: DRAG_THRESHOLD_PX,
 			},
 		},
 	);
@@ -298,6 +297,6 @@ export function useFollowRibbon(ribbon: RefObject<HTMLElement | null>, calendar:
 	);
 	/** A card carried: only the shown day is drawn, so a day out of sight never lies under it as a place to drop on. */
 	const drawnNow = dragging ? [Math.max(0, dayOffset)] : days;
-	const bind = () => withoutClickFilter(gestures());
+	const bind = () => gestures();
 	return { at, turn: { at: dayAt, days: drawnNow, shown: shownDay, change, out: { x: outX, opacity: outOpacity }, in: { x: inX, opacity: inOpacity } }, bind };
 }
