@@ -24,11 +24,13 @@ export class FieldScope {
 	private readonly scope: Scope;
 	private held = false;
 
+	/** `parent`: the scope the field's stands over, Obsidian's own or a note's block's, so a key the field leaves goes on there. */
 	constructor(
 		private readonly app: App,
+		parent: Scope,
 		hotkeys: readonly FieldHotkey[],
 	) {
-		this.scope = new Scope(app.scope);
+		this.scope = new Scope(parent);
 		for (const { modifiers, key, run } of hotkeys)
 			this.scope.register([...modifiers], key, () => {
 				run();

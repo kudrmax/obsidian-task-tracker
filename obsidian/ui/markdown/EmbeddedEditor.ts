@@ -1,6 +1,6 @@
 import { Prec, type Extension } from "@codemirror/state";
 import { type EditorView, keymap, type ViewUpdate } from "@codemirror/view";
-import type { App, Editor, TFile } from "obsidian";
+import type { App, Editor, Scope, TFile } from "obsidian";
 import { FieldScope, type FieldHotkey } from "./fieldScope";
 import { lineCommandKeys } from "./lineCommands";
 
@@ -46,10 +46,11 @@ export interface EditorHooks {
 	/** More of CodeMirror's extensions, after Obsidian's own and before the keys. */
 	readonly extensions?: readonly Extension[];
 	/**
-	 * Given (even none), the field's own scope stands over Obsidian's hotkeys while it has the focus (`FieldScope`): these
-	 * run first, the line commands and the keys that type reach no command.
+	 * The field's own scope over Obsidian's hotkeys while it has the focus (`FieldScope`, Decision 133): its `hotkeys` run
+	 * first, the line commands and the keys that type reach no command; it stands over `parent` (Obsidian's own scope when
+	 * none is given). Without it the field takes no scope (the old screen's fields push their own).
 	 */
-	readonly hotkeys?: readonly FieldHotkey[];
+	readonly ownScope?: { readonly parent?: Scope; readonly hotkeys: readonly FieldHotkey[] };
 	onChange?(): void;
 }
 
@@ -78,7 +79,7 @@ export class EmbeddedEditor {
 		this.owner.editor = this.editor.editor;
 		this.editor.set(text);
 		this.contentDOM.addEventListener("focus", () => (this.host.activeEditor = this.owner));
-		this.scope = hooks.hotkeys ? new FieldScope(app, hooks.hotkeys) : null;
+		this.scope = hooks.ownScope ? new FieldScope(app, hooks.ownScope.parent ?? app.scope, hooks.ownScope.hotkeys) : null;
 		if (this.scope) {
 			const scope = this.scope;
 			this.contentDOM.addEventListener("focus", () => scope.hold(true));

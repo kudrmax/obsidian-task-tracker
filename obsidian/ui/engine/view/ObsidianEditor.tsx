@@ -61,7 +61,7 @@ export function ObsidianEditor({ text, className, placeholder, priority = null, 
 			extensions: [...(lines ? [] : [EditorState.transactionFilter.of(oneLine)]), ...(placeholder ? [hint(placeholder)] : [])],
 			onChange: () => handlers.current.onChange?.(editor.value),
 			/** While it has the focus no hotkey of Obsidian's runs on what is typed, nor a command that changes the line (F194, Decision 133). */
-			hotkeys: onNewSection ? [{ modifiers: ["Alt"], key: "Tab", run: () => handlers.current.onNewSection?.() }] : [],
+			ownScope: { hotkeys: onNewSection ? [{ modifiers: ["Alt"], key: "Tab", run: () => handlers.current.onNewSection?.() }] : [] },
 			keys: [
 				...(handlers.current.onEnter ? [{ key: "Enter", run: () => handlers.current.onEnter?.(editor.value) }] : []),
 				{ key: "Escape", run: () => handlers.current.onEscape() },
