@@ -24,6 +24,8 @@ export interface DayTurn {
 	readonly at: MotionValue<number>;
 	/** The days whose lists are drawn, in days from today: the shown one, and while a finger may draw them in, its neighbours. */
 	readonly days: readonly number[];
+	/** The day the calendar stands on while no change is under way. */
+	readonly shown: number;
 	/** The calendar's day changing as the list lands, or null while it stands on its day. */
 	readonly change: DayChange | null;
 	/** Where the day going out and the day coming in stand, in widths of the calendar's room, read off the list's own position in the same frame. */
@@ -86,6 +88,7 @@ export function useFollowRibbon(ribbon: RefObject<HTMLElement | null>, win: Wind
 	});
 	/** The day the calendar stands on when no change is under way. */
 	const shown = useRef(Math.max(0, dayOffset));
+	const [shownDay, setShownDay] = useState(shown.current);
 	const drawnDays = useRef(days);
 	const glide = useRef<AnimationPlaybackControls | null>(null);
 	const pager = useRef(new FollowPager(placeOf(stop, dayOffset), Infinity));
@@ -139,6 +142,7 @@ export function useFollowRibbon(ribbon: RefObject<HTMLElement | null>, win: Wind
 			if (turn) {
 				ride.current = null;
 				shown.current = turn.to;
+				setShownDay(turn.to);
 				changing.current = null;
 				setChange(null);
 			}
@@ -264,5 +268,5 @@ export function useFollowRibbon(ribbon: RefObject<HTMLElement | null>, win: Wind
 	);
 	/** A card carried: only the shown day is drawn, so a day out of sight never lies under it as a place to drop on. */
 	const drawnNow = dragging ? [Math.max(0, dayOffset)] : days;
-	return { at, turn: { at: dayAt, days: drawnNow, change, out: outOffset, in: inOffset }, bind };
+	return { at, turn: { at: dayAt, days: drawnNow, shown: shownDay, change, out: outOffset, in: inOffset }, bind };
 }

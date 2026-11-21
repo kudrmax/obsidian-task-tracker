@@ -91,7 +91,7 @@ export const Timeline = memo(function Timeline() {
 	/** The browser's reveal of a mark: put at the top of the room, less its scroll margin. */
 	const reveal = useCallback((el: HTMLElement | null) => el?.scrollIntoView({ block: "start", inline: "nearest" }), []);
 	/** The day drawn: the one this calendar shows; as the days turn, while it changes on the list's landing, the day going out and the one coming in (`dayChange.ts`). */
-	const shownDay = own ?? dayOffset;
+	const shownDay = turn ? turn.shown : (own ?? dayOffset);
 	const change = turn?.change ?? null;
 	const outOffset = turn?.out ?? null;
 	const inOffset = turn?.in ?? null;

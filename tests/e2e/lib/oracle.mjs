@@ -3,7 +3,7 @@
  * stand) and what the tasks file says. Nothing here asks the plugin's state.
  */
 
-/** The titles a person sees over the columns, left to right: each wholly inside the view and inside every box that clips it (a day's page beside the shown one lies in the view but past its lane's edge). */
+/** The titles a person sees over the columns, left to right: each wholly inside the view and not hidden whole by a box that clips it (a day's page beside the shown one lies in the view but past its lane's edge). */
 export function columnsInView(cdp, root = ".task-calendar") {
 	return cdp.eval(`(() => {
 		const view = document.querySelector(${JSON.stringify(root)});
@@ -17,7 +17,7 @@ export function columnsInView(cdp, root = ".task-calendar") {
 				for (let up = el.parentElement; up && up !== view; up = up.parentElement) {
 					if (getComputedStyle(up).overflowX === "visible") continue;
 					const c = up.getBoundingClientRect();
-					if (r.left < c.left - 1 || r.right > c.right + 1) return false;
+					if (r.right <= c.left + 1 || r.left >= c.right - 1) return false;
 				}
 				return true;
 			})
