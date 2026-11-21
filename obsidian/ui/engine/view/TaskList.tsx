@@ -7,7 +7,7 @@ import { useAnchor } from "../layers/Layers";
 import type { EntryField as Field, ListId, Row } from "../port";
 import { DayContext, useData, useScreen, useScreenApi } from "../store";
 import { Card, PressedLook } from "./Card";
-import { MovingRow } from "./MovingRow";
+import { MovingRow, MovingRows } from "./MovingRow";
 import { EntryField } from "./QuickAdd";
 
 /** A row counts as this tall until it is drawn and measured (a card and its gap at the default size). */
@@ -50,6 +50,7 @@ export const TaskList = memo(function TaskList({ list }: { readonly list: ListId
 	/** The rows drawn: the list's, with the new task's field standing in its slot when it is in this list. */
 	const drawn = useMemo(() => withEntry(withPlus, list, entry), [withPlus, list, entry]);
 	const fresh = useScreen((s) => s.fresh);
+	const gone = useScreen((s) => s.gone);
 	const reveal = useScreen((s) => s.reveal);
 	const order = useMemo(() => readRows.map((row) => row.id).join(" "), [readRows]);
 	/** Every row is in the sortable list: headers move aside like cards; a card goes after a header into its section. */
@@ -122,6 +123,7 @@ export const TaskList = memo(function TaskList({ list }: { readonly list: ListId
 			<div className="tc-list-items" style={{ height: virtualizer.getTotalSize() }}>
 				<div className="tc-list-block" style={{ transform: `translateY(${items[0]?.start ?? 0}px)` }}>
 					<SortableList list={list} ids={ids}>
+						<MovingRows gone={gone}>
 							{items.map((item) => {
 								const row = drawn[item.index];
 								if (row.kind === "plus")
@@ -144,6 +146,7 @@ export const TaskList = memo(function TaskList({ list }: { readonly list: ListId
 									</MovingRow>
 								);
 							})}
+						</MovingRows>
 					</SortableList>
 				</div>
 			</div>

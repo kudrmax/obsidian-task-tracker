@@ -1847,6 +1847,8 @@ button.tc-btn.tc-folder-btn:disabled { opacity: var(--tc-tile-off-opacity); curs
 .tc-list-items { position: relative; flex: none; }
 .tc-list-block { position: absolute; top: 0; left: 0; right: 0; }
 .tc-list-item { display: flow-root; padding-bottom: var(--tc-card-gap); }
+/* A row leaving (Decision 132): it fades where it stands and takes no press. */
+.task-calendar .is-leaving { pointer-events: none; }
 .tc-list-item > .tc-group-head, .tc-list-item > .tc-drag-source > .tc-group-head { margin-top: var(--tc-section-gap); }
 /* The calendar's tasks and events lie over each other in the stack's order (--tc-stack-z), inside the items: the now line stays over them all. */
 .task-calendar.is-engine .tc-items { isolation: isolate; }
