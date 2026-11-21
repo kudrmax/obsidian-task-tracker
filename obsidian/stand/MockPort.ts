@@ -1,4 +1,4 @@
-import type { AllDayEvent, Block, CardFace, DayEvent, Destination, Edge, EntryBar, EntryCommit, EntryDraft, EntryField, EventPaint, FieldActionId, ListData, ListId, ListPlaceId, MenuAction, MenuFrom, MenuModel, MenuStatusId, Now, PlaceId, ReminderKind, RenameStart, Row, ScreenData, ScreenPort } from "../ui/engine/port";
+import type { AllDayEvent, ScreenContext, Block, CardFace, DayEvent, Destination, Edge, EntryBar, EntryCommit, EntryDraft, EntryField, EventPaint, FieldActionId, ListData, ListId, ListPlaceId, MenuAction, MenuFrom, MenuModel, MenuStatusId, Now, PlaceId, ReminderKind, RenameStart, Row, ScreenData, ScreenPort } from "../ui/engine/port";
 import { type FieldFacts, fieldBar, type MenuFacts, menuLayout, menuPlaces } from "./actionTable";
 import { bgAlphaFor, eventColors } from "../ui/eventColors";
 import { addDays, CALENDAR_COLORS, DAY_START_HOUR, dateOf, dayOf, fileText, LIST_KEYS, LIST_NAMES, type ListKey, MOCK_PROJECTS, type MockFile, type MockSection, type MockTask, minuteOf, mockFile } from "./mockData";
@@ -46,6 +46,7 @@ const REMINDERS: readonly ReminderKind[] = ["live", "notification", "alarm", "no
 /** A draft with nothing set: the field as a new task's opens. */
 /** Steps Undo keeps, as the plugin's history does (F267). */
 const UNDO_STEPS = 100;
+const EVERY_TASK: ScreenContext = { project: null };
 const NO_DRAFT: EntryDraft = { level: null, projects: [], descriptionLine: null, section: false };
 /** A task done or given up leaves the screen; it stays in the file. */
 const closed = (t: MockTask) => t.status === "x" || t.status === "-";
@@ -106,12 +107,12 @@ export class MockPort implements ScreenPort {
 
 	// The port.
 
-	read(dayOffset: number): ScreenData {
-		const key = `${dayOffset}@${minuteOf(this.clock())}`;
+	read(dayOffset: number, context: ScreenContext = EVERY_TASK): ScreenData {
+		const key = `${dayOffset}@${minuteOf(this.clock())}#${context.project ?? ""}`;
 		let data = this.cache.get(key);
 		if (!data) {
 			if (this.cache.size > 16) this.cache.clear();
-			data = this.screenOf(this.file, dayOffset);
+			data = this.screenOf(this.file, dayOffset, null, context);
 			this.cache.set(key, data);
 		}
 		return data;
@@ -127,10 +128,10 @@ export class MockPort implements ScreenPort {
 		return { minute: minuteOf(clock), label: `${pad(clock.getHours())}:${pad(clock.getMinutes())}` };
 	}
 
-	preview(id: string, to: Destination): ScreenData {
+	preview(id: string, to: Destination, context: ScreenContext = EVERY_TASK): ScreenData {
 		const file = structuredClone(this.ahead ?? this.file);
 		this.apply(file, id, to);
-		return this.screenOf(file, to.dayOffset);
+		return this.screenOf(file, to.dayOffset, null, context);
 	}
 
 	/** The stand refuses nothing (Decision 27): every list and every day's calendar takes a task; the refusal stays for part 2's project mode (F161). */
@@ -138,13 +139,13 @@ export class MockPort implements ScreenPort {
 		return this.findBy(this.ahead ?? this.file, (t) => t.id === id) !== null;
 	}
 
-	stretched(id: string, dayOffset: number, edge: Edge, minute: number): ScreenData {
+	stretched(id: string, dayOffset: number, edge: Edge, minute: number, context: ScreenContext = EVERY_TASK): ScreenData {
 		const file = structuredClone(this.ahead ?? this.file);
 		const task = this.findBy(file, (t) => t.id === id)?.task;
-		if (!task?.slot) return this.screenOf(file, dayOffset);
+		if (!task?.slot) return this.screenOf(file, dayOffset, null, context);
 		const span = this.stretchedSpan(task, dayOffset, edge, minute);
 		task.slot = { start: span.start, end: span.end > span.start ? span.end : null };
-		return this.screenOf(file, dayOffset, id);
+		return this.screenOf(file, dayOffset, id, context);
 	}
 
 	/** The plugin's rule (the core's `TimelineSpans.resized`), the simplest form of it. */
@@ -749,21 +750,23 @@ export class MockPort implements ScreenPort {
 	// Reads.
 
 	/** The screen as `file` says; `held`, a task held by a dot, drawn where it is stretched to, not riding the now line. */
-	private screenOf(file: MockFile, dayOffset: number, held: string | null = null): ScreenData {
+	/** `context`: the chosen project, only its tasks shown (with their subtasks), every event still. */
+	private screenOf(file: MockFile, dayOffset: number, held: string | null = null, context: ScreenContext = EVERY_TASK): ScreenData {
 		const shown = dateOf(addDays(this.day(), dayOffset));
 		const cards: Record<string, CardFace> = {};
 		const today = dayOffset === 0;
+		const mine = (shows: (t: MockTask) => boolean) => (t: MockTask) => (context.project === null || (t.projects ?? []).includes(context.project)) && shows(t);
 		return {
 			lists: {
-				inbox: this.listData("Inbox", file.inbox, cards, null, () => true),
-				soon: this.listData("Soon", file.soon, cards, null, (t) => t.due === null),
-				day: this.listData(this.titleOf(dayOffset), this.listOf(file, "day", dayOffset), cards, shown, today ? (t) => t.slot === null : (t) => t.due === shown && t.slot === null),
+				inbox: this.listData("Inbox", file.inbox, cards, null, mine(() => true)),
+				soon: this.listData("Soon", file.soon, cards, null, mine((t) => t.due === null)),
+				day: this.listData(this.titleOf(dayOffset), this.listOf(file, "day", dayOffset), cards, shown, mine(today ? (t) => t.slot === null : (t) => t.due === shown && t.slot === null)),
 			},
 			cards,
 			day: {
 				title: this.titleOf(dayOffset),
 				isToday: today,
-				blocks: this.blocksOf(file, cards, shown, today, held),
+				blocks: this.blocksOf(file, cards, shown, today, held, mine(() => true)),
 				events: this.eventsOf(file, dayOffset),
 				allDay: file.allDay.map((e): AllDayEvent => ({ id: e.id, title: e.title, past: dayOffset < 0, paint: paintOf(e.color) })),
 				hours: Array.from({ length: 24 }, (_, i) => pad((DAY_START_HOUR + i) % 24)),
@@ -809,13 +812,13 @@ export class MockPort implements ScreenPort {
 	 * the present minute, its length kept, its time in the file as it was (the design's «Едет за линией»; at its very minute
 	 * it still stands). A folded task's block is named by its next open step (its card's `step`).
 	 */
-	private blocksOf(file: MockFile, cards: Record<string, CardFace>, shown: string, today: boolean, held: string | null = null): Block[] {
+	private blocksOf(file: MockFile, cards: Record<string, CardFace>, shown: string, today: boolean, held: string | null, shows: (t: MockTask) => boolean): Block[] {
 		const present = minuteOf(this.clock());
 		const blocks: Block[] = [];
 		for (const key of ["now", "soon"] as const)
 			for (const s of file[key])
 				for (const t of s.tasks) {
-					if (!t.slot || closed(t) || t.due !== shown) continue;
+					if (!t.slot || closed(t) || t.due !== shown || !shows(t)) continue;
 					for (const c of t.children) if (!closed(c)) cards[c.id] = this.faceOf(c, shown);
 					cards[t.id] = this.faceOf(t, shown);
 					const { start: from, end } = t.slot;

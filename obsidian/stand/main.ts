@@ -7,7 +7,7 @@ import type { Stop } from "../ui/engine/store";
 import { detectHaptics, type HapticsHost } from "../ui/haptics";
 import { clearPriorityColors, showPriorityColors } from "../ui/priorityColors";
 import { addWindowDocument } from "../ui/windowDocuments";
-import type { ListKey } from "./mockData";
+import { type ListKey, MOCK_PROJECTS } from "./mockData";
 import { keptZoom, MockPort, WRITE_DELAYS, type WriteDelay, ZOOM_KEY } from "./MockPort";
 import { STAND_STEPS, type StandStep, WHOLE_SCREEN } from "./steps";
 
@@ -125,6 +125,8 @@ export interface StandApi {
 	moveFromOutside(title: string, list: ListKey, before: string | null): void;
 	/** Puts every open screen's ribbon at `stop`, as a scenario's setup. */
 	setStop(stop: Stop): void;
+	/** Chooses a made-up project on every open screen (null: none): a change of context, as the projects panel will make it. */
+	setProject(project: string | null): void;
 	/** For a person debugging on the stand (the checks never read it): each open screen's stop, gesture slot, carried task and layer. */
 	debug(): readonly object[];
 }
@@ -165,6 +167,7 @@ export default class TaskCalendarStand extends Plugin {
 			addFromOutside: (list, title) => port.addFromOutside(list, title),
 			moveFromOutside: (title, list, before) => port.moveFromOutside(title, list, before),
 			setStop: (stop) => this.screens.forEach((screen) => screen.store.getState().setStop(stop)),
+			setProject: (project) => this.screens.forEach((screen) => screen.store.getState().setContext({ project })),
 			debug: () => [...this.screens].map((screen) => {
 				const { stop, gesture, lifted, layer, entry, pending, dayOffset, menuLifted, selected } = screen.store.getState();
 				return { stop, gesture, lifted, layer: layer?.kind ?? null, entry, pending, dayOffset, menuLifted, selected };
@@ -190,6 +193,8 @@ export default class TaskCalendarStand extends Plugin {
 		this.addCommand({ id: "open-note", name: "Open the note with the screen's block", callback: () => void this.openNote() });
 		this.addCommand({ id: "new-tasks", name: "New made-up tasks", callback: () => port.reset() });
 		for (const step of STAND_STEPS) this.addCommand({ id: step.id, name: step.name, callback: () => this.showStep(step) });
+		for (const project of MOCK_PROJECTS.filter((p) => !p.folder)) this.addCommand({ id: `project-${project.name}`, name: `Choose the project «${project.name}»`, callback: () => api.setProject(project.name) });
+		this.addCommand({ id: "project-none", name: "Choose no project", callback: () => api.setProject(null) });
 		for (const delay of WRITE_DELAYS) this.addCommand({ id: `delay-${delay}`, name: `Write delay ${delay} ms`, callback: () => (port.delay = delay) });
 	}
 

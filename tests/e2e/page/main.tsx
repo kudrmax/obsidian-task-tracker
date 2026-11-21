@@ -107,6 +107,7 @@ class StandPage {
 			addFromOutside: (list: ListKey, title: string) => port.addFromOutside(list, title),
 			moveFromOutside: (title: string, list: ListKey, before: string | null) => port.moveFromOutside(title, list, before),
 			setStop: (stop: Stop) => this.screens.forEach((screen) => screen.store.getState().setStop(stop)),
+			setProject: (project: string | null) => this.screens.forEach((screen) => screen.store.getState().setContext({ project })),
 			debug: () =>
 				[...this.screens].map((screen) => {
 					const { stop, gesture, lifted, layer, entry, pending, dayOffset } = screen.store.getState();

@@ -284,9 +284,17 @@ export type MenuAction =
 	/** An action whose own screen is part 2's (Repeat, Description, Project, Section, First step, the opens, Open in Calendar): on the stand it closes the menu and writes nothing. */
 	| { readonly kind: "row"; readonly id: TaskActionId | "calendar" };
 
+/**
+ * What the screen is drawn in besides the day: the chosen project (null: every task). Another one is a change of context,
+ * drawn in place (spec, principle 3; F23). The view mode joins it when the modes come (Decision 132).
+ */
+export interface ScreenContext {
+	readonly project: string | null;
+}
+
 export interface ScreenPort {
-	/** The screen for the day `dayOffset` days from today. */
-	read(dayOffset: number): ScreenData;
+	/** The screen for the day `dayOffset` days from today, in `context` (every task when absent). */
+	read(dayOffset: number, context?: ScreenContext): ScreenData;
 	/** Fires after the data changed: a write, an edit from outside. Returns the unsubscribe. The screen reads again each minute too: what rides the now line and what is past changes with the clock. */
 	subscribe(listener: () => void): () => void;
 	/** The present minute from today's start and the clock's time as the now line writes it: «14:20». */
@@ -295,7 +303,7 @@ export interface ScreenPort {
 	 * The screen as it will stand once `move(id, to)` is written: drawn while the task is carried and at the drop, before
 	 * the write's read-back. Writes made and not yet read back are in it already.
 	 */
-	preview(id: string, to: Destination): ScreenData;
+	preview(id: string, to: Destination, context?: ScreenContext): ScreenData;
 	/** Whether `to` takes the task: a place that refuses opens no place for it, and the card's place stays where it was. */
 	takes(id: string, to: Destination): boolean;
 	/**
@@ -303,7 +311,7 @@ export interface ScreenPort {
 	 * task drawn stretched as far as the rules let it (the end no earlier than the start; the start no later than the end,
 	 * and on a task without a length no later than its start, which becomes its end).
 	 */
-	stretched(id: string, dayOffset: number, edge: Edge, minute: number): ScreenData;
+	stretched(id: string, dayOffset: number, edge: Edge, minute: number, context?: ScreenContext): ScreenData;
 	/**
 	 * Where the task goes once its `edge` dot is let go at `minute`; null when nothing changes. Stretched no longer than
 	 * `least` minutes it keeps no length; the bottom dot changes only how long it lasts (a task riding the now line keeps its

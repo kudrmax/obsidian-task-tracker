@@ -1,7 +1,7 @@
 import { DESIGN } from "../../design";
 import { createStore, type StoreApi } from "zustand/vanilla";
 import { LAYER_MS } from "../layers/motion";
-import type { Destination, Edge, EntryBar, EntryDraft, EntryField, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, MenuStatusId, ScreenData, ScreenPort } from "../port";
+import type { Destination, Edge, ScreenContext, EntryBar, EntryDraft, EntryField, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, MenuStatusId, ScreenData, ScreenPort } from "../port";
 import { share } from "./share";
 
 /** Where the ribbon stands: Inbox–Soon, Soon–the day, the day–its calendar. */
@@ -13,6 +13,7 @@ export const STOP_LISTS: Readonly<Record<Stop, readonly ListId[]>> = { inbox: ["
 const SHOWS: Readonly<Record<Stop, Readonly<Record<ListId, boolean>>>> = { inbox: { inbox: true, soon: true, day: false }, soon: { inbox: false, soon: true, day: true }, calendar: { inbox: false, soon: false, day: true } };
 const STOP_OF: Readonly<Record<ListId, Stop>> = { inbox: "inbox", soon: "soon", day: "soon" };
 
+const EVERY_TASK: ScreenContext = { project: null };
 const NO_DRAFT: EntryDraft = { level: null, projects: [], descriptionLine: null, section: false };
 
 /** The one gesture that holds the pointer (spec, «Which gesture holds the pointer»). */
@@ -103,6 +104,13 @@ export interface ScreenState {
 	readonly fresh: ReadonlySet<string>;
 	/** Tasks gone from the screen in the last read (done, deleted, sent where it doesn't show them): their rows fade out (Decision 132). */
 	readonly gone: ReadonlySet<string>;
+	/** What the screen is drawn in besides the day: the chosen project (Decision 132). */
+	readonly context: ScreenContext;
+	/**
+	 * Counts the contexts: each region of rows is keyed by it, so a new context mounts in place, without motion (spec,
+	 * principle 3); a task's row of another context is another row (`MovingRow`'s layout id).
+	 */
+	readonly contextSeq: number;
 	/** Whether Undo has a step to take back (the port's answer, read with the data): dim without one (F267). */
 	readonly canUndo: boolean;
 	/** A card to take the keyboard's focus, once per `seq`: the one a rename ended on by a key (Decision 58). */
@@ -219,6 +227,8 @@ export interface ScreenActions {
 	 * level out, a new task under a renamed one); a renamed card shows its new name at once (F298).
 	 */
 	commitEntry(text: string, next: boolean): void;
+	/** Another context (a project chosen, or none): read again and drawn in place, the days beside the shown one read anew. */
+	setContext(context: ScreenContext): void;
 	/** Undo, the button or ⌘Z (F267): the port takes its last write back, and the cards move as any change moves them. */
 	undo(): void;
 	/** Starts following the port and the clock; returns the stop. Called by the screen as it mounts. */
@@ -255,7 +265,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 				if (!s.pending) set({ pending: true });
 				return;
 			}
-			const next = share(s.read, port.read(s.dayOffset));
+			const next = share(s.read, port.read(s.dayOffset, s.context));
 			const known = s.read.cards;
 			/** A read that changed nothing (a write's read-back after its own change came) keeps what came and went in the last one. */
 			const same = next === s.read;
@@ -279,7 +289,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 			const { dayOffset: from, shown, read, left } = get();
 			if (dayOffset === from) return;
 			const drawn = left[dayOffset];
-			const fresh = port.read(dayOffset);
+			const fresh = port.read(dayOffset, get().context);
 			const next = drawn ? share(drawn.read, fresh) : fresh;
 			const kept = Object.entries(left).filter(([day]) => Math.abs(Number(day) - dayOffset) <= LEFT_KEPT);
 			set({ left: { ...Object.fromEntries(kept), [from]: { shown, read } }, dayOffset, read: next, shown: drawn ? share(drawn.shown, next) : next, fresh: new Set(), gone: new Set() });
@@ -335,12 +345,12 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 				set({ resizing: { id, edge }, layer: null });
 			},
 			resizeTo(id, edge, minute) {
-				set({ shown: share(get().shown, port.stretched(id, get().dayOffset, edge, minute)) });
+				set({ shown: share(get().shown, port.stretched(id, get().dayOffset, edge, minute, get().context)) });
 			},
 			endResize(id, edge, minute, least) {
 				const to = minute === null ? null : port.resized(id, get().dayOffset, edge, minute, least);
 				if (to) {
-					set({ shown: share(get().shown, port.preview(id, to)) });
+					set({ shown: share(get().shown, port.preview(id, to, get().context)) });
 					write(port.move(id, to));
 				} else get().carryHome();
 				home = null;
@@ -356,6 +366,8 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 			fresh: new Set(),
 			gone: new Set(),
 			canUndo: port.canUndo(),
+			context: EVERY_TASK,
+			contextSeq: 0,
 			reveal: null,
 			focusCard: null,
 
@@ -369,7 +381,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 					.filter((day) => day !== dayOffset)
 					.map((day): [number, { shown: ScreenData; read: ScreenData }] => {
 						const had = left[day];
-						const data = had ? share(had.read, port.read(day)) : port.read(day);
+						const data = had ? share(had.read, port.read(day, get().context)) : port.read(day, get().context);
 						return [day, had && had.read === data && had.shown === data ? had : { shown: data, read: data }];
 					});
 				if (read.every(([day, kept]) => left[day] === kept)) return;
@@ -403,11 +415,11 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 				if (get().shown !== back) set({ shown: back });
 			},
 			carryInto(id, to) {
-				set({ shown: share(get().shown, port.preview(id, to)) });
+				set({ shown: share(get().shown, port.preview(id, to, get().context)) });
 			},
 			drop(id, to) {
 				if (to) {
-					set({ shown: share(get().shown, port.preview(id, to)) });
+					set({ shown: share(get().shown, port.preview(id, to, get().context)) });
 					write(port.move(id, to));
 				} else get().carryHome();
 				home = null;
@@ -540,6 +552,12 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 				});
 				if (done.write) write(done.write);
 				if (next && entry.renaming && !entry.stack && !done.next) focusOn(entry.renaming);
+			},
+			setContext(context) {
+				const s = get();
+				if (s.context.project === context.project) return;
+				const next = port.read(s.dayOffset, context);
+				set({ context, contextSeq: s.contextSeq + 1, read: next, shown: next, left: {}, fresh: new Set(), gone: new Set(), selected: null });
 			},
 			undo() {
 				if (port.canUndo()) write(port.undo());

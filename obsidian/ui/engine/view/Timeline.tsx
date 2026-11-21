@@ -100,9 +100,11 @@ export const Timeline = memo(function Timeline() {
 	const nearNow = (minute: number) => todayDrawn && Math.abs(scale.y(minute) - scale.y(now.minute)) < TimeScale.NEAR_NOW;
 	const marks = useMemo(() => scale.marks(), [scale]);
 	const canvas = { [PROPERTY.hour]: px(scale.hourPx), [PROPERTY.stackEnd]: px(end) } as CSSProperties;
+	/** The context is the day's region's React key too: another project draws the calendar's tasks in place (principle 3). */
+	const context = useScreen((s) => s.contextSeq);
 	const layers = change
-		? [<DayItems key={change.from} day={change.from} turn={turn} offset={outOffset} scale={scale} shown={false} now={now} />, <DayItems key={change.to} day={change.to} turn={turn} offset={inOffset} scale={scale} shown now={now} />]
-		: [<DayItems key={shownDay} day={shownDay} turn={turn} offset={null} scale={scale} shown now={now} />];
+		? [<DayItems key={`${change.from}:${context}`} day={change.from} turn={turn} offset={outOffset} scale={scale} shown={false} now={now} />, <DayItems key={`${change.to}:${context}`} day={change.to} turn={turn} offset={inOffset} scale={scale} shown now={now} />]
+		: [<DayItems key={`${shownDay}:${context}`} day={shownDay} turn={turn} offset={null} scale={scale} shown now={now} />];
 	return (
 		<CalendarBlocks ids={ids}>
 			<AllDayBand days={change ? [[change.from, outOffset], [change.to, inOffset]] : [[shownDay, null]]} turn={turn} />
