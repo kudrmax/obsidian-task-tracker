@@ -226,7 +226,7 @@ Companion to [`2026-11-16-ui-standard-stack.md`](2026-11-16-ui-standard-stack.md
 - F187. Project button: whole tree, subprojects indented, "No project" last, check at the chosen, "New project…" at the bottom; a pick closes; chosen project fills the folder in accent; the next field after Enter keeps it; folders dim; no button on a subtask or a section-name field. [`docs/plugin/tasks.md` Новая задача]
 - F188. Place button: Inbox, Backlog, Soon, Now or Date (pick a day); the field moves to the end of that list or day, the wheel turns if needed; in By project the field stays and the task is written to that list; names from Section headings settings, a day as "5 Nov", long names fade. [`docs/plugin/tasks.md` Новая задача]
 - F189. A subtask field has no place or project button, but has repeat; a timeline field has flag and project. [`docs/plugin/tasks.md` Новая задача]
-- F190. What the new task gets by place: Inbox/Backlog/Soon no date; Now today's date; another day its date (Now if not later than today, else Soon); timeline adds the time. [`docs/plugin/tasks.md` Новая задача]
+- F190. What the new task gets by place: Inbox/Backlog/Soon no date; Now today's date; a later day its date, in Soon; a past day today's date, in Now (the past is not kept); timeline adds the time, except on a past day (Decision 145). [`docs/plugin/tasks.md` Новая задача]
 - F191. Under a chosen project a new task gets that project; not under "All" or "No project". [`docs/plugin/tasks.md` Проекты]
 - F192. While a field is open, the projects button can't be pressed. [`obsidian/ui/quick/QuickEntryController.ts`] (code only)
 - F193. The list keeps the field in sight as it moves, unless the hand scrolled just now. [`obsidian/ui/quick/QuickEntryController.ts`] (code only) (check)
