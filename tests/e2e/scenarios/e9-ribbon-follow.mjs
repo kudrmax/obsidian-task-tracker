@@ -57,12 +57,16 @@ export default {
 		/**
 		 * The page against the rule run on the events as the page received them: Chromium merges a frame's wheel events into
 		 * one, the replay loop sends some late under load, and @use-gesture's wheel end (by the page's clock, a timer set as
-		 * its own) lets the fingers go there, on the page as offline. Each landing is still at most one place from its stroke's start.
+		 * its own) lets the fingers go there, on the page as offline, the landing between on the page's clock. A stroke whose
+		 * events reached the page after that end goes on from where the page last drew the columns, somewhere between the
+		 * release and the landing by the clock: the rule is run at both, and the page is held to either. Each landing is still
+		 * at most one place from its stroke's start.
 		 */
 		const stepsFor = (received) => {
-			const asReceived = followSteps(received, rec.w / 2, { start: 1, last: Infinity, ended: received.map((e) => e.ended) });
-			t.expect(asReceived.furthest <= 1, `on the events as the page received them, a stroke's landing ${asReceived.furthest} places from where it began (one swipe, one place)`);
-			return asReceived.steps;
+			const as = (stillOnResume) => followSteps(received, rec.w / 2, { start: 1, last: Infinity, ended: received.map((e) => e.ended), heard: received.map((e) => e.heard), endedAt: received.map((e) => e.endedAt), stillOnResume });
+			const runs = [as(false), as(true)];
+			for (const run of runs) t.expect(run.furthest <= 1, `on the events as the page received them, a stroke's landing ${run.furthest} places from where it began (one swipe, one place)`);
+			return runs.map((run) => run.steps);
 		};
 		const result = await t.replay(file, { startPlace: 1, steps, stepsFor, tolerant: LONG.has(file) && LONG_ASTRAY, span });
 		t.expect(result.ok, `${file}: stops ${JSON.stringify(result.observed)} against ${JSON.stringify(result.expected)}, astray ${result.astray}, stalls ${result.stalls}, frame faults ${JSON.stringify(result.faults.slice(0, 3))}`);

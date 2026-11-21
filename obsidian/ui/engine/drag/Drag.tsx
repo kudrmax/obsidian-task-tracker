@@ -523,14 +523,13 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 		if (container === CALENDAR) {
 			const at = carriedAt.current;
 			const to: Destination | null = at === null ? null : { list: "day", before: null, dayOffset: api.getState().dayOffset, at };
-			const still = to === null || (origin !== null && origin.container === CALENDAR && origin.at === at) || !api.getState().takes(id, to);
+			const still = to === null || !api.getState().changes(id, to) || !api.getState().takes(id, to);
 			return api.getState().drop(id, still ? null : to);
 		}
 		const depth = sideLevel(event, spotKey(container, orderAfter(lifted, over), id), (wanted) => projected(lifted, over, wanted) ?? 0);
 		const slot = slotOf(rowsOf(container), orderAfter(lifted, over), id);
-		const still = origin !== null && origin.container === container && origin.section === slot.section && origin.before === slot.before && origin.depth === depth;
 		const to: Destination = { list: container as ListId, ...slot, dayOffset: api.getState().dayOffset, depth };
-		api.getState().drop(id, still || !api.getState().takes(id, to) ? null : to);
+		api.getState().drop(id, !api.getState().changes(id, to) || !api.getState().takes(id, to) ? null : to);
 	};
 	const cancel = () => {
 		if (active !== null && isPlus(active)) {

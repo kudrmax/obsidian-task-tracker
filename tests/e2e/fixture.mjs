@@ -11,6 +11,8 @@ import { replay } from "./lib/replay.mjs";
 const ROOT = new URL("../../", import.meta.url).pathname;
 const PAGE = pathToFileURL(join(ROOT, "build/e2e-page/index.html")).href;
 const SCREEN = ".task-calendar";
+/** The port the page's screen runs on: the stand's `MockPort`, or with `TC_PORT=core` the core's (`CorePort`, the plan's step 5). */
+const PORT = process.env.TC_PORT === "core" ? "&port=core" : "";
 
 /**
  * A scenario's `t` over a Playwright page holding the test page (tests/e2e/page): `cdp` evaluates in the page and sends the
@@ -33,6 +35,8 @@ async function scenarioTools(page, { platform, theme, out }) {
 		cdp,
 		platform,
 		theme,
+		/** The port the screen runs on: "mock" or "core"; a check of a rule `MockPort` made up reads the core's where it runs on the core. */
+		port: PORT ? "core" : "mock",
 		out,
 		failures,
 		input: new Input(cdp),
@@ -59,7 +63,7 @@ async function scenarioTools(page, { platform, theme, out }) {
 		},
 		/** The page loaded afresh: the whole screen over new made-up tasks. */
 		async open() {
-			await page.goto(`${PAGE}?platform=${platform}&theme=${theme}`);
+			await page.goto(`${PAGE}?platform=${platform}&theme=${theme}${PORT}`);
 			await page.waitForFunction(() => !!window.__tcStand && !!document.querySelector(".task-calendar"));
 			if (platform === "phone") await t.input.touchOn();
 			await t.input.move(1, 1);
