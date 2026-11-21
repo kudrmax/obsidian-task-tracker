@@ -316,8 +316,11 @@ function doorAnswer(answer: DoorAnswer): { result: unknown; text: string | null;
 	return { result: answer.result, text: answer.tasks ?? null, steps: answer.step === true };
 }
 
+/** Every door method once, each over a fresh read of the file: a few hundred calls, far past vitest's 5 s on a busy machine. */
+const EVERY_METHOD_MS = 30_000;
+
 describe("the door's tasks.* calls", () => {
-	it("answer as TaskServiceImpl does over the same text, and write the same file", async () => {
+	it("answer as TaskServiceImpl does over the same text, and write the same file", { timeout: EVERY_METHOD_MS }, async () => {
 		const screen = await service().svc.screen(T);
 		for (const c of TASK_CASES) {
 			const door = callDoor(`tasks.${c.method}`, wire(c.args(screen)), context(c.text === undefined ? FILE : c.text));
@@ -406,6 +409,12 @@ describe("the door's reads for the engine's port", () => {
 		const midnight = (method: string, ...args: unknown[]) => (callDoor(method, args, context(FILE, { settings: JSON.stringify({ dayStartHour: 0 }) })) as Extract<DoorAnswer, { ok: true }>).result;
 		expect([result("days.clockAt", 615), midnight("days.clockAt", 615)]).toEqual(["15:15", "10:15"]);
 		expect([(result("days.hourLabels") as string[]).slice(0, 2), (midnight("days.hourLabels") as string[]).slice(0, 2)]).toEqual([["05", "06"], ["00", "01"]]);
+	});
+
+	it("counts the days between two dates and says what another data.json changes on the screen", () => {
+		expect(result("days.offset", "2026-11-05", "2026-10-30")).toBe(-6);
+		expect(result("rules.shownChange", JSON.stringify({ labelPaint: "stripes" }), JSON.stringify({ labelPaint: "blend" }))).toEqual({ tasks: false, drawn: true, cards: false, timeline: false, gestures: false, calendars: false });
+		expect(result("rules.shownChange", "", JSON.stringify({ assistant: { model: "other" } }))).toBeNull();
 	});
 });
 
@@ -622,6 +631,7 @@ function everyCall(screen: ScreenView): { method: string; args: unknown[]; conte
 		plain("days.side", LATER),
 		plain("days.clockAt", 615),
 		plain("days.hourLabels"),
+		plain("days.offset", T, LATER),
 		...["startHour", "hourAt", "offsetOfHour"].map((m) => plain(`boundary.${m}`, 3)),
 		plain("boundary.dayOf", NOW.getTime()),
 		plain("boundary.dayOfSlot", { date: T, start: 30, end: null }),
@@ -746,6 +756,7 @@ function everyCall(screen: ScreenView): { method: string; args: unknown[]; conte
 		plain("rules.dayMonth", "2026-11-05"),
 		plain("rules.canPick", "timeline"),
 		plain("rules.originOf", named(screen, "Morning run")),
+		plain("rules.shownChange", "", JSON.stringify({ cardGap: 4 })),
 		plain("rules.listCardMenuFrom", named(screen, "Parent")),
 		plain("rules.repeatValue", { kind: "schedule", every: 2, unit: "month", days: [], dayOfMonth: 5, from: "2026-11-05" }),
 		plain("rules.repeatValue", { kind: "schedule", every: 1, unit: "week", days: [0, 2], dayOfMonth: null, from: null }),
@@ -795,7 +806,7 @@ function everyCall(screen: ScreenView): { method: string; args: unknown[]; conte
 }
 
 describe("every answer of the door", () => {
-	it("is plain JSON: it reads back from its text exactly as it was", async () => {
+	it("is plain JSON: it reads back from its text exactly as it was", { timeout: EVERY_METHOD_MS }, async () => {
 		const screen = await service().svc.screen(T);
 		const calls = everyCall(screen);
 		expect(new Set(calls.map((c) => c.method))).toEqual(new Set(doorMethods()));

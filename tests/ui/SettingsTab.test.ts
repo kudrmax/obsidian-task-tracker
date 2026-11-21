@@ -103,8 +103,9 @@ class FakeWorkspace {
 	}
 }
 
+/** The tab's writes run on promises alone, no timer: once the microtasks drain, every one of them has landed. */
 async function settled(): Promise<void> {
-	for (let i = 0; i < 10; i++) await new Promise((resolve) => setTimeout(resolve, 0));
+	await new Promise((resolve) => setImmediate(resolve));
 }
 
 async function open(file: unknown = START, google: GoogleAccount = loggedOut): Promise<void> {
@@ -424,10 +425,8 @@ describe("the settings tab: the cards and the timeline", () => {
 			page(pages[label]);
 		};
 		for (const label of Object.keys(pages) as (keyof typeof pages)[]) {
-			for (const bad of ["", "  ", "-1", "abc", "Infinity", "1,5"]) {
-				await opened(label);
-				await rejects(() => type(input(label), bad));
-			}
+			await opened(label);
+			for (const bad of ["", "  ", "-1", "abc", "Infinity", "1,5"]) await rejects(() => type(input(label), bad));
 		}
 		await opened("Long press delay");
 		await writes(() => type(input("Long press delay"), " 300 "), { longPressMs: 300 });

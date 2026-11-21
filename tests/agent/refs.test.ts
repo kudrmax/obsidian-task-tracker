@@ -7,15 +7,9 @@ import { makeVault, run } from "./vault";
 
 const key = (raw: string, index = 0, path: number[] = []): TaskKey => ({ section: "now", index, path, raw });
 
-/** Two keys of one file whose short refs are alike, found by trying lines until two hash alike. */
+/** Two keys of one file whose short refs are alike (`t12f81157`): the first such pair of `- [ ] Task <n>` lines, found once by trying them in turn. */
 function twins(): [TaskKey, TaskKey] {
-	const seen = new Map<string, TaskKey>();
-	for (let i = 0; ; i++) {
-		const k = key(`- [ ] Task ${i}`, i);
-		const other = seen.get(shortRef(k));
-		if (other) return [other, k];
-		seen.set(shortRef(k), k);
-	}
+	return [key("- [ ] Task 29577", 29577), key("- [ ] Task 58117", 58117)];
 }
 
 describe("refs", () => {

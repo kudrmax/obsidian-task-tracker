@@ -48,4 +48,24 @@ describe("EntryTags", () => {
 		const without = tagged.removeEntry(tags.find(tagged, 0)!);
 		expect(tags.untag(without).serialize()).toBe(doc.removeEntry(a).serialize());
 	});
+
+	it("leaves no trace on a task the operations left as it was: its line comes back byte for byte, markers in Max's order", () => {
+		const markers = { ...M, labelTag: "label", labels: ["home"] };
+		const text = "## Now\n- [ ] A #label/home 🗂️ Work 📅 2026-11-03\n\t- [ ] Sub  #label/home\n- [ ] B\n\n## Soon\n";
+		const doc = TaskDocument.parse(text, SECTIONS, markers);
+		const [a] = doc.tasks("now");
+		const { doc: tagged, tags } = EntryTags.tag(doc, [a, a.subtasks[0]]);
+		expect(tags.untag(tagged).serialize()).toBe(text);
+		const moved = tagged.moveEntry(tags.find(tagged, 0)!, "soon", "end");
+		expect(tags.untag(moved).serialize()).toBe("## Now\n- [ ] B\n\n## Soon\n- [ ] A #label/home 🗂️ Work 📅 2026-11-03\n\t- [ ] Sub  #label/home\n");
+	});
+
+	it("writes a task the operations changed as the file writes any changed task", () => {
+		const markers = { ...M, labelTag: "label", labels: ["home"] };
+		const doc = TaskDocument.parse("## Now\n- [ ] A #label/home 🗂️ Work\n", SECTIONS, markers);
+		const { doc: tagged, tags } = EntryTags.tag(doc, doc.tasks("now"));
+		const entry = tags.find(tagged, 0)!;
+		const done = tagged.replace(entry, { ...entry.task, status: "done", statusChar: "x" });
+		expect(tags.untag(done).serialize()).toBe("## Now\n- [x] A 🗂️ Work #label/home\n");
+	});
 });

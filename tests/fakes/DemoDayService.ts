@@ -5,7 +5,7 @@ import { dayOpening } from "../../core/application/DayServiceImpl";
 import type { Clock, SettingsStore } from "../../core/application/ports";
 import { DayBoundary as Boundary } from "../../core/domain/DayBoundary";
 import { type DayRelation, dayRelation } from "../../core/domain/Days";
-import { addDays } from "../../core/domain/LocalDate";
+import { addDays, daysBetween } from "../../core/domain/LocalDate";
 import type { LocalDate } from "../../core/domain/Task";
 
 /** The board's day: the clock stands still, so today never passes. */
@@ -65,6 +65,10 @@ export class DemoDayService implements DayService {
 
 	hourLabels(): readonly string[] {
 		return hourLabels(this.boundary());
+	}
+
+	offset(from: LocalDate, to: LocalDate): number {
+		return daysBetween(from, to);
 	}
 
 	onDayChange(): () => void {

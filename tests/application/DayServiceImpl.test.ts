@@ -57,6 +57,11 @@ describe("DayServiceImpl", () => {
 		expect(setUp(new Date(2026, 10, 5, 3, 30)).days.clockAt(615)).toBe("10:15");
 	});
 
+	it("counts the whole days from one date to another, across a change of the clocks and back", () => {
+		const { days } = setUp(new Date(2026, 10, 5, 3, 30), 5);
+		expect([days.offset("2026-11-05", "2026-11-08"), days.offset("2026-11-08", "2026-11-05"), days.offset("2026-10-20", "2026-11-05"), days.offset("2026-11-05", "2026-11-05")]).toEqual([3, -3, 16, 0]);
+	});
+
 	it("labels the timeline's hour lines from the hour the day starts at", () => {
 		const labels = setUp(new Date(2026, 10, 5, 3, 30), 5).days.hourLabels();
 		expect([labels.length, labels[0], labels[1], labels[18], labels[19], labels[23]]).toEqual([24, "05", "06", "23", "00", "04"]);
