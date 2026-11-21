@@ -67,10 +67,22 @@ export class CoreEntry {
 		return this.fieldOf(asked.state, dayOffset).at;
 	}
 
-	subtask(id: string, dayOffset: number): Destination {
+	/** A new last subtask of `id`: in the list that shows it, else in its menu's stack (a calendar's task): the core's `subtaskSpot`. */
+	subtask(id: string, dayOffset: number): EntryField {
 		const asked = this.asking(dayOffset);
 		asked.open(asked.subtaskSpot(this.item(id).key));
-		return { ...this.fieldOf(asked.state, dayOffset).at, under: id };
+		const field = this.fieldOf(asked.state, dayOffset);
+		return { ...field, at: { ...field.at, under: id } };
+	}
+
+	/** The field a level in or out by the session's own shift (`indent`), as far as its neighbours let it; null where the bar offers no such shift. */
+	shift(field: EntryField, draft: EntryDraft, text: string, by: 1 | -1): EntryField | null {
+		const state = this.follow(field, draft, text);
+		const offered = state.bar.some((group) => group.actions.some((action) => action.id === (by > 0 ? "indent" : "outdent") && !action.disabled));
+		if (!offered) return null;
+		this.session.indent(by);
+		this.field = { ...this.fieldOf(this.session.state, field.at.dayOffset), renaming: field.renaming };
+		return this.field;
 	}
 
 	rename(id: string, from: MenuFrom, dayOffset: number): RenameStart {
@@ -148,14 +160,14 @@ export class CoreEntry {
 	 */
 	private follow(field: EntryField, draft: EntryDraft | null, text: string | null): EntryState {
 		if (!this.field || placeOf(this.field) !== placeOf(field)) this.open(field);
-		else this.shift((field.at.depth ?? 0) - (this.field.at.depth ?? 0));
+		else this.shiftBy((field.at.depth ?? 0) - (this.field.at.depth ?? 0));
 		this.field = field;
 		if (draft) this.setDraft(draft);
 		if (text !== null && this.session.state?.text !== text) this.session.type(text);
 		return this.session.state!;
 	}
 
-	private shift(by: number): void {
+	private shiftBy(by: number): void {
 		for (let n = 0; n < Math.abs(by); n++) this.session.indent(by > 0 ? 1 : -1);
 	}
 

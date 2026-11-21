@@ -132,6 +132,8 @@ export interface ScreenActions {
 	carryInto(id: string, to: Destination): void;
 	/** Whether `to` takes the carried task (the port's answer): a place that refuses opens no place. */
 	takes(id: string, to: Destination): boolean;
+	/** Whether letting the task go at `to` changes anything (the port's answer). */
+	changes(id: string, to: Destination): boolean;
 	/** The carried task's place back where it was taken: the screen as read, as over a place that refuses it. */
 	carryHome(): void;
 	/** The carried task let go at `to` (null: cancelled, or let go where nothing takes it). */
@@ -431,6 +433,9 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 			takes(id, to) {
 				return port.takes(id, to);
 			},
+			changes(id, to) {
+				return port.changes(id, to);
+			},
 			carryHome() {
 				const back = home ?? get().read;
 				if (get().shown !== back) set({ shown: back });
@@ -467,8 +472,8 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 			startSubtask() {
 				const layer = get().layer;
 				if (!layer) return;
-				if (layer.from === "calendar") return set({ entry: { at: { list: "day", before: null, dayOffset: get().dayOffset, under: layer.id }, renaming: null, stack: true }, draft: NO_DRAFT, entryText: "", entrySeq: get().entrySeq + 1, entryPanel: null, layer: { ...layer, asking: null } });
-				set({ layer: null, entry: { at: port.subtaskPlace(layer.id, get().dayOffset), renaming: null, stack: false }, draft: NO_DRAFT, entryText: "", entrySeq: get().entrySeq + 1, entryPanel: null });
+				const entry = port.subtaskPlace(layer.id, get().dayOffset, layer.from);
+				set({ entry, draft: NO_DRAFT, entryText: "", entrySeq: get().entrySeq + 1, entryPanel: null, layer: entry.stack ? { ...layer, asking: null } : null });
 			},
 			menuPage(page) {
 				const layer = get().layer;
@@ -580,8 +585,9 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 				get().openEntry(port.listEnd(list, get().dayOffset));
 			},
 			indentEntry(by) {
-				const entry = get().entry;
-				if (entry && offers(by > 0 ? "indent" : "outdent")) set({ entry: { ...entry, at: { ...entry.at, under: undefined, depth: Math.max(0, (entry.at.depth ?? 0) + by) } } });
+				const { entry, draft, entryText } = get();
+				const shifted = entry && port.entryShift(entry, draft, entryText, by);
+				if (shifted) set({ entry: shifted });
 			},
 			commitEntry(text, next) {
 				const { entry, draft, shown } = get();

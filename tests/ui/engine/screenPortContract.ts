@@ -121,6 +121,43 @@ export function describeScreenPort(name: string, make: PortMaker): void {
 			expect(fresh !== undefined && !seen.has(fresh)).toBe(true);
 		});
 
+		it("says a card let go where it was lifted, or a block at its own minute, changes nothing; elsewhere it does", async () => {
+			const port = await make(0);
+			const data = port.read(0);
+			const rows = data.lists.inbox.rows;
+			const at = rows.findIndex((row) => row.kind === "task" && row.depth === 0);
+			const next = rows.slice(at + 1).find((row) => row.kind === "task" && row.depth === 0);
+			const header = rows.slice(0, at).reverse().find((row) => row.kind === "section");
+			const id = rows[at].id;
+			expect(port.changes(id, { list: "inbox", before: next?.id ?? null, dayOffset: 0, depth: 0, section: header?.id ?? null })).toBe(false);
+			expect(port.changes(id, toSoon())).toBe(true);
+			const block = data.day.blocks.find((b) => b.start > port.now().minute)!;
+			expect(port.changes(block.id, { list: "day", before: null, dayOffset: 0, at: block.start })).toBe(false);
+			expect(port.changes(block.id, { list: "day", before: null, dayOffset: 0, at: block.start + 60 })).toBe(true);
+		});
+
+		it("opens Add subtask's field under a list's card in its list, and a calendar task's in its menu's stack", async () => {
+			const port = await make(0);
+			const data = port.read(0);
+			const card = firstTask(data, "inbox");
+			const inList = port.subtaskPlace(card, 0, "list");
+			expect([inList.stack, inList.at.list, inList.at.under, inList.at.depth]).toEqual([false, "inbox", card, 1]);
+			const block = data.day.blocks[0];
+			const inStack = port.subtaskPlace(block.id, 0, "calendar");
+			expect([inStack.stack, inStack.at.list, inStack.at.under]).toEqual([true, "day", block.id]);
+		});
+
+		it("shifts a field a level in under the card above and back out; never past what the rules let it", async () => {
+			const port = await make(0);
+			const draft = { level: null, projects: [], descriptionLine: null, section: false };
+			const field = { at: port.listEnd("inbox", 0), renaming: null, stack: false };
+			const shifted = port.entryShift(field, draft, "", 1);
+			expect(shifted?.at.depth).toBe(1);
+			expect(port.entryShift(shifted!, draft, "", 1)).toBeNull();
+			expect(port.entryShift(shifted!, draft, "", -1)?.at.depth).toBe(0);
+			expect(port.entryShift(field, draft, "", -1)).toBeNull();
+		});
+
 		it("stops telling a listener once it unsubscribes", async () => {
 			const port = await make(0);
 			let told = 0;

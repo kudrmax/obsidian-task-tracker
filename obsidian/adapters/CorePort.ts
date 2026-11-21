@@ -1,4 +1,4 @@
-import { type CalendarService, dividerAt, type DividerStop, LIST_WIDTHS, listShareOf, type ListWidths, listWidths, type Clock, type DayEvents, type DayService, type DropColumn, type DroppedTask, type DropTo, type LocalDate, listCardMenuFrom, type MenuFrom as CoreMenuFrom, originOf, type ScreenReader, type ShownChange, type TaskItem, type TaskService } from "../../core/application/contracts";
+import { sameSlot, type CalendarService, dividerAt, type DividerStop, LIST_WIDTHS, listShareOf, type ListWidths, listWidths, type Clock, type DayEvents, type DayService, type DropColumn, type DroppedTask, type DropTo, type LocalDate, listCardMenuFrom, type MenuFrom as CoreMenuFrom, originOf, type ScreenReader, type ShownChange, type TaskItem, type TaskService } from "../../core/application/contracts";
 import type { Destination, Edge, EntryBar, EntryCommit, EntryDraft, EntryField, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, RenameStart, ScreenData, ScreenPort } from "../ui/engine/port";
 import { CoreEntry } from "./CoreEntry";
 import { ListCards } from "./ListCards";
@@ -96,6 +96,17 @@ export class CorePort implements ScreenPort {
 		return this.drawing.draw({ date, screen, lists: this.drawing.listsOf(screen), events: this.eventsOf(date) });
 	}
 
+	/** Nothing changes where the core leaves the task as it is: a card let go where it was lifted (`placeOfDrop`), a time it has already (`sameSlot`). */
+	changes(id: string, to: Destination): boolean {
+		const move = this.moveOf(id, to);
+		const item = this.reader.item(id);
+		if (!move || !item || move.kind === "home") return false;
+		if (move.kind === "slot") return !sameSlot(item.slot, move.slot);
+		if (move.to.kind !== "time") return true;
+		const landed = this.reader.dropPreview(move.tasks, move.to, move.day).landings[0];
+		return !(landed?.kind === "timeline" && sameSlot(landed.item.slot, item.slot));
+	}
+
 	takes(id: string, to: Destination): boolean {
 		const move = this.moveOf(id, to);
 		if (!move) return false;
@@ -160,8 +171,12 @@ export class CorePort implements ScreenPort {
 		return this.entry.end(list, dayOffset);
 	}
 
-	subtaskPlace(id: string, dayOffset: number): Destination {
+	subtaskPlace(id: string, dayOffset: number): EntryField {
 		return this.entry.subtask(id, dayOffset);
+	}
+
+	entryShift(field: EntryField, draft: EntryDraft, text: string, by: 1 | -1): EntryField | null {
+		return this.entry.shift(field, draft, text, by);
 	}
 
 	entryBar(field: EntryField, draft: EntryDraft, text: string): EntryBar {
