@@ -53,7 +53,14 @@ export interface MockSection {
 	tasks: MockTask[];
 }
 
-export type MockFile = Record<ListKey, MockSection[]> & { events: MockEvent[]; allDay: MockAllDay[] };
+/** A project of the tree, in its order: a subproject one deeper; a folder takes no task of its own. */
+export interface MockProject {
+	name: string;
+	depth: number;
+	folder: boolean;
+}
+
+export type MockFile = Record<ListKey, MockSection[]> & { events: MockEvent[]; allDay: MockAllDay[]; projects: MockProject[] };
 
 /** The made-up calendars' colours (the design's palette: work, Google, pink, green). */
 export const CALENDAR_COLORS = { work: "#0A84FF", google: "#FF9F0A", pink: "#FF375F", green: "#30D158" } as const;
@@ -138,19 +145,21 @@ export function mockFile(clock: Date): MockFile {
 		{ id: "ev4", title: "Звонок с клиентом", start: quarter(at + 210), end: quarter(at + 210) + 30, color: CALENDAR_COLORS.pink },
 		{ id: "ev5", title: "Синк с Олей", start: quarter(at + 225), end: quarter(at + 225) + 30, color: CALENDAR_COLORS.google },
 	].filter((e) => e.start >= 0 && e.end <= 24 * 60);
-	return { inbox, now, soon, backlog, done, events, allDay: [{ id: "ad1", title: "День рождения Кости", color: CALENDAR_COLORS.green }] };
+	return { inbox, now, soon, backlog, done, events, allDay: [{ id: "ad1", title: "День рождения Кости", color: CALENDAR_COLORS.green }], projects: mockProjects() };
 }
 
-const noEvents = (): Pick<MockFile, "events" | "allDay"> => ({ events: [], allDay: [] });
+const noEventsAndTheTree = (): Pick<MockFile, "events" | "allDay" | "projects"> => ({ events: [], allDay: [], projects: mockProjects() });
 
-/** The made-up projects, the tree in its order: a subproject one deeper; a folder takes no task of its own. */
-export const MOCK_PROJECTS: readonly { readonly name: string; readonly depth: number; readonly folder: boolean }[] = [
+/** The made-up projects, the tree in its order. */
+const MOCK_PROJECTS: readonly MockProject[] = [
 	{ name: "Дом", depth: 0, folder: false },
 	{ name: "Ремонт", depth: 1, folder: false },
 	{ name: "Работа", depth: 0, folder: true },
 	{ name: "Отчёты", depth: 1, folder: false },
 	{ name: "Отпуск", depth: 0, folder: false },
 ];
+
+const mockProjects = (): MockProject[] => MOCK_PROJECTS.map((project) => ({ ...project }));
 
 /** The file as a tasks file's text (docs/plugin/file.md): the checks' oracle reads it, never the screen's state. */
 export function fileText(file: MockFile, clock: Date): string {
@@ -182,7 +191,7 @@ export function fileText(file: MockFile, clock: Date): string {
 export function oneColumnFile(): MockFile {
 	const names = ["Купить молоко", "Позвонить маме", "Оплатить свет", "Записаться к врачу", "Прочитать книгу", "Починить велосипед", "Ответить Косте", "Собрать документы", "Заказать билеты", "Разобрать почту", "Полить цветы", "Спланировать неделю"];
 	const tasks: MockTask[] = names.map((title, i) => ({ id: `c${i + 1}`, title, level: null, status: " ", due: null, slot: null, description: null, children: [] }));
-	return { inbox: [{ id: "c-s1", name: null, tasks }], now: [{ id: "c-s2", name: null, tasks: [] }], soon: [{ id: "c-s3", name: null, tasks: [] }], backlog: [{ id: "c-s4", name: null, tasks: [] }], done: [{ id: "c-s5", name: null, tasks: [] }], ...noEvents() };
+	return { inbox: [{ id: "c-s1", name: null, tasks }], now: [{ id: "c-s2", name: null, tasks: [] }], soon: [{ id: "c-s3", name: null, tasks: [] }], backlog: [{ id: "c-s4", name: null, tasks: [] }], done: [{ id: "c-s5", name: null, tasks: [] }], ...noEventsAndTheTree() };
 }
 
 /** The stand's second step: two columns, Inbox and Soon, of plain tasks, to carry tasks between them. */
