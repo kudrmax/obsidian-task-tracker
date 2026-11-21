@@ -41,6 +41,9 @@ export default {
 			await tap(button);
 			await t.sleep(500);
 			t.expect((await t.oracle.cards("day"))[0] === "Пришла со стороны", "a tap on the dim Undo changes nothing");
+			await tap(await t.oracle.rect(".task-calendar > button.tc-plus"));
+			await t.sleep(500);
+			t.expect(await t.cdp.eval(`!document.querySelector(".task-calendar > .tc-capsule").checkVisibility({ visibilityProperty: true })`), "the capsule hides with the plus while a task is typed");
 			return;
 		}
 
