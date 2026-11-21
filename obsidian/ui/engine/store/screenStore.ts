@@ -495,8 +495,10 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 				const to = port.entryPlace(entry, choice, date, reach);
 				if (to.at.dayOffset !== get().dayOffset) get().showDay(to.at.dayOffset);
 				const where = to.at.list;
+				/** Another day than today stands past the calendar, where the ribbon turns the days (Decision 127); a list out of sight, the stop that shows it. */
+				const next = to.at.dayOffset !== 0 ? "calendar" : SHOWS[stop][where] ? stop : STOP_OF[where];
 				/** The field opens again at its new place, with what was typed (a new field brought into sight, F193). */
-				set({ entry: to, entrySeq: get().entrySeq + 1, entryPanel: null, ...(SHOWS[stop][where] ? {} : { stop: STOP_OF[where] }) });
+				set({ entry: to, entrySeq: get().entrySeq + 1, entryPanel: null, ...(next === stop ? {} : { stop: next }) });
 			},
 			plusTap(shown) {
 				get().openEntry(port.newTaskPlace(get().dayOffset, shown));

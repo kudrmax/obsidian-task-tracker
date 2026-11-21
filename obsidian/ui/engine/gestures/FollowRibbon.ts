@@ -35,13 +35,26 @@ export interface DayLookValues {
 	readonly opacity: MotionValue<number>;
 }
 
+/** The handlers @use-gesture gives the ribbon's element. */
+type GestureHandlers = ReturnType<ReturnType<typeof useGesture>>;
+
+/**
+ * The ribbon's handlers without @use-gesture's click filter (`filterTaps` takes the click after a drag that was no tap):
+ * its flag outlived a drag cancelled because another gesture held the pointer (a block's dot pulled, F103) or a mouse's
+ * pull it never followed, and ate the next tap on a task. A swipe gives no click to filter: a finger that moved past the
+ * browser's slop makes none, and a mouse or the trackpad never moves the ribbon by a drag.
+ */
+function withoutClickFilter(handlers: GestureHandlers): GestureHandlers {
+	return Object.fromEntries(Object.entries(handlers).filter(([name]) => name !== "onClickCapture")) as GestureHandlers;
+}
+
 export const DayTurnContext = createContext<DayTurn | null>(null);
 
 export interface FollowGestures {
 	/** Where the strip stands, in columns from Inbox: 0 Inbox–Soon, 1 Soon–day, 2 the day–its calendar. */
 	readonly at: MotionValue<number>;
 	readonly turn: DayTurn;
-	readonly bind: ReturnType<typeof useGesture>;
+	readonly bind: () => GestureHandlers;
 }
 
 const sameDays = (a: readonly number[], b: readonly number[]) => a.length === b.length && a.every((day, i) => day === b[i]);
@@ -228,7 +241,7 @@ export function useFollowRibbon(ribbon: RefObject<HTMLElement | null>, win: Wind
 		return { cues, claimed: wheelLocked.current && !sample.ctrl };
 	};
 
-	const bind = useGesture(
+	const gestures = useGesture(
 		{
 			onDrag: ({ first, last, xy: [x], initial: [x0], velocity: [vx], direction: [dx], event, cancel }) => {
 				if ((event as PointerEvent).pointerType === "mouse") return;
@@ -274,5 +287,6 @@ export function useFollowRibbon(ribbon: RefObject<HTMLElement | null>, win: Wind
 	);
 	/** A card carried: only the shown day is drawn, so a day out of sight never lies under it as a place to drop on. */
 	const drawnNow = dragging ? [Math.max(0, dayOffset)] : days;
+	const bind = () => withoutClickFilter(gestures());
 	return { at, turn: { at: dayAt, days: drawnNow, shown: shownDay, change, out: { x: outX, opacity: outOpacity }, in: { x: inX, opacity: inOpacity } }, bind };
 }

@@ -168,17 +168,19 @@ export default {
 			t.expect(Math.abs((await field())?.left - before.left - 20) <= 1, "and Tab takes it there, as the button");
 		}
 		if (item === "place out of sight") {
-			await t.cdp.eval(`(async () => { window.__tcStand.step("step-menu"); await new Promise((r) => setTimeout(r, 700)); return 1; })()`);
+			/** A note's block shows Inbox alone: a place it can't bring into sight keeps the field where it stands (the audit's 9). */
+			await t.stand("openNote()");
+			await t.sleep(600);
 			await plus();
 			const here = await field();
 			await type("Флажок");
 			await press(".tc-bar-place");
-			await tile("Inbox");
+			await tile("Soon");
 			await t.sleep(400);
 			const kept = await field();
-			t.expect(kept && kept.list === here?.list && (await text()) === "Флажок" && (await box(".tc-bar-place"))?.text === "Inbox", `a layout without Inbox keeps the field where it stands, its text in it, the place Inbox (the audit's 9): ${JSON.stringify(kept)}`);
+			t.expect(kept && kept.list === here?.list && (await text()) === "Флажок" && (await box(".tc-bar-place"))?.text === "Soon", `a place the block can't show keeps the field where it stands, its text in it, the place Soon (the audit's 9): ${JSON.stringify(kept)}`);
 			await enter();
-			t.expect((await t.oracle.tasks("Inbox")).some((task) => task.title === "Флажок"), "and the task is written to Inbox");
+			t.expect((await t.oracle.tasks("Soon")).some((task) => task.title === "Флажок"), "and the task is written to Soon");
 		}
 		if (item === "calendar") {
 			await t.setClock("12:00");

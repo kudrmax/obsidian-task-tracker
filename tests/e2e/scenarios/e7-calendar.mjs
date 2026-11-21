@@ -8,11 +8,11 @@ const once = (find) => {
 };
 
 /**
- * Step 6 (spec 2026-11-18, «Decisions» 25 and 27): Soon, today's list and today's calendar side by side, the clock at noon.
- * A card carried onto the calendar stands as the card it will be, at the hour its top is over, its start written on its
- * dashed place, and is written there without a length; a block carried to another hour moves there, its length kept; into
- * today's list it loses its time, into Soon too (F157); under today's last card, in the list's empty room, it goes to the
- * list's end. Cancelled, nothing is written. A tall block taken low keeps its plate under the finger, and held at the
+ * Step 6 (spec 2026-11-18, «Decisions» 25, 27 and 129): the whole screen at today's list and today's calendar, the clock
+ * at noon. A card carried onto the calendar stands as the card it will be, at the hour its top is over, its start written
+ * on its dashed place, and is written there without a length; a block carried to another hour moves there, its length
+ * kept; into today's list it loses its time; under today's last card, in the list's empty room, it goes to the list's end.
+ * (Soon never stands beside the calendar on the whole screen; Soon erasing a time, F157, is `calendarDrop.test.ts`'s.) Cancelled, nothing is written. A tall block taken low keeps its plate under the finger, and held at the
  * calendar's edge the calendar scrolls under it. The carried task is seen every frame.
  */
 export default {
@@ -54,23 +54,6 @@ export default {
 		const day = await t.oracle.cards("day");
 		t.expect((await timeOf("Ревью дизайна")) === null && day.indexOf("Ревью дизайна") === day.indexOf("Полить цветы") - 1, `a block into today's list: a task there without a time, before «Полить цветы»: ${JSON.stringify(day)}`);
 		t.expect(reviewFaults.length === 0, `block → list frames: ${JSON.stringify(reviewFaults.slice(0, 4))}`);
-
-		/** Soon takes a timed task as the plugin does, its time erased (F157, Decision 27): its place opens there, let go it is a task of Soon without a time. */
-		const doctor = await blockBy("Звонок врачу");
-		const report = await cardBy(t, "Сдать отчёт", "soon");
-		let over = null;
-		const soonFaults = await t.frames(
-			() =>
-				carry(t, doctor, once(async () => ({ x: report.x, y: report.top + 4 })), {
-					during: async () => (over = await t.cdp.eval(`({ inSoon: !!document.querySelector('[data-list="soon"] .tc-drag-source.is-lifted'), home: !!document.querySelector(".tc-block > .tc-drag-source.is-lifted") })`)),
-				}),
-			{ maxStep: 80, carried: { id: doctor.id, from: 0, until: 1500 } },
-		);
-		await t.sleep(500);
-		const soon = await t.oracle.tasks("Soon");
-		t.expect(over && over.inSoon && !over.home, `over Soon its place opens there: ${JSON.stringify(over)}`);
-		t.expect((await timeOf("Звонок врачу")) === null && soon.some((task) => task.title === "Звонок врачу" && !task.timed && !task.dated), `let go over Soon, it is a task of Soon without a time or a date: ${JSON.stringify(soon.slice(0, 4))}`);
-		t.expect(soonFaults.length === 0, `block → Soon frames: ${JSON.stringify(soonFaults.slice(0, 4))}`);
 
 		/** Max's find (Decision 27): a block carried under today's last card, into the list's empty room, goes to the list's end, not back onto the calendar. */
 		const moved = await blockBy("Обед");

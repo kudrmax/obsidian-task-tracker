@@ -53,6 +53,7 @@ export default {
 		}
 		if (item === "free room") {
 			await t.cdp.eval(`(async () => { window.__tcStand.step("step-menu"); await new Promise((r) => setTimeout(r, 700)); return 1; })()`);
+			await t.setStop("soon");
 			const room = await t.cdp.eval(`(() => { const l = document.querySelector('[data-list="soon"]'); const r = l.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.bottom - 30 }; })()`);
 			t.expect(await t.cdp.eval(`!document.elementFromPoint(${room.x}, ${room.y}).closest(".tc-drag-source")`), "the point is the list's free room under its cards");
 			await press(room, 1);

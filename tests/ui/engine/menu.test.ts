@@ -307,6 +307,16 @@ describe("the menu's fields and the plus, in the store", () => {
 		expect(store.getState().shown.lists.inbox.rows.some((r) => store.getState().shown.cards[r.id]?.title === "В инбокс")).toBe(true);
 	});
 
+	it("a day picked for the field from Soon turns the ribbon past the calendar, where the days turn (Decision 129)", () => {
+		const store = createScreenStore(port());
+		store.getState().start();
+		store.getState().setStop("soon");
+		store.getState().plusTap(["soon", "day"]);
+		store.getState().entryPlace("date", "2026-11-27", ["inbox", "soon", "day"]);
+		expect(store.getState()).toMatchObject({ stop: "calendar", dayOffset: 9 });
+		expect(store.getState().entry!.at).toMatchObject({ list: "day", dayOffset: 9 });
+	});
+
 	it("a task just typed lets the next field under it go a level in, before its write is read back (the audit's 8)", () => {
 		const p = port();
 		p.delay = 300;
