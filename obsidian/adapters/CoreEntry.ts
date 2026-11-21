@@ -1,5 +1,5 @@
 import { type DayService, type DropColumn, type EntryList, type EntryState, type LocalDate, type MenuProject, type ProjectsNodeId, type Placement, type QuickEntryView, QuickEntrySession, type ScreenReader, type TaskItem, type TaskService, type WriteLine } from "../../core/application/contracts";
-import { WriteQueue } from "../ui/quick/WriteQueue";
+import { WriteQueue } from "./WriteQueue";
 import type { Destination, EntryBar, EntryCommit, EntryDraft, EntryField, ListId, MenuFrom, PlaceId, RenameStart } from "../ui/engine/port";
 import { ListCards } from "./ListCards";
 import { projectPageOf } from "./menuModel";

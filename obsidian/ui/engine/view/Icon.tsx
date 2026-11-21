@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { type IconName, ICONS } from "../../kit/icons";
+import { type IconName, ICONS } from "../../shared/icons";
 
 /** One of the design's icons (`kit/icons`): strokes in currentColor, a solid part filled. */
 export const Icon = memo(function Icon({ name, className }: { readonly name: IconName; readonly className?: string }) {

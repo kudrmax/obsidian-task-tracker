@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
-import type { IconName } from "../../kit/icons";
-import { PROPERTY } from "../../design";
+import type { IconName } from "../../shared/icons";
+import { PROPERTY } from "../../shared/design";
 import { Icon } from "./Icon";
 
 /** The menu's rows, drawn alike wherever a list of rows stands: the task menu's pages and the bar's Project panel. */

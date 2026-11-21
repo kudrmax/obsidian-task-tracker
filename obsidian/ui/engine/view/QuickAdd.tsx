@@ -1,5 +1,5 @@
 import { memo, type FocusEvent, type CSSProperties, useState } from "react";
-import { PROPERTY } from "../../design";
+import { PROPERTY } from "../../shared/design";
 import { CarriedPlus } from "../drag/Drag";
 import { useScreen, useScreenApi } from "../store";
 import { Icon } from "./Icon";

@@ -1,6 +1,6 @@
 import { autoUpdate, flip, FloatingFocusManager, FloatingOverlay, FloatingPortal, hide, type Middleware, type MiddlewareState, offset, type Placement, useDismiss, useFloating, useInteractions, useRole, useTransitionStatus } from "@floating-ui/react";
 import { type CSSProperties, createContext, type MouseEvent as ReactMouseEvent, type MutableRefObject, type ReactNode, type RefObject, useContext, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { DESIGN, PROPERTY } from "../../design";
+import { DESIGN, PROPERTY } from "../../shared/design";
 import type { MenuFrom } from "../port";
 import { useScreenApi } from "../store";
 import { blockTop } from "./block";

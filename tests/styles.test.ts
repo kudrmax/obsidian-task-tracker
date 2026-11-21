@@ -2,8 +2,8 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { DEFAULT_CARD_SIZE } from "../core/application/contracts";
-import { DESIGN, DESIGN_TOKENS, DesignMeasure } from "../obsidian/ui/design";
-import { STATUS_BAR_SHOWN } from "../obsidian/ui/StatusBarRoom";
+import { DESIGN, DESIGN_TOKENS, DesignMeasure } from "../obsidian/ui/shared/design";
+import { STATUS_BAR_SHOWN } from "../obsidian/host/StatusBarRoom";
 
 interface Declaration {
 	readonly selector: string;

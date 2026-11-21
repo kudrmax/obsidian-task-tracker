@@ -1,4 +1,4 @@
-import { DESIGN, LAYOUT } from "../../design";
+import { DESIGN, LAYOUT } from "../../shared/design";
 import type { TimeScale } from "./timeScale";
 
 /**

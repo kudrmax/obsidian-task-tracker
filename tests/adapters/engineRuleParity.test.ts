@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { levelRange, SWIPE_FLICK_SPEED, swipeLanding } from "../../core/application/contracts";
 import { snapMinute } from "../../core/application/snapGrid";
-import { LAYOUT } from "../../obsidian/ui/design";
+import { LAYOUT } from "../../obsidian/ui/shared/design";
 import { levelBetween } from "../../obsidian/ui/engine/drag/tree";
 import { FLICK_SPEED, FollowPager } from "../../obsidian/ui/engine/gestures/followPager";
 import { TimeScale } from "../../obsidian/ui/engine/layout/timeScale";

@@ -1,4 +1,4 @@
-import { DESIGN, LAYOUT } from "../../design";
+import { DESIGN, LAYOUT } from "../../shared/design";
 
 /** A grid line between the hours: its minute from the day's start, and its label (`:30`) when it is a labelled one. */
 export interface GridMark {

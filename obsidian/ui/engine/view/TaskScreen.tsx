@@ -1,5 +1,5 @@
 import { type CSSProperties, type MouseEvent, type PointerEvent, type TouchEvent, useEffect, useId, useRef } from "react";
-import { PROPERTY } from "../../design";
+import { PROPERTY } from "../../shared/design";
 import { Drag, type Grab, type Landing, useTouchPresses } from "../drag/Drag";
 import { Layers } from "../layers/Layers";
 import { Layout, type Place, reachOf } from "../layout/Layout";

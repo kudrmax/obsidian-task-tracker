@@ -1,5 +1,5 @@
 import { type CSSProperties, memo, type MouseEvent, useCallback, useContext, useMemo, useRef, useState } from "react";
-import { DESIGN, PROPERTY } from "../../design";
+import { DESIGN, PROPERTY } from "../../shared/design";
 import { CalendarBlocks, SortableRow, useCalendarDrop, useNewSlot } from "../drag/Drag";
 import { type Edge, useResize } from "../gestures/Resize";
 import { hourOf, type RoomMeasure, useCalendarZoom } from "../gestures/Zoom";

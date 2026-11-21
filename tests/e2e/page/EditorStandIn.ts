@@ -1,10 +1,10 @@
 import type { App } from "obsidian";
-import type { EditorHooks, EditorHost } from "../../../obsidian/ui/markdown/EmbeddedEditor";
+import type { EditorHooks, EditorHost } from "../../../obsidian/ui/shared/markdown/EmbeddedEditor";
 
-export type { EditorHooks, EditorHost, EditorKey } from "../../../obsidian/ui/markdown/EmbeddedEditor";
+export type { EditorHooks, EditorHost, EditorKey } from "../../../obsidian/ui/shared/markdown/EmbeddedEditor";
 
 /**
- * The test page's stand-in for Obsidian's embedded editor (`obsidian/ui/markdown/EmbeddedEditor.ts`), with its interface: a
+ * The test page's stand-in for Obsidian's embedded editor (`obsidian/ui/shared/markdown/EmbeddedEditor.ts`), with its interface: a
  * plain-text field that honours the keys it is given (Enter, Escape, Tab and Shift+Tab) and its own hotkeys (⌥Tab).
  * Obsidian's own editor (`[[`, its look, its hotkeys held off the field) is checked by hand in the test Obsidian.
  */

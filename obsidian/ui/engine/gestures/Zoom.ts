@@ -1,6 +1,6 @@
 import { useGesture } from "@use-gesture/react";
 import { type RefObject, useCallback, useEffect, useLayoutEffect, useRef } from "react";
-import { DESIGN } from "../../design";
+import { DESIGN } from "../../shared/design";
 import { TimeScale } from "../layout/timeScale";
 import { useScreenApi, type Zoom } from "../store";
 

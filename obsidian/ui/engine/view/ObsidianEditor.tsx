@@ -1,7 +1,7 @@
 import { EditorState, type Transaction, type TransactionSpec } from "@codemirror/state";
 import { placeholder as hint } from "@codemirror/view";
 import { type FocusEvent, useEffect, useRef } from "react";
-import { type EditorHost, EmbeddedEditor } from "../../markdown/EmbeddedEditor";
+import { type EditorHost, EmbeddedEditor } from "../../shared/markdown/EmbeddedEditor";
 import { useHost } from "./host";
 
 /** A line break typed or pasted in a title (the plugin's `LINE_BREAK`): the title stays one line, which wraps. */

@@ -1,4 +1,4 @@
-import { DESIGN } from "../../design";
+import { DESIGN } from "../../shared/design";
 import { createStore, type StoreApi } from "zustand/vanilla";
 import { EVERY_TASK } from "../port";
 import { type Stop, stopShowing } from "../layout/columns";
@@ -283,7 +283,7 @@ const HOLDING: readonly (Gesture | null)[] = ["drag", "resize"];
 const HALVES = 0.5;
 
 /** One store per mounted screen, over its port (spec, «Screen state»); `zoom`, the calendar's zoom the host kept. */
-export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, listShare = HALVES): ScreenStore {
+export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, listShare = HALVES, opening: ScreenContext = EVERY_TASK): ScreenStore {
 	/** Writes of the screen's own not yet read back: their reads come together once the last is in. */
 	let writing = 0;
 	/** The screen as it stood when the carried task was lifted: its place's home, a drop's in-flight write drawn in it. */
@@ -295,7 +295,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 	let picked: (() => void) | null = null;
 	/** A context chosen while a drag or a resize held the screen still: set as it ends. */
 	let waitingContext: ScreenContext | null = null;
-	const first = port.read(0);
+	const first = port.read(0, opening);
 	return createStore<Screen>()((setRaw, get) => {
 		/**
 		 * The store's one way to change: the field's bar is worked out again in the same change whenever the field, what the
@@ -462,7 +462,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 			canUndo: port.canUndo(),
 			canRedo: port.canRedo(),
 			notice: null,
-			context: EVERY_TASK,
+			context: opening,
 			contextSeq: 0,
 			reveal: null,
 			focusCard: null,
