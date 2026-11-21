@@ -51,6 +51,18 @@ describe("DayServiceImpl", () => {
 		expect(days.relation("2026-11-06")).toBe("other");
 	});
 
+	it("says the clock of a minute from the day's start by the hour the day starts at, past midnight from 00:00 again", () => {
+		const { days } = setUp(new Date(2026, 10, 5, 3, 30), 5);
+		expect([days.clockAt(0), days.clockAt(9 * 60 + 15), days.clockAt(19 * 60 + 30.6), days.clockAt(24 * 60)]).toEqual(["05:00", "14:15", "00:30", "05:00"]);
+		expect(setUp(new Date(2026, 10, 5, 3, 30)).days.clockAt(615)).toBe("10:15");
+	});
+
+	it("labels the timeline's hour lines from the hour the day starts at", () => {
+		const labels = setUp(new Date(2026, 10, 5, 3, 30), 5).days.hourLabels();
+		expect([labels.length, labels[0], labels[1], labels[18], labels[19], labels[23]]).toEqual([24, "05", "06", "23", "00", "04"]);
+		expect(setUp(new Date(2026, 10, 5, 3, 30)).days.hourLabels().slice(0, 3)).toEqual(["00", "01", "02"]);
+	});
+
 	it("opens today's timeline on the now line, another day's at the hour the settings name, both from the day's start", () => {
 		const { days } = setUp(new Date(2026, 10, 5, 3, 30), 4);
 		expect(days.openAt("2026-11-04")).toEqual({ kind: "now", minute: 23 * 60 + 30 });

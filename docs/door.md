@@ -574,6 +574,26 @@ core, never building them themselves:
 - `rules.repeatSentence(rule)`: a rule in a sentence where no row draws the week's letters: `repeatValue`'s words, and
   for weeks on a schedule `"Every week on Mon, Wed"`.
 
+#### The engine's port (2026-11-21)
+
+What the plugin's new screen (the engine, over `CorePort`) asks and a frontend used to assemble itself; added, nothing
+renamed or removed:
+
+- `tasks.takes(origins, to)`: whether the place `to` (a `DropTo`) takes the cards carried from `origins` (`DropOrigin`s,
+  the one under the finger first, `"new"` for the plus), `rules.acceptsDrop` at the column it lands in: a section of Now,
+  or of Soon on a later day, is the day's list; `nest` the column its parent is dragged from (`rules.originOf`), none
+  under a closed task. A refused drop writes nothing. `tasks.takes(["timeline"], { kind: "list", column: "inbox", before:
+  null })` → `false`; `tasks.takes(["soon"], { kind: "title", list: "soon", date: "2026-11-20" })` → `true`.
+- `tasks.opensGaps(origins, column, day)`: whether `column`, showing `day`, opens a place between its cards for the
+  carried ones (`rules.placesInGap` with the sections it shows that day); else they go to its end.
+  `tasks.opensGaps(["inbox"], "day", "2026-11-01")` (a past day) → `false`.
+- `tasks.resizedSlot(item, day, edge, minute, minDurationMin)`: the slot `tasks.resize` with the same arguments writes,
+  writing nothing; `null` where it writes nothing. For a block of 13:00–14:00 on a day starting at midnight,
+  `tasks.resizedSlot(lunch, T, "end", 900, 15)` → `{ date: T, start: 780, end: 900 }`.
+- `TaskService.reader(filter)` is the host's (`DOOR_COVERAGE`): a `ScreenReader` holds one read of the file and answers
+  `screen`, `columnView`, `item(id)`, `dropPreview`, `takes`, `menu(id, from, day)`, `stretch` and `resizedSlot` at once,
+  as the service does. The door reads the text handed in on every call, so each call is one read already.
+
 ### `days.*`: `DayService`
 
 `today()`, `relation(date)`, `step(date, days)`, `stepFunnel({mode, date}, shift)` (the funnel's walk, see «Projects as one view») (where a swipe or a day arrow leads: `{mode, date}` or null past the row's ends;
@@ -589,6 +609,10 @@ host's: it checks the clock (once a minute while a screen is open), and when `da
 `YYYY-MM-DD`, `today`, `tomorrow`, `yesterday`, `+N`, `-N`, by today; `null` for anything else (`"+2"` →
 `"2026-11-20"`). `weekday(date)`: the weekday's whole name, `"Wednesday"`. `side(date)`: `"past"`, `"today"` or
 `"future"`.
+
+`clockAt(minute)`: the clock `minute` minutes after the day's start, by the hour the day starts at, past midnight from
+`"00:00"` again (`days.clockAt(615)` → `"15:15"` with the day starting at 5). `hourLabels()`: the timeline's hour lines'
+labels from that hour, 24 of them (`["05", "06", …, "04"]`).
 
 ### `boundary.*`: where a day begins
 
@@ -887,7 +911,10 @@ escapes and embeds stay text), `oneLine`, `sameLevels`, `labelTitle`, `sameLabel
 `usableLabelColor` (a colour a label may have: `usableColor`'s, or `"clear"`, no colour; `usableLabelColor("clear")` →
 `true`), `acceptsDrop`,
 `placesInGap`, `canPick(from)` (Select tasks picks a card drawn at `from`, a `MenuFrom`: a list column's, never the
-timeline's, Done's, a stack's or the full screen's), `repeatValue(rule)` (the Repeat row's words, `null` for weeks on a
+timeline's, Done's, a stack's or the full screen's), `originOf(item)` (the column a task's card is dragged from, its
+`DroppedTask.from`: `"timeline"` on a time, `"day"` for Now's and a dated Soon task, else its list; `null` for a closed
+task), `listCardMenuFrom(item)` (the `MenuFrom` of its card in its list column: Now's `"day"`, Done's `"done"`),
+`repeatValue(rule)` (the Repeat row's words, `null` for weeks on a
 schedule), `onTheDay(rule)` (`"On the 5th"` under a monthly schedule's unit, empty for any other), `dayMonth(date)`
 (`"5 Nov"`), `listWidths(share, viewWidth, dividerWidth)` (the list column beside the calendar, every number in points:
 `{ width, min, max, center }`: the width drawn for the saved share of the columns' width, `viewWidth` less the divider's
@@ -979,6 +1006,7 @@ Open full screen and Open in Obsidian are its own rows, outside the model.
   the door makes no request.
 - `WorkCalendarSetup` (`scriptableLoader`, `export`): the Scriptable script and the Shortcuts export are the Obsidian
   plugin's fallback on the iPhone; an app writes `calendar/iphone.json` itself (`iphoneCalendarText`).
+- `ScreenReader` (`TaskService.reader`): a read held across calls; the door reads the text handed in on every call.
 - `DayEventsAsk`, `PolledScreen`, `CalendarPoll`, `SecretField`: the halves of `events`' fetch, `keepFresh` and
   `bindClientSecret`, which are the host's.
 

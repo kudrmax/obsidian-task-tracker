@@ -1,6 +1,6 @@
 import { type FunnelAt, stepFunnel } from "../../core/application/screenPlaces";
 import type { DayBoundary, DayOpening, DayService, DaySide } from "../../core/application/contracts";
-import { dayNamed, daySide, daysFrom, weekdayName, weekOf } from "../../core/application/dayWords";
+import { clockOf, dayNamed, daySide, daysFrom, hourLabels, weekdayName, weekOf } from "../../core/application/dayWords";
 import { dayOpening } from "../../core/application/DayServiceImpl";
 import type { Clock, SettingsStore } from "../../core/application/ports";
 import { DayBoundary as Boundary } from "../../core/domain/DayBoundary";
@@ -57,6 +57,14 @@ export class DemoDayService implements DayService {
 
 	side(date: LocalDate): DaySide {
 		return daySide(date, this.today());
+	}
+
+	clockAt(minute: number): string {
+		return clockOf(this.boundary(), minute);
+	}
+
+	hourLabels(): readonly string[] {
+		return hourLabels(this.boundary());
 	}
 
 	onDayChange(): () => void {

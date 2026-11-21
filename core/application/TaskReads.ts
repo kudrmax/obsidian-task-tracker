@@ -24,6 +24,7 @@ import type {
 	DayView,
 	DraftMarks,
 	DropColumn,
+	DropFrom,
 	DropOrigin,
 	FullTree,
 	GroupedList,
@@ -49,6 +50,8 @@ import { fullTree } from "./fullTree";
 import { type ItemLevels, itemLevels, ownCard, toItem } from "./taskItems";
 import type { TaskRules } from "./TaskRules";
 import { droppedSpan, type ResizeEdge, type SlottedTask, type StretchSpan, TimelineSpans } from "./TimelineSpans";
+import { placesInGap, takesDrop } from "./drops";
+import { originOf } from "./projectsLift";
 import type { Clock, SettingsStore } from "./ports";
 import { ProjectIndex, projectTreeOf } from "./projects";
 import type { DropTo, FunnelView, ProjectFilter, ProjectNote, ProjectRef, ProjectsNodeId, ProjectsScreenState, ProjectsView } from "./contracts";
@@ -614,6 +617,46 @@ export class TaskReads {
 		return this.timeline().stretched(slotted(item), day, edge, minute);
 	}
 
+	resizedSlot(item: TaskItem, day: LocalDate, edge: ResizeEdge, minute: number, minDurationMin: number): Slot | null {
+		return this.timeline().resized(slotted(item), day, edge, minute, minDurationMin);
+	}
+
+	/** Whether `to` takes the tasks carried from `origins` (`takesDrop`); a place under a task reads that task. */
+	takesRead(origins: readonly DropOrigin[], to: DropTo): Read<boolean> {
+		return { reads: to.kind === "nest", missing: () => false, answer: (s) => this.takes(s, origins, to) };
+	}
+
+	takes(s: Snapshot | null, origins: readonly DropOrigin[], to: DropTo): boolean {
+		return takesDrop(origins, to, (parent) => (s ? this.originAt(s.doc, parent) : null));
+	}
+
+	/** Whether `column` on `day` opens a gap for every task carried from `origins` (`placesInGap`). */
+	opensGaps(origins: readonly DropOrigin[], column: DropColumn, day: LocalDate): boolean {
+		const grouped = this.columnSections(column, day) !== null;
+		return origins.every((from) => placesInGap(column, from, grouped));
+	}
+
+	/** Every task of the file, its subtasks at every depth, as `screen` under `filter` draws it, by its id. */
+	itemsRead(filter: ProjectsNodeId | null): Read<ReadonlyMap<string, TaskItem>> {
+		return { reads: true, missing: () => new Map(), answer: (s) => this.itemsById(s!, filter) };
+	}
+
+	private itemsById(s: Snapshot, filter: ProjectsNodeId | null): ReadonlyMap<string, TaskItem> {
+		const { item } = this.filtered(s, filter);
+		const byId = new Map<string, TaskItem>();
+		const visit = (found: TaskItem): void => {
+			byId.set(found.id, found);
+			found.allSubtasks.forEach(visit);
+		};
+		for (const list of SEARCH_ORDER) s.doc.tasks(list).forEach((entry) => visit(item(entry)));
+		return byId;
+	}
+
+	private originAt(doc: TaskDocument, key: TaskKey): DropFrom | null {
+		const entry = this.rules.found(doc, key);
+		return entry ? originOf({ list: entry.section, slot: entry.task.slot, dueDate: entry.task.dueDate }) : null;
+	}
+
 	/** The timeline's rules by the clock and the day's boundary now. */
 	timeline(): TimelineSpans {
 		return new TimelineSpans(this.rules.moment().boundary, this.clock.now());
@@ -648,7 +691,7 @@ export class TaskReads {
 		return known.map((project) => ({ project, depth: project.path.length - 1 }));
 	}
 
-	private today(): LocalDate {
+	today(): LocalDate {
 		return this.rules.today();
 	}
 }

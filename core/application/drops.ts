@@ -47,6 +47,33 @@ export function acceptsDrop(target: DropColumn | "timeline", origins: readonly D
 	}
 }
 
+/**
+ * The column or the timeline a drop lands in, `acceptsDrop`'s target: a section of Now, or of Soon on a later day, is the
+ * day's list; a place under a task is where that task is dragged from (`parentOrigin`, null for a closed one or none).
+ */
+export function dropTarget(to: DropTo, parentOrigin: (parent: TaskKey) => DropFrom | null): DropColumn | "timeline" | null {
+	switch (to.kind) {
+		case "time":
+			return "timeline";
+		case "clearSlot":
+			return "day";
+		case "list":
+		case "place":
+			return to.column;
+		case "group":
+		case "title":
+			return to.list === "now" || to.date !== null ? "day" : to.list;
+		case "nest":
+			return parentOrigin(to.parent);
+	}
+}
+
+/** Whether the place a drop names takes the tasks carried from `origins` (`acceptsDrop` at its `dropTarget`). */
+export function takesDrop(origins: readonly DropOrigin[], to: DropTo, parentOrigin: (parent: TaskKey) => DropFrom | null): boolean {
+	const target = dropTarget(to, parentOrigin);
+	return target !== null && acceptsDrop(target, origins);
+}
+
 /** A list that shows sections places a task from anywhere, and any list a new task; another only a task from itself: one from elsewhere goes to its end. */
 export function placesInGap(column: DropColumn, from: DropOrigin, grouped: boolean): boolean {
 	return from === "new" || from === column || grouped;
