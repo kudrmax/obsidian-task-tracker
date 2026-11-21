@@ -13,11 +13,11 @@ export default {
 		const tap = (p) => (t.platform === "phone" ? t.input.tap(p.x, p.y) : t.input.click(p.x, p.y));
 		if (item === "list") {
 			await t.setStop("inbox");
-			/** A card cut by the list's bottom edge: the list scrolled so the edge runs through one. */
+			/** A card cut by the list's bottom edge: the list scrolled so the edge runs through one; tapped in its middle, clear of the Undo capsule over the list's corner. */
 			/** The list scrolled so its bottom edge runs through a card, as a person leaves it. */
 			await t.cdp.eval(`(() => { const s = document.querySelector('[data-list="inbox"]'); const box = s.getBoundingClientRect(); const c = [...s.querySelectorAll(".tc-card[data-id]")].map((e) => e.getBoundingClientRect()).find((r) => r.bottom > box.bottom); if (c) s.scrollTop += c.top + c.height / 2 - box.bottom; return 1; })()`);
 			await t.sleep(300);
-			const cut = await t.cdp.eval(`(() => { const s = document.querySelector('[data-list="inbox"]'); const box = s.getBoundingClientRect(); const hit = [...s.querySelectorAll(".tc-card[data-id]")].map((c) => ({ c, r: c.getBoundingClientRect() })).find(({ r }) => r.top < box.bottom - 8 && r.bottom > box.bottom + 4); if (!hit) return null; return { id: hit.c.dataset.id, title: hit.c.querySelector(".tc-card-title").textContent, x: hit.r.left + 30, y: (hit.r.top + box.bottom) / 2, bottom: box.bottom, top: box.top }; })()`);
+			const cut = await t.cdp.eval(`(() => { const s = document.querySelector('[data-list="inbox"]'); const box = s.getBoundingClientRect(); const hit = [...s.querySelectorAll(".tc-card[data-id]")].map((c) => ({ c, r: c.getBoundingClientRect() })).find(({ r }) => r.top < box.bottom - 8 && r.bottom > box.bottom + 4); if (!hit) return null; return { id: hit.c.dataset.id, title: hit.c.querySelector(".tc-card-title").textContent, x: hit.r.left + hit.r.width / 2, y: (hit.r.top + box.bottom) / 2, bottom: box.bottom, top: box.top }; })()`);
 			if (!t.expect(cut !== null, "a card cut by the list's bottom edge")) return;
 			await tap(cut);
 			await t.sleep(t.platform === "phone" ? 600 : 850);

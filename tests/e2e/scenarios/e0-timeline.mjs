@@ -34,7 +34,7 @@ export default {
 		t.expect(now.y > view.top && now.y < view.bottom, "the timeline opens with the now line in sight");
 
 		const file = await t.file();
-		const timed = [...file.matchAll(/^- \[ \] (.+?) 📅 \S+ 📌 \S+ (\d\d:\d\d)-(\d\d:\d\d)$/gm)].map((m) => ({ title: m[1], start: m[2] }));
+		const timed = [...file.matchAll(/^- \[ \] (.+?) 📅 \S+ 📌 \S+ (\d\d:\d\d)-(\d\d:\d\d)(?: 🗂️ \S+)*$/gmu)].map((m) => ({ title: m[1], start: m[2] }));
 		const blocks = await t.cdp.eval(`[...document.querySelectorAll(".tc-timeline [data-block]")].map((b) => { const r = b.closest(".tc-block").getBoundingClientRect(); const corner = b.querySelector(".tc-block-meta:not(.is-hidden)"); return { title: b.querySelector(".tc-card-title").textContent, top: r.top, left: r.left, right: r.right, height: r.height, corner: corner ? [...corner.children].map((c) => c.textContent).join(":") : null }; })`);
 		t.expect(blocks.length === timed.length && timed.length >= 4, `every timed task of the file has its block: ${blocks.length} of ${timed.length}`);
 		/**
