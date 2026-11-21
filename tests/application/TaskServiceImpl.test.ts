@@ -270,6 +270,23 @@ describe("the task sheet", () => {
 		expect(await svc.edit(moved!.key, { text: "A3", placement: { kind: "soon" }, priority: null })).toBeNull();
 	});
 
+	it("tells once what another setting changes on the screen, and nothing for a setting it does not show", async () => {
+		const settings = new FakeSettingsStore();
+		const { svc } = setup(FULL, settings);
+		const told: unknown[] = [];
+		const off = svc.onShownChange((change) => told.push(change));
+		await settings.update({ labelPaint: "blend" });
+		await settings.update({ google: { ...DEFAULT_SETTINGS.google, refreshToken: "token" } });
+		await settings.update({ cardHeight: DEFAULT_SETTINGS.cardHeight + 4 });
+		off();
+		await settings.update({ labelPaint: "stripes" });
+		const none = { tasks: false, drawn: false, cards: false, timeline: false, gestures: false, calendars: false };
+		expect(told).toEqual([
+			{ ...none, drawn: true },
+			{ ...none, cards: true },
+		]);
+	});
+
 	it("edit or rename to the same title writes nothing: the line keeps its markers in the order Max wrote them", async () => {
 		for (const line of ["- [ ] A 🗂️ Work #label/home", "- [ ] A #label/home 🗂️ Work"]) {
 			const text = `## Inbox\n\n## Projects\n\n- Work\n\n## Now\n\n${line}\n- [ ] B\n\n## Soon\n\n## Backlog\n\n## Done\n`;

@@ -855,7 +855,7 @@ ${line}`;
     while (tail < before.length - head && tail < after.length - head && before[before.length - 1 - tail] === after[after.length - 1 - tail]) tail++;
     const b = before.slice(head, before.length - tail);
     const a = after.slice(head, after.length - tail);
-    const same = sharedLines(b, a);
+    const same2 = sharedLines(b, a);
     const blocks = [];
     let i = 0;
     let j = 0;
@@ -864,7 +864,7 @@ ${line}`;
       if (open) blocks.push([head + open[0], head + i, head + open[1], head + j]);
       open = null;
     };
-    for (const [x, y] of [...same, [b.length, a.length]]) {
+    for (const [x, y] of [...same2, [b.length, a.length]]) {
       if (i < x || j < y) {
         open ??= [i, j];
         i = x;
@@ -2108,7 +2108,7 @@ ${line}`;
   }
   function nest(doc, entry, parent, before) {
     if (before && samePlace(before, entry)) return doc;
-    return intoUnfolded(doc, parent, (d, same) => d.nestEntry(same(entry), same(parent), before && same(before)));
+    return intoUnfolded(doc, parent, (d, same2) => d.nestEntry(same2(entry), same2(parent), before && same2(before)));
   }
   function subtaskDueDate(placement, inherited, today) {
     if (samePlacement(placement, inherited)) return null;
@@ -2119,7 +2119,7 @@ ${line}`;
     const dueDate = subtaskDueDate(draft.placement, placementOfEntry(parent, today), today);
     const { text, ...marks } = typed(doc, draft.text, draft.priority, draft.labels ?? []);
     const task = newTask(text, { dueDate, ...marks });
-    return intoUnfolded(doc, parent, (d, same) => d.insertUnder(same(parent), task));
+    return intoUnfolded(doc, parent, (d, same2) => d.insertUnder(same2(parent), task));
   }
   function firstStep(doc, entry, typedText) {
     const { text, ...marks } = typed(doc, typedText, null, []);
@@ -2174,10 +2174,10 @@ ${line}`;
       return doc.insert(section, "end", withDraftRepeat(newTask(text, { dueDate, slot: unsorted ? null : slot ?? null, ...marks, projects: draftProjects(doc, draft, []) ?? [] }), draft, today, boundary));
     }
     if (entry.path.length > 0) return placeSubtask(doc, entry, draft, today, boundary);
-    const same = samePlacement(placementOfEntry(entry, today), draft.placement);
-    const changed2 = { ...entry.task, ...draftMarks(doc, entry.task, draft), ...same ? {} : { dueDate }, ...unsorted ? { slot: null } : {}, ...draftProjects(doc, draft, entry.task.projects) !== void 0 && { projects: draftProjects(doc, draft, entry.task.projects) } };
+    const same2 = samePlacement(placementOfEntry(entry, today), draft.placement);
+    const changed2 = { ...entry.task, ...draftMarks(doc, entry.task, draft), ...same2 ? {} : { dueDate }, ...unsorted ? { slot: null } : {}, ...draftProjects(doc, draft, entry.task.projects) !== void 0 && { projects: draftProjects(doc, draft, entry.task.projects) } };
     const edited = doc.replace(entry, withDraftRepeat(changed2, draft, today, boundary));
-    if (same || entry.section === section) return edited;
+    if (same2 || entry.section === section) return edited;
     return edited.moveEntry(sameEntryIn(edited, entry), section, "end");
   }
   function sendTo(doc, entry, placement, today) {
@@ -2258,7 +2258,7 @@ ${line}`;
         return intoUnfolded(
           doc,
           place.parent,
-          (d, same) => d.insertUnder(same(place.parent), withRepeat(newTask(text, marks), repeat, today, boundary), place.before && same(place.before))
+          (d, same2) => d.insertUnder(same2(place.parent), withRepeat(newTask(text, marks), repeat, today, boundary), place.before && same2(place.before))
         );
       case "slot": {
         const made = createInSlot(doc, place.slot, text, { ...marks, projects }, today, boundary);
@@ -2846,8 +2846,8 @@ ${e.calendar}`;
     const soon = typedIn(view.soon, id);
     const inbox = typedIn(view.inbox, id);
     const backlog = typedIn(view.backlog, id);
-    const same = list === view.day.list && slotted2 === view.day.slotted && soon === view.soon && inbox === view.inbox && backlog === view.backlog;
-    return same ? view : { ...view, day: { ...view.day, list, slotted: slotted2 }, soon, inbox, backlog };
+    const same2 = list === view.day.list && slotted2 === view.day.slotted && soon === view.soon && inbox === view.inbox && backlog === view.backlog;
+    return same2 ? view : { ...view, day: { ...view.day, list, slotted: slotted2 }, soon, inbox, backlog };
   }
   function typedRows(rows, id) {
     const out = [];
@@ -5035,11 +5035,11 @@ ${key.title}`.toLowerCase();
     for (const refs of chosen) for (const ref of refs) if (!options.some((option) => key(option.project) === key(ref))) options.push({ project: { ...ref, mark: true }, depth: 0 });
     const all = (ref) => chosen.length > 0 && chosen.every((refs) => refs.some((r) => key(r) === key(ref)));
     const first = chosen[0] ?? [];
-    const same = chosen.every((refs) => refs.length === first.length && refs.every((ref, i) => key(ref) === key(first[i])));
+    const same2 = chosen.every((refs) => refs.length === first.length && refs.every((ref, i) => key(ref) === key(first[i])));
     const none = chosen.every((refs) => refs.length === 0);
     const shared = first.find(all) ?? null;
     return {
-      value: none ? NO_PROJECT : same ? first.length === 1 ? first[0].name : `${first[0].name} +${first.length - 1}` : "",
+      value: none ? NO_PROJECT : same2 ? first.length === 1 ? first[0].name : `${first[0].name} +${first.length - 1}` : "",
       current: shared,
       options: options.map(({ project, depth }) => {
         const checked = all(project);
@@ -7510,7 +7510,7 @@ ${key.title}`.toLowerCase();
     /** Tags `entries` in their order: the n-th is found again as `find(doc, n)`. */
     static tag(doc, entries) {
       const asRead = entries.map((entry) => doc.find(entry.section, entry.index, entry.path));
-      const tagged = doc.replaceAll(asRead.map((same, n) => [same, { ...same.task, text: same.task.text + markOf(n) }]));
+      const tagged = doc.replaceAll(asRead.map((same2, n) => [same2, { ...same2.task, text: same2.task.text + markOf(n) }]));
       return { doc: tagged, tags: new _EntryTags(asRead) };
     }
     /** `text` with the n-th mark: written in place of a tagged task's text, it keeps the task tagged. */
@@ -8853,6 +8853,23 @@ ${key.title}`.toLowerCase();
     return date === today ? { kind: "now", minute: boundary.offsetOf(date, now) } : { kind: "hour", minute: boundary.offsetOfHour(hour) };
   }
 
+  // core/application/readingSettings.ts
+  function readsAnew(before, after) {
+    return before.tasksFile !== after.tasksFile || readingKey(before) !== readingKey(after) || !sameLevels(before.priorities, after.priorities) || !sameLabels(before.labels, after.labels);
+  }
+  var same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  function shownChange(before, after) {
+    const change = {
+      tasks: readsAnew(before, after),
+      drawn: before.tasksFile !== after.tasksFile || !same(before.sections, after.sections) || before.groups.ungrouped !== after.groups.ungrouped || !same(before.groups.presets, after.groups.presets) || !sameLevels(before.priorities, after.priorities) || !sameLabels(before.labels, after.labels) || before.labelPaint !== after.labelPaint,
+      cards: before.cardHeight !== after.cardHeight || before.cardGap !== after.cardGap,
+      timeline: before.dayStartHour !== after.dayStartHour || before.scrollToHour !== after.scrollToHour || !same(before.zoomLevels, after.zoomLevels),
+      gestures: before.longPressMs !== after.longPressMs,
+      calendars: !same(before.hiddenCalendars, after.hiddenCalendars) || before.workCalendarFile !== after.workCalendarFile || before.staleAfterMinutes !== after.staleAfterMinutes
+    };
+    return Object.values(change).some(Boolean) ? change : null;
+  }
+
   // core/application/PhoneCalls.ts
   var DoorError = class extends Error {
     constructor(code, message) {
@@ -9213,6 +9230,7 @@ ${key.title}`.toLowerCase();
     side: (c, [date]) => daySide(date, c.rules.today()),
     clockAt: (c, [minute]) => clockOf(boundaryOf2(c), minute),
     hourLabels: (c) => hourLabels(boundaryOf2(c)),
+    offset: (_c, [from, to]) => daysBetween(from, to),
     /** Where a day begins: the hour it starts at. The `boundary.*` calls place by it. */
     boundary: (c) => ({ startHour: boundaryOf2(c).startHour })
   };
@@ -9479,7 +9497,8 @@ ${key.title}`.toLowerCase();
     onTheDay,
     canPick,
     listCardMenuFrom,
-    originOf
+    originOf,
+    shownChange: (before, after) => shownChange(settingsOf(before), settingsOf(after))
   };
   var CONSTANTS = { PROJECTS_HOVER_MS, PROJECTS_INDENT, REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, CLEAR_COLOR, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS, DEFAULT_ZOOM_LEVELS, DEFAULT_ZOOM_HOUR, SHOWN_LISTS, FUNNEL_PLACES, ROW_LISTS, VIEW_WORDS, SWIPE_FLICK_SPEED, CARD_HEIGHTS, CARD_GAPS, DEFAULT_CARD_SIZE, LIST_WIDTHS, REPEAT_WORDS, DIVIDER_SNAP, MOST_CARD_COLORS, NO_DAY_EVENTS };
   var TIMELINE = {

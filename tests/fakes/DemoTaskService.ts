@@ -888,6 +888,11 @@ export class DemoTaskService implements TaskService {
 		return () => this.listeners.delete(listener);
 	}
 
+	/** The demo's settings never change. */
+	onShownChange(): () => void {
+		return () => {};
+	}
+
 	get fileExists(): boolean {
 		return this.exists;
 	}
