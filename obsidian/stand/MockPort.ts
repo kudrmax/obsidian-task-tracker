@@ -1,4 +1,5 @@
-import type { AllDayEvent, ScreenContext, Block, CardFace, DayEvent, Destination, Edge, EntryBar, EntryCommit, EntryDraft, EntryField, EventPaint, FieldActionId, ListData, ListId, ListPlaceId, MenuAction, MenuFrom, MenuModel, MenuStatusId, Now, PlaceId, ProjectPage, ReminderKind, RenameStart, Row, ScreenData, ScreenPort } from "../ui/engine/port";
+import { EVERY_TASK } from "../ui/engine/port";
+import type { AllDayEvent, ScreenContext, Block, CardFace, DayEvent, Destination, Edge, EntryBar, EntryCommit, EntryDraft, EntryField, EventPaint, FieldActionId, ListData, ListId, ListPlaceId, MenuAction, MenuFrom, MenuModel, MenuStatusId, Now, PlaceId, ProjectPage, ReminderKind, RenameStart, Row, ScreenData, ScreenPort, UndoOutcome } from "../ui/engine/port";
 import { type FieldFacts, fieldBar, type MenuFacts, menuLayout, menuPlaces } from "./actionTable";
 import { bgAlphaFor, eventColors } from "../ui/eventColors";
 import { addDays, CALENDAR_COLORS, DAY_START_HOUR, dateOf, dayOf, fileText, LIST_KEYS, LIST_NAMES, type ListKey, type MockFile, type MockSection, type MockTask, minuteOf, mockFile } from "./mockData";
@@ -43,10 +44,9 @@ const LEVELS = [
 /** The file's mark each status tile writes. */
 const STATUS_MARKS: Readonly<Record<MenuStatusId, MockTask["status"]>> = { done: "x", inProgress: "/", stopProgress: " ", wontDo: "-", stop: " " };
 const REMINDERS: readonly ReminderKind[] = ["live", "notification", "alarm", "none"];
-/** A draft with nothing set: the field as a new task's opens. */
 /** Steps Undo keeps, as the plugin's history does (F267). */
 const UNDO_STEPS = 100;
-const EVERY_TASK: ScreenContext = { project: null };
+/** A draft with nothing set: the field as a new task's opens. */
 const NO_DRAFT: EntryDraft = { level: null, projects: [], descriptionLine: null, section: false };
 /** What makes two projects one: their names, case aside (the core's `projectKey`). */
 const projectKey = (name: string) => name.normalize("NFC").toLowerCase();
@@ -60,6 +60,12 @@ const closed = (t: MockTask) => t.status === "x" || t.status === "-";
  * appear, writes that wait `delay` ms as a real write and read-back do. Its state reads as a tasks file's text. In part 2
  * the core's rules win over these.
  */
+/** A step Undo or Redo writes back: the file as it stood, and the edits from outside counted then. */
+interface Step {
+	readonly file: MockFile;
+	readonly outside: number;
+}
+
 export class MockPort implements ScreenPort {
 	private file: MockFile;
 	/** The file with the writes not yet read back already made: what a preview and a refusal are drawn from. Null when none is in flight. */
@@ -69,8 +75,11 @@ export class MockPort implements ScreenPort {
 	/** Reads by day, as of the clock's minute: what rides the now line and what is past changes with it. */
 	private readonly cache = new Map<string, ScreenData>();
 	private added = 0;
-	/** The file as it stood before each of the screen's writes, the last last: Undo writes the last one back (F267). */
-	private history: MockFile[] = [];
+	/** The screen's steps to take back, the last last, and those taken back, to do again (F267, F268). */
+	private undos: Step[] = [];
+	private redos: Step[] = [];
+	/** Counts the edits from outside: a step older than the last one can't be taken back or done again (F270). */
+	private outside = 0;
 	delay: WriteDelay = 30;
 
 	constructor(private readonly clock: () => Date = () => new Date()) {
@@ -87,7 +96,8 @@ export class MockPort implements ScreenPort {
 	reset(file: MockFile = mockFile(this.clock())): void {
 		this.file = file;
 		this.ahead = null;
-		this.history = [];
+		this.undos = [];
+		this.redos = [];
 		this.changed();
 	}
 
@@ -626,25 +636,55 @@ export class MockPort implements ScreenPort {
 	}
 
 	canUndo(): boolean {
-		return this.history.length > 0;
+		return this.undos.length > 0;
 	}
 
-	/** The file as it stood before the screen's last write, written back: a write of its own, which Undo does not take back in turn. */
-	async undo(): Promise<void> {
-		const before = this.history.pop();
-		if (!before) return;
-		await this.write((file) => Object.assign(file, structuredClone(before)), false);
+	canRedo(): boolean {
+		return this.redos.length > 0;
+	}
+
+	/** The file as it stood before the screen's last step, written back; the step kept to do again. */
+	undo(): Promise<UndoOutcome> {
+		return this.retrace(this.undos, this.redos);
+	}
+
+	/** The step last taken back, done again. */
+	redo(): Promise<UndoOutcome> {
+		return this.retrace(this.redos, this.undos);
+	}
+
+	/** The plugin's notices (`CalendarScreen`'s): a step the file changed under is dropped, and says so. */
+	undoNotice(step: "undo" | "redo", outcome: UndoOutcome): string | null {
+		if (outcome !== "conflict") return null;
+		return step === "undo" ? "Can’t undo: the tasks file changed" : "Can’t redo: the tasks file changed";
+	}
+
+	/** The last step of `from` written back, the file as it stood before it kept on `to`; a step an edit from outside came after is dropped. */
+	private async retrace(from: Step[], to: Step[]): Promise<UndoOutcome> {
+		const step = from.pop();
+		if (!step) return "nothing";
+		if (step.outside !== this.outside) {
+			this.changed();
+			return "conflict";
+		}
+		to.push({ file: structuredClone(this.ahead ?? this.file), outside: this.outside });
+		await this.write((file) => Object.assign(file, structuredClone(step.file)), false);
+		return "done";
 	}
 
 	// Writes.
 
 	/**
-	 * A write made at once in `ahead` (previews see it), and in the file after `delay`, as a real write is read back; the
-	 * file as it stood before it kept for Undo (`undoable`), up to the plugin's hundred steps.
+	 * A write made at once in `ahead` (previews see it), and in the file after `delay`, as a real write is read back; a
+	 * step of the screen's own (`step`) keeps the file as it stood before it for Undo, up to the plugin's hundred steps,
+	 * and leaves nothing to do again.
 	 */
-	private async write(change: (file: MockFile) => void, undoable = true): Promise<void> {
+	private async write(change: (file: MockFile) => void, step = true): Promise<void> {
 		this.ahead ??= structuredClone(this.file);
-		if (undoable) this.history = [...this.history, structuredClone(this.ahead)].slice(-UNDO_STEPS);
+		if (step) {
+			this.undos = [...this.undos, { file: structuredClone(this.ahead), outside: this.outside }].slice(-UNDO_STEPS);
+			this.redos = [];
+		}
 		change(this.ahead);
 		this.inFlight++;
 		if (this.delay > 0) await new Promise((resolve) => window.setTimeout(resolve, this.delay));
@@ -654,11 +694,12 @@ export class MockPort implements ScreenPort {
 	}
 
 	/**
-	 * A hand edit or Sync: not the screen's to take back, and the steps before it would write over it. The stand drops them
-	 * (the core drops only the steps whose lines changed, with its notice, F270: CorePort's).
+	 * A hand edit or Sync: not the screen's to take back, and the steps before it would write over it. The stand can't tell
+	 * which lines it touched, so each of them is refused when its turn comes, with the notice (the core refuses only the
+	 * steps whose lines changed, F270).
 	 */
 	private editedOutside(): void {
-		this.history = [];
+		this.outside++;
 		this.changed();
 	}
 
@@ -805,8 +846,10 @@ export class MockPort implements ScreenPort {
 
 	// Reads.
 
-	/** The screen as `file` says; `held`, a task held by a dot, drawn where it is stretched to, not riding the now line. */
-	/** `context`: the chosen project, only its tasks shown (with their subtasks), every event still. */
+	/**
+	 * The screen as `file` says; `held`, a task held by a dot, drawn where it is stretched to, not riding the now line;
+	 * `context`, the chosen project: only its tasks shown (with their subtasks), every event still.
+	 */
 	private screenOf(file: MockFile, dayOffset: number, held: string | null = null, context: ScreenContext = EVERY_TASK): ScreenData {
 		const shown = dateOf(addDays(this.day(), dayOffset));
 		const cards: Record<string, CardFace> = {};

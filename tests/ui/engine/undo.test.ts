@@ -52,16 +52,57 @@ describe("Undo (F267, F269): the screen's own writes, one step each", () => {
 		stop();
 	});
 
-	it("never takes back an edit from outside: Sync or a hand edit drops the steps before it", async () => {
+	it("never takes back an edit from outside (F269, F270): a step the file changed under is refused with the port's notice, and dropped", async () => {
 		const { port, store, stop } = screen();
 		const start = inbox(port);
 		await port.act(start[0], { kind: "delete" });
 		port.addFromOutside("inbox", "Пришла со стороны");
 		await settled();
-		expect(store.getState().canUndo).toBe(false);
+		expect(store.getState().canUndo).toBe(true);
 		store.getState().undo();
 		await settled();
 		expect(port.fileText()).toContain("Пришла со стороны");
+		expect(inbox(port)).not.toContain(start[0]);
+		expect(store.getState().notice?.text).toBe("Can’t undo: the tasks file changed");
+		expect(store.getState().canUndo).toBe(false);
+		stop();
+	});
+
+	it("⌘⇧Z does a step taken back again, and a new step leaves nothing to do again (F268)", async () => {
+		const { port, store, stop } = screen();
+		const start = inbox(port);
+		await port.act(start[0], { kind: "delete" });
+		store.getState().undo();
+		await settled();
+		expect(inbox(port)).toEqual(start);
+		expect(store.getState().canRedo).toBe(true);
+		KEYS.find((k) => k.id === "redo")?.run(store.getState());
+		await settled();
+		expect(inbox(port)).not.toContain(start[0]);
+		expect(store.getState().canRedo).toBe(false);
+		store.getState().undo();
+		await settled();
+		await port.act(start[1], { kind: "delete" });
+		await settled();
+		expect(store.getState().canRedo).toBe(false);
+		stop();
+	});
+
+	it("what came in a read comes in only until the screen has drawn that read, however soon a row mounts again", async () => {
+		const { port, store, stop } = screen();
+		const start = inbox(port);
+		await port.act(start[0], { kind: "delete" });
+		store.getState().undo();
+		await settled();
+		const { fresh, readSeq } = store.getState();
+		expect(fresh.has(start[0])).toBe(true);
+		store.getState().drawn(readSeq - 1);
+		expect(store.getState().fresh.has(start[0])).toBe(true);
+		store.getState().drawn(readSeq);
+		expect(store.getState().fresh.size).toBe(0);
+		const none = store.getState().fresh;
+		store.getState().drawn(readSeq);
+		expect(store.getState().fresh).toBe(none);
 		stop();
 	});
 

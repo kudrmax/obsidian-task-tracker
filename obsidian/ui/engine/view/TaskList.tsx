@@ -135,7 +135,7 @@ const ContextList = memo(function ContextList({ list, context }: { readonly list
 								const row = drawn[item.index];
 								if (row.kind === "plus")
 									return (
-										<MovingRow key={row.id} id={row.id} context={context} index={item.index} ref={virtualizer.measureElement} order={order} carried fresh={false} className="tc-list-item">
+										<MovingRow key={row.id} id={row.id} context={context} index={item.index} measure={virtualizer.measureElement} order={order} carried fresh={false} className="tc-list-item">
 											<SortableRow id={row.id} gap>
 												<div className="tc-card" style={{ [PROPERTY.level]: String(liftedDepth ?? 0) } as CSSProperties} />
 											</SortableRow>
@@ -143,12 +143,12 @@ const ContextList = memo(function ContextList({ list, context }: { readonly list
 									);
 								if (row.kind === "entry")
 									return (
-										<MovingRow key={row.id} id={row.id} context={context} index={item.index} ref={virtualizer.measureElement} order={order} carried={false} fresh={false} className="tc-list-item">
+										<MovingRow key={row.id} id={row.id} context={context} index={item.index} measure={virtualizer.measureElement} order={order} carried={false} fresh={false} className="tc-list-item">
 											<EntryField key={entrySeq} depth={row.depth} />
 										</MovingRow>
 									);
 								return (
-									<MovingRow key={row.id} id={row.id} context={context} index={item.index} ref={virtualizer.measureElement} order={order} carried={lifted === row.id} fresh={fresh.has(row.id)} className="tc-list-item">
+									<MovingRow key={row.id} id={row.id} context={context} index={item.index} measure={virtualizer.measureElement} order={order} carried={lifted === row.id} fresh={fresh.has(row.id)} className="tc-list-item">
 										<RowFace row={row.kind === "task" && row.id === lifted && liftedDepth !== null ? { ...row, depth: liftedDepth } : row} />
 									</MovingRow>
 								);

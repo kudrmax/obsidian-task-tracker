@@ -1,11 +1,11 @@
-import type { EntryBarGroup, FieldActionId, FieldGroup, MenuActionGroup, MenuStatusId, TaskActionId, TaskMenuActionId, TaskMenuGroup } from "../../../core/application/contracts";
+import type { EntryBarGroup, FieldActionId, FieldGroup, MenuActionGroup, MenuStatusId, TaskActionId, TaskMenuActionId, TaskMenuGroup, UndoOutcome } from "../../../core/application/contracts";
 
 /**
  * The task actions are the core's (`core/application/taskActions.ts`, task actions spec): the ids, the groups and the
  * offered actions a surface lays out. The port answers with them; the engine keeps only each action's look and handler,
  * an exhaustive `Record` over the surface's ids. Types only: the engine runs no code of the core.
  */
-export type { EntryBarGroup, FieldActionId, FieldGroup, MenuActionGroup, MenuStatusId, TaskActionId, TaskMenuActionId, TaskMenuGroup };
+export type { EntryBarGroup, FieldActionId, FieldGroup, MenuActionGroup, MenuStatusId, TaskActionId, TaskMenuActionId, TaskMenuGroup, UndoOutcome };
 
 /**
  * The screen's one port (docs/superpowers/specs/2026-11-18-ui-engine.md, «The owners», «Data and writes»): what the screen
@@ -314,6 +314,9 @@ export interface ScreenContext {
 	readonly project: string | null;
 }
 
+/** Every task: no project chosen. */
+export const EVERY_TASK: ScreenContext = { project: null };
+
 export interface ScreenPort {
 	/** The screen for the day `dayOffset` days from today, in `context` (every task when absent). */
 	read(dayOffset: number, context?: ScreenContext): ScreenData;
@@ -373,10 +376,18 @@ export interface ScreenPort {
 	newProject(name: string): Promise<string | null>;
 	/** What the menu of the task or event `id` offers, opened `from` there. */
 	menu(id: string, from: MenuFrom): MenuModel;
-	/** Whether Undo has a step of the screen's own to take back (F267): it is dim without one. */
+	/**
+	 * The screen's own steps taken back and done again, as the core's `UndoService` keeps them (F267–F270): one action one
+	 * step, an edit from outside none. Whether there is one to take back (Undo is dim without one) or to do again; a change
+	 * of either fires `subscribe`.
+	 */
 	canUndo(): boolean;
-	/** Takes the screen's last write back (F267, F269); resolves once written and read back. */
-	undo(): Promise<void>;
+	canRedo(): boolean;
+	/** Takes the screen's last step back; resolves once written and read back: done, nothing to take back, or refused because the file changed under it. */
+	undo(): Promise<UndoOutcome>;
+	redo(): Promise<UndoOutcome>;
+	/** What the notice says after `step` came out as `outcome` («Can’t undo: the tasks file changed»); null: no notice. */
+	undoNotice(step: "undo" | "redo", outcome: UndoOutcome): string | null;
 	/**
 	 * Writes what was tapped in the menu of `id` opened `from` there (a status tile of a folded block writes its step);
 	 * resolves once written and read back, to the task's id as the file now has it (the core's key is fresh after a

@@ -6,8 +6,9 @@ import { menuButton } from "../lib/menu.mjs";
  * E2, Undo (F267, F268, F269; docs/plugin/tasks.md «Отмена»; the design's «Отмена»; Decision 132): the capsule opposite
  * the plus takes the screen's last action back, its icon dim while there is none. A task done comes back where it stood,
  * fading in as the cards under it glide aside; a task sent to another list glides back to its place; a task done on the
- * calendar fades back in where it stood. On the Mac ⌘Z does what the button does. An edit from outside is not the
- * screen's to take back. The tasks file says what happened.
+ * calendar fades back in where it stood. On the Mac ⌘Z does what the button does and ⌘⇧Z does the step again. An edit
+ * from outside is not the screen's to take back, and a step the file changed under is refused with the notice. The
+ * capsule is two cells, Undo and «⋯». The tasks file says what happened.
  */
 const SEEN = 0.1;
 const WHOLE = 0.9;
@@ -32,6 +33,8 @@ export default {
 			} else await tap(await t.oracle.rect(".task-calendar > .tc-capsule .tc-undo"));
 		};
 		t.expect(await dim(), "Undo is dim while there is nothing to take back");
+		const capsule = await t.cdp.eval(`(() => { const c = document.querySelector(".task-calendar > .tc-capsule"); const r = c.getBoundingClientRect(); return { width: r.width, height: r.height, cells: [...c.children].map((b) => b.getAttribute("aria-label") + (b.getAttribute("aria-disabled") === "true" ? " off" : "")) }; })()`);
+		t.expect(capsule.width === 80 && capsule.height === 44 && JSON.stringify(capsule.cells) === JSON.stringify(["Undo off", "More off"]), `the capsule is two cells, Undo and «⋯», each off for now: ${JSON.stringify(capsule)}`);
 
 		if (item === "outside") {
 			await t.stand(`addFromOutside("now", "Пришла со стороны")`);
@@ -41,6 +44,17 @@ export default {
 			await tap(button);
 			await t.sleep(500);
 			t.expect((await t.oracle.cards("day"))[0] === "Пришла со стороны", "a tap on the dim Undo changes nothing");
+			const [first] = await t.oracle.cards("day");
+			await tap(await cardBy(t, first, "day"));
+			await t.sleep(400);
+			await press("Done");
+			await t.sleep(700);
+			await t.stand(`addFromOutside("now", "Ещё одна со стороны")`);
+			await t.sleep(400);
+			await undo();
+			await t.sleep(700);
+			t.expect(JSON.stringify(await t.stand("notices()")) === JSON.stringify(["Can’t undo: the tasks file changed"]), `a step the file changed under is refused, and says so: ${JSON.stringify(await t.stand("notices()"))}`);
+			t.expect(!(await t.oracle.cards("day")).includes(first) && (await t.file()).includes("Ещё одна со стороны"), "the file is left as it is");
 			await tap(await t.oracle.rect(".task-calendar > button.tc-plus"));
 			await t.sleep(500);
 			t.expect(await t.cdp.eval(`!document.querySelector(".task-calendar > .tc-capsule").checkVisibility({ visibilityProperty: true })`), "the capsule hides with the plus while a task is typed");
@@ -85,6 +99,12 @@ export default {
 			const faults = frameFaults(frames, { maxStep: 40 });
 			t.expect(faults.length === 0, `frames of Undo: ${JSON.stringify(faults.slice(0, 3))}`);
 			t.expect(await dim(), "nothing left to take back: Undo is dim again");
+			if (t.platform === "desktop") {
+				await t.cdp.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Z", code: "KeyZ", windowsVirtualKeyCode: 90, modifiers: 12 });
+				await t.cdp.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Z", code: "KeyZ", windowsVirtualKeyCode: 90, modifiers: 12 });
+				await t.sleep(800);
+				t.expect(!(await t.oracle.cards("day")).includes(leaving) && (await t.file()).includes(`- [x] ${leaving}`), `⌘⇧Z does it again: ${JSON.stringify((await t.oracle.cards("day")).slice(0, 3))}`);
+			}
 			return;
 		}
 

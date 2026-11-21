@@ -20,6 +20,8 @@ export interface MountOptions {
 	readonly desk: boolean;
 	/** Draws markdown as Obsidian does: the start of a description by the menu. */
 	readonly markdown: (text: string, el: HTMLElement, sourcePath: string) => () => void;
+	/** Shows a notice as Obsidian does. */
+	readonly notice: (text: string) => void;
 	/** macOS's touch and lift on the trackpad, where the host hears them (Decision 126). */
 	readonly fingers?: TrackpadFingers | null;
 }
@@ -30,7 +32,7 @@ export interface MountedScreen {
 }
 
 /** The engine's screen in `el`: its own store over the port, in the element's own document and window. */
-export function mountScreen(el: HTMLElement, { port, place, app, sourcePath, haptics, zoom, markdown, desk, fingers = null }: MountOptions): MountedScreen {
+export function mountScreen(el: HTMLElement, { port, place, app, sourcePath, haptics, zoom, markdown, desk, notice, fingers = null }: MountOptions): MountedScreen {
 	const doc = el.ownerDocument;
 	const store = createScreenStore(port, zoom.kept ?? DESIGN.hourPx);
 	const keep = store.subscribe((s, was) => {
@@ -38,7 +40,7 @@ export function mountScreen(el: HTMLElement, { port, place, app, sourcePath, hap
 		else if (was.gesture === "zoom" && s.gesture !== "zoom") zoom.keep(s.zoom);
 	});
 	const root = createRoot(el);
-	root.render(<TaskScreen store={store} place={place} host={{ doc, win: doc.defaultView ?? window, layerRoot: doc.body, app, sourcePath, haptics, zoomMost: zoom.most, markdown, desk, fingers }} />);
+	root.render(<TaskScreen store={store} place={place} host={{ doc, win: doc.defaultView ?? window, layerRoot: doc.body, app, sourcePath, haptics, zoomMost: zoom.most, markdown, desk, notice, fingers }} />);
 	return {
 		store,
 		unmount: () => {

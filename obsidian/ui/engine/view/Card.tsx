@@ -3,6 +3,7 @@ import { PROPERTY } from "../../design";
 import type { CardFace } from "../port";
 import { useData } from "../store";
 import { Icon } from "./Icon";
+import { useLeaving } from "./MovingRow";
 
 /**
  * What a task's card shows on the calendar besides what it shows in a list (F91, F93, F94): its corner (its start in a stack, its length when shorter than the card), the moving edge's
@@ -35,9 +36,10 @@ export interface CardProps {
  */
 export const Card = memo(function Card({ id, depth = 0, copy = false, block }: CardProps) {
 	const read = useData((d) => d.cards[id]);
+	const leaving = useLeaving();
 	const last = useRef(read);
 	if (read) last.current = read;
-	const face = last.current;
+	const face = read ?? (leaving ? last.current : undefined);
 	if (!face) return null;
 	const marked = copy ? { "data-copy": id } : block ? { "data-block": id, "data-own-press": "" } : { "data-id": id };
 	return (

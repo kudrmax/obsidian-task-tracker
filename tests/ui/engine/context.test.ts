@@ -36,4 +36,28 @@ describe("a change of context (F23, Decision 132)", () => {
 		store.getState().setContext({ project: "Дом" });
 		expect(store.getState().contextSeq).toBe(seq + 1);
 	});
+
+	it("waits for a drag to end: what the finger holds stays still under it (principle 5)", () => {
+		const { store } = screen();
+		store.getState().claim("drag");
+		store.getState().setContext({ project: "Дом" });
+		expect(store.getState().context.project).toBeNull();
+		store.getState().release("drag");
+		expect(store.getState().context.project).toBe("Дом");
+	});
+
+	it("closes a menu whose task the new context doesn't show, and keeps one whose task it does", () => {
+		const { port, store } = screen();
+		const day = port.read(0);
+		const home = port.read(0, { project: "Дом" });
+		const theirs = day.lists.day.rows.find((row) => row.kind === "task" && row.id in home.cards)!.id;
+		const other = day.lists.day.rows.find((row) => row.kind === "task" && !(row.id in home.cards))!.id;
+		store.getState().openMenu(theirs);
+		store.getState().setContext({ project: "Дом" });
+		expect(store.getState().layer?.id).toBe(theirs);
+		store.getState().setContext({ project: null });
+		store.getState().openMenu(other);
+		store.getState().setContext({ project: "Дом" });
+		expect(store.getState().layer).toBeNull();
+	});
 });

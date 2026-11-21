@@ -1,6 +1,6 @@
 import { AnimatePresence, motion, useIsPresent } from "motion/react";
-import { type CSSProperties, forwardRef, type ReactNode } from "react";
-import { LAYER_MS } from "../layers/motion";
+import { type CSSProperties, type ForwardedRef, forwardRef, type ReactNode, useCallback, useRef } from "react";
+import { EASE_OUT, LAYER_MS } from "../layers/motion";
 
 /**
  * Rows that move (spec, «The owners»; principle 3): a row glides to its new place whatever moved it, a drag, a command,
@@ -13,13 +13,14 @@ import { LAYER_MS } from "../layers/motion";
  * measure every other row in the middle of the drop, without the place dnd-kit has them at, so they would glide back from
  * where they stood before the drag.
  */
-export const MovingRow = forwardRef<HTMLDivElement, MovingRowProps>(function MovingRow({ id, order, context = 0, carried, fresh, placed = false, className, style, index, children }, ref) {
+export const MovingRow = forwardRef<HTMLDivElement, MovingRowProps>(function MovingRow({ id, order, context = 0, carried, fresh, placed = false, className, style, index, measure, children }, ref) {
 	const still = carried || placed;
 	const present = useIsPresent();
+	const setElement = useMeasured(ref, measure, present);
 	return (
 		<motion.div
-			ref={ref}
-			data-index={present ? index : undefined}
+			ref={setElement}
+			data-index={present ? index : NO_INDEX}
 			className={present ? className : `${className ?? ""} is-leaving`}
 			style={style}
 			layout={still ? false : "position"}
@@ -36,6 +37,26 @@ export const MovingRow = forwardRef<HTMLDivElement, MovingRowProps>(function Mov
 		</motion.div>
 	);
 });
+
+/** Whether the row drawing this is leaving: its card keeps the face it had, the screen's data no longer has it. */
+export const useLeaving = (): boolean => !useIsPresent();
+
+/**
+ * The row's element to the presence (its pop) and, while the row is present, to the list's virtualizer (`measure`): a row
+ * leaving is no row of the list any more, so it is never measured again, and its index is none the virtualizer counts.
+ */
+function useMeasured(ref: ForwardedRef<HTMLDivElement>, measure: ((element: HTMLDivElement | null) => void) | undefined, present: boolean) {
+	const presentNow = useRef(present);
+	presentNow.current = present;
+	return useCallback(
+		(element: HTMLDivElement | null) => {
+			if (typeof ref === "function") ref(element);
+			else if (ref) ref.current = element;
+			if (element === null || presentNow.current) measure?.(element);
+		},
+		[ref, measure],
+	);
+}
 
 /**
  * The rows of a region as they come and go (Motion's `AnimatePresence`, `popLayout`, Decision 132): a row whose task is
@@ -68,8 +89,9 @@ export interface MovingRowProps {
 	readonly fresh: boolean;
 	readonly className?: string;
 	readonly style?: CSSProperties;
-	/** Its index for the list's virtualizer, which measures it; a row leaving has none (it is no row of the list any more). */
+	/** Its index for the list's virtualizer, and the virtualizer's measure of it; a row leaving has neither. */
 	readonly index?: number;
+	readonly measure?: (element: HTMLDivElement | null) => void;
 	readonly children: ReactNode;
 }
 
@@ -79,5 +101,7 @@ const COME_IN = { opacity: 0, scale: 0.96 };
 const FADED = { opacity: 0 };
 const SHOWN = { opacity: 1, scale: 1 };
 /** A row leaves in the design's `--tc-duration-collapse` on its `--tc-ease-out`, as a layer closes (F296, F297). */
-const LEAVE = { duration: LAYER_MS.close / 1000, ease: [0.2, 0.8, 0.2, 1] } as const;
+const LEAVE = { duration: LAYER_MS.close / 1000, ease: EASE_OUT } as const;
 const AT_ONCE = { opacity: 0, transition: { duration: 0 } };
+/** The index of a row leaving: out of every list's range, so the virtualizer ignores it. */
+const NO_INDEX = -1;

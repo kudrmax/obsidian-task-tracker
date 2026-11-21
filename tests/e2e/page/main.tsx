@@ -51,6 +51,8 @@ class StandPage {
 	private leafScreen: MountedScreen | null = null;
 	private readonly app = {} as App;
 	private readonly haptics = detectHaptics(window as unknown as HapticsHost);
+	/** The notices shown, in order, as Obsidian's `Notice` would show them. */
+	private readonly notices: string[] = [];
 
 	constructor(private readonly leaf: HTMLElement) {}
 
@@ -114,12 +116,13 @@ class StandPage {
 					return { stop, gesture, lifted, layer: layer?.kind ?? null, entry, pending, dayOffset };
 				}),
 			step: (id: string) => this.showStep(id),
+			notices: () => [...this.notices],
 			openNote: () => this.openNote(),
 		};
 	}
 
 	private mount(el: HTMLElement, place: Place, sourcePath: string): MountedScreen {
-		const screen = mountScreen(el, { port: this.port, place, app: this.app, sourcePath, haptics: this.haptics, zoom: keptZoom(load, save), markdown: plainMarkdown, desk: !document.body.classList.contains("is-mobile") });
+		const screen = mountScreen(el, { port: this.port, place, app: this.app, sourcePath, haptics: this.haptics, zoom: keptZoom(load, save), markdown: plainMarkdown, notice: (text: string) => void this.notices.push(text), desk: !document.body.classList.contains("is-mobile") });
 		this.screens.add(screen);
 		return screen;
 	}

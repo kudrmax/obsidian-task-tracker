@@ -27,6 +27,7 @@ export default {
 			if (t.expect(at !== null, `the menu shows «${words}»`)) await tap(at);
 			await t.sleep(300);
 		};
+		await t.cdp.eval(`(() => { window.__warned = []; const warn = console.warn; console.warn = (...args) => { window.__warned.push(String(args[0])); warn(...args); }; return 1; })()`);
 		const [, leaving, under] = await t.oracle.cards("day");
 		const leavingAt = await cardBy(t, leaving, "day");
 		const underAt = await cardBy(t, under, "day");
@@ -58,5 +59,9 @@ export default {
 		t.expect(stepsOf(rose, -1) >= 3 && Math.abs(rose.at(-1) - leavingAt.top) < 1, `the card under it glides up into its place: ${JSON.stringify(rose)}`);
 		const faults = frameFaults(frames, { maxStep: 40 });
 		t.expect(faults.length === 0, `frames of a task leaving: ${JSON.stringify(faults.slice(0, 3))}`);
+		await t.cdp.eval(`(() => { const s = document.querySelector('[data-list="day"]'); s.scrollTop = s.scrollHeight; return 1; })()`);
+		await t.sleep(300);
+		const warned = await t.cdp.eval("window.__warned");
+		t.expect(warned.length === 0, `no warning in the console, the list scrolled after (a leaving row is no row of the virtualizer): ${JSON.stringify(warned)}`);
 	},
 };

@@ -1,4 +1,4 @@
-import { type App, Component, FileSystemAdapter, ItemView, MarkdownRenderChild, MarkdownRenderer, Platform, Plugin, Scope, type TFile, type WorkspaceLeaf } from "obsidian";
+import { type App, Component, Notice, FileSystemAdapter, ItemView, MarkdownRenderChild, MarkdownRenderer, Platform, Plugin, Scope, type TFile, type WorkspaceLeaf } from "obsidian";
 import { MacTrackpadFingers } from "../infrastructure/trackpad/MacTrackpadFingers";
 import { TRACKPAD_MODULE } from "../infrastructure/trackpad/module";
 import { KEYS, takesKeys } from "../ui/engine/keys";
@@ -79,7 +79,7 @@ class StandView extends ItemView {
 		this.unmount();
 		this.contentEl.empty();
 		this.contentEl.addClass("tc-view");
-		this.screen = mountScreen(this.contentEl, { port: this.stand.port, place: "leaf", app: this.app, sourcePath: "", haptics: haptics(), zoom: this.stand.zoom(), markdown: markdownOf(this.app), desk: !Platform.isMobile, fingers: this.stand.fingers });
+		this.screen = mountScreen(this.contentEl, { port: this.stand.port, place: "leaf", app: this.app, sourcePath: "", haptics: haptics(), zoom: this.stand.zoom(), markdown: markdownOf(this.app), desk: !Platform.isMobile, notice: (text) => new Notice(text), fingers: this.stand.fingers });
 		this.screen.store.getState().setStop(this.stand.step.stop);
 		this.stand.screens.add(this.screen);
 	}
@@ -105,7 +105,7 @@ class StandBlock extends MarkdownRenderChild {
 
 	override onload(): void {
 		this.containerEl.addClass("tc-stand-block");
-		this.screen = mountScreen(this.containerEl, { port: this.stand.port, place: "note", app: this.stand.app, sourcePath: this.path, haptics: haptics(), zoom: this.stand.zoom(), markdown: markdownOf(this.stand.app), desk: !Platform.isMobile, fingers: this.stand.fingers });
+		this.screen = mountScreen(this.containerEl, { port: this.stand.port, place: "note", app: this.stand.app, sourcePath: this.path, haptics: haptics(), zoom: this.stand.zoom(), markdown: markdownOf(this.stand.app), desk: !Platform.isMobile, notice: (text) => new Notice(text), fingers: this.stand.fingers });
 		this.stand.screens.add(this.screen);
 	}
 
