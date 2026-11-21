@@ -411,6 +411,10 @@ describe("the door's reads for the engine's port", () => {
 		expect([(result("days.hourLabels") as string[]).slice(0, 2), (midnight("days.hourLabels") as string[]).slice(0, 2)]).toEqual([["05", "06"], ["00", "01"]]);
 	});
 
+	it("says the notice of a step the file changed under, and none for another outcome", () => {
+		expect([result("rules.undoNotice", "undo", "conflict"), result("rules.undoNotice", "redo", "done")]).toEqual(["Can’t undo: the tasks file changed", null]);
+	});
+
 	it("counts the days between two dates and says what another data.json changes on the screen", () => {
 		expect(result("days.offset", "2026-11-05", "2026-10-30")).toBe(-6);
 		expect(result("rules.shownChange", JSON.stringify({ labelPaint: "stripes" }), JSON.stringify({ labelPaint: "blend" }))).toEqual({ tasks: false, drawn: true, cards: false, timeline: false, gestures: false, calendars: false });
@@ -757,6 +761,7 @@ function everyCall(screen: ScreenView): { method: string; args: unknown[]; conte
 		plain("rules.canPick", "timeline"),
 		plain("rules.originOf", named(screen, "Morning run")),
 		plain("rules.shownChange", "", JSON.stringify({ cardGap: 4 })),
+		plain("rules.undoNotice", "redo", "conflict"),
 		plain("rules.listCardMenuFrom", named(screen, "Parent")),
 		plain("rules.repeatValue", { kind: "schedule", every: 2, unit: "month", days: [], dayOfMonth: 5, from: "2026-11-05" }),
 		plain("rules.repeatValue", { kind: "schedule", every: 1, unit: "week", days: [0, 2], dayOfMonth: null, from: null }),

@@ -76,6 +76,25 @@ describe("TaskService.reader: one read of the file, answered at once", () => {
 		}
 	});
 
+	it("within another filter: at once, over the same read, as a reader made under that filter", async () => {
+		const { store, svc } = service();
+		const reader = await svc.reader();
+		await svc.create({ text: "Written after the read", placement: { kind: "inbox" }, priority: null });
+		const reads = store.reads;
+		const filtered = reader.within("project:Отчёты");
+		const back = filtered.within(null);
+		const screens = [T, LATER].map((date) => [filtered.screen(date), back.screen(date)] as const);
+		expect(store.reads).toBe(reads);
+		const before = service().svc;
+		for (const [n, date] of [T, LATER].entries()) {
+			expect(screens[n][0]).toEqual(await before.screen(date, "project:Отчёты"));
+			expect(screens[n][1]).toEqual(reader.screen(date));
+		}
+		expect(reader.within(null)).toBe(reader);
+		const write = named(reader.screen(T), "Write report");
+		expect(filtered.item(write.id)).toEqual(named(filtered.screen(T), "Write report"));
+	});
+
 	it("gives each column's list as columnView over that screen", async () => {
 		const { svc } = service();
 		const reader = await svc.reader();

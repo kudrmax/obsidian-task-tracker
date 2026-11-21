@@ -611,6 +611,8 @@ export interface ScreenReader {
 	stretch(id: string, day: LocalDate, edge: ResizeEdge, minute: number): StretchSpan | null;
 	/** `TaskService.resizedSlot` of the task `id`; null for no such task, one off the timeline, or a time that stays. */
 	resizedSlot(id: string, day: LocalDate, edge: ResizeEdge, minute: number, minDurationMin: number): Slot | null;
+	/** A reader over the same read under another project filter, at once: no read of the file; itself for its own filter. */
+	within(filter: ProjectsNodeId | null): ScreenReader;
 }
 
 /** A quick move of a task menu: Today, Tomorrow, or Pick a date, which asks for the day. */
@@ -1956,6 +1958,7 @@ export interface DayService {
 
 /** What a step back or forward did: changed the file, found nothing to do, or found its lines edited since and left the file as it is. */
 export type UndoOutcome = "done" | "nothing" | "conflict";
+export { undoNotice } from "./undoNotice";
 
 /**
  * The plugin's own changes of the tasks file, one step per action, taken back and done again. Edits by hand and through
