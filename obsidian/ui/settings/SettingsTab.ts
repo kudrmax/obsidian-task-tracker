@@ -13,6 +13,8 @@ export interface SettingsTabDeps {
 	readonly work: WorkCalendarSetup;
 	readonly calendars: Pick<CalendarService, "known" | "setShown">;
 	readonly assistant: AssistantService;
+	/** «Trackpad through macOS», this Mac's switch: null where there is none (the phone, Windows, Linux). */
+	readonly trackpad: { readonly on: boolean; set(on: boolean): void } | null;
 }
 
 
@@ -99,7 +101,7 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 	private moreGroup(el: HTMLElement): void {
 		new Setting(el).setName("More").setHeading();
 		this.pageRow(el, "Calendars", "Which calendars show, the Google account, the work calendar from the iPhone.", (page, redraw) => this.calendarsPage(page, redraw));
-		this.pageRow(el, "Day and timeline", "When a day starts, the hour a day opens at, long press, zoom levels.", (page) => this.dayPage(page));
+		this.pageRow(el, "Day and timeline", "When a day starts, the hour a day opens at, long press, zoom levels, the trackpad.", (page) => this.dayPage(page));
 		this.pageRow(el, "Tasks file", this.settings.tasksFile, (page) => this.tasksFilePage(page));
 		this.pageRow(el, "Assistant", "The model the assistant asks, how long it waits, each button's prompt.", (page, redraw) => void new AssistantSettingsPage(this.deps.assistant, redraw).build(page));
 	}
@@ -346,6 +348,12 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 			.setName("Zoom levels")
 			.setDesc("Pixels per hour, like 28, 56, 112, 224: a pinch stops wherever the fingers lift, up to the largest. Zoomed out all the way, it shows the whole day instead of the smallest one. A drag snaps to 30 minutes at 28, 15 at 56, 5 from 112 on.")
 			.addText((t) => t.setValue(this.settings.zoomLevels).onChange((text) => this.service.setZoomLevels(text)));
+		const trackpad = this.deps.trackpad;
+		if (trackpad)
+			new Setting(el)
+				.setName("Trackpad through macOS")
+				.setDesc("Two fingers move the columns by macOS's own touch and lift. Off: the columns follow the trackpad by its scrolling alone. Takes effect the next time Obsidian opens.")
+				.addToggle((t) => t.setValue(trackpad.on).onChange((on) => trackpad.set(on)));
 	}
 
 	/** Which calendars show first; the Google account and the client it needs; the work calendar; when a file counts as stale. */

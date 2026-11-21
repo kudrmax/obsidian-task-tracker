@@ -2,6 +2,7 @@ import { Notice, Platform, Plugin, type EventRef, type Vault } from "obsidian";
 import { PROTOCOL_ACTION } from "./infrastructure/GoogleRedirectLogin";
 import { openOutside } from "./infrastructure/OutsideLink";
 import { SYNC_ACTION } from "./infrastructure/SyncRoundTrip";
+import { trackpadSwitch } from "./infrastructure/trackpad";
 import { PluginCodeWatcher } from "./infrastructure/PluginCodeWatcher";
 import { DEVICE_STATE_KEY, PluginSettings } from "./infrastructure/PluginSettings";
 import { systemClock, type SettingsStore } from "../core/application/ports";
@@ -80,7 +81,7 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 		this.register(() => services.stopSyncForApp());
 		this.register(() => services.assistant.stopAll());
 		this.handOverPlace(services);
-		const settingsTab = new TaskCalendarSettingsTab(this.app, this, { settings: new SettingsServiceImpl(this), google: services.google, work: services.work, calendars: services.calendars, assistant: services.assistant });
+		const settingsTab = new TaskCalendarSettingsTab(this.app, this, { settings: new SettingsServiceImpl(this), google: services.google, work: services.work, calendars: services.calendars, assistant: services.assistant, trackpad: Platform.isDesktopApp && Platform.isMacOS ? trackpadSwitch(this.app) : null });
 		this.addSettingTab(settingsTab);
 		this.register(() => settingsTab.closePage());
 		return services;

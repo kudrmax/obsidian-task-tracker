@@ -2,6 +2,7 @@ import { Component, MarkdownRenderer, Notice, Platform, type Plugin, type Worksp
 import type { ScreenSettingsStore } from "../../core/application/contracts";
 import type { DeviceSettings } from "../adapters/DeviceSettings";
 import type { TrackpadFingers } from "../ui/engine/gestures/trackpadFollow";
+import { trackpadFingers } from "../infrastructure/trackpad";
 import { KEYS } from "../ui/engine/keys";
 import type { MountedScreen } from "../ui/engine/mount";
 import type { ScreenPort } from "../ui/engine/port";
@@ -11,7 +12,6 @@ import { addWindowDocument } from "../ui/paint/windowDocuments";
 import { detectHaptics, type HapticsHost } from "./haptics";
 import { type LeafLook, ScreenLeaf } from "./ScreenLeaf";
 import { ScreenMounts } from "./ScreenMounts";
-import { hearFingers } from "./trackpad";
 
 /** What a host's screens draw from: the port and what the device keeps, opened once, at the first screen. */
 export interface ScreenSource {
@@ -92,7 +92,7 @@ export class ScreenHost {
 	}
 
 	private async assemble(): Promise<ScreenMounts> {
-		const [source, fingers] = await Promise.all([this.options.source(), hearFingers(this.plugin)]);
+		const [source, fingers] = await Promise.all([this.options.source(), trackpadFingers(this.plugin.app, this.plugin)]);
 		if (this.ended) fingers?.dispose();
 		else this.fingers = fingers;
 		const app = this.plugin.app;

@@ -6,7 +6,7 @@ import { SettingsServiceImpl } from "../../../core/application/SettingsServiceIm
 import { DEVICE_STATE_KEY, PluginSettings, type SettingsPersistence } from "../../../obsidian/infrastructure/PluginSettings";
 import { DEFAULT_SETTINGS } from "../../../core/settings";
 import { SETTINGS_FILE, type StoredSettings } from "../../../obsidian/settingsFile";
-import { TaskCalendarSettingsTab } from "../../../obsidian/ui/settings/SettingsTab";
+import { type SettingsTabDeps, TaskCalendarSettingsTab } from "../../../obsidian/ui/settings/SettingsTab";
 import { rig } from "../../application/assistant/assistantFakes";
 
 type FileSettings = Omit<StoredSettings, "listShare" | "zoom" | "treeWidth">;
@@ -108,13 +108,13 @@ async function settled(): Promise<void> {
 	await new Promise((resolve) => setImmediate(resolve));
 }
 
-async function open(file: unknown = START, google: GoogleAccount = loggedOut): Promise<void> {
+async function open(file: unknown = START, google: GoogleAccount = loggedOut, trackpad: SettingsTabDeps["trackpad"] = null): Promise<void> {
 	document.body.replaceChildren();
 	disk = new Disk(file);
 	settings = new PluginSettings(disk, FILE, SETTINGS_FILE);
 	await settings.load();
 	workspace = new FakeWorkspace();
-	tab = new TaskCalendarSettingsTab({ workspace } as unknown as App, {} as Plugin, { settings: new SettingsServiceImpl(settings), google, work, calendars, assistant: rig().assistant });
+	tab = new TaskCalendarSettingsTab({ workspace } as unknown as App, {} as Plugin, { settings: new SettingsServiceImpl(settings), google, work, calendars, assistant: rig().assistant, trackpad });
 	tab.display();
 }
 
@@ -436,6 +436,18 @@ describe("the settings tab: the cards and the timeline", () => {
 		await writes(() => type(input("Stale after"), "2.5"), { staleAfterMinutes: 2.5 });
 		await opened("Stale after");
 		await writes(() => type(input("Stale after"), "1e3"), { staleAfterMinutes: 1000 });
+	});
+
+	it("shows «Trackpad through macOS» where the Mac has the switch, and turns it as toggled; nowhere else", async () => {
+		page("Day and timeline");
+		expect(rows("Trackpad through macOS")).toHaveLength(0);
+		const turned: boolean[] = [];
+		await open(START, loggedOut, { on: true, set: (on) => void turned.push(on) });
+		page("Day and timeline");
+		const toggle = rows("Trackpad through macOS")[0].querySelector<HTMLInputElement>("input[type=checkbox]")!;
+		expect(toggle.checked).toBe(true);
+		toggle.click();
+		expect(turned).toEqual([false]);
 	});
 
 	it("writes the hour the day starts at as the dropdown chose it", async () => {

@@ -1,6 +1,7 @@
-import { createHash } from "node:crypto";
-import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { LoadingGuard } from "./LoadingGuard";
+import { type FilesInUse, ModuleFiles } from "./ModuleFiles";
+import type { TrackpadSwitch } from "./TrackpadSwitch";
 
 /** What the engine hears of the fingers (the engine's `FingerSignal`), on the clock of the window it listens in. */
 export type FingerSignal =
@@ -14,16 +15,28 @@ type NativeSignal =
 	| { readonly kind: "up"; readonly at: number; readonly phase: number; readonly lastMove: number | null }
 	| { readonly kind: "momentumEnded"; readonly at: number; readonly phase: number; readonly last: number };
 
+interface AttachStatus {
+	readonly installed: boolean;
+	readonly hook: string;
+	readonly pid: number;
+	readonly build?: string;
+	readonly path?: string;
+}
+
 interface MainLoader {
 	readonly CHANNEL: string;
-	attach(webContentsId: number, addonPath: string): { readonly installed: boolean; readonly path: string; readonly pid: number };
+	attach(webContentsId: number, addonPath: string): AttachStatus;
 	detach(webContentsId: number): void;
 	uptime(): number | null;
+	files(): FilesInUse;
+	firstTime(what: string): boolean;
+	pid(): number;
 }
 
 interface Remote {
 	require(path: string): unknown;
 	getCurrentWebContents(): { readonly id: number };
+	readonly app: { getPath(name: "userData"): string };
 }
 
 interface IpcRenderer {
@@ -31,7 +44,7 @@ interface IpcRenderer {
 	removeListener(channel: string, listener: (event: unknown, signal: NativeSignal) => void): void;
 }
 
-interface Electron {
+export interface Electron {
 	readonly ipcRenderer?: IpcRenderer;
 	readonly remote?: Remote;
 }
@@ -44,12 +57,18 @@ export interface TrackpadModule {
 }
 
 export interface TrackpadHost {
-	/** The plugin's folder on the disk: the module is written there once per build of it. */
-	readonly dir: string;
 	readonly electron: () => Electron;
 	readonly remoteFallback: () => Remote | undefined;
+	readonly switch: TrackpadSwitch;
 	readonly log: (message: string) => void;
+	/** Said to the person once, when the module is set aside for a reason they can act on. */
+	readonly notice: (message: string) => void;
 }
+
+const FALLBACK = "the columns read the trackpad by its scrolling";
+
+export const CRASH_NOTICE = "Task Calendar: the trackpad module is off, as Obsidian quit while loading it. To try it again, turn «Trackpad through macOS» off and on in the settings.";
+export const RESTART_NOTICE = `Task Calendar: restart Obsidian to use the new trackpad module; until then ${FALLBACK}.`;
 
 /** Calls to the main process for the clocks' offset: the one that came back fastest is kept. */
 const CLOCK_SAMPLES = 7;
@@ -60,7 +79,7 @@ const CLOCK_SAMPLES = 7;
  * of the scroll events AppKit hands the window, and the loader sends them to this window by IPC. The moments come in
  * macOS's uptime; each listener gets them on its own window's clock (its wheel events' `timeStamp`), the offset measured
  * once by asking the main process its uptime. `load` answers null wherever this can't be had: not a Mac, no `remote`,
- * the module refused; the ribbon then reads the fingers from the deltas as before.
+ * the module refused or set aside by the crash guard; the ribbon then reads the fingers from the deltas as before.
  */
 export class MacTrackpadFingers {
 	private readonly listeners = new Set<(signal: NativeSignal) => void>();
@@ -85,26 +104,42 @@ export class MacTrackpadFingers {
 			const remote = electron.remote ?? host.remoteFallback();
 			const ipc = electron.ipcRenderer;
 			if (!remote || !ipc) {
-				host.log("trackpad: no remote in this Obsidian, the ribbon reads the fingers from the deltas");
+				host.log(`trackpad: no remote in this Obsidian, ${FALLBACK}`);
 				return null;
 			}
-			const addonPath = written(host.dir, "trackpad", ".node", Buffer.from(module.binary, "base64"));
-			const loaderPath = written(host.dir, "trackpad-main", ".cjs", Buffer.from(module.loader, "utf8"));
-			const loader = remote.require(loaderPath) as MainLoader;
-			const webContentsId = remote.getCurrentWebContents().id;
-			const status = loader.attach(webContentsId, addonPath);
-			const clock = offsetOf(loader, home);
-			if (!status.installed || clock === null) {
-				loader.detach(webContentsId);
-				host.log(`trackpad: the native module did not hook AppKit (installed ${status.installed}), the ribbon reads the fingers from the deltas`);
-				return null;
-			}
-			host.log(`trackpad: native module in the main process (pid ${status.pid}, ${status.path}), clocks read to ±${clock.error.toFixed(2)} ms`);
-			return new MacTrackpadFingers(ipc, loader, webContentsId, clock.offset, home);
+			const files = new ModuleFiles(join(remote.app.getPath("userData"), "task-calendar", "trackpad"), Buffer.from(module.binary, "base64"), Buffer.from(module.loader, "utf8"));
+			const paths = files.write();
+			const loader = remote.require(paths.loader) as MainLoader;
+			const fingers = MacTrackpadFingers.attached(files, paths.addon, loader, ipc, remote, host, home);
+			files.clean(loader.files());
+			return fingers;
 		} catch (error) {
-			host.log(`trackpad: the native module is unavailable (${String(error)}), the ribbon reads the fingers from the deltas`);
+			host.log(`trackpad: the native module is unavailable (${String(error)}), ${FALLBACK}`);
 			return null;
 		}
+	}
+
+	private static attached(files: ModuleFiles, addonPath: string, loader: MainLoader, ipc: IpcRenderer, remote: Remote, host: TrackpadHost, home: Window): MacTrackpadFingers | null {
+		const guard = new LoadingGuard(files.dir, files.build, loader.pid());
+		if (guard.crashedBefore()) {
+			host.switch.skip(files.build);
+			host.notice(CRASH_NOTICE);
+		}
+		if (host.switch.skipped === files.build) {
+			host.log(`trackpad: build ${files.build} took Obsidian down while loading, ${FALLBACK}`);
+			return null;
+		}
+		const webContentsId = remote.getCurrentWebContents().id;
+		const status = guard.around(() => loader.attach(webContentsId, addonPath));
+		const clock = status.installed ? offsetOf(loader, home) : null;
+		if (!status.installed || clock === null) {
+			loader.detach(webContentsId);
+			host.log(`trackpad: the native module did not hook AppKit (${status.hook}), ${FALLBACK}`);
+			if (status.hook === "refused" && loader.firstTime("restart")) host.notice(RESTART_NOTICE);
+			return null;
+		}
+		host.log(`trackpad: native module ${status.build} in the main process (${status.hook}, pid ${status.pid}, ${status.path}), clocks read to ±${clock.error.toFixed(2)} ms`);
+		return new MacTrackpadFingers(ipc, loader, webContentsId, clock.offset, home);
 	}
 
 	listen(win: Window, listener: (signal: FingerSignal) => void): () => void {
@@ -131,19 +166,6 @@ export class MacTrackpadFingers {
 			return;
 		}
 	}
-}
-
-/**
- * The file in the plugin's folder, named by its content: written once, never over a module already loaded (macOS keeps a
- * loaded module's pages mapped, and a rewrite in place would crash the process), so a new build writes a new name.
- */
-function written(dir: string, name: string, extension: string, content: Buffer): string {
-	const path = join(dir, `${name}-${createHash("sha256").update(content).digest("hex").slice(0, 12)}${extension}`);
-	if (existsSync(path) && readFileSync(path).equals(content)) return path;
-	const temporary = `${path}.${process.pid}.tmp`;
-	writeFileSync(temporary, content);
-	renameSync(temporary, path);
-	return path;
 }
 
 function offsetOf(loader: MainLoader, home: Window): { offset: number; error: number } | null {
