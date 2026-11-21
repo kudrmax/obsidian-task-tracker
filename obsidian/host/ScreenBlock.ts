@@ -4,7 +4,7 @@ import type { ScreenContext } from "../ui/engine/port";
 import type { ScreenHost } from "./ScreenHost";
 
 /** The class every note's block of the screen wears: its size and ground (the stylesheet's `.tc-note-block`). */
-export const NOTE_BLOCK = "tc-note-block";
+const NOTE_BLOCK = "tc-note-block";
 
 /**
  * `TaskScreen` at `note` inside a note (F5's block, a project note's view): mounted once loaded, in `context`. The note's

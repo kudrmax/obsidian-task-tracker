@@ -1,30 +1,20 @@
 // @vitest-environment happy-dom
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { DEFAULT_CARD_SIZE } from "../../../core/application/contracts";
-import { clearCardSize, showCardSize, shownCardSize } from "../../../obsidian/ui/paint/cardSize";
+import { afterEach, describe, expect, it } from "vitest";
+import { clearCardSize, showCardSize } from "../../../obsidian/ui/paint/cardSize";
 
 describe("cardSize", () => {
-	afterEach(() => {
-		clearCardSize();
-		vi.restoreAllMocks();
-	});
+	afterEach(() => clearCardSize());
 
-	it("gives the settings' defaults before any size is shown", () => {
-		expect(shownCardSize()).toEqual({ height: DEFAULT_CARD_SIZE.height, gap: DEFAULT_CARD_SIZE.gap });
-	});
-
-	it("gives the size last shown without reading the styles", () => {
-		const style = vi.spyOn(window, "getComputedStyle");
+	it("puts the settings' size on the body, where the tokens built on it live", () => {
 		showCardSize({ height: 44, gap: 6 });
-		for (let i = 0; i < 100; i++) expect(shownCardSize()).toEqual({ height: 44, gap: 6 });
-		expect(style).not.toHaveBeenCalled();
 		expect(document.body.style.getPropertyValue("--tc-card-h")).toBe("44px");
+		expect(document.body.style.getPropertyValue("--tc-card-gap")).toBe("6px");
 	});
 
-	it("goes back to the defaults once cleared", () => {
+	it("takes it off once cleared: the stylesheet's defaults count again", () => {
 		showCardSize({ height: 44, gap: 6 });
 		clearCardSize();
-		expect(shownCardSize()).toEqual({ height: DEFAULT_CARD_SIZE.height, gap: DEFAULT_CARD_SIZE.gap });
 		expect(document.body.style.getPropertyValue("--tc-card-h")).toBe("");
+		expect(document.body.style.getPropertyValue("--tc-card-gap")).toBe("");
 	});
 });

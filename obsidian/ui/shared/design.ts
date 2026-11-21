@@ -115,9 +115,6 @@ export const DURATION = {
 	snap: "--tc-duration-snap",
 } as const;
 
-/** The easings the code animates with, read from styles.css as the durations are. */
-export const EASING = {
-} as const;
 
 /** Measures that only the code uses: thresholds and distances, not drawn. */
 export const LAYOUT = {

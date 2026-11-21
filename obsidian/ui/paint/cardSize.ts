@@ -39,7 +39,3 @@ export function clearCardSize(): void {
 	set = false;
 }
 
-/** The size the cards are drawn at, kept where it is set: a gesture asks for it on every move. */
-export function shownCardSize(): CardSize {
-	return shown;
-}

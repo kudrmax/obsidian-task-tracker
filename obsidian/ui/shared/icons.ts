@@ -69,11 +69,6 @@ export type IconName = keyof typeof DRAWINGS;
 
 export const ICONS: Readonly<Record<IconName, IconSpec>> = DRAWINGS;
 
-/** A name the core hands over (an assistant row's icon) is one of the drawings. */
-export function isIconName(name: string): name is IconName {
-	return Object.prototype.hasOwnProperty.call(DRAWINGS, name);
-}
-
 function path(svg: SVGSVGElement, d: string): SVGPathElement {
 	const shape = document.createElementNS(NS, "path");
 	shape.setAttribute("d", d);
