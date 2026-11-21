@@ -438,7 +438,7 @@ describe("the field's description, projects and new section (task actions spec, 
 		store.getState().toggleProject("Дом");
 		store.getState().toggleProject("Отпуск");
 		const bar = store.getState().entryBar(store.getState().entry!, store.getState().draft, "");
-		expect(bar.projects.filter((o) => o.on).map((o) => o.name)).toEqual(["Дом", "Отпуск"]);
+		expect(bar.project.options.filter((o) => o.on).map((o) => o.name)).toEqual(["Дом", "Отпуск"]);
 		store.getState().commitEntry("Два проекта", true);
 		expect(store.getState().draft.projects).toEqual(["Дом", "Отпуск"]);
 		store.getState().clearProjects();
@@ -469,5 +469,88 @@ describe("the field's description, projects and new section (task actions spec, 
 		store.getState().openEntry({ list: "day", before: null, dayOffset: 0, at: 600 });
 		const bar = store.getState().entryBar(store.getState().entry!, store.getState().draft, "");
 		expect(bar.bar.flatMap((g) => g.actions).map((a) => a.id)).toContain("repeat");
+	});
+});
+
+describe("the Project page and «New project…» (Decision 134), ⌥Tab's offer (Decision 133)", () => {
+	const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+	const firstTask = (p: MockPort) => Object.values(p.read(0).cards).find((c) => !/шаг/.test(c.title))!;
+	const lineOf = (p: MockPort, title: string) => p.fileText().split("\n").find((l) => l.includes(title)) ?? "";
+
+	it("a project's check writes and leaves the menu on its page, the task's check on it", async () => {
+		const p = port();
+		const store = createScreenStore(p);
+		const task = firstTask(p);
+		store.getState().openMenu(task.id);
+		store.getState().menuPage("projects");
+		store.getState().actHere({ kind: "project", name: "Дом" });
+		await wait(5);
+		expect(store.getState().layer?.page).toBe("projects");
+		expect(lineOf(p, task.title)).toContain("🗂️ Дом");
+		const model = store.getState().layer!.model as TaskMenuModel;
+		expect(model.project.options.find((o) => o.name === "Дом")?.on).toBe(true);
+		expect(model.project.none).toBe(false);
+	});
+
+	it("follows the task's fresh id after a check, so the next check finds it (the core's key changes on a write)", async () => {
+		class FreshIds extends MockPort {
+			override async act(...args: Parameters<MockPort["act"]>): Promise<string | null> {
+				await super.act(...args);
+				return `${args[0]}'`;
+			}
+		}
+		const p = new FreshIds(() => NOW);
+		p.delay = 0;
+		const store = createScreenStore(p);
+		const task = firstTask(p);
+		store.getState().openMenu(task.id);
+		store.getState().menuPage("projects");
+		store.getState().actHere({ kind: "project", name: "Дом" });
+		await wait(5);
+		expect(store.getState().layer?.id).toBe(`${task.id}'`);
+	});
+
+	it("New project in the menu: a name of nothing goes back to the projects; a name closes the menu and gives the task the project", async () => {
+		const p = port();
+		const store = createScreenStore(p);
+		const task = firstTask(p);
+		store.getState().openMenu(task.id);
+		store.getState().menuPage("projectName");
+		store.getState().nameMenuProject("  🗂️ ");
+		expect(store.getState().layer?.page).toBe("projects");
+		store.getState().nameMenuProject("Дача");
+		expect(store.getState().layer).toBeNull();
+		await wait(LAYER_MS.close + 20);
+		expect(lineOf(p, task.title)).toContain("🗂️ Дача");
+	});
+
+	it("New project on the bar: Escape and a name of nothing go back to the projects; a name is the field's, even with Enter right after it", async () => {
+		const p = port();
+		p.delay = 30;
+		const store = createScreenStore(p);
+		store.getState().plusTap(["soon", "day"]);
+		store.getState().showEntryPanel("projectName");
+		store.getState().nameEntryProject(null);
+		expect(store.getState().entryPanel).toBe("project");
+		store.getState().showEntryPanel("projectName");
+		store.getState().nameEntryProject(" ");
+		expect(store.getState().entryPanel).toBe("project");
+		store.getState().showEntryPanel("projectName");
+		store.getState().nameEntryProject("Дача");
+		expect(store.getState().entryPanel).toBeNull();
+		store.getState().commitEntry("Сразу Enter", true);
+		await wait(120);
+		expect(lineOf(p, "Сразу Enter")).toContain("🗂️ Дача");
+		expect(store.getState().draft.projects).toEqual(["Дача"]);
+	});
+
+	it("⌥Tab, like the bar's switch, makes no new section where the bar offers none (a rename)", () => {
+		const p = port();
+		const store = createScreenStore(p);
+		const task = firstTask(p);
+		store.getState().openMenu(task.id);
+		store.getState().startRename();
+		store.getState().toggleSection();
+		expect(store.getState().draft.section).toBe(false);
 	});
 });

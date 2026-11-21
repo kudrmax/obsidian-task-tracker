@@ -1,5 +1,5 @@
 import { cardBy } from "../lib/carry.mjs";
-import { menuButton, menuNow } from "../lib/menu.mjs";
+import { centreOf, menuButton, menuNow } from "../lib/menu.mjs";
 
 /**
  * E4's leftovers (F122, F123, F187, F220, F194; Decisions 133, 134): the menu's Project page (the tree, a check that stays,
@@ -114,20 +114,20 @@ export default {
 		}
 
 		if (item === "bar new project") {
-			await tap(await t.cdp.eval(`(() => { const r = document.querySelector(".task-calendar > button.tc-plus").getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`));
+			await tap(await centreOf(t, ".task-calendar > button.tc-plus"));
 			await t.sleep(400);
 			await type("Купить доски");
-			const project = await t.cdp.eval(`(() => { const r = document.querySelector(".tc-bar-project").getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+			const project = await centreOf(t, ".tc-bar-project");
 			await tap(project);
 			await t.sleep(350);
-			const newRow = await t.cdp.eval(`(() => { const r = document.querySelector(".tc-quick-panel .tc-new-project").getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+			const newRow = await centreOf(t, ".tc-quick-panel .tc-new-project");
 			await tap(newRow);
 			await t.sleep(350);
 			t.expect(await focusedIn(".tc-quick-panel .tc-project-name"), "«New project…» on the bar: the name's field in the panel, the caret in it");
 			await t.shot("bar-new-project");
 			await esc();
 			t.expect((await rows(".tc-quick-panel")).at(-1) === "New project…" && (await focusedIn(".tc-entry")), "Escape: back to the projects, the task's field taking the focus back");
-			await tap(await t.cdp.eval(`(() => { const r = document.querySelector(".tc-quick-panel .tc-new-project").getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`));
+			await tap(await centreOf(t, ".tc-quick-panel .tc-new-project"));
 			await t.sleep(350);
 			await type("Дача");
 			await enter();
@@ -137,7 +137,7 @@ export default {
 			t.expect((await t.cdp.eval(`document.activeElement?.textContent`)) === "Купить доски", "what was typed stays");
 			await enter();
 			t.expect((await line("Купить доски")).includes("🗂️ Дача"), `written with the new project: ${await line("Купить доски")}`);
-			await tap(await t.cdp.eval(`(() => { const r = document.querySelector(".tc-bar-project").getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`));
+			await tap(await centreOf(t, ".tc-bar-project"));
 			await t.sleep(350);
 			t.expect((await rows(".tc-quick-panel")).includes("Дача✓"), `the next field keeps it, the tree has it: ${JSON.stringify(await rows(".tc-quick-panel"))}`);
 		}
@@ -149,7 +149,7 @@ export default {
 			await key("Tab", "Tab", 9, 1);
 			t.expect(!(await t.cdp.eval(`!!document.querySelector(".tc-entry .tc-quick-field.is-section")`)), "a rename has no new section: ⌥Tab does nothing");
 			await esc();
-			await tap(await t.cdp.eval(`(() => { const r = document.querySelector(".task-calendar > button.tc-plus").getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`));
+			await tap(await centreOf(t, ".task-calendar > button.tc-plus"));
 			await t.sleep(400);
 			const section = () => t.cdp.eval(`!!document.querySelector(".tc-entry .tc-quick-field.is-section") && !!document.querySelector(".tc-bar-section.is-set")`);
 			await key("Tab", "Tab", 9, 1);

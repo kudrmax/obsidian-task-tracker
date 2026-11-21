@@ -108,8 +108,8 @@ export const QuickBar = memo(function QuickBar({ reach }: { readonly reach: read
 								<ProjectNameField onEnd={(name) => api.getState().nameEntryProject(name)} onLeave={(event) => (keepsTyping(event) ? undefined : api.getState().commitEntry(api.getState().entryText, false))} />
 							) : (
 								<>
-									<ProjectRows projects={bar.projects} onToggle={(name) => api.getState().toggleProject(name)} onNone={() => (api.getState().clearProjects(), close())} />
-									<NewProjectRow onPick={() => setPanel("projectName")} />
+									<ProjectRows page={bar.project} onToggle={(name) => api.getState().toggleProject(name)} onNone={() => (api.getState().clearProjects(), close())} />
+									<NewProjectRow label={bar.project.newLabel} onPick={() => setPanel("projectName")} />
 								</>
 							)}
 						</BarPanel>

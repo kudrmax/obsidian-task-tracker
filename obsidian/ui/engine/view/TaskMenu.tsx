@@ -7,6 +7,7 @@ import { type Asking, type Layer, useScreen, useScreenApi } from "../store";
 import { type BlockLook, CardInsides, PressedLook } from "./Card";
 import { useHost } from "./host";
 import { Icon } from "./Icon";
+import { Row, RowGroup } from "./MenuRows";
 import { NewProjectRow, ProjectNameField, ProjectRows } from "./Projects";
 import { EntryField } from "./QuickAdd";
 import { paintStyle } from "./Timeline";
@@ -177,8 +178,8 @@ function taskGroups(layer: Layer, typing: boolean, model: TaskMenuModel, steps: 
 	if (layer.page === "projects")
 		return [
 			<Row key="back" label="Project" icon="chevronLeft" className="tc-menu-back" lead onPick={() => steps.menuPage("menu")} />,
-			<ProjectRows key="projects" projects={model.projects} onToggle={(name) => steps.actHere({ kind: "project", name })} onNone={() => pick({ kind: "project", name: null })} />,
-			<NewProjectRow key="new" onPick={() => steps.menuPage("projectName")} />,
+			<ProjectRows key="projects" page={model.project} onToggle={(name) => steps.actHere({ kind: "project", name })} onNone={() => pick({ kind: "project", name: null })} />,
+			<NewProjectRow key="new" label={model.project.newLabel} onPick={() => steps.menuPage("projectName")} />,
 		];
 	if (layer.page === "projectName")
 		return [
@@ -290,50 +291,6 @@ export function TileGroup({ kind, rows }: { readonly kind: string; readonly rows
 				</div>
 			))}
 		</div>
-	);
-}
-
-export interface RowSpec {
-	readonly label: string;
-	readonly icon?: IconName;
-	readonly value?: string;
-	readonly disabled?: boolean;
-	/** One of a list to choose from: its check in the accent. */
-	readonly choice?: boolean;
-	readonly quiet?: boolean;
-	/** Takes the focus as it mounts: what asked a question taken back by Cancel. */
-	readonly focus?: boolean;
-	readonly onPick: () => void;
-}
-
-export function RowGroup({ rows }: { readonly rows: readonly RowSpec[] }) {
-	return (
-		<div className="tc-menu-group">
-			{rows.map((row) => (
-				<Row key={row.label} {...row} />
-			))}
-		</div>
-	);
-}
-
-/** A row: the label, a value beside it, the icon on the right; or, as the way back, the icon leading the label. */
-function Row({ label, icon, value, disabled, choice, quiet, focus, onPick, className = "", lead = false }: RowSpec & { readonly className?: string; readonly lead?: boolean }) {
-	const root = className.includes("tc-menu-back") ? className : `tc-menu-row ${className}`;
-	return (
-		<button type="button" role="menuitem" className={`tc-btn ${root}${choice ? " is-choice" : ""}${quiet ? " is-quiet" : ""}`.trim()} disabled={disabled} autoFocus={focus} onClick={onPick}>
-			{lead ? (
-				<>
-					{icon ? <Icon name={icon} /> : null}
-					{label}
-				</>
-			) : (
-				<>
-					<span className="tc-menu-label">{label}</span>
-					{value ? <span className="tc-menu-value">{value}</span> : null}
-					{icon ? <Icon name={icon} /> : null}
-				</>
-			)}
-		</button>
 	);
 }
 

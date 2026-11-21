@@ -1,4 +1,4 @@
-import type { AllDayEvent, Block, CardFace, DayEvent, Destination, Edge, EntryBar, EntryCommit, EntryDraft, EntryField, EventPaint, FieldActionId, ListData, ListId, ListPlaceId, MenuAction, MenuFrom, MenuModel, MenuStatusId, Now, PlaceId, ReminderKind, RenameStart, Row, ScreenData, ScreenPort } from "../ui/engine/port";
+import type { AllDayEvent, Block, CardFace, DayEvent, Destination, Edge, EntryBar, EntryCommit, EntryDraft, EntryField, EventPaint, FieldActionId, ListData, ListId, ListPlaceId, MenuAction, MenuFrom, MenuModel, MenuStatusId, Now, PlaceId, ProjectPage, ReminderKind, RenameStart, Row, ScreenData, ScreenPort } from "../ui/engine/port";
 import { type FieldFacts, fieldBar, type MenuFacts, menuLayout, menuPlaces } from "./actionTable";
 import { bgAlphaFor, eventColors } from "../ui/eventColors";
 import { addDays, CALENDAR_COLORS, DAY_START_HOUR, dateOf, dayOf, fileText, LIST_KEYS, LIST_NAMES, type ListKey, type MockFile, type MockSection, type MockTask, minuteOf, mockFile } from "./mockData";
@@ -264,7 +264,7 @@ export class MockPort implements ScreenPort {
 			bar: fieldBar(facts, lit),
 			levels: LEVELS.map((l) => ({ ...l, on: l.prefix === level })),
 			tint: level && !draft.section ? LEVEL_COLORS[level as "p1" | "p2"] : null,
-			projects: this.projectChoices(draft.projects),
+			project: this.projectPage(draft.projects),
 			where: { id: here, title: title(here) },
 			places: (["inbox", "backlog", "soon", "now", "date"] as const).map((id) => ({ id, title: id === "date" ? "Date" : LIST_NAMES[id], on: id === here })),
 			date: { today, picked: here === "date" || here === "now" ? shownDay : null },
@@ -464,7 +464,7 @@ export class MockPort implements ScreenPort {
 			labels: [],
 			date: { today, picked: task.due, removable: task.due !== null && task.due !== today },
 			places: menuPlaces(facts).map((place) => ({ id: place, title: LIST_NAMES[place], on: place === goes })),
-			projects: this.projectChoices(task.projects ?? []),
+			project: this.projectPage(task.projects ?? []),
 			reminders: REMINDERS.map((kind) => ({ kind, checked: kind === reminder })),
 			peek: task.description,
 			subtasks: from === "calendar" ? task.children.filter((c) => !closed(c)).map((c) => c.id) : [],
@@ -515,8 +515,8 @@ export class MockPort implements ScreenPort {
 	}
 
 	/** What a menu's tap writes, by the plugin's rules, the simplest: a move puts the task at the end of Now (today and before) or Soon, due that day, without its time. */
-	async act(given: string, action: MenuAction, from: MenuFrom = "list"): Promise<void> {
-		if (action.kind === "row") return;
+	async act(given: string, action: MenuAction, from: MenuFrom = "list"): Promise<string | null> {
+		if (action.kind === "row") return given;
 		const shown = this.findBy(this.ahead ?? this.file, (t) => t.id === given)?.task;
 		const id = action.kind === "status" && shown ? this.statusTask(shown, from).id : given;
 		await this.write((file) => {
@@ -555,12 +555,18 @@ export class MockPort implements ScreenPort {
 					return this.putOff(file, task, action.date);
 			}
 		});
+		/** The stand's ids stay through a write; the core's key is fresh after one. */
+		return this.findBy(this.file, (t) => t.id === given) ? given : null;
 	}
 
-	/** The tree in its order, each project on while `on` names it (any case). */
-	private projectChoices(on: readonly string[]) {
+	/** The Project page (the core's `MenuProject`): the tree in its order, each project on while `on` names it (any case), a folder not to be picked unless on. */
+	private projectPage(on: readonly string[]): ProjectPage {
 		const named = new Set(on.map(projectKey));
-		return (this.ahead ?? this.file).projects.map((p) => ({ ...p, on: named.has(projectKey(p.name)) }));
+		const options = (this.ahead ?? this.file).projects.map(({ name, depth, folder }) => {
+			const has = named.has(projectKey(name));
+			return { name, depth, on: has, disabled: folder && !has };
+		});
+		return { options, none: !options.some((option) => option.on), noneLabel: "No project", newLabel: "New project…" };
 	}
 
 	/** A project's check (the core's `toggleProject`): on beside the task's others, or off; a folder takes no task; null: No project. */

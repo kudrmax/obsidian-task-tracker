@@ -1,39 +1,27 @@
-import { type CSSProperties, type FocusEvent, useRef } from "react";
-import { PROPERTY } from "../../design";
-import type { ProjectChoice } from "../port";
-import { Icon } from "./Icon";
+import { type FocusEvent, useRef } from "react";
+import type { ProjectPage } from "../port";
+import { Row, RowGroup } from "./MenuRows";
 import { ObsidianEditor } from "./ObsidianEditor";
 
 /**
- * A Project page's choices, the menu's and the bar's alike (F122, F123, F187; the plugin's `projectChooser`): the tree in
- * its order, a subproject a step further in, a check on each the task has, a folder dim unless the task has it; No
- * project last.
+ * A Project page's choices, the menu's and the bar's alike (F122, F123, F187; the plugin's `projectChooser`), as the port
+ * offers them (the core's `MenuProject`): the tree in its order, a subproject a step further in, a check on each the
+ * task has, one that can't be picked dim; No project last, checked as the page says.
  */
-export function ProjectRows({ projects, onToggle, onNone }: { readonly projects: readonly ProjectChoice[]; readonly onToggle: (name: string) => void; readonly onNone: () => void }) {
+export function ProjectRows({ page, onToggle, onNone }: { readonly page: ProjectPage; readonly onToggle: (name: string) => void; readonly onNone: () => void }) {
 	return (
-		<div className="tc-menu-group">
-			{projects.map((option) => (
-				<button key={option.name} type="button" role="menuitem" className="tc-btn tc-menu-row is-choice tc-project-option" style={{ [PROPERTY.level]: String(option.depth) } as CSSProperties} disabled={option.folder && !option.on} onClick={() => onToggle(option.name)}>
-					<span className="tc-menu-label">{option.name}</span>
-					{option.on ? <Icon name="check" /> : null}
-				</button>
-			))}
-			<button type="button" role="menuitem" className="tc-btn tc-menu-row is-choice is-quiet" onClick={onNone}>
-				<span className="tc-menu-label">No project</span>
-				{projects.some((option) => option.on) ? null : <Icon name="check" />}
-			</button>
-		</div>
+		<RowGroup
+			rows={[
+				...page.options.map((option) => ({ label: option.name, icon: option.on ? ("check" as const) : undefined, choice: true, disabled: option.disabled, depth: option.depth, className: "tc-project-option", onPick: () => onToggle(option.name) })),
+				{ label: page.noneLabel, icon: page.none ? ("check" as const) : undefined, choice: true, quiet: true, onPick: onNone },
+			]}
+		/>
 	);
 }
 
 /** «New project…», apart under the projects as New section is (F220). */
-export function NewProjectRow({ onPick }: { readonly onPick: () => void }) {
-	return (
-		<button type="button" role="menuitem" className="tc-btn tc-menu-row is-apart is-add tc-new-project" onClick={onPick}>
-			<span className="tc-menu-label">New project…</span>
-			<Icon name="plus" />
-		</button>
-	);
+export function NewProjectRow({ label, onPick }: { readonly label: string; readonly onPick: () => void }) {
+	return <Row label={label} icon="plus" className="is-apart is-add tc-new-project" onPick={onPick} />;
 }
 
 /**
@@ -51,10 +39,7 @@ export function ProjectNameField({ onEnd, onLeave }: { readonly onEnd: (name: st
 	};
 	return (
 		<div>
-			<button type="button" role="menuitem" className="tc-btn tc-menu-back" onClick={() => end(null)}>
-				<Icon name="chevronLeft" />
-				New project
-			</button>
+			<Row label="New project" icon="chevronLeft" className="tc-menu-back" lead onPick={() => end(null)} />
 			<div className="tc-menu-group tc-project-name">
 				<ObsidianEditor text="" className="tc-quick-field tc-title-field tc-project-name-field" placeholder="Project name" onEnter={end} onEscape={() => end(null)} onLeave={onLeave ? (event) => (ended.current ? undefined : onLeave(event)) : undefined} />
 			</div>

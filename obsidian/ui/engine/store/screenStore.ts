@@ -284,6 +284,8 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 			const kept = Object.entries(left).filter(([day]) => Math.abs(Number(day) - dayOffset) <= LEFT_KEPT);
 			set({ left: { ...Object.fromEntries(kept), [from]: { shown, read } }, dayOffset, read: next, shown: drawn ? share(drawn.shown, next) : next, fresh: new Set() });
 		};
+		/** «New project…» on the bar being written: Enter or a tap away on the field waits for it (`commitEntry`). */
+		let naming: Promise<void> | null = null;
 		/** Whether the field's bar offers `id` now (the port's answer): Tab, Shift+Tab and ⌥Tab obey the same buttons. */
 		const offers = (id: FieldActionId): boolean => {
 			const { entry, draft, entryText } = get();
@@ -458,7 +460,13 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 			},
 			actHere(action) {
 				const layer = get().layer;
-				if (layer) write(port.act(layer.id, action, layer.from));
+				if (!layer) return;
+				/** The menu stays on its page with the task as the file now has it: the core's key is fresh after a write. */
+				const follow = (id: string | null) => {
+					const now = get().layer;
+					if (id !== null && now && now.id === layer.id && id !== layer.id) set({ layer: { ...now, id } });
+				};
+				write(port.act(layer.id, action, layer.from).then(follow));
 			},
 			nameMenuProject(name) {
 				if (port.blankProjectName(name)) get().menuPage("projects");
@@ -503,12 +511,15 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 				const back = name === null || port.blankProjectName(name);
 				set({ entryPanel: back ? "project" : null, entrySeq: get().entrySeq + 1 });
 				if (back) return;
-				write(
-					port.newProject(name).then((made) => {
-						const { entry, draft } = get();
-						if (made !== null && entry && !draft.projects.includes(made)) set({ draft: { ...draft, projects: [...draft.projects, made] } });
-					}),
-				);
+				const made = port.newProject(name).then((project) => {
+					const { entry, draft } = get();
+					if (project !== null && entry && !draft.projects.includes(project)) set({ draft: { ...draft, projects: [...draft.projects, project] } });
+				});
+				naming = made;
+				void made.finally(() => {
+					if (naming === made) naming = null;
+				});
+				write(made);
 			},
 			openDescription() {
 				const { entry, draft } = get();
@@ -547,6 +558,13 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 			commitEntry(text, next) {
 				const { entry, draft, shown } = get();
 				if (!entry) return;
+				/** A new project still being made for this field: the task is written once the field has it, by the field as it then stands. */
+				if (naming) {
+					void naming.then(() => {
+						if (get().entry === entry) get().commitEntry(text, next);
+					});
+					return;
+				}
 				const done = port.commit(entry, text, draft, next);
 				const face = done.face;
 				set({

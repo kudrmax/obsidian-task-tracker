@@ -208,7 +208,7 @@ export interface EntryBar {
 	readonly levels: readonly LevelTile[];
 	readonly tint: string | null;
 	/** The Project page: the tree, each project checked while the field has it, folders not to be chosen. */
-	readonly projects: readonly ProjectChoice[];
+	readonly project: ProjectPage;
 	/** What the place button shows, and the places its panel offers. */
 	readonly where: { readonly id: PlaceId; readonly title: string } | null;
 	readonly places: readonly { readonly id: PlaceId; readonly title: string; readonly on: boolean }[];
@@ -216,12 +216,20 @@ export interface EntryBar {
 	readonly date: { readonly today: string; readonly picked: string | null };
 }
 
-/** A project of a Project page (the bar's and the menu's), the tree in its order: how deep, whether the task has it, whether it is a folder (no task's own). */
+/** A project of a Project page (the bar's and the menu's), the tree in its order (the core's `MenuProjectOption`): how deep, whether the task has it, whether it can't be picked (a folder it hasn't). */
 export interface ProjectChoice {
 	readonly name: string;
 	readonly depth: number;
 	readonly on: boolean;
-	readonly folder: boolean;
+	readonly disabled: boolean;
+}
+
+/** A Project page as the core's `MenuProject` offers it: the choices, whether No project is checked, the words of No project and «New project…». */
+export interface ProjectPage {
+	readonly options: readonly ProjectChoice[];
+	readonly none: boolean;
+	readonly noneLabel: string;
+	readonly newLabel: string;
 }
 
 /** Where a task's menu is opened from: a list's card, a calendar's block, a card of a block's stack in its menu (F107). */
@@ -263,7 +271,7 @@ export interface TaskMenuModel {
 	/** Pick a date's list tiles above the month (the core's `places`), each on while the task goes there; none for a subtask. */
 	readonly places: readonly { readonly id: ListPlaceId; readonly title: string; readonly on: boolean }[];
 	/** The Project page (F122, F123): the tree, each project checked while the task has it, folders not to be chosen. */
-	readonly projects: readonly ProjectChoice[];
+	readonly project: ProjectPage;
 	/** The Reminder page's kinds, the task's own checked. */
 	readonly reminders: readonly { readonly kind: ReminderKind; readonly checked: boolean }[];
 	/** The start of the task's description, over its copy (markdown); null without one. */
@@ -357,6 +365,10 @@ export interface ScreenPort {
 	newProject(name: string): Promise<string | null>;
 	/** What the menu of the task or event `id` offers, opened `from` there. */
 	menu(id: string, from: MenuFrom): MenuModel;
-	/** Writes what was tapped in the menu of `id` opened `from` there (a status tile of a folded block writes its step); resolves once written and read back. */
-	act(id: string, action: MenuAction, from?: MenuFrom): Promise<void>;
+	/**
+	 * Writes what was tapped in the menu of `id` opened `from` there (a status tile of a folded block writes its step);
+	 * resolves once written and read back, to the task's id as the file now has it (the core's key is fresh after a
+	 * write, so a menu left open on its page goes on with it), null once it is gone.
+	 */
+	act(id: string, action: MenuAction, from?: MenuFrom): Promise<string | null>;
 }
