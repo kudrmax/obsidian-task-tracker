@@ -157,8 +157,8 @@ function specificity(selector: string): Weight {
 /** The classes the code gives its buttons, and none it also gives another element. */
 const BUTTON_CLASSES = (() => {
 	const classes = (pattern: RegExp) => new Set(code.files.flatMap(({ text }) => [...text.matchAll(pattern)].flatMap((m) => m[1].split(/\s+/))).filter((name) => name.startsWith("tc-")));
-	const onButtons = classes(/(?:"button", ["`]|\bcls: ["`])([^"`$]+)/g);
-	const onOthers = classes(/"(?:div|span)", ["`]([^"`$]+)/g);
+	const onButtons = classes(/(?:"button", ["`]|\bcls: ["`]|<button\b[^>]*?\bclassName=\{?["`])([^"`$]+)/g);
+	const onOthers = classes(/(?:"(?:div|span)", ["`]|<(?:div|span)\b[^>]*?\bclassName=\{?["`])([^"`$]+)/g);
 	return new Set([...onButtons].filter((name) => !onOthers.has(name)));
 })();
 
@@ -337,17 +337,17 @@ describe("styles.css keeps to its design system", () => {
 		expect(offenders).toEqual([]);
 	});
 
-	it("gives the bottom row one shadow: the wheel, the round buttons (the plus, the plus under the finger, Undo) and the desktop capsule", () => {
+	it("gives the bottom row one shadow: the round buttons (the plus, the plus under the finger, Undo) and the desktop capsule", () => {
 		const shadowOf = (element: string) =>
 			sheet.rules.filter((d) => d.property === "box-shadow" && d.selector.split(/,(?![^(]*\))/).some((s) => s.trim() === element)).map((d) => d.value);
-		for (const element of [".tc-seg", ":is(button, div).tc-btn.is-round.is-accent", ":is(button, div).tc-btn.is-round.is-plain", ".tc-quick-bar.is-desk::before"])
+		for (const element of [":is(button, div).tc-btn.is-round.is-accent", ":is(button, div).tc-btn.is-round.is-plain", ".tc-quick-bar.is-desk::before"])
 			expect(shadowOf(element), element).toEqual(["var(--tc-shadow-control)"]);
 	});
 
-	it("draws the menus, the description's peek and the sources window as one window", () => {
+	it("draws the menus as one window, its shadow the level's", () => {
 		const of = (element: string, property: string) =>
 			sheet.rules.filter((d) => d.property === property && d.selector.split(/,(?![^(]*\))/).some((s) => s.trim() === element)).map((d) => d.value);
-		for (const element of [".tc-panel", ".tc-desc-peek", ".tc-popover"]) {
+		for (const element of [".tc-panel"]) {
 			expect(of(element, "background"), element).toEqual(["var(--tc-panel-bg)"]);
 			expect(of(element, "box-shadow"), element).toEqual(["var(--tc-shadow-panel)"]);
 		}
@@ -358,25 +358,6 @@ describe("styles.css keeps to its design system", () => {
 	it("draws the cards at the settings' default size until the settings set theirs", () => {
 		expect(sheet.tokens.get("--tc-card-h")).toBe(`${DEFAULT_CARD_SIZE.height}px`);
 		expect(sheet.tokens.get("--tc-card-gap")).toBe(`${DEFAULT_CARD_SIZE.gap}px`);
-	});
-
-	it("runs a list to the bottom under its foot and the fade, its end room a row rather than padding, the lists fading as the day does", () => {
-		const of = (selector: string) => new Map(sheet.rules.filter((d) => d.selector === selector).map((d) => [d.property, d.value]));
-		expect(of(".tc-left, .tc-soon, .tc-inbox, .tc-done")).toEqual(new Map([["display", "flex"], ["flex-direction", "column"]]));
-		const list = of(".tc-list");
-		expect([list.get("flex"), list.get("min-height")]).toEqual(["1 1 0", "0"]);
-		expect([...list.keys()].filter((property) => property.startsWith("padding"))).toEqual([]);
-		expect(of(".tc-list > *").get("flex-shrink")).toBe("0");
-		expect([of(".tc-list::after").get("flex-shrink"), of(".tc-list::after").get("height")]).toEqual(["0", "var(--tc-foot-fade-day)"]);
-		expect(of(".task-calendar > .tc-fade").get("height")).toBe("var(--tc-foot-fade-day)");
-		expect(of(".task-calendar:is(.is-lists, .is-inbox) > .tc-fade").size).toBe(0);
-		expect(sheet.tokens.get("--tc-nav-room")).toBe("max(0px, var(--view-bottom-spacing, 0px))");
-	});
-
-	it("lets the foot fade give way while a task is typed, so a field at the end of a column shows whole: down to the status bar on the desktop, behind the bar on the phone", () => {
-		const of = (selector: string) => new Map(sheet.rules.filter((d) => d.selector === selector).map((d) => [d.property, d.value]));
-		expect(of("body:not(.is-mobile) .task-calendar.is-entering > .tc-fade").get("height")).toBe("var(--tc-chrome-room)");
-		expect(of("body.is-mobile .task-calendar.is-entering > .tc-fade").get("height")).toBe("calc(var(--tc-bar-h) + var(--tc-bar-stand))");
 	});
 
 	it("keeps the phone's foot fade off the keyboard's slide: only the bar rides it, so the fade's eased height never sweeps a dark band over the screen", () => {
@@ -392,15 +373,6 @@ describe("styles.css keeps to its design system", () => {
 		expect(dot.get("background")).toBe("var(--tc-muted)");
 		expect(of("[data-priority] .tc-progress-dot, .tc-quick-row:has(> [data-priority]) > .tc-progress-dot").get("background")).toBe("var(--tc-priority-meta)");
 		expect(sheet.tokens.get("--tc-progress-dot")).toBe("4px");
-	});
-
-	it("tints a dragged card's repeat mark as its month, over the float's own ground", () => {
-		const listed = (d: Declaration, selector: string) => d.selector.split(",").some((part) => part.trim() === selector);
-		const of = (selector: string) => new Map(sheet.rules.filter((d) => listed(d, selector)).map((d) => [d.property, d.value]));
-		expect(of(".tc-float .tc-due-repeat").get("color")).toBe("var(--tc-float-month)");
-		expect(of(".tc-float .tc-due-mon").get("color")).toBe("var(--tc-float-month)");
-		const order = (selector: string) => sheet.rules.findIndex((d) => listed(d, selector));
-		expect(order(".tc-float .tc-due-repeat")).toBeGreaterThan(order("[data-priority] .tc-due-repeat"));
 	});
 
 	it("shows a label of a row of four tiles whole while it fits the tile and its gap; a longer one fades as in any tile", () => {
@@ -419,10 +391,10 @@ describe("styles.css keeps to its design system", () => {
 	 */
 	it("never lets the browser scroll the screen or a column sideways to bring a field into sight: they clip, they do not scroll", () => {
 		const of = (selector: string) => sheet.rules.filter((d) => d.selector === selector && d.property.startsWith("overflow")).map((d) => `${d.property}: ${d.value}`);
-		for (const selector of ["body .workspace-leaf-content .view-content.tc-view", ".task-calendar", ".tc-left", ".tc-soon", ".tc-inbox", ".tc-done", ".tc-right"]) {
+		for (const selector of ["body .workspace-leaf-content .view-content.tc-view", ".task-calendar"]) {
 			expect(of(selector), selector).toEqual(["overflow: clip"]);
 		}
-		const strip = /^\.task-calendar(\.[\w-]+)*( > [^ ,]+)?$|^\.tc-(left|soon|inbox|done|right|projects)$/;
+		const strip = /^\.task-calendar(\.[\w-]+)*( > [^ ,]+)?$/;
 		expect(sheet.rules.filter((d) => strip.test(d.selector) && d.property.startsWith("overflow") && d.value !== "clip")).toEqual([]);
 	});
 
@@ -437,15 +409,13 @@ describe("styles.css keeps to its design system", () => {
 		expect(field.map((d) => `${d.selector} { ${d.property}: ${d.value} }`)).toEqual(field.map((d) => `${d.selector} { ${d.property}: clip }`));
 	});
 
-	it("stands the switch and the plus in one row over Obsidian's chrome: the phone's navigation, or the desktop's status bar while it is shown", () => {
+	it("stands the plus and Undo in one row over Obsidian's chrome: the phone's navigation, or the desktop's status bar while it is shown", () => {
 		const of = (selector: string) => new Map(sheet.rules.filter((d) => d.selector === selector).map((d) => [d.property, d.value]));
 		expect(sheet.tokens.get("--tc-status-room")).toBe("0px");
 		expect(sheet.tokens.get("--tc-chrome-room")).toBe("calc(var(--tc-nav-room) + var(--tc-status-room))");
 		expect(of("body:not(.is-mobile).tc-status-bar-shown").get("--tc-status-room")).toBe("var(--tc-status-bar)");
-		const seg = of(".task-calendar > .tc-seg");
-		const row = of(".task-calendar > button.tc-plus, .task-calendar > .tc-plus-ring, .task-calendar > .tc-capsule, .task-calendar > button.tc-select-btn");
+		const row = of(".task-calendar > button.tc-plus, .task-calendar > .tc-plus-ring, .task-calendar > .tc-capsule");
 		const plus = of(".task-calendar > button.tc-plus, .task-calendar > .tc-plus-ring");
-		expect(seg.get("bottom")).toBe("calc(var(--tc-chrome-room) + var(--tc-foot-gap) - var(--tc-keyboard-room))");
 		expect(row.get("bottom")).toBe("calc(var(--tc-chrome-room) + var(--tc-foot-gap) + (var(--tc-wheel) - var(--tc-plus-size)) / 2 - var(--tc-keyboard-room))");
 		expect(plus.get("right")).toBe("var(--tc-space-16)");
 		expect(of(".tc-quick-bar").get("bottom")).toBe("var(--tc-bar-bottom)");
@@ -460,14 +430,6 @@ describe("styles.css keeps to its design system", () => {
 		const hidden = sheet.rules.find((d) => d.selector.includes(".mobile-toolbar") && d.property === "display");
 		expect(hidden?.selector).toBe("body.is-mobile:has(.task-calendar.is-entering) :is(.mobile-toolbar, .mobile-toolbar-spacer)");
 		expect(hidden?.value).toBe("none");
-	});
-
-	it("stands the phone's search bar on the keyboard while it is up, over Obsidian's navigation only while it is down", () => {
-		expect(sheet.tokens.get("--tc-search-bottom")).toBe("calc(var(--tc-bar-bottom) + var(--tc-nav-room))");
-		const up = sheet.rules.find((d) => d.property === "--tc-search-bottom");
-		expect(up?.selector).toBe(".task-calendar.is-keyboard-up > .tc-search");
-		expect(up?.value).toBe("var(--tc-bar-bottom)");
-		expect(sheet.rules.find((d) => d.selector === ".tc-search-bar" && d.property === "bottom")?.value).toBe("var(--tc-search-bottom)");
 	});
 
 	it("lifts each shift button over the bar's ground, as the desktop dissolves their group into the bar", () => {
@@ -489,10 +451,10 @@ describe("styles.css keeps to its design system", () => {
 		expect(room[0]).toContain(`.${STATUS_BAR_SHOWN}`);
 	});
 
-	it("stands the switch, the plus and Undo as on the screen without the phone keyboard, so it uncovers them in place", () => {
+	it("stands the plus and Undo as on the screen without the phone keyboard, so it uncovers them in place", () => {
 		const of = (selector: string) => new Map(sheet.rules.filter((d) => d.selector === selector).map((d) => [d.property, d.value]));
 		expect(sheet.tokens.get("--tc-keyboard-room")).toBe("var(--keyboard-height, 0px)");
-		expect(of(".task-calendar > button.tc-plus, .task-calendar > .tc-plus-ring, .task-calendar > .tc-capsule, .task-calendar > button.tc-select-btn").get("bottom")).toMatch(/- var\(--tc-keyboard-room\)\)$/);
+		expect(of(".task-calendar > button.tc-plus, .task-calendar > .tc-plus-ring, .task-calendar > .tc-capsule").get("bottom")).toMatch(/- var\(--tc-keyboard-room\)\)$/);
 	});
 
 	it("reads the hour only on the canvas", () => {
@@ -513,10 +475,7 @@ describe("the code keeps to the design system", () => {
 		expect([...read].filter((name) => !new RegExp(`(?<![\\w-])${name}(?![\\w-])`).test(written))).toEqual([]);
 	});
 
-	it("hides by the plugin's own classes, never by an inline style, and calls the DOM helper by its name", () => {
-		const of = (selector: string) => new Map(sheet.rules.filter((d) => d.selector === selector).map((d) => [d.property, d.value]));
-		expect(of(".task-calendar > .tc-hidden").get("display")).toBe("none");
-		expect(of(".tc-invisible").get("visibility")).toBe("hidden");
+	it("hides nothing by an inline style, and calls the DOM helper by its name", () => {
 		const offenders = code.files.flatMap(({ path, text }) => (/\.style\.(display|visibility) =|\bel as \w+/.test(text) ? [path] : []));
 		expect(offenders).toEqual([]);
 	});

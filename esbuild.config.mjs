@@ -6,7 +6,6 @@ import path from "node:path";
 const { version } = JSON.parse(await readFile("manifest.json", "utf8"));
 
 const production = process.argv.includes("production");
-const demo = process.argv.includes("demo");
 /** `--outfile=<path>`: the build written elsewhere, as tests/build.test.ts loads it. */
 const outfile = process.argv.find((arg) => arg.startsWith("--outfile="))?.slice("--outfile=".length) ?? "main.js";
 
@@ -32,7 +31,7 @@ const eventsInWindow = {
 };
 
 const context = await esbuild.context({
-  entryPoints: [demo ? "obsidian/demo.ts" : "obsidian/main.ts"],
+  entryPoints: ["obsidian/main.ts"],
   bundle: true,
   external: ["obsidian", "electron", "@codemirror/state", "@codemirror/view", ...builtinModules, ...builtinModules.map((name) => `node:${name}`)],
   // The agent SDK calls createRequire(import.meta.url) as it loads; a cjs bundle has no import.meta.

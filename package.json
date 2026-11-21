@@ -6,7 +6,6 @@
 	"scripts": {
 		"build": "tsc --noEmit && node esbuild.config.mjs production && node core/build.mjs && node agent/build.mjs",
 		"dev": "node esbuild.config.mjs",
-		"build:demo": "tsc --noEmit && node esbuild.config.mjs production demo",
 		"test": "vitest run",
 		"test:apple": "swift test --package-path apple/Core",
 		"build:stand": "node scripts/build-stand.mjs",

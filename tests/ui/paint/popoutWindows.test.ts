@@ -31,11 +31,11 @@ describe("a popout window draws as the main one", () => {
 	});
 });
 
-/** A listener on the main window's `document` or `window` never hears a popout window: the screen and a note's block listen to their own. */
-describe("the screen listens to its own window", () => {
-	const files = ["CalendarScreen.ts", "ViewWatch.ts", "drag/DragController.ts", "drag/GroupDrag.ts", "quick/QuickEntryController.ts", "menu/Overlay.ts", "menu/TaskMenu.ts", "full/FullScreen.ts"];
+/** A listener on the main window's `document` or `window` never hears a popout window: the host's leaf and a note's block listen to their own (the engine's own guard keeps it from listening by hand at all). */
+describe("the host listens to its own window", () => {
+	const files = ["ScreenLeaf.ts", "ScreenBlock.ts", "NoteBlocks.ts", "ViewWatch.ts"];
 	it.each(files)("%s", (file) => {
-		const source = readFileSync(join(process.cwd(), "obsidian/ui", file), "utf8");
+		const source = readFileSync(join(process.cwd(), "obsidian/host", file), "utf8");
 		expect(source).not.toMatch(/registerDomEvent\((document|window),|\b(document|window)\.(add|remove)EventListener|\bdocument\.(hidden|activeElement|body)/);
 	});
 });
