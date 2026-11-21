@@ -44,7 +44,7 @@ const towardCalendar = (at: number): number => Math.min(1, Math.max(0, at - offs
 
 export function dayColumnWidth(at: number): string {
 	const toward = towardCalendar(at);
-	return `calc(${COLUMN_SHARE}% + ${toward} * (var(--tc-list-width) + var(--tc-divider) / 2 - ${COLUMN_SHARE}%))`;
+	return `calc(${COLUMN_SHARE}% + ${toward} * (var(--tc-ribbon-list-width) + var(--tc-divider) / 2 - ${COLUMN_SHARE}%))`;
 }
 
 /**
@@ -68,16 +68,17 @@ const pxOf = (place: number, w: PlaceWidths): number => (place <= CALENDAR ? pla
 const placeOfPx = (px: number, w: PlaceWidths): number => (px <= CALENDAR * w.stop ? px / w.stop : CALENDAR + (px - CALENDAR * w.stop) / w.day);
 
 /**
- * The px a place counts for a stroke `moved` px on from `base` (places): each place as wide as it is drawn, so the columns
- * and the day's pages stay under the fingers on either side of the calendar, whatever width the divider gave the list.
+ * The place `px` of fingers on from `base`, each place as wide as it is drawn, so the columns and the day's pages stay
+ * under the fingers on either side of the calendar, whatever width the divider gave the list. On one side it is the
+ * pager's own count, `base + px / width`.
  */
-export function strokeWidth(base: number, moved: number, w: PlaceWidths): number {
+export function placesAfter(base: number, px: number, w: PlaceWidths): number {
 	const edge = CALENDAR * w.stop;
 	const from = pxOf(base, w);
-	const to = from + moved;
-	if (from <= edge && to <= edge) return w.stop;
-	if (from >= edge && to >= edge) return w.day;
-	return moved / (placeOfPx(to, w) - base);
+	const to = from + px;
+	if (from <= edge && to <= edge) return base + px / w.stop;
+	if (from >= edge && to >= edge) return base + px / w.day;
+	return placeOfPx(to, w);
 }
 
 /** The px a place counts for a landing from `from` to `to`: a day's past the calendar, else a stop's. */

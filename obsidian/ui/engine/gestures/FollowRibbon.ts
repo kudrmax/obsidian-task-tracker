@@ -1,8 +1,7 @@
 import { useGesture, useWheel } from "@use-gesture/react";
 import { animate, type AnimationPlaybackControls, type MotionValue, useMotionValue, useTransform } from "motion/react";
 import { createContext, type RefObject, useEffect, useRef, useState } from "react";
-import { DESIGN } from "../../design";
-import { CALENDAR, landingWidth, type PlaceWidths, placeOf, standAt, strokeWidth } from "../layout/columns";
+import { CALENDAR, landingWidth, type PlaceWidths, placeOf, placesAfter, standAt } from "../layout/columns";
 import { useScreen, useScreenApi } from "../store";
 import { type ChangeTiming, changeLook, changeTiming, type DayChange } from "./dayChange";
 import { FollowPager, LANDING, landingAt, landingVelocity } from "./followPager";
@@ -69,7 +68,7 @@ const sameDays = (a: readonly number[], b: readonly number[]) => a.length === b.
  * @use-gesture's wheel end, its 140 ms of quiet, lets go fingers that stopped without momentum). Both read the one gesture
  * slot; the stop the store keeps is where the strip lands.
  */
-export function useFollowRibbon(ribbon: RefObject<HTMLElement | null>, win: Window, fingers: TrackpadFingers | null): FollowGestures {
+export function useFollowRibbon(ribbon: RefObject<HTMLElement | null>, calendar: RefObject<HTMLElement | null>, win: Window, fingers: TrackpadFingers | null): FollowGestures {
 	const api = useScreenApi();
 	const stop = useScreen((s) => s.stop);
 	const dayOffset = useScreen((s) => s.dayOffset);
@@ -119,15 +118,19 @@ export function useFollowRibbon(ribbon: RefObject<HTMLElement | null>, win: Wind
 	/** The finger's movement so far in this drag, px on: the pager takes it piece by piece. */
 	const drawn = useRef(0);
 
-	/** Half the ribbon: one column, the way a step goes (the browser's width of the ribbon, read as a stroke moves, as @use-gesture's pager example reads the window's). */
-	const column = () => (ribbon.current?.clientWidth ?? 0) / 2;
-	/** A place's width: a stop's step, and past the calendar the day list's column as the divider set it (its list and its half of the divider). */
+	/**
+	 * A place's width as the browser draws it (the ribbon's width read as a stroke moves, as @use-gesture's pager example reads the window's): a stop's step, half the ribbon; past the calendar a day, the day list's
+	 * column, all the ribbon but the calendar, which keeps its width at the calendar all the way (Decision 131).
+	 */
 	const widths = (): PlaceWidths => {
 		const view = ribbon.current?.clientWidth ?? 0;
-		return { stop: view / 2, day: api.getState().listWidths(view).width + DESIGN.dividerWidth / 2 };
+		return { stop: view / 2, day: view - (calendar.current?.clientWidth ?? view / 2) };
 	};
-	/** Where this stroke began, in places, and how far the fingers drew it, px on. */
-	const stroke = useRef({ base: 0, moved: 0 });
+	/** The fingers' pixels as places, each place as wide as it is drawn. */
+	const scale = () => {
+		const w = widths();
+		return { after: (base: number, px: number) => placesAfter(base, px, w) };
+	};
 
 	/**
 	 * The days to draw: those in sight now and those a finger can bring into sight from the place the ribbon stands at or
@@ -200,7 +203,6 @@ export function useFollowRibbon(ribbon: RefObject<HTMLElement | null>, win: Wind
 		landing.current = false;
 		settle();
 		pager.current.begin(along.get(), fresh);
-		stroke.current = { base: along.get(), moved: 0 };
 		standAt(screen, pager.current.stop);
 		draw(true);
 		return true;
@@ -208,13 +210,12 @@ export function useFollowRibbon(ribbon: RefObject<HTMLElement | null>, win: Wind
 
 	const move = (px: number) => {
 		if (!pager.current.following) return;
-		stroke.current.moved += px;
-		along.set(pager.current.move(px, strokeWidth(stroke.current.base, stroke.current.moved, widths())));
+		along.set(pager.current.move(px, scale()));
 	};
 
 	const release = (speed: number) => {
 		if (!pager.current.following) return;
-		const to = pager.current.release(along.get(), speed, column());
+		const to = pager.current.release(along.get(), speed, scale());
 		const screen = api.getState();
 		standAt(screen, to);
 		screen.release("ribbon");

@@ -3,7 +3,7 @@ import type { DividerStop, ListWidths } from "../ui/engine/port";
 /**
  * The core's divider rule (`core/application/listWidth.ts`: `LIST_WIDTHS`, `listWidths`, `listShareOf`, `DIVIDER_SNAP`,
  * `dividerAt`) served by the stand, which may not import the core, by the same values; `CorePort` serves the core's own in
- * the plan's step 5 and this file goes. `tests/ui/engine/standListWidths.test.ts` holds it to the core's.
+ * the plan's step 5 and this file goes. `tests/ui/engine/divider.test.ts` holds it to the core's.
  */
 export const LIST_BOUNDS = { min: 110, max: 280 } as const;
 const SNAP = { distance: 8, slowSpeed: 0.08 } as const;

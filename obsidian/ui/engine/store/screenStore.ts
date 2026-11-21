@@ -1,7 +1,7 @@
 import { DESIGN } from "../../design";
 import { createStore, type StoreApi } from "zustand/vanilla";
 import { LAYER_MS } from "../layers/motion";
-import type { Destination, DividerStop, Edge, ListWidths, EntryBar, EntryDraft, EntryField, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, MenuStatusId, ScreenData, ScreenPort } from "../port";
+import type { Destination, DividerStop, Edge, EntryBar, EntryDraft, EntryField, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, MenuStatusId, ScreenData, ScreenPort } from "../port";
 import { share } from "./share";
 
 /** Where the ribbon stands: Inbox–Soon, Soon–the day, the day–its calendar. */
@@ -88,8 +88,8 @@ export interface ScreenState {
 	readonly zoom: Zoom;
 	/** The day list's share of the columns beside the calendar, as the divider set it (F51–F53): kept on the device by the host. */
 	readonly listShare: number;
-	/** The divider steps into the middle or out of it: the list's width glides there (F52) instead of following at once. */
-	readonly listGlide: boolean;
+	/** The divider is dragged and no step into the middle or out of it glides now: the list's width follows the hand at once; else a change glides (F52). */
+	readonly listFollow: boolean;
 	/** The list's bounds on a phone (the port's): the stylesheet draws a kept share within them as the window changes. */
 	readonly listBounds: { readonly min: number; readonly max: number };
 	/** The calendar's selected task: its two dots show, to resize it (F102); a tap elsewhere lets it go. */
@@ -167,11 +167,11 @@ export interface ScreenActions {
 	setPlusAt(at: { readonly into: ListId; readonly index: number } | null): void;
 	setPlusMinute(minute: number | null): void;
 	setZoom(zoom: Zoom): void;
-	/** The day list beside the calendar in a ribbon `viewWidth` wide, as the port's rule draws the share: its width, bounds and middle. */
-	listWidths(viewWidth: number): ListWidths;
+	/** The list's width that puts the divider in the middle of a ribbon `viewWidth` wide (the port's rule). */
+	dividerMiddle(viewWidth: number): number;
 	/** The divider dragged to make the list `wanted` wide at `speed` px/ms: where the port's rule stands it, the share set to it. */
 	dragDivider(wanted: number, viewWidth: number, speed: number): DividerStop;
-	glideList(glide: boolean): void;
+	followList(follow: boolean): void;
 	/** The edge the carried card heads into (`room:edge`; null: none): a new one waits a quarter second before it may scroll. */
 	scrollToward(edge: string | null): void;
 	/** A minute of the day as the clock writes it (the port's): «14:15». */
@@ -313,10 +313,10 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 			plusMinute: null,
 			zoom,
 			listShare,
-			listGlide: false,
+			listFollow: false,
 			listBounds: port.listBounds,
-			listWidths(viewWidth) {
-				return port.listWidths(get().listShare, viewWidth, DESIGN.dividerWidth);
+			dividerMiddle(viewWidth) {
+				return port.listWidths(get().listShare, viewWidth, DESIGN.dividerWidth).center;
 			},
 			dragDivider(wanted, viewWidth, speed) {
 				const stop = port.dividerAt(wanted, port.listWidths(get().listShare, viewWidth, DESIGN.dividerWidth), speed);
@@ -324,8 +324,8 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 				if (next !== get().listShare) set({ listShare: next });
 				return stop;
 			},
-			glideList(glide) {
-				if (get().listGlide !== glide) set({ listGlide: glide });
+			followList(follow) {
+				if (get().listFollow !== follow) set({ listFollow: follow });
 			},
 			scrollArmed: false,
 			scrollToward(edge) {

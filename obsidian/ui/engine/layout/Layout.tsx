@@ -1,4 +1,5 @@
 import { type CSSProperties, memo, type PointerEvent, type ReactNode, type RefObject, useContext, useRef } from "react";
+import { DESIGN } from "../../design";
 import { useDivider } from "../gestures/Divider";
 import { DayTurnContext, type FollowGestures, useFollowRibbon } from "../gestures/FollowRibbon";
 import { RibbonTrack, StripColumn, StripRule } from "../gestures/RibbonTrack";
@@ -48,8 +49,9 @@ export const Layout = memo(function Layout({ place }: { readonly place: Place })
  */
 function RibbonColumns() {
 	const ribbon = useRef<HTMLDivElement>(null);
+	const calendar = useRef<HTMLElement>(null);
 	const { win, fingers } = useHost();
-	const { at, turn, bind } = useFollowRibbon(ribbon, win, fingers);
+	const { at, turn, bind } = useFollowRibbon(ribbon, calendar, win, fingers);
 	return (
 		<div className="tc-ribbon" ref={ribbon} {...bind()}>
 			<DayTurnContext.Provider value={turn}>
@@ -59,8 +61,8 @@ function RibbonColumns() {
 					<ListColumn list="soon" />
 					<ColumnRule at={at} stop="soon" />
 					<TurningDayColumn at={at} />
-					<ListDivider at={at} ribbon={ribbon} />
-					<CalendarColumn />
+					<ListDivider at={at} ribbon={ribbon} calendar={calendar} />
+					<CalendarColumn ref={calendar} />
 				</RibbonTrack>
 			</DayTurnContext.Provider>
 		</div>
@@ -90,34 +92,32 @@ function TurningDayColumn({ at }: { readonly at: RibbonAt }) {
 }
 
 /**
- * The share the divider set, its glide and the port's bounds, on the two columns it divides: the stylesheet draws the
- * list's width from them (`--tc-list-width`), the calendar taking the rest.
+ * The share the divider set and the port's bounds, on the two columns it divides: the stylesheet draws the list's
+ * width from them (`--tc-ribbon-list-width`, the one place it is worked out), the calendar taking the rest; while the
+ * hand drags the divider it follows at once, else a change glides.
  */
-function useListWidth(): CSSProperties {
+function useListWidth(): { readonly style: CSSProperties; readonly follow: string } {
 	const share = useScreen((s) => s.listShare);
 	const { min, max } = useScreen((s) => s.listBounds);
-	return { "--tc-list-share": share, "--tc-list-least": `${min}px`, "--tc-list-most": `${max}px` } as CSSProperties;
+	const follow = useScreen((s) => s.listFollow);
+	return { style: { "--tc-ribbon-list-share": share, "--tc-ribbon-list-least": `${min}px`, "--tc-ribbon-list-most": `${max}px` } as CSSProperties, follow: follow ? " is-following" : "" };
 }
-
-const gliding = (glide: boolean) => (glide ? " is-gliding" : "");
 
 /** The day list's column: half the ribbon at Soon, the divider's width at the calendar, going from one to the other with the strip. */
 function DayColumnBox({ at, children }: { readonly at: RibbonAt; readonly children: ReactNode }) {
-	const style = useListWidth();
-	const glide = useScreen((s) => s.listGlide);
+	const { style, follow } = useListWidth();
 	return (
-		<StripColumn at={at} widthAt={dayColumnWidth} className={`tc-stage-col is-day${gliding(glide)}`} style={style}>
+		<StripColumn at={at} widthAt={dayColumnWidth} className={`tc-stage-col is-day${follow}`} style={style}>
 			{children}
 		</StripColumn>
 	);
 }
 
 /** The day's calendar: the rest of the window beside the list, the width it has at the calendar all the way there. */
-function CalendarColumn() {
-	const style = useListWidth();
-	const glide = useScreen((s) => s.listGlide);
+function CalendarColumn({ ref }: { readonly ref: RefObject<HTMLElement | null> }) {
+	const { style, follow } = useListWidth();
 	return (
-		<section className={`tc-stage-col is-timeline${gliding(glide)}`} style={style}>
+		<section ref={ref} className={`tc-stage-col is-timeline${follow}`} style={style}>
 			<ColumnHead title={null} />
 			<div className="tc-stage-body">
 				<Timeline />
@@ -140,9 +140,14 @@ function ColumnRule({ at, stop }: { readonly at: RibbonAt; readonly stop: Stop }
 const DIVIDER_SHIFT = ruleShift("calendar");
 
 /** The divider between the day's list and its calendar, with its handle: dragged by either, it sets the list's width (F51–F53). */
-function ListDivider({ at, ribbon }: { readonly at: RibbonAt; readonly ribbon: RefObject<HTMLDivElement | null> }) {
+function ListDivider({ at, ribbon, calendar }: { readonly at: RibbonAt; readonly ribbon: RefObject<HTMLDivElement | null>; readonly calendar: RefObject<HTMLElement | null> }) {
 	const { haptics } = useHost();
-	const bind = useDivider(() => ribbon.current?.clientWidth ?? 0, () => haptics.tap());
+	/** The list as the browser draws it: all the ribbon but the calendar and the divider's half beside it. */
+	const drawn = () => {
+		const view = ribbon.current?.clientWidth ?? 0;
+		return { view, list: view - (calendar.current?.clientWidth ?? 0) - DESIGN.dividerWidth / 2 };
+	};
+	const bind = useDivider(drawn, () => haptics.tap());
 	const handlers = bind();
 	/** The divider's press is its own: the ribbon under it never begins a swipe from it. */
 	const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {

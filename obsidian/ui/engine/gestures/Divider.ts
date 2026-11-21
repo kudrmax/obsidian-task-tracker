@@ -5,9 +5,13 @@ import { useScreenApi } from "../store";
 /** How long a step into the middle or out of it glides: the design's `--tc-duration-snap` (`tests/ui/engine/divider.test.ts` holds them equal). */
 export const SNAP_MS = 120;
 
-interface Press {
-	readonly width: number;
+/** The ribbon's width and the list's width as the browser draws them, read as the drag begins. */
+export interface DrawnWidths {
 	readonly view: number;
+	readonly list: number;
+}
+
+interface Press extends DrawnWidths {
 	snapped: boolean;
 	/** Until when (the events' clock, ms) the list's width still glides into or out of the middle. */
 	glidesUntil: number;
@@ -18,14 +22,16 @@ interface Press {
  * width; brought slowly near the middle of the window it holds there with a light tap, and lets go the same way, each step
  * gliding; a fast drag passes by. Where it stands is the port's rule (`dividerAt`, the core's); the drag's speed is
  * @use-gesture's. It holds the gesture slot while it runs, so nothing else moves under it; the host keeps the share it
- * was let go at. `view` reads the ribbon's width as the drag begins, as the ribbon's own gesture does.
+ * was let go at.
  */
-export function useDivider(view: () => number, onSnap: () => void) {
+export function useDivider(drawn: () => DrawnWidths, onSnap: () => void) {
 	const api = useScreenApi();
 	const press = useRef<Press | null>(null);
 	useEffect(
 		() => () => {
-			if (press.current) api.getState().release("divider");
+			if (!press.current) return;
+			api.getState().followList(false);
+			api.getState().release("divider");
 		},
 		[api],
 	);
@@ -35,24 +41,23 @@ export function useDivider(view: () => number, onSnap: () => void) {
 			const screen = api.getState();
 			if (first) {
 				if (!screen.claim("divider")) return cancel();
-				const width = view();
-				const list = screen.listWidths(width);
-				screen.glideList(false);
-				press.current = { width: list.width, view: width, snapped: list.width === list.center, glidesUntil: 0 };
+				const widths = drawn();
+				press.current = { ...widths, snapped: Math.abs(widths.list - screen.dividerMiddle(widths.view)) < 0.5, glidesUntil: 0 };
 			}
 			const held = press.current;
 			if (!held) return;
 			if (!first || mx !== 0) {
-				const stop = screen.dragDivider(held.width + mx, held.view, speed);
+				const stop = screen.dragDivider(held.list + mx, held.view, speed);
 				if (stop.snapped !== held.snapped) {
 					if (stop.snapped) onSnap();
 					held.glidesUntil = timeStamp + SNAP_MS;
 				}
 				held.snapped = stop.snapped;
-				screen.glideList(timeStamp < held.glidesUntil);
+				screen.followList(timeStamp >= held.glidesUntil);
 			}
 			if (!last) return;
 			press.current = null;
+			screen.followList(false);
 			screen.release("divider");
 		},
 		{ pointer: { capture: true } },
