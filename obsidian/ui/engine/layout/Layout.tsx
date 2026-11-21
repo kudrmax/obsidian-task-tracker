@@ -98,8 +98,8 @@ function RibbonColumns() {
 /**
  * The stand's step of the ribbon as a gallery (stage0.md, «Round seven»): the four columns at their widths, the strip
  * standing at three stops; past the calendar the days, one place a day (Max, 2026-11-21; Decision 127): the strip stands,
- * the day's list turns under the fingers as a page with its header, and the calendar, dimmed while they hold it, changes
- * to the new day as the list lands there.
+ * the day's list turns under the fingers as a page with its header, and the calendar, standing on its day while they hold
+ * it, changes to the new day on the list's own landing.
  */
 function FollowColumns() {
 	const ribbon = useRef<HTMLDivElement>(null);
@@ -112,7 +112,7 @@ function FollowColumns() {
 					<ListColumn list="inbox" />
 					<ListColumn list="soon" />
 					<TurningDayColumn />
-					<ColumnBox className={`is-timeline${turn.held ? " is-held" : ""}`}>
+					<ColumnBox className="is-timeline">
 						<ColumnHead title={null} />
 						<div className="tc-stage-body">
 							<Timeline />
