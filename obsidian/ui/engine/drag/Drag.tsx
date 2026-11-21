@@ -5,7 +5,7 @@ import { type CSSProperties, memo, type ReactNode, useCallback, useEffect, useMe
 import { createPortal } from "react-dom";
 import { ROW_PX } from "../layout/columns";
 import type { Destination, ListId, Row } from "../port";
-import { secondaryClick, useAnchor } from "../layers/Layers";
+import { secondaryClick } from "../layers/Layers";
 import { cssEase, FLY } from "../layers/motion";
 import { useScreen, useScreenApi } from "../store";
 import { EdgeHeading } from "./edgeHeading";
@@ -209,7 +209,6 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 		useSensor(CardTouchSensor, { activationConstraint: { delay: LONG_PRESS_MS, tolerance: LONG_PRESS_TOLERANCE_PX }, busy }),
 		useSensor(PlusTouchSensor, { activationConstraint: { distance: MOUSE_DISTANCE_PX }, busy }),
 	);
-	const anchor = useAnchor();
 	const [active, setActive] = useState<string | null>(null);
 	/**
 	 * Whether what was lifted last has a copy that flies into its place when let go. The calendar's new place has none: its
@@ -509,16 +508,16 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 		if (container === null || refusedNow.current) return api.getState().drop(id, null);
 		/**
 		 * Held and let go unmoved (the plugin's hold): a task on the calendar is selected with its menu open (F106), a card's
-		 * menu opens under the mouse (the plugin's mouse long tap); it goes back where it was.
+		 * menu opens under the mouse (the plugin's mouse long tap); it goes back where it was. The row opens it as its tap
+		 * does, from the row the press began on.
 		 */
 		if (!moved.current && origin !== null && origin.container === container) {
-			const fromCalendar = container === CALENDAR;
 			const mouse = !("touches" in event.activatorEvent);
 			api.getState().drop(id, null);
-			if (!fromCalendar && !mouse) return;
-			anchor.current = doc.querySelector(fromCalendar ? `[data-block="${id}"]` : `[data-id="${id}"]`);
-			api.getState().openMenu(id, fromCalendar ? "calendar" : "list");
-			if (fromCalendar) api.getState().select(id);
+			if (container !== CALENDAR && !mouse) return;
+			const row = (event.activatorEvent.target as Element | null)?.closest?.(".tc-drag-source");
+			const press = (lifted.data.current as RowData | undefined)?.press;
+			if (row && press) press(row, true);
 			return;
 		}
 		if (container === CALENDAR) {
@@ -695,15 +694,21 @@ export function useListTarget(list: ListId, ids: readonly string[], away: number
 	return useDroppable({ id: away === null ? `${LIST_TARGET}${list}` : `${LIST_TARGET}${list}@${away}`, disabled: away !== null, data: { items: ids } }).setNodeRef;
 }
 
+/** What a carried row tells dnd-kit besides its place (its sortable `data`): how it opens its menu, from the row pressed, held or tapped. */
+interface RowData {
+	readonly press?: (row: Element, held: boolean) => void;
+}
+
 /**
  * A row of a list in dnd-kit's sortable list: the thin wrapper dnd-kit draws again around the memoized card (stage 0,
  * second round). A task's card is carried by it; lifted, it stays where the card will land, as the gap (spec, «Decided»).
  * A section's header moves aside like cards but is not carried (`onTap` absent): a card goes after it into its section.
  * A calendar's block is `placed`: its box says where it stands, so dnd-kit never moves it (its box glides by CSS).
  */
-export const SortableRow = memo(function SortableRow({ id, onTap, gap = false, placed = false, children }: { readonly id: string; readonly onTap?: (target: Element) => void; readonly gap?: boolean; readonly placed?: boolean; readonly children: ReactNode }) {
+export const SortableRow = memo(function SortableRow({ id, onTap, gap = false, placed = false, children }: { readonly id: string; readonly onTap?: (row: Element, held: boolean) => void; readonly gap?: boolean; readonly placed?: boolean; readonly children: ReactNode }) {
 	const carried = onTap !== undefined;
-	const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({ id, disabled: { draggable: !carried, droppable: false }, animateLayoutChanges: placed ? STAY : undefined });
+	const data = useMemo((): RowData => ({ press: onTap }), [onTap]);
+	const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({ id, data, disabled: { draggable: !carried, droppable: false }, animateLayoutChanges: placed ? STAY : undefined });
 	const style: CSSProperties = placed ? {} : { transform: CSS.Translate.toString(transform), transition };
 	/** The card takes the focus back when the store asks (a rename ended by a key, Decision 58). */
 	const node = useRef<HTMLDivElement | null>(null);
@@ -719,7 +724,7 @@ export const SortableRow = memo(function SortableRow({ id, onTap, gap = false, p
 		[setNodeRef],
 	);
 	return (
-		<div ref={hold} className={`tc-drag-source${isDragging || gap ? " is-lifted" : ""}`} style={style} {...(carried ? attributes : {})} {...(carried ? listeners : {})} onClick={carried ? (event) => onTap(event.currentTarget) : undefined} onContextMenu={carried ? (event) => secondaryClick(event) && onTap(event.currentTarget) : undefined}>
+		<div ref={hold} className={`tc-drag-source${isDragging || gap ? " is-lifted" : ""}`} style={style} {...(carried ? attributes : {})} {...(carried ? listeners : {})} onClick={carried ? (event) => onTap(event.currentTarget, false) : undefined} onContextMenu={carried ? (event) => secondaryClick(event) && onTap(event.currentTarget, false) : undefined}>
 			{children}
 		</div>
 	);

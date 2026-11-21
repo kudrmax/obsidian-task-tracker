@@ -1,13 +1,14 @@
-import { memo, type ReactNode, useContext, useEffect, useRef, useState } from "react";
+import { memo, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import type { IconName } from "../../kit/icons";
-import { MenuLayer, secondaryClick, useAnchor } from "../layers/Layers";
+import { type BlockLook, MenuLayer, secondaryClick, useMenuFrom, useMenuOrigin } from "../layers/Layers";
 import { monthGrid, monthOf, monthTitle } from "../layout/month";
 import type { ListPlaceId, MenuAction, MenuActionGroup, MenuStatusId, ReminderKind, TaskMenuActionId, TaskMenuModel } from "../port";
 import { type Asking, type Layer, useScreen, useScreenApi } from "../store";
-import { type BlockLook, CardInsides, PressedLook } from "./Card";
+import { CardFace } from "./Card";
 import { useHost } from "./host";
 import { Icon } from "./Icon";
 import { Row, RowGroup } from "./MenuRows";
+import { MovingRow, MovingRows } from "./MovingRow";
 import { NewProjectRow, ProjectNameField, ProjectRows } from "./Projects";
 import { EntryField } from "./QuickAdd";
 import { paintStyle } from "./Timeline";
@@ -116,8 +117,7 @@ export function tileRows<T>(tiles: readonly T[]): readonly (readonly T[])[] {
 export const TaskMenu = memo(function TaskMenu() {
 	const api = useScreenApi();
 	const { layerRoot } = useHost();
-	const anchor = useAnchor();
-	const look = useContext(PressedLook);
+	const origin = useMenuOrigin();
 	const layer = useScreen((s) => s.layer);
 	/** A field typed in the menu itself: a stack's card renamed in its place, or a new subtask at the stack's end (F108). */
 	const typing = useScreen((s) => (s.entry?.stack ? (s.entry.renaming === null ? "subtask" : "rename") : null));
@@ -127,7 +127,7 @@ export const TaskMenu = memo(function TaskMenu() {
 	if (layer && layer !== was.current) {
 		const fresh = was.current === null || !last.current;
 		/** A subtask's menu over its task's (F107) takes the sheet as it stands: the copy and the stack stay, the panel under them. */
-		last.current = fresh ? { layer, reference: anchor.current, look: look.current, seq: (last.current?.seq ?? 0) + 1 } : { ...last.current!, layer };
+		last.current = fresh ? { layer, reference: origin.element, look: origin.look, seq: (last.current?.seq ?? 0) + 1 } : { ...last.current!, layer };
 	}
 	was.current = layer;
 	const shown = last.current;
@@ -383,17 +383,15 @@ function MenuCopy({ id, look, notes }: { readonly id: string; readonly look: Blo
 	if (block)
 		return (
 			<div className={`tc-lifted is-block is-whole${notes ? " has-notes" : ""}`} data-lifted={id}>
-				<div className={`tc-block-card${selected ? " is-selected" : ""}`} data-status={face.inProgress ? "inProgress" : "open"} data-priority={face.color ?? undefined}>
-					<CardInsides face={face} block={look ?? { corner: null, pill: null, clock: block.clock }} />
+				<CardFace face={face} block={look ?? { corner: null, pill: null, clock: block.clock }} className={`tc-block-card${selected ? " is-selected" : ""}`}>
 					{notes ? <CopyNotes text={notes} /> : null}
-				</div>
+				</CardFace>
 			</div>
 		);
 	return (
-		<div className={`tc-lifted is-whole${face.step !== null ? " is-two-line" : ""}${notes ? " has-notes" : ""}`} data-lifted={id} data-status={face.inProgress ? "inProgress" : "open"} data-priority={face.color ?? undefined}>
-			<CardInsides face={face} />
+		<CardFace face={face} className={`tc-lifted is-whole${notes ? " has-notes" : ""}`} data-lifted={id}>
 			{notes ? <CopyNotes text={notes} /> : null}
-		</div>
+		</CardFace>
 	);
 }
 
@@ -413,36 +411,34 @@ function CopyNotes({ text }: { readonly text: string }) {
 	);
 }
 
+/** The stack's rows apart from every list's (`MovingRow`'s context): a task's card in a list and in the stack are two rows. */
+const STACK = "stack";
+
 /**
  * A calendar task's open subtasks between its copy and the panel (F107; the design's «Подзадачи», variant C): cards at the
  * copy's width, a tap on one opening its own menu in the same sheet; with Add subtask, a field for a new one last (F108).
+ * Its cards are rows that move (spec, «The owners»): a subtask typed in comes in, one done leaves, as in a list.
  */
 function Stack({ ids, typing, renaming, pressed }: { readonly ids: readonly string[]; readonly typing: boolean; readonly renaming: string | null; readonly pressed: string | null }) {
-	const api = useScreenApi();
-	const anchor = useAnchor();
-	const look = useContext(PressedLook);
+	const openMenuFrom = useMenuFrom();
 	const entrySeq = useScreen((s) => s.entrySeq);
+	const fresh = useScreen((s) => s.fresh);
+	const gone = useScreen((s) => s.gone);
+	const order = useMemo(() => ids.join(" "), [ids]);
 	return (
 		<div className={`tc-menu-subtasks${pressed ? " is-handed" : ""}`}>
-			{ids.map((id) =>
-				id === renaming ? (
-					<EntryField key={`rename-${entrySeq}`} />
-				) : (
-				<StackCard
-					key={id}
-					id={id}
-					pressed={id === pressed}
-					onPress={(card) => {
-						anchor.current = card;
-						look.current = null;
-						api.getState().openMenu(id, "stack", false);
-					}}
-				/>
-				),
-			)}
-			{typing ? (
-				<EntryField key={entrySeq} />
-			) : null}
+			<MovingRows gone={gone}>
+				{ids.map((id) => (
+					<MovingRow key={id} id={id} context={STACK} order={order} carried={false} fresh={fresh.has(id)}>
+						{id === renaming ? <EntryField key={`rename-${entrySeq}`} /> : <StackCard id={id} pressed={id === pressed} onPress={(card) => openMenuFrom(id, "stack", card)} />}
+					</MovingRow>
+				))}
+				{typing ? (
+					<MovingRow key="entry" id="entry" context={STACK} order={order} carried={false} fresh={false}>
+						<EntryField key={entrySeq} />
+					</MovingRow>
+				) : null}
+			</MovingRows>
 		</div>
 	);
 }
@@ -450,9 +446,5 @@ function Stack({ ids, typing, renaming, pressed }: { readonly ids: readonly stri
 function StackCard({ id, pressed, onPress }: { readonly id: string; readonly pressed: boolean; readonly onPress: (card: HTMLElement) => void }) {
 	const face = useScreen((s) => s.shown.cards[id]);
 	if (!face) return null;
-	return (
-		<div className={`tc-card${pressed ? " is-pressed" : ""}${face.step !== null ? " is-two-line" : ""}`} data-stack={id} data-status={face.inProgress ? "inProgress" : "open"} data-priority={face.color ?? undefined} onClick={(e) => onPress(e.currentTarget)} onContextMenu={(e) => secondaryClick(e) && onPress(e.currentTarget)}>
-			<CardInsides face={face} />
-		</div>
-	);
+	return <CardFace face={face} className={`tc-card${pressed ? " is-pressed" : ""}`} data-stack={id} onClick={(e) => onPress(e.currentTarget)} onContextMenu={(e) => secondaryClick(e) && onPress(e.currentTarget)} />;
 }

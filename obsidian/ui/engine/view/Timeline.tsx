@@ -3,13 +3,13 @@ import { DESIGN, PROPERTY } from "../../design";
 import { CalendarBlocks, SortableRow, useCalendarDrop, useNewSlot } from "../drag/Drag";
 import { type Edge, useResize } from "../gestures/Resize";
 import { hourOf, type RoomMeasure, useCalendarZoom } from "../gestures/Zoom";
-import { Pinned, secondaryClick, useAnchor } from "../layers/Layers";
+import { type BlockLook, Pinned, pressedIn, secondaryClick, useMenuFrom } from "../layers/Layers";
 import { type EventBox, layEvents, layTasks, opening, type Shade, shadesOn, stackEnd, type TaskBox } from "../layout/calendar";
 import { TimeScale } from "../layout/timeScale";
 import { type DayTurn, DayTurnContext } from "../gestures/FollowRibbon";
 import type { AllDayEvent, Block, DayData, DayEvent, EventPaint, Now } from "../port";
 import { DayContext, useData, useScreen, useScreenApi } from "../store";
-import { Card, PressedLook } from "./Card";
+import { Card } from "./Card";
 import { useHost } from "./host";
 import { MovingRow, MovingRows } from "./MovingRow";
 import { EntryField } from "./QuickAdd";
@@ -296,18 +296,26 @@ function AllDayRow({ row, open }: { readonly row: AllDayEvent; readonly open: (i
 	);
 }
 
-/** A tap on an event or a task opens its menu, from the element tapped. */
+/**
+ * The calendar's one way to open a menu: an event's or a task's, standing over `element`, a task's copy in its `look`. A
+ * tap brings it into the calendar's sight first, partly out of it as it may be (the design's «Полная карточка»); a hold
+ * found it under the finger.
+ */
+function useCalendarMenu(): (id: string, element: Element, look?: BlockLook | null, held?: boolean) => void {
+	const openMenuFrom = useMenuFrom();
+	return useCallback(
+		(id, element, look = null, held = false) => {
+			if (!held) element.scrollIntoView({ block: "nearest" });
+			openMenuFrom(id, "calendar", element, look);
+		},
+		[openMenuFrom],
+	);
+}
+
+/** A tap on an event opens its menu, from the event's block. */
 function useOpenMenu(): (id: string, event: MouseEvent<HTMLElement>) => void {
-	const api = useScreenApi();
-	const anchor = useAnchor();
-	const pressed = useContext(PressedLook);
-	return (id, event) => {
-		pressed.current = null;
-		anchor.current = event.currentTarget.querySelector(".tc-event-block") ?? event.currentTarget;
-		/** Partly out of the calendar's sight, it is scrolled into it first (the design's «Полная карточка»). */
-		anchor.current.scrollIntoView({ block: "nearest" });
-		api.getState().openMenu(id, "calendar");
-	};
+	const open = useCalendarMenu();
+	return (id, event) => open(id, pressedIn(event.currentTarget, ".tc-event-block"));
 }
 
 /**
@@ -362,21 +370,19 @@ const BlockItem = memo(function BlockItem({ block, box, shades, order, z, top, s
 	 */
 	const menuAway = useScreen((s) => s.layer?.id === block.id && s.menuLifted);
 	const api = useScreenApi();
-	const anchor = useAnchor();
-	const pressed = useContext(PressedLook);
+	const open = useCalendarMenu();
 	const [element, setElement] = useState<HTMLDivElement | null>(null);
+	/** Its box glides (a drop, a resize let go, a write read back): its dots follow it every frame meanwhile. */
+	const [gliding, setGliding] = useState(false);
 	const className = `tc-block${selected ? " is-selected" : ""}${resizing ? " is-resizing" : ""}${renaming ? " is-renaming" : ""}`;
 	const look = { corner: box.stacked ? block.startParts : box.shortLength ? block.lengthParts : null, pill: resizing === "start" ? block.clock : resizing === "end" ? (block.endClock ?? block.clock) : null, clock: block.clock };
 	return (
-		<MovingRow ref={setElement} id={block.id} order={order} carried={lifted} fresh={fresh} placed className={className} style={boxStyle(box, selected || resizing ? top : z)}>
+		<MovingRow ref={setElement} id={block.id} order={order} carried={lifted} fresh={fresh} placed className={className} style={boxStyle(box, selected || resizing ? top : z)} onGlide={setGliding}>
 			<SortableRow
 				id={block.id}
 				placed
-				onTap={(target) => {
-					anchor.current = target.querySelector("[data-block]") ?? target;
-					anchor.current.scrollIntoView({ block: "nearest" });
-					pressed.current = look;
-					api.getState().openMenu(block.id, "calendar", false);
+				onTap={(row, held) => {
+					open(block.id, pressedIn(row, "[data-block]"), look, held);
 					api.getState().select(block.id);
 				}}
 			>
@@ -391,7 +397,7 @@ const BlockItem = memo(function BlockItem({ block, box, shades, order, z, top, s
 					))}
 				</div>
 			) : null}
-			{(selected || resizing) && !lifted && !renaming && !menuAway && element ? <Grips block={block} reference={element} scale={scale} /> : null}
+			{(selected || resizing) && !lifted && !renaming && !menuAway && element ? <Grips block={block} reference={element} scale={scale} gliding={gliding} /> : null}
 		</MovingRow>
 	);
 });
@@ -423,8 +429,10 @@ function NewPlace({ minute, box, z, field }: { readonly minute: number; readonly
  * while its menu is open (pulling one closes it): the top one on its top edge at the right, the bottom one on its bottom
  * edge at the left.
  */
-function Grips({ block, reference, scale }: { readonly block: Block; readonly reference: Element; readonly scale: TimeScale }) {
+function Grips({ block, reference, scale, gliding }: { readonly block: Block; readonly reference: Element; readonly scale: TimeScale; readonly gliding: boolean }) {
 	const { layerRoot } = useHost();
+	/** The task moves under its dots: pulled by one, gliding to its new box, or the screen under it slides, zooms or parts at the divider. */
+	const moving = useScreen((s) => gliding || s.resizing?.id === block.id || s.gesture === "ribbon" || s.gesture === "zoom" || s.gesture === "divider");
 	/**
 	 * The task's menu stands its subtasks right under its copy (F107): the bottom dot lies under the stack there, as the
 	 * plugin's dot on the copy lies under its stack, so neither covers a card's title (the audit's 13).
@@ -432,11 +440,11 @@ function Grips({ block, reference, scale }: { readonly block: Block; readonly re
 	const stacked = useScreen((s) => s.layer !== null && (s.layer.stack?.of === block.id || (s.layer.id === block.id && s.layer.model.kind === "task" && (s.layer.model.subtasks.length > 0 || s.entry?.stack === true))));
 	return (
 		<>
-			<Pinned reference={reference} placement="top-end" into={DESIGN.grip / 2} along={-DESIGN.gripStartRight} root={layerRoot}>
+			<Pinned reference={reference} placement="top-end" into={DESIGN.grip / 2} along={-DESIGN.gripStartRight} root={layerRoot} moving={moving}>
 				<Grip block={block} edge="start" scale={scale} />
 			</Pinned>
 			{stacked ? null : (
-				<Pinned reference={reference} placement="bottom-start" into={DESIGN.grip / 2} along={DESIGN.gripEndLeft} root={layerRoot}>
+				<Pinned reference={reference} placement="bottom-start" into={DESIGN.grip / 2} along={DESIGN.gripEndLeft} root={layerRoot} moving={moving}>
 					<Grip block={block} edge="end" scale={scale} />
 				</Pinned>
 			)}

@@ -3,11 +3,11 @@ import { type CSSProperties, memo, useCallback, useContext, useEffect, useLayout
 import { PROPERTY } from "../../design";
 import { PLUS, SortableList, SortableRow, useListTarget } from "../drag/Drag";
 import { descendantsOf } from "../drag/tree";
-import { useAnchor } from "../layers/Layers";
+import { pressedIn, useMenuFrom } from "../layers/Layers";
 import { ROW_PX } from "../layout/columns";
 import type { EntryField as Field, ListId, Row } from "../port";
 import { DayContext, useData, useScreen, useScreenApi } from "../store";
-import { Card, PressedLook } from "./Card";
+import { Card } from "./Card";
 import { MovingRow, MovingRows } from "./MovingRow";
 import { EntryField } from "./QuickAdd";
 
@@ -162,9 +162,7 @@ const ContextList = memo(function ContextList({ list, context }: { readonly list
 
 /** A row's face: a section's header, or a task's card as a drag source that opens its menu when tapped. */
 const RowFace = memo(function RowFace({ row }: { readonly row: Row }) {
-	const api = useScreenApi();
-	const anchor = useAnchor();
-	const pressed = useContext(PressedLook);
+	const openMenuFrom = useMenuFrom();
 	if (row.kind === "section")
 		return (
 			<SortableRow id={row.id}>
@@ -176,11 +174,7 @@ const RowFace = memo(function RowFace({ row }: { readonly row: Row }) {
 	return (
 		<SortableRow
 			id={row.id}
-			onTap={(target) => {
-				anchor.current = target.querySelector("[data-id]") ?? target;
-				pressed.current = null;
-				api.getState().openMenu(row.id, "list", true);
-			}}
+			onTap={(target, held) => openMenuFrom(row.id, "list", pressedIn(target, "[data-id]"), null, !held)}
 		>
 			<Card id={row.id} depth={row.depth} />
 		</SortableRow>

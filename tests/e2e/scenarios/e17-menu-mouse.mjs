@@ -45,7 +45,7 @@ export default {
 			t.expect((await menuNow(t))?.words.includes("Rename"), "and on a calendar's block");
 			await escape();
 			await right(await block("Упаковать книги"));
-			const stackCard = await t.cdp.eval(`(() => { const c = [...document.querySelectorAll(".tc-menu-subtasks > [data-stack]")].find((e) => e.textContent.includes("Заказать машину")); const r = c.getBoundingClientRect(); return { x: r.left + 30, y: r.top + 15 }; })()`);
+			const stackCard = await t.cdp.eval(`(() => { const c = [...document.querySelectorAll(".tc-menu-subtasks [data-stack]")].find((e) => e.textContent.includes("Заказать машину")); const r = c.getBoundingClientRect(); return { x: r.left + 30, y: r.top + 15 }; })()`);
 			await right(stackCard);
 			const sub = await menuNow(t);
 			t.expect(sub && sub.words.includes("Done") && !sub.words.includes("Add subtask"), `and on a stack's card, its own menu: ${JSON.stringify(sub?.words)}`);
@@ -83,7 +83,7 @@ export default {
 		await twice(await block("Обед"), "a calendar's block");
 		await press(await block("Упаковать книги"));
 		await menuNow(t);
-		const stackCard = await t.cdp.eval(`(() => { const c = [...document.querySelectorAll(".tc-menu-subtasks > [data-stack]")].find((e) => e.textContent.includes("Заказать машину")); const r = c.getBoundingClientRect(); return { x: r.left + 30, y: r.top + 15 }; })()`);
+		const stackCard = await t.cdp.eval(`(() => { const c = [...document.querySelectorAll(".tc-menu-subtasks [data-stack]")].find((e) => e.textContent.includes("Заказать машину")); const r = c.getBoundingClientRect(); return { x: r.left + 30, y: r.top + 15 }; })()`);
 		await press(stackCard, 1);
 		await t.sleep(40);
 		await press(stackCard, 2);

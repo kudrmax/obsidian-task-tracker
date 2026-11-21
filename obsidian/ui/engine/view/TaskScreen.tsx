@@ -1,10 +1,11 @@
-import { type CSSProperties, type MouseEvent, type PointerEvent, type TouchEvent, useEffect, useRef, useState } from "react";
+import { type CSSProperties, type MouseEvent, type PointerEvent, type TouchEvent, useEffect, useId, useRef } from "react";
 import { PROPERTY } from "../../design";
 import { Drag, type Grab, type Landing } from "../drag/Drag";
 import { Layers } from "../layers/Layers";
 import { Layout, type Place, reachOf } from "../layout/Layout";
 import { StoreContext, type ScreenStore, useScreen } from "../store";
-import { type BlockLook, Card, PressedLook } from "./Card";
+import { Card } from "./Card";
+import { RowScreen } from "./MovingRow";
 import { QuickBar } from "./QuickBar";
 import { Icon } from "./Icon";
 import { HostContext, type ScreenHost, useHost } from "./host";
@@ -43,9 +44,9 @@ const letSelectionGo = (event: MouseEvent, store: ScreenStore) => {
  */
 export function TaskScreen({ store, host, place }: { readonly store: ScreenStore; readonly host: ScreenHost; readonly place: Place }) {
 	useEffect(() => store.getState().start(), [store]);
-	const [pressed] = useState<{ current: BlockLook | null }>(() => ({ current: null }));
+	const rows = useId();
 	return (
-		<PressedLook.Provider value={pressed}>
+		<RowScreen.Provider value={rows}>
 		<StoreContext.Provider value={store}>
 			<HostContext.Provider value={host}>
 				<Layers>
@@ -55,7 +56,7 @@ export function TaskScreen({ store, host, place }: { readonly store: ScreenStore
 				</Layers>
 			</HostContext.Provider>
 		</StoreContext.Provider>
-		</PressedLook.Provider>
+		</RowScreen.Provider>
 	);
 }
 
