@@ -25,6 +25,7 @@ import {
 	type DropPreview,
 	type DropOrigin,
 	type FullTree,
+	type ScreenReader,
 	type DropTo,
 	type EndList,
 	type GroupedList,
@@ -79,6 +80,7 @@ import type { UndoHistory } from "./UndoHistory";
 import { TaskIdentity } from "./TaskIdentity";
 import type { ResizeEdge, StretchSpan } from "./TimelineSpans";
 import { snapMinute } from "./snapGrid";
+import { SnapshotReader } from "./SnapshotReader";
 import type { ListedTasks } from "./assistant/tasks";
 
 /** The file's text read last, normalized: `changed` when normalizing it changes what the file says. */
@@ -703,6 +705,24 @@ export class TaskServiceImpl implements TaskService {
 		return this.ask(this.writes.dropPreview(tasks, to, day, filter, this.projectsScreenStore.get().carry));
 	}
 
+	takes(origins: readonly DropOrigin[], to: DropTo): Promise<boolean> {
+		return this.ask(this.reads.takesRead(origins, to));
+	}
+
+	opensGaps(origins: readonly DropOrigin[], column: DropColumn, day: LocalDate): boolean {
+		return this.reads.opensGaps(origins, column, day);
+	}
+
+	resizedSlot(item: TaskItem, day: LocalDate, edge: ResizeEdge, minute: number, minDurationMin: number): Slot | null {
+		return this.reads.resizedSlot(item, day, edge, minute, minDurationMin);
+	}
+
+	async reader(filter?: ProjectsNodeId | null): Promise<ScreenReader> {
+		await this.normalize();
+		const s = await this.snapshotOrNull();
+		return new SnapshotReader(this.reads, this.writes, (read) => this.answerOver(s, read), filter ?? null, () => this.projectsScreenStore.get().carry);
+	}
+
 	async normalize(): Promise<void> {
 		const text = await this.store.read();
 		if (text === null) return;
@@ -747,7 +767,12 @@ export class TaskServiceImpl implements TaskService {
 	private async ask<R>(read: Read<R>): Promise<R> {
 		if (read.tidies) await this.normalize();
 		if (!read.reads) return read.answer(null);
-		const s = await this.snapshotOrNull();
+		return this.answerOver(await this.snapshotOrNull(), read);
+	}
+
+	/** A read over the file as `s` read it: missing without a file, or failing. */
+	private answerOver<R>(s: Snapshot | null, read: Read<R>): R {
+		if (!read.reads) return read.answer(null);
 		if (s) return read.answer(s);
 		if (read.missing) return read.missing();
 		throw new TasksFileMissingError(this.settings.get().tasksFile);

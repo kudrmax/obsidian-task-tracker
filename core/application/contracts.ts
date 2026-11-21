@@ -536,6 +536,9 @@ export type DropTo =
 	 */
 	| { readonly kind: "place"; readonly column: DropColumn; readonly place: ListPlace | null };
 
+/** The column a task's card is dragged from (`DroppedTask.from`), by where its task stands; none for a closed one. */
+export { originOf } from "./projectsLift";
+
 /** A task let go, and where it was dragged from. */
 export interface DroppedTask {
 	readonly key: TaskKey;
@@ -586,6 +589,30 @@ export interface DropPreview {
 /** Whether a target takes the tasks carried from these places, and whether a list shows where in it a task goes or puts it at its end. */
 export { acceptsDrop, placesInGap } from "./drops";
 
+/**
+ * The file as one read saw it, answering at once while a finger moves (`TaskService.reader`): every answer is the one the
+ * service gives over that read, under the reader's filter, and none reads the file again. Without a tasks file, the
+ * screen that says so and no task.
+ */
+export interface ScreenReader {
+	/** `TaskService.screen(date, filter)`. */
+	screen(date: LocalDate): ScreenView;
+	/** `TaskService.columnView` over `screen(date)`. */
+	columnView(column: DropColumn, date: LocalDate): ColumnList;
+	/** The task, or a subtask at any depth, whose `TaskItem.id` is `id`, as the screen draws it; null for none. */
+	item(id: string): TaskItem | null;
+	/** `TaskService.dropPreview(tasks, to, day, filter)`. */
+	dropPreview(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate): DropPreview;
+	/** `TaskService.takes(origins, to)`. */
+	takes(origins: readonly DropOrigin[], to: DropTo): boolean;
+	/** `TaskService.menu` of the task `id`, opened `from` a place of the screen of `day`; null for no such task. */
+	menu(id: string, from: MenuFrom, day: LocalDate): TaskMenuModel<TaskMenuActionId> | null;
+	/** `TaskService.stretch` of the task `id`; null for no such task or one off the timeline. */
+	stretch(id: string, day: LocalDate, edge: ResizeEdge, minute: number): StretchSpan | null;
+	/** `TaskService.resizedSlot` of the task `id`; null for no such task, one off the timeline, or a time that stays. */
+	resizedSlot(id: string, day: LocalDate, edge: ResizeEdge, minute: number, minDurationMin: number): Slot | null;
+}
+
 /** A quick move of a task menu: Today, Tomorrow, or Pick a date, which asks for the day. */
 export type QuickMoveId = "today" | "tomorrow" | "pick";
 
@@ -630,6 +657,8 @@ export interface MenuSections {
 export type MenuFrom = DropColumn | "timeline" | "done" | "stack" | "full" | "fullSubtask";
 /** Whether Select tasks picks a card drawn at a `MenuFrom`: a list column's alone. */
 export { canPick } from "./menus";
+/** The `MenuFrom` of a task's card in its list column: Now's in the day's list, Done's in Done. */
+export { listCardMenuFrom } from "./menus";
 
 /** A picked task of the bulk menu and the column its card stands in. */
 export interface PickedTask {
@@ -1840,6 +1869,26 @@ export interface TaskService {
 	 * screen at the moment of the drop; a task the filter no longer shows lands `away`. Rejects as `drop` would.
 	 */
 	dropPreview(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate, filter?: ProjectsNodeId | null): Promise<DropPreview>;
+	/**
+	 * Whether the place `to` takes the tasks carried from `origins` (the one under the finger first; `"new"` for the plus),
+	 * as `acceptsDrop` says of the column it lands in: a section of Now, or of Soon on a later day, is the day's list; a
+	 * place under a task, the column that task is dragged from (`originOf`; none under a closed task). Inbox and Backlog
+	 * take only undated tasks from Inbox, Backlog, Soon or the plus; Soon refuses a task from the timeline; the timeline
+	 * one task. A refused drop writes nothing: the card goes back.
+	 */
+	takes(origins: readonly DropOrigin[], to: DropTo): Promise<boolean>;
+	/**
+	 * Whether `column`, showing `day`, opens a place between its cards for the tasks carried from `origins`: a list that
+	 * shows sections for any, one without only for its own cards and the plus (`placesInGap`); else they go to its end.
+	 */
+	opensGaps(origins: readonly DropOrigin[], column: DropColumn, day: LocalDate): boolean;
+	/** The slot `resize` with the same arguments writes, writing nothing; null where it writes nothing. */
+	resizedSlot(item: TaskItem, day: LocalDate, edge: ResizeEdge, minute: number, minDurationMin: number): Slot | null;
+	/**
+	 * One read of the file, the file tidied first, answering the screen's reads at once under `filter` (`ScreenReader`):
+	 * a frontend asks it while a finger moves and takes a new one when `onChange` fires.
+	 */
+	reader(filter?: ProjectsNodeId | null): Promise<ScreenReader>;
 
 	/** Applies the normalization rules (spec §4.4). Writes only when something changed. */
 	normalize(): Promise<void>;
@@ -1882,6 +1931,10 @@ export interface DayService {
 	weekday(date: LocalDate): string;
 	/** Which side of today `date` is. */
 	side(date: LocalDate): DaySide;
+	/** The clock `minute` minutes after the day's start, by the hour the day starts at: `"14:15"`; past midnight from `"00:00"`. */
+	clockAt(minute: number): string;
+	/** The labels of the timeline's hour lines, from the hour the day starts at: `"05"`, `"06"`, …, `"04"`. */
+	hourLabels(): readonly string[];
 	/**
 	 * Fires when today changes. `passed` is checked once a minute while anyone listens, and the tasks file is normalized
 	 * before it fires; while a listener is not `ready` (a screen hidden or held by a gesture) the minute's check waits for

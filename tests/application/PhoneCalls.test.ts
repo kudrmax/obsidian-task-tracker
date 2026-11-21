@@ -280,6 +280,14 @@ const TASK_CASES: readonly Case[] = [
 	{ method: "drop", args: (s) => [[{ key: key(s, "Idea"), from: "inbox" }], { kind: "place", column: "soon", place: { kind: "task", group: null, before: key(s, "Later") } }, T] },
 	{ method: "drop", args: (s) => [[{ key: key(s, "Idea"), from: "inbox" }], { kind: "place", column: "backlog", place: { kind: "task", group: null, before: null } }, T, "none"] },
 	{ method: "dropPreview", args: (s) => [[{ key: key(s, "Idea"), from: "inbox" }], { kind: "place", column: "backlog", place: { kind: "task", group: null, before: null } }, T, "project:Окружение"] },
+	{ method: "takes", args: () => [["timeline"], { kind: "list", column: "inbox", before: null }] },
+	{ method: "takes", args: () => [["soon", "new"], { kind: "title", list: "inbox", date: null }] },
+	{ method: "takes", args: (s) => [["timeline"], { kind: "nest", parent: key(s, "Parent"), before: null }] },
+	{ method: "takes", args: (s) => [["timeline"], { kind: "nest", parent: key(s, "Idea"), before: null }], text: null },
+	{ method: "opensGaps", args: () => [["inbox"], "day", T] },
+	{ method: "opensGaps", args: () => [["inbox"], "day", "2026-11-01"] },
+	{ method: "resizedSlot", args: (s) => [named(s, "Lunch"), T, "end", 900, 15] },
+	{ method: "resizedSlot", args: (s) => [named(s, "Lunch"), T, "end", 840, 15] },
 	{ method: "normalize", args: () => [] },
 	{ method: "normalize", args: () => [], text: "## Now\n\n- [ ] Old ⏰ 2026-10-01 10:00\n" },
 	{ method: "createFile", args: () => [], text: null },
@@ -382,6 +390,22 @@ describe("the door's coverage", () => {
 		const spaces = new Set(Object.values(DOOR_COVERAGE).flatMap((c) => ("space" in c ? [c.space] : [])));
 		const own = ["boundary", "entry", "sectionName", "repeatPage", "description", "rules", "reminders", "capture", "timeline", "notes", "projects"];
 		expect(new Set(doorMethods().map((m) => m.split(".")[0]))).toEqual(new Set([...spaces, ...own]));
+	});
+});
+
+describe("the door's reads for the engine's port", () => {
+	const result = (method: string, ...args: unknown[]) => (callDoor(method, wire(args), context()) as Extract<DoorAnswer, { ok: true }>).result;
+
+	it("says a card's origin and its list's menu place as the core's rules do", async () => {
+		const screen = await service().svc.screen(T);
+		expect([result("rules.originOf", named(screen, "Morning run")), result("rules.originOf", named(screen, "Idea")), result("rules.originOf", named(screen, "Long ago"))]).toEqual(["timeline", "inbox", null]);
+		expect([result("rules.listCardMenuFrom", named(screen, "Parent")), result("rules.listCardMenuFrom", named(screen, "Someday"))]).toEqual(["day", "backlog"]);
+	});
+
+	it("says the clock and the hour lines by the hour the day starts at", () => {
+		const midnight = (method: string, ...args: unknown[]) => (callDoor(method, args, context(FILE, { settings: JSON.stringify({ dayStartHour: 0 }) })) as Extract<DoorAnswer, { ok: true }>).result;
+		expect([result("days.clockAt", 615), midnight("days.clockAt", 615)]).toEqual(["15:15", "10:15"]);
+		expect([(result("days.hourLabels") as string[]).slice(0, 2), (midnight("days.hourLabels") as string[]).slice(0, 2)]).toEqual([["05", "06"], ["00", "01"]]);
 	});
 });
 
@@ -596,6 +620,8 @@ function everyCall(screen: ScreenView): { method: string; args: unknown[]; conte
 		plain("days.dayNamed", "soon"),
 		plain("days.weekday", T),
 		plain("days.side", LATER),
+		plain("days.clockAt", 615),
+		plain("days.hourLabels"),
 		...["startHour", "hourAt", "offsetOfHour"].map((m) => plain(`boundary.${m}`, 3)),
 		plain("boundary.dayOf", NOW.getTime()),
 		plain("boundary.dayOfSlot", { date: T, start: 30, end: null }),
@@ -719,6 +745,8 @@ function everyCall(screen: ScreenView): { method: string; args: unknown[]; conte
 		plain("rules.dividerAt", 190, { width: 187, min: 110, max: 280, center: 187 }, 0.01),
 		plain("rules.dayMonth", "2026-11-05"),
 		plain("rules.canPick", "timeline"),
+		plain("rules.originOf", named(screen, "Morning run")),
+		plain("rules.listCardMenuFrom", named(screen, "Parent")),
 		plain("rules.repeatValue", { kind: "schedule", every: 2, unit: "month", days: [], dayOfMonth: 5, from: "2026-11-05" }),
 		plain("rules.repeatValue", { kind: "schedule", every: 1, unit: "week", days: [0, 2], dayOfMonth: null, from: null }),
 		plain("rules.repeatSentence", { kind: "schedule", every: 1, unit: "week", days: [0, 2], dayOfMonth: null, from: null }),
