@@ -88,7 +88,8 @@ are numbers, every moment is epoch milliseconds (`…Ms`).
 
 ### `tasks.*`: `TaskService`
 
-Every method of `TaskService` but `onChange`, by its name and with its arguments: `tasks.screen(date)`,
+Every method of `TaskService` but `onChange`, `onShownChange` and `reader` (the host watches its files and `data.json`; it asks
+`rules.shownChange` what another `data.json` changes on the screen), by its name and with its arguments: `tasks.screen(date)`,
 `tasks.search(query)`, `tasks.menu(item, from, screen)` (its `groups`: the order the menu is drawn in, the plugin's), `tasks.drop(tasks, to, day)`, `tasks.createInPlace(text,
 priority, place, repeat?, labels?)`, … (every one `methods()` lists). The answers are those of the plugin's
 TaskServiceImpl over the same text, as `tests/application/PhoneCalls.test.ts` checks method by method.
@@ -614,6 +615,9 @@ host's: it checks the clock (once a minute while a screen is open), and when `da
 `"00:00"` again (`days.clockAt(615)` → `"15:15"` with the day starting at 5). `hourLabels()`: the timeline's hour lines'
 labels from that hour, 24 of them (`["05", "06", …, "04"]`).
 
+`offset(from, to)`: whole days from `from` to `to`, negative for an earlier `to` (`days.offset("2026-11-05", "2026-10-30")` →
+`-6`); a host never counts days itself.
+
 ### `boundary.*`: where a day begins
 
 `DayBoundary`'s rules under the settings' `dayStartHour`, times in epoch ms: `startHour()`, `dayOf(ms)`,
@@ -914,6 +918,10 @@ escapes and embeds stay text), `oneLine`, `sameLevels`, `labelTitle`, `sameLabel
 timeline's, Done's, a stack's or the full screen's), `originOf(item)` (the column a task's card is dragged from, its
 `DroppedTask.from`: `"timeline"` on a time, `"day"` for Now's and a dated Soon task, else its list; `null` for a closed
 task), `listCardMenuFrom(item)` (the `MenuFrom` of its card in its list column: Now's `"day"`, Done's `"done"`),
+`shownChange(before, after)` (two `data.json` texts, `""` for the defaults: what going from one to the other changes on the
+screen, `ShownChange` `{ tasks, drawn, cards, timeline, gestures, calendars }`, each part true drawn anew; `null` when the
+screen shows none of it, the assistant's or Google's settings; `rules.shownChange("", '{"labelPaint":"blend"}')` →
+`{ tasks: false, drawn: true, cards: false, timeline: false, gestures: false, calendars: false }`),
 `repeatValue(rule)` (the Repeat row's words, `null` for weeks on a
 schedule), `onTheDay(rule)` (`"On the 5th"` under a monthly schedule's unit, empty for any other), `dayMonth(date)`
 (`"5 Nov"`), `listWidths(share, viewWidth, dividerWidth)` (the list column beside the calendar, every number in points:

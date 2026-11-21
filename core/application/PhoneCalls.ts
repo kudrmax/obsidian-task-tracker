@@ -3,7 +3,7 @@ import { clockOf, dayNamed, daySide, daysFrom, hourLabels, weekdayName, weekOf }
 import type { DayBoundary } from "../domain/DayBoundary";
 import { GROUPED_LISTS } from "../domain/Lists";
 import { dayRelation } from "../domain/Days";
-import { addDays, MINUTES_PER_DAY, minutesToHHMM } from "../domain/LocalDate";
+import { addDays, daysBetween, MINUTES_PER_DAY, minutesToHHMM } from "../domain/LocalDate";
 import { DESCRIPTION_TEMPLATE } from "../domain/description";
 import { isPresetColor, PRIORITY_COLORS, usableColor } from "../domain/Priority";
 import { CLEAR_COLOR, labelTitle, sameLabels, usableLabelColor } from "../domain/Label";
@@ -78,6 +78,7 @@ import { NO_TASK_IDS, TaskIdentity, type TaskIdState } from "./TaskIdentity";
 import type { PatchIds } from "../domain/TextPatch";
 import { snapMinute } from "./snapGrid";
 import { dayOpening } from "./DayServiceImpl";
+import { shownChange } from "./readingSettings";
 import { repeatPageEnd } from "./RepeatPage";
 import { descriptionOpen, descriptionRead, descriptionSave, descriptionTyped } from "./DescriptionDraft";
 
@@ -408,7 +409,7 @@ const TASKS: Readonly<Record<string, Handler>> = {
 	firstStep: (c, [key, text]) => c.run(c.writes.firstStep(key as A, text as string)),
 	firstStepScreen: (_c, [view, key]) => firstStepScreen(view as A, key as A),
 	firstStepProjects: (_c, [view, key]) => firstStepProjects(view as A, key as A),
-	edit: (c, [key, draft]) => c.run(c.writes.edit(key as A, draft as A)),
+	edit: (c, [key, draft]) => c.run(c.writes.edit(KEPT(c), key as A, draft as A)),
 	placementOf: (c, [item]) => c.reads.placementOf(item as A),
 	dayColumn: (c, [date]) => c.reads.dayColumn(date as string),
 	columnSections: (c, [column, date]) => c.reads.columnSections(column as A, date as string),
@@ -567,7 +568,7 @@ const TASKS: Readonly<Record<string, Handler>> = {
 };
 
 /** The TaskService methods the door leaves to the host: it is the host that watches its files and holds a read of them. */
-export const HOST_TASK_METHODS: readonly string[] = ["onChange", "reader"];
+export const HOST_TASK_METHODS: readonly string[] = ["onChange", "onShownChange", "reader"];
 
 /**
  * Door names an app may still call whose methods left the services (CLAUDE.md: the door keeps its functions' names),
@@ -617,6 +618,7 @@ const DAYS: Readonly<Record<string, Handler>> = {
 	side: (c, [date]) => daySide(date as string, c.rules.today()),
 	clockAt: (c, [minute]) => clockOf(boundaryOf(c), minute as number),
 	hourLabels: (c) => hourLabels(boundaryOf(c)),
+	offset: (_c, [from, to]) => daysBetween(from as string, to as string),
 	/** Where a day begins: the hour it starts at. The `boundary.*` calls place by it. */
 	boundary: (c) => ({ startHour: boundaryOf(c).startHour }),
 };
@@ -940,6 +942,7 @@ const RULES: Readonly<Record<string, (...args: A[]) => unknown>> = {
 	canPick,
 	listCardMenuFrom,
 	originOf,
+	shownChange: (before: string, after: string) => shownChange(settingsOf(before), settingsOf(after)),
 };
 
 /** contracts.ts's runtime constants, as the UI reads them. */

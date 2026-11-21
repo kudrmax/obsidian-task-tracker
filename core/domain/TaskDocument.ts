@@ -145,6 +145,11 @@ function indentWidth(line: string): number {
 }
 
 function sameTask(a: Task, b: Task): boolean {
+	return sameOwnLine(a, b) && sameLines(a.children, b.children);
+}
+
+/** The same task's own line, its subtasks and description aside. */
+function sameOwnLine(a: Task, b: Task): boolean {
 	return (
 		a.status === b.status &&
 		a.statusChar === b.statusChar &&
@@ -159,8 +164,7 @@ function sameTask(a: Task, b: Task): boolean {
 		a.slot?.end === b.slot?.end &&
 		a.reminder === b.reminder &&
 		a.collapsed === b.collapsed &&
-		sameLines(a.projects, b.projects) &&
-		sameLines(a.children, b.children)
+		sameLines(a.projects, b.projects)
 	);
 }
 
@@ -406,19 +410,21 @@ export class TaskDocument {
 
 	/**
 	 * Each entry of this document becomes its task, as `replace` one after another would, in one rewrite. Only the task's
-	 * own line changes unless its description and subtasks do; those rewritten lines may not hold another change.
+	 * own line changes unless its description and subtasks do; those rewritten lines may not hold another change. With
+	 * `asRead`, the entry as it was read before: a task whose own line says what it said then gets that line back as it was.
 	 */
-	replaceAll(changes: readonly (readonly [TaskEntry, Task])[]): TaskDocument {
+	replaceAll(changes: readonly (readonly [entry: TaskEntry, task: Task, asRead?: TaskEntry])[]): TaskDocument {
 		const edits: { line: number; count: number; rows: Row[] }[] = [];
 		const mint = this.mint();
-		for (const [entry, task] of changes) {
+		for (const [entry, task, asRead] of changes) {
 			const span = this.spanOf(entry);
 			if (sameTask(entry.task, task)) continue;
+			const line = asRead && sameOwnLine(asRead.task, task) && asRead.indent === entry.indent && asRead.bullet === entry.bullet ? asRead.raw : formatTaskLine({ indent: entry.indent, bullet: entry.bullet, task }, this.markers);
 			const own = sameLines(entry.task.children, task.children);
 			edits.push(
 				own
-					? { line: span.line, count: 1, rows: this.rewritten({ line: span.line, lineCount: 1 }, [formatTaskLine({ indent: entry.indent, bullet: entry.bullet, task }, this.markers)], mint) }
-					: { line: span.line, count: span.lineCount, rows: this.rewritten(span, this.linesOf(entry.indent, entry.bullet, task), mint) },
+					? { line: span.line, count: 1, rows: this.rewritten({ line: span.line, lineCount: 1 }, [line], mint) }
+					: { line: span.line, count: span.lineCount, rows: this.rewritten(span, [line, ...task.children], mint) },
 			);
 		}
 		if (edits.length === 0) return this;

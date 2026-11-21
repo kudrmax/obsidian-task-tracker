@@ -10,17 +10,13 @@ const FIRST = 0xe001;
  * its text, which the operations keep wherever they move it; `untag` takes every mark off before the document is written.
  */
 export class EntryTags {
-	private constructor(private readonly count: number) {}
+	private constructor(private readonly asRead: readonly TaskEntry[]) {}
 
 	/** Tags `entries` in their order: the n-th is found again as `find(doc, n)`. */
 	static tag(doc: TaskDocument, entries: readonly TaskEntry[]): { readonly doc: TaskDocument; readonly tags: EntryTags } {
-		const tagged = doc.replaceAll(
-			entries.map((entry, n) => {
-				const same = doc.find(entry.section, entry.index, entry.path)!;
-				return [same, { ...same.task, text: same.task.text + markOf(n) }] as const;
-			}),
-		);
-		return { doc: tagged, tags: new EntryTags(entries.length) };
+		const asRead = entries.map((entry) => doc.find(entry.section, entry.index, entry.path)!);
+		const tagged = doc.replaceAll(asRead.map((same, n) => [same, { ...same.task, text: same.task.text + markOf(n) }] as const));
+		return { doc: tagged, tags: new EntryTags(asRead) };
 	}
 
 	/** `text` with the n-th mark: written in place of a tagged task's text, it keeps the task tagged. */
@@ -42,12 +38,13 @@ export class EntryTags {
 		return search(doc.allTasks());
 	}
 
+	/** Takes every mark off: a task the operations left as it was gets its line back as it was read, wherever it now stands. */
 	untag(doc: TaskDocument): TaskDocument {
-		const changes: (readonly [TaskEntry, Task])[] = [];
-		for (let n = 0; n < this.count; n++) {
+		const changes: (readonly [TaskEntry, Task, TaskEntry])[] = [];
+		this.asRead.forEach((asRead, n) => {
 			const entry = this.find(doc, n);
-			if (entry) changes.push([entry, { ...entry.task, text: entry.task.text.slice(0, -markOf(n).length) }]);
-		}
+			if (entry) changes.push([entry, { ...entry.task, text: entry.task.text.slice(0, -markOf(n).length) }, asRead]);
+		});
 		return doc.replaceAll(changes);
 	}
 }

@@ -341,6 +341,12 @@ export class TaskRules {
 		return { operation, place: () => place };
 	}
 
+	/** Whether `edit` writes anything on the snapshot `s`: not for a blank title, nor for the task as it stands and where. */
+	editChanges(s: { readonly doc: TaskDocument; readonly today: LocalDate; readonly boundary: DayBoundary }, key: TaskKey, draft: TaskDraft): boolean {
+		const edit = this.edit(key, draft);
+		return edit !== null && edit.operation(s.doc, s.today, this.settings.get(), s.boundary).serialize() !== s.doc.serialize();
+	}
+
 	setStatus(key: TaskKey, status: TaskStatus): Operation {
 		return (doc) => ops.setStatus(doc, this.entryOf(doc, key), status);
 	}
