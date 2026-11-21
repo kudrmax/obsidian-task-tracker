@@ -21,6 +21,8 @@ const turn = (s: Screen, shift: -1 | 1) => standAt(s, placeOf(s.stop, s.dayOffse
 export const KEYS: readonly ScreenKey[] = [
 	{ id: "step-on", name: "Ribbon: one stop on", modifiers: [], key: "ArrowRight", run: (s) => turn(s, 1) },
 	{ id: "step-back", name: "Ribbon: one stop back", modifiers: [], key: "ArrowLeft", run: (s) => turn(s, -1) },
+	/** ⌘Z does what the Undo button does (F268); in a field the field keeps it (the table takes no key while one is open). */
+	{ id: "undo", name: "Undo", modifiers: ["Mod"], key: "z", run: (s) => s.undo() },
 ];
 
 /** Whether the screen takes keys now: no layer, no field, no gesture holding the pointer. */

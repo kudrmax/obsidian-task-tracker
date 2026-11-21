@@ -103,6 +103,8 @@ export interface ScreenState {
 	readonly fresh: ReadonlySet<string>;
 	/** Tasks gone from the screen in the last read (done, deleted, sent where it doesn't show them): their rows fade out (Decision 132). */
 	readonly gone: ReadonlySet<string>;
+	/** Whether Undo has a step to take back (the port's answer, read with the data): dim without one (F267). */
+	readonly canUndo: boolean;
 	/** A card to take the keyboard's focus, once per `seq`: the one a rename ended on by a key (Decision 58). */
 	readonly focusCard: { readonly id: string; readonly seq: number } | null;
 	/** A task to bring into sight in its list, once per `seq`. */
@@ -217,6 +219,8 @@ export interface ScreenActions {
 	 * level out, a new task under a renamed one); a renamed card shows its new name at once (F298).
 	 */
 	commitEntry(text: string, next: boolean): void;
+	/** Undo, the button or ⌘Z (F267): the port takes its last write back, and the cards move as any change moves them. */
+	undo(): void;
 	/** Starts following the port and the clock; returns the stop. Called by the screen as it mounts. */
 	start(): () => void;
 }
@@ -253,11 +257,13 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 			}
 			const next = share(s.read, port.read(s.dayOffset));
 			const known = s.read.cards;
-			const fresh = new Set(Object.keys(next.cards).filter((id) => !(id in known)));
-			const gone = new Set(Object.keys(known).filter((id) => !(id in next.cards)));
+			/** A read that changed nothing (a write's read-back after its own change came) keeps what came and went in the last one. */
+			const same = next === s.read;
+			const fresh = same ? s.fresh : new Set(Object.keys(next.cards).filter((id) => !(id in known)));
+			const gone = same ? s.gone : new Set(Object.keys(known).filter((id) => !(id in next.cards)));
 			/** An open menu shows its task as it now stands (a subtask typed into its stack, F108). */
 			const layer = s.layer && s.layer.model.kind === "task" && next.cards[s.layer.id] ? { ...s.layer, model: port.menu(s.layer.id, s.layer.from) } : s.layer;
-			set({ read: next, shown: share(s.shown, next), pending: false, fresh: fresh.size === 0 && s.fresh.size === 0 ? s.fresh : fresh, gone: gone.size === 0 && s.gone.size === 0 ? s.gone : gone, layer });
+			set({ read: next, shown: share(s.shown, next), pending: false, fresh: fresh.size === 0 && s.fresh.size === 0 ? s.fresh : fresh, gone: gone.size === 0 && s.gone.size === 0 ? s.gone : gone, layer, canUndo: port.canUndo() });
 		};
 
 		const write = (done: Promise<unknown>) => {
@@ -349,6 +355,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 			},
 			fresh: new Set(),
 			gone: new Set(),
+			canUndo: port.canUndo(),
 			reveal: null,
 			focusCard: null,
 
@@ -534,12 +541,18 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 				if (done.write) write(done.write);
 				if (next && entry.renaming && !entry.stack && !done.next) focusOn(entry.renaming);
 			},
+			undo() {
+				if (port.canUndo()) write(port.undo());
+			},
 			start() {
 				const off = port.subscribe(refresh);
 				let timer = 0;
-				/** Each minute the clock moves and the screen reads again: what rides the now line moves with it, what is over fades. */
+				/**
+				 * Each minute the clock moves and the screen reads again: what rides the now line moves with it, what is over fades.
+				 * What came and went a minute ago is drawn by now: a row scrolled into sight later no longer comes in.
+				 */
 				const tick = () => {
-					set({ now: port.now() });
+					set({ now: port.now(), fresh: new Set(), gone: new Set() });
 					refresh();
 					timer = window.setTimeout(tick, MINUTE_MS - (Date.now() % MINUTE_MS));
 				};

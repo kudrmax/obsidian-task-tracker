@@ -87,10 +87,11 @@ class StandPage {
 		this.mount(block, "note", NOTE_PATH);
 	}
 
-	/** A key of the screen's table, as the stand's view scope runs it: only while the screen takes keys. */
+	/** A key of the screen's table, as the stand's view scope runs it (`Mod` is ⌘ or Ctrl): only while the screen takes keys. */
 	onKey = (event: KeyboardEvent): void => {
-		if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
-		const key = KEYS.find((k) => k.key === event.key && k.modifiers.length === 0);
+		if (event.defaultPrevented) return;
+		const held = [...(event.metaKey || event.ctrlKey ? ["Mod"] : []), ...(event.shiftKey ? ["Shift"] : []), ...(event.altKey ? ["Alt"] : [])];
+		const key = KEYS.find((k) => k.key.toLowerCase() === event.key.toLowerCase() && k.modifiers.length === held.length && k.modifiers.every((m) => held.includes(m)));
 		const screen = this.leafScreen?.store.getState();
 		if (!key || !screen || !takesKeys(screen)) return;
 		key.run(screen);

@@ -44,6 +44,8 @@ const LEVELS = [
 const STATUS_MARKS: Readonly<Record<MenuStatusId, MockTask["status"]>> = { done: "x", inProgress: "/", stopProgress: " ", wontDo: "-", stop: " " };
 const REMINDERS: readonly ReminderKind[] = ["live", "notification", "alarm", "none"];
 /** A draft with nothing set: the field as a new task's opens. */
+/** Steps Undo keeps, as the plugin's history does (F267). */
+const UNDO_STEPS = 100;
 const NO_DRAFT: EntryDraft = { level: null, projects: [], descriptionLine: null, section: false };
 /** A task done or given up leaves the screen; it stays in the file. */
 const closed = (t: MockTask) => t.status === "x" || t.status === "-";
@@ -62,6 +64,8 @@ export class MockPort implements ScreenPort {
 	/** Reads by day, as of the clock's minute: what rides the now line and what is past changes with it. */
 	private readonly cache = new Map<string, ScreenData>();
 	private added = 0;
+	/** The file as it stood before each of the screen's writes, the last last: Undo writes the last one back (F267). */
+	private history: MockFile[] = [];
 	delay: WriteDelay = 30;
 
 	constructor(private readonly clock: () => Date = () => new Date()) {
@@ -78,13 +82,14 @@ export class MockPort implements ScreenPort {
 	reset(file: MockFile = mockFile(this.clock())): void {
 		this.file = file;
 		this.ahead = null;
+		this.history = [];
 		this.changed();
 	}
 
 	/** A task added at the top of `list` from outside the screen, as a hand edit or Sync brings it. */
 	addFromOutside(list: ListKey, title: string): void {
 		this.file[list][0].tasks.unshift(this.newTask(title, list === "now" ? dateOf(this.day()) : null));
-		this.changed();
+		this.editedOutside();
 	}
 
 	/** A task moved from outside: the one titled `title` before the one titled `before` (null: its list's first section's end). */
@@ -96,7 +101,7 @@ export class MockPort implements ScreenPort {
 		if (!into) throw new Error(`no task «${before}»`);
 		const at = before === null ? into.length : into.findIndex((t) => t.title === before);
 		into.splice(at, 0, found.task);
-		this.changed();
+		this.editedOutside();
 	}
 
 	// The port.
@@ -563,16 +568,40 @@ export class MockPort implements ScreenPort {
 		sections[sections.length - 1].tasks.push(task);
 	}
 
+	canUndo(): boolean {
+		return this.history.length > 0;
+	}
+
+	/** The file as it stood before the screen's last write, written back: a write of its own, which Undo does not take back in turn. */
+	async undo(): Promise<void> {
+		const before = this.history.pop();
+		if (!before) return;
+		await this.write((file) => Object.assign(file, structuredClone(before)), false);
+	}
+
 	// Writes.
 
-	/** A write made at once in `ahead` (previews see it), and in the file after `delay`, as a real write is read back. */
-	private async write(change: (file: MockFile) => void): Promise<void> {
+	/**
+	 * A write made at once in `ahead` (previews see it), and in the file after `delay`, as a real write is read back; the
+	 * file as it stood before it kept for Undo (`undoable`), up to the plugin's hundred steps.
+	 */
+	private async write(change: (file: MockFile) => void, undoable = true): Promise<void> {
 		this.ahead ??= structuredClone(this.file);
+		if (undoable) this.history = [...this.history, structuredClone(this.ahead)].slice(-UNDO_STEPS);
 		change(this.ahead);
 		this.inFlight++;
 		if (this.delay > 0) await new Promise((resolve) => window.setTimeout(resolve, this.delay));
 		change(this.file);
 		if (--this.inFlight === 0) this.ahead = null;
+		this.changed();
+	}
+
+	/**
+	 * A hand edit or Sync: not the screen's to take back, and the steps before it would write over it. The stand drops them
+	 * (the core drops only the steps whose lines changed, with its notice, F270: CorePort's).
+	 */
+	private editedOutside(): void {
+		this.history = [];
 		this.changed();
 	}
 

@@ -335,6 +335,10 @@ export interface ScreenPort {
 	commit(field: EntryField, text: string, draft: EntryDraft, next: boolean): EntryCommit;
 	/** What the menu of the task or event `id` offers, opened `from` there. */
 	menu(id: string, from: MenuFrom): MenuModel;
+	/** Whether Undo has a step of the screen's own to take back (F267): it is dim without one. */
+	canUndo(): boolean;
+	/** Takes the screen's last write back (F267, F269); resolves once written and read back. */
+	undo(): Promise<void>;
 	/** Writes what was tapped in the menu of `id` opened `from` there (a status tile of a folded block writes its step); resolves once written and read back. */
 	act(id: string, action: MenuAction, from?: MenuFrom): Promise<void>;
 }
