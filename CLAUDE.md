@@ -32,6 +32,14 @@ The plugin is used every day on the phone (iOS) and on the desktop (macOS). Ever
 
 `domain` and `application` are pure: no host globals (`window`, `document`, `setTimeout`, `localStorage`…), they get the clock and timers through ports. `core/phone` is the Apple apps' door, `globalThis.TaskCalendarPhone`: its functions keep their names, arguments and results (adding is fine), the app calls them. `tests/architecture.test.ts` guards the imports, the host globals (`core/tsconfig.json`) and what `contracts.ts` re-exports; `tests/uiDecides.test.ts` trips on task fields compared in `obsidian/ui`. Don't loosen them or raise a baseline: move the decision into `application`.
 
+## The engine (the screen being rebuilt)
+
+The plugin's screen is being rebuilt on the standard stack (React, Zustand, Motion, @use-gesture, dnd-kit) as the engine, `obsidian/ui/engine/`. Its spec is `docs/superpowers/specs/2026-11-18-ui-engine.md`: the Principles and the owners table are binding (one owner per concern, a second path is a defect); its «Decisions» record what was decided. The run to the release follows `docs/superpowers/plans/2026-11-21-to-release.md` (integration branch `ui-engine`, master merged at the start of every step); read its «rules every step keeps» first. The engine imports nothing from `core/`: it gets everything through its port (`engine/port.ts`).
+
+- **The stand**, `obsidian/stand/`: a plugin of its own (id `task-calendar-stand`) running the engine over `MockPort`'s made-up tasks. `npm run build:stand` builds it into `build/stand/` (and a whole vault in `build/stand-vault/`), never the root `main.js`. It runs only in the test Obsidian, never in `~/Obsidian`; Max's own stand gets the built files only.
+- **The trackpad module**, `native/trackpad/` (Decision 126, the one named exception to «standard, never invented»): a macOS N-API module reading the trackpad's own touch and lift. `npm run build:trackpad` rebuilds the committed universal `trackpad.node` and its source hash; `tests/infrastructure/trackpad.test.ts` fails when `addon.m` changed without a rebuild.
+- The end-to-end checks run the engine in Chromium: `npx playwright test` (`tests/e2e/`, every scenario on the desktop and the phone, dark and light, Max's recordings replayed).
+
 ## One design system
 
 - `styles.css`: the `body { … }` block at the top holds every token (`--tc-…`): colours, radii, sizes, type, spacing, motion. Component rules only read `var(--tc-…)`. `tests/styles.test.ts` fails on a bare number, colour or radius in a rule, on an unused or undefined token, and on `DESIGN` in `obsidian/ui/design.ts` disagreeing with the CSS. Don't loosen it: move the value into a token.
@@ -84,6 +92,7 @@ A behaviour Max reported broken a second time is guarded by a test that names hi
 
 - One swipe of the lists moves them one place, never two, from the very first swipe after launch: `RibbonPaging` (`apple/Core`) with `RibbonPagingTests`, the core's `rules.swipeLanding` with `tests/application/swipeLanding.test.ts`. Broken on 11-08 by a parity audit that read the plugin as gliding on, and on 11-09 by a ribbon that knew where a swipe started only after its first scroll.
 - At Inbox and at Soon the two columns split the screen in half; the divider sets the day list against the calendar at Today only: `RibbonColumns` (`apple/Core`) with `RibbonColumnsTests`, as `docs/plugin/screen.md` says for the plugin. Broken three times by «no column may change its width while the ribbon moves», which made Inbox and Soon take the divider's widths.
+- A card let go between the calendar and a list flies into its place's width in one motion, never growing part way and then jumping to full: Decision 121 of `docs/superpowers/specs/2026-11-18-ui-engine.md`, the carried plate's width in `styles.css` (`min(--tc-carried-w, 100%)`), with the e2e scenario `e7-calendar-drop-flight` (the copy's width goes one way, its last frame is the card's box). Reported by Max about five times.
 
 A fix reaches Max only through the installer below; after merging anything for the app, run it, and before reading a recording of Max's, check which master his phone runs.
 

@@ -21,6 +21,7 @@ You don't touch `obsidian/` or `apple/`.
 - The door keeps its functions' names, arguments and results; you only add. Every new method of `call` goes into `docs/door.md`.
 - `contracts.ts` and `settings.ts` change only for the feature you were given; say in your report exactly what changed there, the frontends build on it.
 - Test first, then the code. Before reporting: `npm test` and `npm run build` green, output unfiltered. `core/task-calendar-phone.js` rebuilt and committed.
+- The plugin's screen is being rebuilt as the engine; it reaches the core only through its port, and a rule the iPhone app or `agent/` also uses stays in the core, once: `docs/superpowers/specs/2026-11-18-ui-engine.md` and the plan `docs/superpowers/plans/2026-11-21-to-release.md`.
 - Decide technical questions yourself. Only a product question (what Max sees or does) goes to the lead, in product words, one at a time.
 
 ## Report to the lead

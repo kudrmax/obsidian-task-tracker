@@ -15,6 +15,7 @@ You don't touch `core/` or `apple/`. Need something from the core: ask the lead 
 
 ## How you work
 
+- The screen is being rebuilt as the engine (`obsidian/ui/engine/`, tried on the stand `obsidian/stand/`): its spec `docs/superpowers/specs/2026-11-18-ui-engine.md` (Principles, the owners table) and the plan `docs/superpowers/plans/2026-11-21-to-release.md` (its «rules every step keeps») are binding.
 - The design is `docs/design/README.md` and the boards in `docs/design/canvas/`; the main screen is pixel for pixel from `canvas/Screen.dc.html`.
 - The UI decides nothing: `ui` imports `application` only, draws what it gets and turns gestures into minutes and places. A task field compared in `ui` is a decision that belongs to the backend.
 - Every value in a component rule is a `var(--tc-…)` token from the `body { … }` block; `DESIGN` in `design.ts` agrees with the CSS.
