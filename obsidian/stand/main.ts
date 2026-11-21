@@ -1,5 +1,5 @@
-import { type App, Component, Notice, FileSystemAdapter, ItemView, MarkdownRenderChild, MarkdownRenderer, Platform, Plugin, Scope, type TFile, type WorkspaceLeaf } from "obsidian";
-import type { MacTrackpadFingers } from "../infrastructure/trackpad/MacTrackpadFingers";
+import { type App, Component, Notice, ItemView, MarkdownRenderChild, MarkdownRenderer, Platform, Plugin, Scope, type TFile, type WorkspaceLeaf } from "obsidian";
+import { type MacTrackpadFingers, trackpadFingers } from "../infrastructure/trackpad";
 import { KEYS, takesKeys } from "../ui/engine/keys";
 import type { Place } from "../ui/engine/layout/Layout";
 import { type MountedScreen, mountScreen } from "../ui/engine/mount";
@@ -213,11 +213,8 @@ export default class TaskCalendarStand extends Plugin {
 		};
 		(window as unknown as { __tcStand?: StandApi }).__tcStand = api;
 		this.register(() => delete (window as unknown as { __tcStand?: StandApi }).__tcStand);
-		this.fingers = await this.hearFingers();
-		this.register(() => {
-			this.fingers?.dispose();
-			this.fingers = null;
-		});
+		this.fingers = await trackpadFingers(this.app, this);
+		this.register(() => (this.fingers = null));
 		showPriorityColors([]);
 		this.register(clearPriorityColors);
 		this.register(() => this.source.dispose());
@@ -237,30 +234,6 @@ export default class TaskCalendarStand extends Plugin {
 		for (const project of MOCK_PROJECTS.filter((p) => !p.folder)) this.addCommand({ id: `project-${project.name}`, name: `Choose the project «${project.name}»`, callback: () => api.setProject(project.name) });
 		this.addCommand({ id: "project-none", name: "Choose no project", callback: () => api.setProject(null) });
 		for (const delay of WRITE_DELAYS) this.addCommand({ id: `delay-${delay}`, name: `Write delay ${delay} ms`, callback: () => this.source.setDelay(delay) });
-	}
-
-	/** Loaded only on the Mac's desktop app: the module reads Node's files, which the phone's Obsidian refuses at the plugin's load. */
-	private async hearFingers(): Promise<MacTrackpadFingers | null> {
-		const adapter = this.app.vault.adapter;
-		if (!Platform.isDesktopApp || !Platform.isMacOS || !(adapter instanceof FileSystemAdapter) || !this.manifest.dir) return null;
-		const host = window as unknown as { require?: (id: string) => unknown };
-		const [{ MacTrackpadFingers }, { TRACKPAD_MODULE }] = await Promise.all([import("../infrastructure/trackpad/MacTrackpadFingers"), import("../infrastructure/trackpad/module")]);
-		return MacTrackpadFingers.load(
-			TRACKPAD_MODULE,
-			{
-				dir: adapter.getFullPath(this.manifest.dir),
-				electron: () => host.require?.("electron") as never,
-				remoteFallback: () => {
-					try {
-						return host.require?.("@electron/remote") as never;
-					} catch {
-						return undefined;
-					}
-				},
-				log: (message) => console.info(`[task-calendar-stand] ${message}`),
-			},
-			window,
-		);
 	}
 
 	private onActiveView(checking: boolean, run: (view: StandView) => void): boolean {
