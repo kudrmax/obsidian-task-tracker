@@ -89,6 +89,14 @@ describe("the carried card's level by swipes on its place (Max, 2026-11-18)", ()
 		expect(move(1560)).toBe(1);
 		expect(move(1520)).toBe(0);
 	});
+	it("past the deepest level nothing builds up, however the hand gets there: a short step back is one level back", () => {
+		for (const far of [62, 77.5, 81.5, 99]) {
+			const move = hand(new SwipeLevel(null, 0, 0, 0), "p", 100, upTo(2));
+			for (let x = 100; x < 100 + far; x += 3.2) move(x);
+			expect(move(100 + far)).toBe(2);
+			expect(move(100 + far - SWIPE_STEP - 10)).toBe(1);
+		}
+	});
 	it("the way to a place is no swipe: a hand still moving right as it comes onto it, then resting, leaves a task", () => {
 		const level = new SwipeLevel(null, 0, 0, 0);
 		expect(level.at(100, 1000, "p", upTo(1))).toBe(0);
