@@ -2,14 +2,14 @@ import { type App, Component, FileSystemAdapter, ItemView, MarkdownRenderChild, 
 import { MacTrackpadFingers } from "../infrastructure/trackpad/MacTrackpadFingers";
 import { TRACKPAD_MODULE } from "../infrastructure/trackpad/module";
 import { KEYS, takesKeys } from "../ui/engine/keys";
-import type { Place } from "../ui/engine/layout/Layout";
 import { type MountedScreen, mountScreen } from "../ui/engine/mount";
 import type { Stop } from "../ui/engine/store";
 import { detectHaptics, type HapticsHost } from "../ui/haptics";
 import { clearPriorityColors, showPriorityColors } from "../ui/priorityColors";
 import { addWindowDocument } from "../ui/windowDocuments";
-import { calendarFile, type ListKey, longListsFile, type MockFile, oneColumnFile, sectionsFile, subtasksFile, twoColumnsFile } from "./mockData";
+import type { ListKey } from "./mockData";
 import { keptZoom, MockPort, WRITE_DELAYS, type WriteDelay, ZOOM_KEY } from "./MockPort";
+import { STAND_STEPS, type StandStep, WHOLE_SCREEN } from "./steps";
 
 /** The stand's own view type and code block language: never the plugin's. */
 export const STAND_VIEW = "task-calendar-stand";
@@ -61,8 +61,7 @@ class StandView extends ItemView {
 	runKey(id: string): boolean {
 		const screen = this.screen?.store.getState();
 		const key = KEYS.find((k) => k.id === id);
-		/** The step of the ribbon as a gallery has no keys yet: only the fingers move it. */
-		if (!screen || !key || !takesKeys(screen) || this.stand.leafPlace === "follow") return true;
+		if (!screen || !key || !takesKeys(screen)) return true;
 		key.run(screen);
 		return false;
 	}
@@ -75,12 +74,13 @@ class StandView extends ItemView {
 		this.unmount();
 	}
 
-	/** The screen drawn again for the stand's step now: the view's own screen, Obsidian's lifecycle left alone. */
+	/** The screen drawn again for the stand's step now, the ribbon standing where the step shows: the view's own screen, Obsidian's lifecycle left alone. */
 	remount(): void {
 		this.unmount();
 		this.contentEl.empty();
 		this.contentEl.addClass("tc-view");
-		this.screen = mountScreen(this.contentEl, { port: this.stand.port, place: this.stand.leafPlace, app: this.app, sourcePath: "", haptics: haptics(), zoom: this.stand.zoom(), markdown: markdownOf(this.app), desk: !Platform.isMobile, fingers: this.stand.fingers });
+		this.screen = mountScreen(this.contentEl, { port: this.stand.port, place: "leaf", app: this.app, sourcePath: "", haptics: haptics(), zoom: this.stand.zoom(), markdown: markdownOf(this.app), desk: !Platform.isMobile, fingers: this.stand.fingers });
+		this.screen.store.getState().setStop(this.stand.step.stop);
 		this.stand.screens.add(this.screen);
 	}
 
@@ -136,8 +136,8 @@ export interface StandApi {
 export default class TaskCalendarStand extends Plugin {
 	readonly port = new MockPort();
 	readonly screens = new Set<MountedScreen>();
-	/** What a leaf shows: the whole screen, or a step alone (one column, then two) with plain tasks. */
-	leafPlace: Place = "leaf";
+	/** The step a leaf shows: the whole screen, or the tasks of a step and the ribbon standing where they are. */
+	step: StandStep = WHOLE_SCREEN;
 	/** macOS's touch and lift on the trackpad (Decision 126); null on the phone, on Windows and Linux, and wherever the native module can't load. */
 	fingers: MacTrackpadFingers | null = null;
 
@@ -149,10 +149,10 @@ export default class TaskCalendarStand extends Plugin {
 		);
 	}
 
-	/** Shows `place` in every open leaf, with its tasks: the first step's dozen, or the whole made-up file. */
-	private async showStep(place: Place, file: MockFile | undefined = place === "column" ? oneColumnFile() : place === "twoColumns" ? twoColumnsFile() : undefined): Promise<void> {
-		this.leafPlace = place;
-		this.port.reset(file);
+	/** Shows `step` in every open leaf, with its tasks. */
+	private showStep(step: StandStep): void {
+		this.step = step;
+		this.port.reset(step.file?.());
 		for (const leaf of this.app.workspace.getLeavesOfType(STAND_VIEW)) if (leaf.view instanceof StandView) leaf.view.remount();
 	}
 
@@ -189,16 +189,7 @@ export default class TaskCalendarStand extends Plugin {
 		if (!Platform.isMobile) this.addCommand({ id: "open-window", name: "Open the screen in a new window", callback: () => void this.open(true) });
 		this.addCommand({ id: "open-note", name: "Open the note with the screen's block", callback: () => void this.openNote() });
 		this.addCommand({ id: "new-tasks", name: "New made-up tasks", callback: () => port.reset() });
-		this.addCommand({ id: "step-one-column", name: "Step 1: one column and drag", callback: () => void this.showStep("column") });
-		this.addCommand({ id: "step-two-columns", name: "Step 2: two columns and drag between them", callback: () => void this.showStep("twoColumns") });
-		this.addCommand({ id: "step-subtasks", name: "Step 3: subtasks", callback: () => void this.showStep("twoColumns", subtasksFile()) });
-		this.addCommand({ id: "step-sections", name: "Step 4: sections", callback: () => void this.showStep("twoColumns", sectionsFile()) });
-		this.addCommand({ id: "step-long-lists", name: "Step 5: long lists", callback: () => void this.showStep("twoColumns", longListsFile()) });
-		this.addCommand({ id: "step-calendar", name: "Step 6: onto and off the calendar", callback: () => void this.showStep("calendar", calendarFile(new Date())) });
-		this.addCommand({ id: "step-swipe", name: "Step 7: swipe the columns", callback: () => void this.showStep("follow") });
-		this.addCommand({ id: "step-menu", name: "Step 8: the task menu", callback: () => void this.showStep("calendar", calendarFile(new Date())) });
-		this.addCommand({ id: "step-quick-add", name: "Step 9: quick add", callback: () => void this.showStep("leaf") });
-		this.addCommand({ id: "whole-screen", name: "The whole screen", callback: () => void this.showStep("leaf") });
+		for (const step of STAND_STEPS) this.addCommand({ id: step.id, name: step.name, callback: () => this.showStep(step) });
 		for (const delay of WRITE_DELAYS) this.addCommand({ id: `delay-${delay}`, name: `Write delay ${delay} ms`, callback: () => (port.delay = delay) });
 	}
 

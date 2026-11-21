@@ -42,7 +42,7 @@ export default {
 	async run(t, item) {
 		const [file, part] = item.split(" ");
 		const span = part ? SPANS[part] : null;
-		await t.cdp.eval(`(async () => { window.__tcStand.step("step-swipe"); await new Promise((r) => setTimeout(r, 500)); return 1; })()`);
+		await t.cdp.eval(`(async () => { window.__tcStand.step("whole-screen"); await new Promise((r) => setTimeout(r, 500)); return 1; })()`);
 		await t.setStop("soon");
 		const rec = JSON.parse(readFileSync(RECORDINGS + file, "utf8"));
 		const wheels = (span ? inSpan(rec.events, span) : rec.events).filter((e) => e.type === "wheel");

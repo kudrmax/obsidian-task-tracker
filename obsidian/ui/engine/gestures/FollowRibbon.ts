@@ -1,18 +1,15 @@
 import { useGesture, useWheel } from "@use-gesture/react";
 import { animate, type AnimationPlaybackControls, type MotionValue, useMotionValue, useTransform } from "motion/react";
 import { createContext, type RefObject, useEffect, useRef, useState } from "react";
-import { STOPS, type Stop, useScreen, useScreenApi } from "../store";
+import { CALENDAR, placeOf, standAt } from "../layout/columns";
+import { useScreen, useScreenApi } from "../store";
 import { type ChangeTiming, changeLook, changeTiming, type DayChange } from "./dayChange";
 import { FollowPager, LANDING, landingAt, landingVelocity } from "./followPager";
 import { type FingerSignal, TrackpadFollow, type TrackpadFingers } from "./trackpadFollow";
-import type { WheelSample } from "./wheelStrokes";
-import { type WheelCue, WheelFollow } from "./wheelFollow";
+import { type WheelCue, WheelFollow, type WheelSample } from "./wheelFollow";
 
 /** Where the landing counts as done, in places: under a pixel at any width the ribbon has. */
 const REST = 0.001;
-
-/** The ribbon's last stop, the day and its calendar: past it the places are the days, one a day. */
-const CALENDAR = STOPS.length - 1;
 
 /**
  * The days a turn draws past the calendar (Max, 2026-11-21; Decision 127): the strip stands; the day's list turns as a
@@ -38,17 +35,27 @@ export interface DayLookValues {
 	readonly opacity: MotionValue<number>;
 }
 
+/** The handlers @use-gesture gives the ribbon's element. */
+type GestureHandlers = ReturnType<ReturnType<typeof useGesture>>;
+
+/**
+ * The ribbon's handlers without @use-gesture's click filter (`filterTaps` takes the click after a drag that was no tap):
+ * its flag outlived a drag cancelled because another gesture held the pointer (a block's dot pulled, F103) or a mouse's
+ * pull it never followed, and ate the next tap on a task. A swipe gives no click to filter: a finger that moved past the
+ * browser's slop makes none, and a mouse or the trackpad never moves the ribbon by a drag.
+ */
+function withoutClickFilter(handlers: GestureHandlers): GestureHandlers {
+	return Object.fromEntries(Object.entries(handlers).filter(([name]) => name !== "onClickCapture")) as GestureHandlers;
+}
+
 export const DayTurnContext = createContext<DayTurn | null>(null);
 
 export interface FollowGestures {
 	/** Where the strip stands, in columns from Inbox: 0 Inbox–Soon, 1 Soon–day, 2 the day–its calendar. */
 	readonly at: MotionValue<number>;
 	readonly turn: DayTurn;
-	readonly bind: ReturnType<typeof useGesture>;
+	readonly bind: () => GestureHandlers;
 }
-
-/** Where the ribbon stands at a stop and day, in places: the stops 0–2, past the calendar one place a day. */
-const placeOf = (stop: Stop, dayOffset: number) => STOPS.indexOf(stop) + (stop === "calendar" ? Math.max(0, dayOffset) : 0);
 
 const sameDays = (a: readonly number[], b: readonly number[]) => a.length === b.length && a.every((day, i) => day === b[i]);
 
@@ -164,7 +171,7 @@ export function useFollowRibbon(ribbon: RefObject<HTMLElement | null>, win: Wind
 		setChange(null);
 	};
 
-	/** A stop or day set from outside (a scenario's setup): the ribbon goes there by the same landing. Read as the store stands once the render is in: a finger's lift sets the stop and the day one after the other. */
+	/** A stop or day set from outside (a key, a place picked for a new task, a scenario's setup): the ribbon goes there by the same landing. Read as the store stands once the render is in: a finger's lift sets the stop and the day one after the other. */
 	useEffect(() => {
 		const now = api.getState();
 		const to = placeOf(now.stop, now.dayOffset);
@@ -185,8 +192,7 @@ export function useFollowRibbon(ribbon: RefObject<HTMLElement | null>, win: Wind
 		landing.current = false;
 		settle();
 		pager.current.begin(along.get(), fresh);
-		screen.setStop(STOPS[Math.min(pager.current.stop, CALENDAR)]);
-		screen.showDay(Math.max(0, pager.current.stop - CALENDAR));
+		standAt(screen, pager.current.stop);
 		draw(true);
 		return true;
 	};
@@ -200,8 +206,7 @@ export function useFollowRibbon(ribbon: RefObject<HTMLElement | null>, win: Wind
 		if (!pager.current.following) return;
 		const to = pager.current.release(along.get(), speed, column());
 		const screen = api.getState();
-		screen.setStop(STOPS[Math.min(to, CALENDAR)]);
-		screen.showDay(Math.max(0, to - CALENDAR));
+		standAt(screen, to);
 		screen.release("ribbon");
 		draw(true);
 		land(to, speed);
@@ -236,7 +241,7 @@ export function useFollowRibbon(ribbon: RefObject<HTMLElement | null>, win: Wind
 		return { cues, claimed: wheelLocked.current && !sample.ctrl };
 	};
 
-	const bind = useGesture(
+	const gestures = useGesture(
 		{
 			onDrag: ({ first, last, xy: [x], initial: [x0], velocity: [vx], direction: [dx], event, cancel }) => {
 				if ((event as PointerEvent).pointerType === "mouse") return;
@@ -282,5 +287,6 @@ export function useFollowRibbon(ribbon: RefObject<HTMLElement | null>, win: Wind
 	);
 	/** A card carried: only the shown day is drawn, so a day out of sight never lies under it as a place to drop on. */
 	const drawnNow = dragging ? [Math.max(0, dayOffset)] : days;
+	const bind = () => withoutClickFilter(gestures());
 	return { at, turn: { at: dayAt, days: drawnNow, shown: shownDay, change, out: { x: outX, opacity: outOpacity }, in: { x: inX, opacity: inOpacity } }, bind };
 }

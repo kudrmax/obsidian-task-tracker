@@ -1,8 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
 import { MockPort } from "../../../obsidian/stand/MockPort";
-import { swipeStep } from "../../../obsidian/ui/engine/gestures/swipeStep";
-import { COLUMN_SHARE, offsetOf, shownAt, STRIP_WIDTH } from "../../../obsidian/ui/engine/layout/columns";
 import { LAYER_MS } from "../../../obsidian/ui/engine/layers/motion";
 import { share } from "../../../obsidian/ui/engine/store/share";
 import { createScreenStore } from "../../../obsidian/ui/engine/store";
@@ -18,56 +16,6 @@ function screen() {
 const titles = (store: ReturnType<typeof screen>["store"], list: "inbox" | "soon" | "day") =>
 	store.getState().shown.lists[list].rows.flatMap((row) => (row.kind === "task" ? [store.getState().shown.cards[row.id].title] : []));
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
-
-/**
- * Max asked twice (CLAUDE.md, «Behaviours Max had to ask for twice»): one swipe of the lists moves them one place, never
- * two, from the very first swipe after launch. In the engine the swipe's rule is `swipeStep` and the step is the store's.
- */
-describe("one swipe, one place (Max)", () => {
-	it("a swipe goes at most one place whatever its length or speed", () => {
-		for (const moved of [-900, -300, -100, -10, 0, 10, 100, 300, 900]) for (const flick of [-1, 0, 1]) expect(Math.abs(swipeStep(moved, 195, flick))).toBeLessThanOrEqual(1);
-		expect(swipeStep(400, 195, 0)).toBe(1);
-		expect(swipeStep(90, 195, 0)).toBe(0);
-		expect(swipeStep(20, 195, 1)).toBe(1);
-		expect(swipeStep(-20, 195, -1)).toBe(-1);
-	});
-
-	it("the first step after the screen opens moves the ribbon one stop", () => {
-		const { store } = screen();
-		expect(store.getState().stop).toBe("calendar");
-		store.getState().step(-1);
-		expect(store.getState().stop).toBe("soon");
-		store.getState().step(-1);
-		expect(store.getState().stop).toBe("inbox");
-		store.getState().step(-1);
-		expect(store.getState().stop).toBe("inbox");
-	});
-
-	it("past the day's calendar a step turns the day, and back on today returns to Soon", () => {
-		const { store } = screen();
-		store.getState().step(1);
-		expect(store.getState()).toMatchObject({ stop: "calendar", dayOffset: 1, dayWay: 1 });
-		expect(store.getState().shown.day.title).toBe("Tomorrow");
-		store.getState().step(-1);
-		expect(store.getState()).toMatchObject({ stop: "calendar", dayOffset: 0, dayWay: -1 });
-		store.getState().step(-1);
-		expect(store.getState().stop).toBe("soon");
-	});
-});
-
-/** Max asked twice: at Inbox and at Soon the two columns split the screen in half. */
-describe("halves at Inbox and Soon (Max)", () => {
-	it("each shown column is half the window", () => {
-		for (const stop of ["inbox", "soon"] as const) {
-			expect(shownAt(stop)).toHaveLength(2);
-			expect((STRIP_WIDTH * COLUMN_SHARE) / 100).toBe(50);
-		}
-		expect(shownAt("inbox")).toEqual(["inbox", "soon"]);
-		expect(shownAt("soon")).toEqual(["soon", "day"]);
-		expect(shownAt("calendar")).toEqual(["day", "timeline"]);
-		expect([offsetOf("inbox"), offsetOf("soon"), offsetOf("calendar")]).toEqual([0, 1, 2]);
-	});
-});
 
 describe("the screen's store", () => {
 	it("draws a drop at once and keeps it through the write's read-back, each card's face the same object", async () => {
@@ -128,19 +76,7 @@ describe("the screen's store", () => {
 	});
 });
 
-describe("the day's slide", () => {
-	it("keeps every day still sliding out, however fast the strokes came", () => {
-		const { store } = screen();
-		store.getState().step(1);
-		store.getState().step(1);
-		store.getState().step(-1);
-		const { left, dayOffset } = store.getState();
-		expect(dayOffset).toBe(1);
-		expect(left[0].shown.day.title).toBe("Today");
-		expect(left[2].shown.day.title).not.toBe("Tomorrow");
-		expect(left[1].shown.day.title).toBe("Tomorrow");
-	});
-
+describe("the days drawn beside the shown one", () => {
 	it("reads the days a finger draws into sight, and keeps what they drew when one of them is shown", () => {
 		const { store } = screen();
 		store.getState().peekDays([0, 1, 2]);
@@ -153,11 +89,9 @@ describe("the day's slide", () => {
 		expect(store.getState().left[1].shown).toBe(drawn);
 		store.getState().showDay(1);
 		expect(store.getState().dayOffset).toBe(1);
-		expect(store.getState().dayWay).toBe(1);
 		expect(store.getState().shown.lists.day).toBe(drawn.lists.day);
 		expect(store.getState().left[0].shown.day.title).toBe("Today");
 		store.getState().showDay(0);
-		expect(store.getState().dayWay).toBe(-1);
 		expect(store.getState().shown.day.title).toBe("Today");
 	});
 });

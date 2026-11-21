@@ -1,7 +1,8 @@
-import { swipeStep } from "./swipeStep";
-
 /** A finger let go at least this fast, px/ms, goes one place its way, however little of the way it drew (the core's `SWIPE_FLICK_SPEED`). */
 export const FLICK_SPEED = 0.3;
+
+/** Let go slowly, the nearest place: one on once the fingers drew past half a place (`drawn`, in places), else back. */
+const nearest = (drawn: number, width: number): -1 | 0 | 1 => (width <= 0 || Math.abs(drawn) * 2 < 1 ? 0 : drawn > 0 ? 1 : -1);
 
 /**
  * The ribbon as a gallery of places (Max, 2026-11-19: «как фотки в галерее»), the same for a finger on glass and two on
@@ -50,7 +51,7 @@ export class FollowPager {
 		/** A flick the way this stroke drew goes one place that way, one against it springs back (the core's `swipeLanding`); slower, the nearest place. */
 		const drawn = Math.sign(this.moved);
 		const flick = Math.abs(speed) >= FLICK_SPEED ? Math.sign(speed) : 0;
-		const step = flick !== 0 ? (flick === drawn ? flick : 0) : swipeStep((at - this.stop) * width, width, 0);
+		const step = flick !== 0 ? (flick === drawn ? flick : 0) : nearest(at - this.stop, width);
 		this.stop = Math.min(this.last, Math.max(0, this.origin - 1, Math.min(this.origin + 1, this.stop + step)));
 		this.before = this.origin;
 		this.origin = null;

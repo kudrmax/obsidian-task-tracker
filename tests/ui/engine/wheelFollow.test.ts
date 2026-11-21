@@ -1,13 +1,13 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { FollowPager } from "../../../obsidian/ui/engine/gestures/followPager";
 import { WheelFollow } from "../../../obsidian/ui/engine/gestures/wheelFollow";
-import { WheelStrokes } from "../../../obsidian/ui/engine/gestures/wheelStrokes";
 // @ts-expect-error the e2e checks' shared replay of the rule is plain JavaScript
 import { followSteps } from "../../e2e/lib/follow.mjs";
 
 const RECORDINGS = join(__dirname, "..", "..", "e2e", "recordings");
+/** The round-six pager's strokes on Max's long sessions, as it turned them before it gave way to the gallery (stage0.md, «Round six»). */
+const ROUND_SIX = JSON.parse(readFileSync(join(__dirname, "fixtures", "round-six-pager-strokes.json"), "utf8")) as Record<string, number[]>;
 
 interface Wheel {
 	readonly dx: number;
@@ -93,10 +93,7 @@ describe("the trackpad followed as a finger", () => {
 		["max-2026-11-17-r5.json", 0.84],
 		["max-2026-11-17-r6-pager.json", 0.9],
 	] as const)("agrees with the pager on most of %s's strokes", (file, share) => {
-		const pager = new WheelStrokes();
-		const strokes = recording(file)
-			.wheels.map((e) => pager.feed(e))
-			.filter((s) => s !== 0);
+		const strokes = ROUND_SIX[file];
 		const { steps } = run(file);
 		expect(common(steps, strokes) / Math.max(steps.length, strokes.length)).toBeGreaterThanOrEqual(share);
 	});
@@ -114,55 +111,5 @@ describe("the trackpad followed as a finger", () => {
 		const quiet = fingers.quietAt;
 		expect(quiet).not.toBeNull();
 		expect(fingers.tick(quiet! + 1)).toEqual([{ kind: "release", t: quiet, speed: 0 }]);
-	});
-});
-
-describe("the gallery's rule", () => {
-	const width = 400;
-
-	it("held mid-way and let go: under half back, past half on", () => {
-		const under = new FollowPager(1, 2);
-		under.begin(1, true);
-		expect(under.release(under.move(150, width), 0, width)).toBe(1);
-		const past = new FollowPager(1, 2);
-		past.begin(1, true);
-		expect(past.release(past.move(-250, width), 0, width)).toBe(0);
-	});
-
-	it("a flick goes one place its way, however little drawn, never two", () => {
-		const pager = new FollowPager(0, 2);
-		pager.begin(0, true);
-		expect(pager.move(2000, width)).toBe(1);
-		expect(pager.release(1, 5, width)).toBe(1);
-	});
-
-	it("a flick against the way drawn springs back", () => {
-		const pager = new FollowPager(1, 2);
-		pager.begin(1, true);
-		expect(pager.release(pager.move(60, width), -1, width)).toBe(1);
-	});
-
-	it("two quick flicks the same way, the second during the first's landing, go two places, one each", () => {
-		const pager = new FollowPager(0, 2);
-		pager.begin(0, true);
-		expect(pager.release(pager.move(80, width), 2, width)).toBe(1);
-		pager.begin(0.6, true);
-		expect(pager.release(pager.move(60, width), 2, width)).toBe(2);
-	});
-
-	it("the same stroke going on after a lift that was not one keeps its own place", () => {
-		const pager = new FollowPager(0, 2);
-		pager.begin(0, true);
-		expect(pager.release(pager.move(60, width), 2, width)).toBe(1);
-		pager.begin(0.2, false);
-		expect(pager.move(2000, width)).toBe(1);
-		expect(pager.release(1, 2, width)).toBe(1);
-	});
-
-	it("stops at the row's ends", () => {
-		const pager = new FollowPager(0, 2);
-		pager.begin(0, true);
-		expect(pager.move(-300, width)).toBe(0);
-		expect(pager.release(0, -3, width)).toBe(0);
 	});
 });

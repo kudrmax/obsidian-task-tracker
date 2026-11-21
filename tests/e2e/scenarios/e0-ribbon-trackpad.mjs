@@ -1,11 +1,11 @@
 /**
  * E0, the ribbon on the Mac trackpad (spec, «Gestures that are not drag»; stage 0 round six): each stroke turns the screen
- * one stop its way at once, the momentum tail nothing, a vertical scroll nothing; past the day's calendar the days turn,
- * the day sliding in as one region from the side it comes from. What is checked is what a person reads.
+ * one stop its way, the momentum tail nothing, a vertical scroll nothing; past the day's calendar the days turn, the
+ * day's list as a page with its header, the next day's page beside it (Decision 127). What is checked is what a person reads.
  */
 export default {
 	name: "e0-ribbon-trackpad",
-	features: ["E0: ribbon (trackpad), Slide"],
+	features: ["E0: ribbon (trackpad), the day turn"],
 	platforms: ["desktop"],
 	async run(t) {
 		const view = await t.oracle.rect(".task-calendar");
@@ -41,12 +41,12 @@ export default {
 		await strokes(-1, 1);
 		await is(["Today"], "and back to today");
 
-		/** Mid-slide (turned by the key, so no probe runs inside a stroke's stream) the day going out still shows its own day. */
+		/** Mid-turn (turned by the key, so no probe runs inside a stroke's stream) the page going out still shows its own day, the page coming in beside it. */
 		await t.cdp.send("Input.dispatchKeyEvent", { type: "keyDown", key: "ArrowRight", code: "ArrowRight", windowsVirtualKeyCode: 39 });
 		await t.cdp.send("Input.dispatchKeyEvent", { type: "keyUp", key: "ArrowRight", code: "ArrowRight", windowsVirtualKeyCode: 39 });
 		await t.sleep(60);
-		const mid = await t.cdp.eval(`[...document.querySelectorAll(".tc-day-title")].map((e) => e.textContent)`);
-		t.expect(JSON.stringify(mid) === JSON.stringify(["Today", "Tomorrow"]), `mid-slide the day going out still shows its own title beside the day coming in: ${JSON.stringify(mid)}`);
+		const mid = await t.cdp.eval(`[...document.querySelectorAll(".tc-day-lane .tc-day-title")].map((e) => e.textContent)`);
+		t.expect(mid.indexOf("Tomorrow") === mid.indexOf("Today") + 1 && mid.indexOf("Today") >= 0, `mid-turn the day going out still shows its own title beside the day coming in: ${JSON.stringify(mid)}`);
 		await t.sleep(700);
 		await strokes(-1, 1);
 		await is(["Today"], "back to today again");

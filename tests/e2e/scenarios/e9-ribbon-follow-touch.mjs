@@ -11,7 +11,7 @@ export default {
 	features: ["Step 7: swipe the columns (touch)"],
 	platforms: ["phone"],
 	async run(t) {
-		await t.cdp.eval(`(async () => { window.__tcStand.step("step-swipe"); await new Promise((r) => setTimeout(r, 500)); return 1; })()`);
+		await t.cdp.eval(`(async () => { window.__tcStand.step("whole-screen"); await new Promise((r) => setTimeout(r, 500)); return 1; })()`);
 		await t.setStop("soon");
 		const view = await t.oracle.rect(".task-calendar");
 		const columns = async () => (await t.oracle.columns()).filter((title) => title !== "");

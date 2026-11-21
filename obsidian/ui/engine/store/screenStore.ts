@@ -53,13 +53,12 @@ export interface ScreenState {
 	/** The last read: the order the rows glide by (Motion's `layoutDependency`, stage 0 «Integration findings» 3). */
 	readonly read: ScreenData;
 	/**
-	 * The days the screen turned away from, as they stood, by their offset: each region still sliding out draws its own
-	 * day, however fast the strokes came. The last few only: a region is gone within one slide.
+	 * The days drawn beside the shown one, as they stood, by their offset: the day's pages a turn brings into sight and the
+	 * day turned away from, each drawn as it was however fast the strokes came. The few near the shown day only.
 	 */
 	readonly left: Readonly<Record<number, { readonly shown: ScreenData; readonly read: ScreenData }>>;
-	/** The shown day, in days from today, and the way it last turned (the day's slide). */
+	/** The shown day, in days from today. */
 	readonly dayOffset: number;
-	readonly dayWay: -1 | 0 | 1;
 	readonly stop: Stop;
 	readonly gesture: Gesture | null;
 	/** The task carried now. */
@@ -109,15 +108,13 @@ export interface ScreenState {
 }
 
 export interface ScreenActions {
-	/** The ribbon one stop on (1) or back (-1); past the day's calendar, the days. */
-	step(shift: -1 | 1): void;
 	setStop(stop: Stop): void;
 	/**
 	 * The ribbon's place past the calendar as a finger lets it go (`offset` days from today): the day shown from now on, the
-	 * day turned away from kept for its region still sliding out.
+	 * day turned away from kept for its page still in sight.
 	 */
 	showDay(offset: number): void;
-	/** Reads the days `offsets` (other than the shown one) for regions a finger draws into sight, kept as the days turned away from are. */
+	/** Reads the days `offsets` (other than the shown one) for the pages a finger draws into sight, kept as the days turned away from are. */
 	peekDays(offsets: readonly number[]): void;
 	/** Takes the pointer for `gesture` unless another holds it; whether it got it. A drag takes it from the ribbon (its long press already proved the ribbon still, dnd-kit's activation constraint), never from a pinch or a resize. */
 	claim(gesture: Gesture): boolean;
@@ -228,7 +225,7 @@ export type ScreenStore = StoreApi<Screen>;
 const MINUTE_MS = 60_000;
 /** How long a carried card stays at a room's edge it headed into before the room scrolls under it (F162: a quarter second). */
 const SCROLL_DWELL_MS = 250;
-/** Days kept for regions sliding out: as many as fast strokes can leave sliding at once. */
+/** Days kept beside the shown one, either way: as many as fast strokes can leave in sight at once. */
 const LEFT_KEPT = 4;
 
 /** Gestures during which data that arrives waits (spec, principle 5): what the finger holds stays still under it. */
@@ -268,17 +265,16 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 			});
 		};
 
-		/** The day `dayOffset` shown: the one turned away from kept for its region still sliding out, a day already drawn in sight read again over what it drew. */
-		const showDay = (dayOffset: number, dayWay: -1 | 0 | 1) => {
+		/** The day `dayOffset` shown: the one turned away from kept for its page still in sight, a day already drawn in sight read again over what it drew. */
+		const showDay = (dayOffset: number) => {
 			const { dayOffset: from, shown, read, left } = get();
 			if (dayOffset === from) return;
 			const drawn = left[dayOffset];
 			const fresh = port.read(dayOffset);
 			const next = drawn ? share(drawn.read, fresh) : fresh;
 			const kept = Object.entries(left).filter(([day]) => Math.abs(Number(day) - dayOffset) <= LEFT_KEPT);
-			set({ left: { ...Object.fromEntries(kept), [from]: { shown, read } }, dayOffset, dayWay, read: next, shown: drawn ? share(drawn.shown, next) : next, fresh: new Set() });
+			set({ left: { ...Object.fromEntries(kept), [from]: { shown, read } }, dayOffset, read: next, shown: drawn ? share(drawn.shown, next) : next, fresh: new Set() });
 		};
-		const turnDay = (shift: -1 | 1) => showDay(get().dayOffset + shift, shift);
 		/** The card `id` takes the focus back, as a menu closing gives it back (Decision 58). */
 		const focusOn = (id: string) => set({ focusCard: { id, seq: (get().focusCard?.seq ?? 0) + 1 } });
 
@@ -287,7 +283,6 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 			read: first,
 			left: {},
 			dayOffset: 0,
-			dayWay: 0,
 			stop: "calendar",
 			gesture: null,
 			lifted: null,
@@ -353,18 +348,10 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 			reveal: null,
 			focusCard: null,
 
-			step(shift) {
-				const { stop, shown } = get();
-				if (stop === "calendar" && (shift > 0 || !shown.day.isToday)) return turnDay(shift);
-				const at = STOPS.indexOf(stop) + shift;
-				if (at >= 0 && at < STOPS.length) set({ stop: STOPS[at] });
-			},
 			setStop(stop) {
 				set({ stop });
 			},
-			showDay(offset) {
-				showDay(offset, Math.sign(offset - get().dayOffset) as -1 | 0 | 1);
-			},
+			showDay,
 			peekDays(offsets) {
 				const { dayOffset, left } = get();
 				const read = offsets
@@ -508,8 +495,10 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx):
 				const to = port.entryPlace(entry, choice, date, reach);
 				if (to.at.dayOffset !== get().dayOffset) get().showDay(to.at.dayOffset);
 				const where = to.at.list;
+				/** Another day than today stands past the calendar, where the ribbon turns the days (Decision 127); a list out of sight, the stop that shows it. */
+				const next = to.at.dayOffset !== 0 ? "calendar" : SHOWS[stop][where] ? stop : STOP_OF[where];
 				/** The field opens again at its new place, with what was typed (a new field brought into sight, F193). */
-				set({ entry: to, entrySeq: get().entrySeq + 1, entryPanel: null, ...(SHOWS[stop][where] ? {} : { stop: STOP_OF[where] }) });
+				set({ entry: to, entrySeq: get().entrySeq + 1, entryPanel: null, ...(next === stop ? {} : { stop: next }) });
 			},
 			plusTap(shown) {
 				get().openEntry(port.newTaskPlace(get().dayOffset, shown));

@@ -12,7 +12,7 @@ export default {
 	features: ["Step 7: swipe the columns (touch over cards and the calendar)"],
 	platforms: ["phone"],
 	async run(t) {
-		await t.cdp.eval(`(async () => { window.__tcStand.step("step-swipe"); await new Promise((r) => setTimeout(r, 800)); return 1; })()`);
+		await t.cdp.eval(`(async () => { window.__tcStand.step("whole-screen"); await new Promise((r) => setTimeout(r, 800)); return 1; })()`);
 		const columns = async () => (await t.oracle.columns()).filter((title) => title !== "");
 		const is = async (want, what) => t.expect(JSON.stringify(await columns()) === JSON.stringify(want), `${what}: ${JSON.stringify(await columns())}`);
 		const scrollLeft = () => t.cdp.eval(`document.querySelector(".tc-ribbon-track").getBoundingClientRect().left`);

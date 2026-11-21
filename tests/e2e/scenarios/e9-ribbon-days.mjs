@@ -46,7 +46,7 @@ export default {
 	name: "e9-ribbon-days",
 	features: ["Step 7: swipe the columns past the calendar (the days)"],
 	async run(t) {
-		await t.cdp.eval(`(async () => { window.__tcStand.step("step-swipe"); await new Promise((r) => setTimeout(r, 500)); return 1; })()`);
+		await t.cdp.eval(`(async () => { window.__tcStand.step("whole-screen"); await new Promise((r) => setTimeout(r, 500)); return 1; })()`);
 		await t.setStop("calendar");
 		const columns = async () => (await t.oracle.columns()).filter((title) => title !== "");
 		const is = async (want, what) => t.expect(JSON.stringify(await columns()) === JSON.stringify(want), `${what}: ${JSON.stringify(await columns())}`);

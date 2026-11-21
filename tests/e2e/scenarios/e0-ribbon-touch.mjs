@@ -14,7 +14,7 @@ const FOLLOW_PX = 4;
 
 export default {
 	name: "e0-ribbon-touch",
-	features: ["E0: ribbon (touch), gesture slot, Slide"],
+	features: ["E0: ribbon (touch), gesture slot, the day turn"],
 	platforms: ["phone"],
 	async run(t) {
 		const view = await t.oracle.rect(".task-calendar");

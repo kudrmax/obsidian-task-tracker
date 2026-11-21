@@ -24,7 +24,7 @@ export default {
 	name: "e9-ribbon-days-calendar",
 	features: ["Step 7: the calendar as the days turn"],
 	async run(t) {
-		await t.cdp.eval(`(async () => { window.__tcStand.step("step-swipe"); await new Promise((r) => setTimeout(r, 500)); return 1; })()`);
+		await t.cdp.eval(`(async () => { window.__tcStand.step("whole-screen"); await new Promise((r) => setTimeout(r, 500)); return 1; })()`);
 		await t.setStop("calendar");
 		const ribbon = await t.oracle.rect(".tc-ribbon");
 		const lane = await t.oracle.rect(".tc-stage-col.is-day");

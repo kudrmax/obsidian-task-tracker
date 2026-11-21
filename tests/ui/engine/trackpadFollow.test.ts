@@ -125,6 +125,15 @@ describe("TrackpadFollow on Max's probe session (Decision 126)", () => {
 		}
 	});
 
+	/** Max asked twice (CLAUDE.md, «Behaviours Max had to ask for twice»): one place a stroke from the very first after the screen opens. */
+	it("takes the session's very first stroke one place, as every one after it (Max)", () => {
+		const meant = (s: Stroke) => Math.abs(s.moved) * 2 >= WIDTH || (Math.abs(s.released!.speed) >= FLICK_SPEED && Math.sign(s.released!.speed) === Math.sign(s.moved));
+		const first = strokes.find(meant)!;
+		expect(first.origin).toBe(1000);
+		expect(first.released!.to - first.origin).toBe(Math.sign(first.moved));
+		for (const s of strokes.filter(meant)) expect(s.released!.to - s.origin).toBe(Math.sign(s.moved));
+	});
+
 	it("moves the columns by no delta of the momentum", () => {
 		const moved = new Set(strokes.flatMap((s) => s.movedAt));
 		expect(momentumWheels(SESSION).filter((t) => moved.has(t))).toEqual([]);

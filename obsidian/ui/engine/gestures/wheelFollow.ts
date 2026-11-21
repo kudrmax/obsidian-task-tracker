@@ -1,4 +1,10 @@
-import type { WheelSample } from "./wheelStrokes";
+/** A wheel event as the ribbon reads it: its deltas, when it came (ms), and whether it is a pinch (ctrl). */
+export interface WheelSample {
+	readonly dx: number;
+	readonly dy: number;
+	readonly t: number;
+	readonly ctrl?: boolean;
+}
 
 /**
  * What the fingers on the trackpad did, as the ribbon follows them: they began a stroke (`fresh`: a new touch; otherwise
