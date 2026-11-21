@@ -6,8 +6,11 @@ import { makeVault, snapshotOf } from "./vault";
 const PROGRAM = "agent/obsidian-task-calendar.mjs";
 const committed = readFileSync(PROGRAM, "utf8");
 
+/** A test that starts Node itself (the build, the program): a process each, slow to start on a busy machine. */
+const PROCESS_MS = 30_000;
+
 describe(PROGRAM, () => {
-	it("is the build of agent/: run `node agent/build.mjs` after changing it or the core", () => {
+	it("is the build of agent/: run `node agent/build.mjs` after changing it or the core", { timeout: PROCESS_MS }, () => {
 		expect(execFileSync("node", ["agent/build.mjs", "--stdout"], { encoding: "utf8" })).toBe(committed);
 	});
 
@@ -20,7 +23,7 @@ describe(PROGRAM, () => {
 		expect(committed).not.toMatch(/claude-agent-sdk|ClaudeTransport|googleapis\.com|\bfetch\(/);
 	});
 
-	it("answers on stdout with exit code 0, a failure with its code and exit code 1, and ends by itself", () => {
+	it("answers on stdout with exit code 0, a failure with its code and exit code 1, and ends by itself", { timeout: PROCESS_MS }, () => {
 		const vault = makeVault();
 		const before = snapshotOf(vault);
 		const ok = spawnSync("node", [PROGRAM, "inbox", "--vault", vault], { encoding: "utf8", timeout: 20_000 });

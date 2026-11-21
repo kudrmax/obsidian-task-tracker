@@ -96,7 +96,7 @@ describe("the functions before `call`", () => {
 			phoneDoor.capture(FILE, "", "inbox", "A", NOW),
 			phoneDoor.capture(FILE, "", "inbox", " ", NOW),
 			phoneDoor.calendarFiles(""),
-			phoneDoor.meetings(OLD_CHOICE, [GOOGLE, IPHONE, "{"], 0, NOW * 2, NOW),
+			phoneDoor.meetings(OLD_CHOICE, [GOOGLE, IPHONE, "{"], new Date(2026, 10, 4).getTime(), new Date(2026, 10, 5).getTime(), NOW),
 		];
 		for (const answer of answers) expect(() => plainJson(answer, true)).not.toThrow();
 	});

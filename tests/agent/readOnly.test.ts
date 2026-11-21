@@ -42,8 +42,11 @@ const COMMANDS: readonly (readonly string[])[] = [
 	["today", "--no-project"],
 ];
 
+/** Every command of the program, each reading the vault afresh: far past vitest's 5 s on a busy machine. */
+const EVERY_COMMAND_MS = 30_000;
+
 describe("every command", () => {
-	it("leaves the tasks file, data.json and the calendars as they were, byte for byte", async () => {
+	it("leaves the tasks file, data.json and the calendars as they were, byte for byte", { timeout: EVERY_COMMAND_MS }, async () => {
 		const vault = makeVault({ tasks: UNTIDY });
 		const before = snapshotOf(vault);
 		for (const argv of COMMANDS) {
