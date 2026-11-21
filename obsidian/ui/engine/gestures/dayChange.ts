@@ -1,31 +1,53 @@
+import { easeIn, easeOut } from "motion/react";
+
 /**
- * The calendar's day changing as the day's list lands on another day (Max, 2026-11-21; Decision 127): the shown day slides
- * out of the calendar's room, then the new day slides in, never both in sight, no dimming. Both ride the list's own
- * landing: `progress` 0 is where it began, 1 where the list stands still, so the calendar comes to rest on the frame the
- * list does. `outWay` is the side the day going out leaves by, `inWay` the side the day coming in enters from (-1 left).
+ * The calendar's day changing as the day's list lands on another day (Max, 2026-11-21; Decision 127): the quick switch
+ * he liked, timed by the list's own landing. The day going out nudges `SHIFT` of its width the way the list went and
+ * fades; then the day coming in appears from `SHIFT` on the other side and fades in, its nudge riding the list's
+ * remaining way, so both stand still on the same frame. Never both in sight.
  */
 export interface DayChange {
 	readonly from: number;
 	readonly to: number;
-	readonly outWay: number;
-	readonly inWay: number;
+	/** 1 to a later day (the list went left), -1 to an earlier one. */
+	readonly way: number;
 }
 
-/** Where the two days stand at `progress`, in widths of the calendar's room: the first half takes the old day out, the second brings the new one in. */
-export function changeOffsets(change: DayChange, progress: number): { readonly from: number; readonly to: number } {
-	return { from: change.outWay * Math.min(1, 2 * progress), to: change.inWay * Math.min(1, 2 - 2 * progress) };
+/** How far a day nudges as the calendar changes day, in widths of its room. */
+export const SHIFT = 0.06;
+/** The day going out fades in this long, s, as the switch Max liked; a shorter landing shortens it. */
+const OUT_S = 0.06;
+/** The day coming in fades in this long, s. */
+const IN_S = 0.1;
+/** The going out's share of a landing too short for both. */
+const OUT_SHARE = 0.375;
+
+/** The switch's times for a landing of `durationS`: as Max saw them, shortened to end with the landing. */
+export interface ChangeTiming {
+	readonly outS: number;
+	readonly inS: number;
+}
+
+export function changeTiming(durationS: number): ChangeTiming {
+	const outS = Math.min(OUT_S, OUT_SHARE * durationS);
+	return { outS, inS: Math.max(0, Math.min(IN_S, durationS - outS)) };
+}
+
+export interface DayLook {
+	/** In widths of the calendar's room. */
+	readonly x: number;
+	readonly opacity: number;
 }
 
 /**
- * The change toward `target` from where the calendar stands: `change` under way at `progress`, or settled on `shown`.
- * A landing that takes the list on keeps what is in sight where it is: back to the day going out, the two trade places;
- * to a third day, the day in sight (the old one while it still shows, else the new one going back the way it came) goes
- * out and the third comes in.
+ * The two days `timeS` into the landing, the list `landed` of its way there (0 to 1) and `landedAtOut` of it as the old
+ * day was gone. At `landed` 1 the new day stands whole in its place, on the list's last frame.
  */
-export function retarget(change: DayChange | null, progress: number, shown: number, target: number): { readonly change: DayChange | null; readonly progress: number } {
-	if (!change) return target === shown ? { change: null, progress: 1 } : { change: { from: shown, to: target, outWay: -Math.sign(target - shown), inWay: Math.sign(target - shown) }, progress: 0 };
-	if (target === change.to) return { change, progress };
-	if (target === change.from) return { change: { from: change.to, to: change.from, outWay: change.inWay, inWay: change.outWay }, progress: 1 - progress };
-	if (progress < 0.5) return { change: { from: change.from, to: target, outWay: change.outWay, inWay: Math.sign(target - change.from) }, progress };
-	return { change: { from: change.to, to: target, outWay: change.inWay, inWay: Math.sign(target - change.to) }, progress: 1 - progress };
+export function changeLook(change: DayChange, timing: ChangeTiming, timeS: number, landed: number, landedAtOut: number): { readonly out: DayLook; readonly in: DayLook } {
+	if (landed >= 1) return { out: { x: -change.way * SHIFT, opacity: 0 }, in: { x: 0, opacity: 1 } };
+	const going = timing.outS > 0 ? Math.min(1, Math.max(0, timeS / timing.outS)) : 1;
+	if (going < 1) return { out: { x: -change.way * SHIFT * easeIn(going), opacity: 1 - easeIn(going) }, in: { x: change.way * SHIFT, opacity: 0 } };
+	const coming = timing.inS > 0 ? Math.min(1, Math.max(0, (timeS - timing.outS) / timing.inS)) : 1;
+	const left = landedAtOut < 1 ? Math.min(1, Math.max(0, (1 - landed) / (1 - landedAtOut))) : 0;
+	return { out: { x: -change.way * SHIFT, opacity: 0 }, in: { x: change.way * SHIFT * left, opacity: easeOut(coming) } };
 }

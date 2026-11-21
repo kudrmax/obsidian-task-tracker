@@ -1,13 +1,16 @@
 /**
  * Step 7 past the calendar, the calendar's side (Max, 2026-11-21; spec 2026-11-18, Decision 127): while the fingers hold
  * the day's list off its day the calendar stands on the shown day, unchanged and at full strength; let go onto the next
- * day, the old day slides out of the calendar's room and the new one slides in, never both in sight, riding the list's own
- * landing so that the list and the calendar come to rest on the same frame; let go short, the calendar never moves.
+ * day, the quick switch (the old day nudged out and faded, then the new one in), never both in sight, timed by the list's
+ * own landing so that the list and the calendar come to rest on the same frame; let go short, the calendar never moves.
  */
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-/** Each frame: the left of the list's page nearest the lane's edge, the calendar's days in sight (a day slid a whole width out is not), and their lefts; exact. */
-const RECORD = `(() => { window.__tcCal = []; let run = true; const t0 = performance.now(); const home = document.querySelector(".tc-stage-col.is-day").getBoundingClientRect().left; const tick = () => { if (!run) return; const pages = [...document.querySelectorAll(".tc-day-lane > .tc-slide")].map((s) => s.getBoundingClientRect().left); const page = pages.reduce((a, x) => (Math.abs(x - home) < Math.abs(a - home) ? x : a), Infinity); const days = [...document.querySelectorAll(".tc-stage-col.is-timeline .tc-items")].filter((i) => { const m = /translateX\\((-?[0-9.e-]+)%\\)/.exec(i.style.transform); return !m || Math.abs(+m[1]) < 99.9; }); const col = document.querySelector(".tc-stage-col.is-timeline"); window.__tcCal.push({ t: performance.now() - t0, page, cal: days.map((i) => i.getBoundingClientRect().left), opacity: +getComputedStyle(col).opacity * +getComputedStyle(col.querySelector(".tc-stage-body")).opacity * (days[0] ? +getComputedStyle(days[0]).opacity : 1) }); requestAnimationFrame(tick); }; requestAnimationFrame(tick); window.__tcCalStop = () => { run = false; return window.__tcCal; }; return 1; })()`;
+/** Each frame: the left of the list's page nearest the lane's edge, the calendar's days in sight (their left and strength; a day faded out is not), and the calendar's own strength; exact. */
+const RECORD = `(() => { window.__tcCal = []; let run = true; const t0 = performance.now(); const home = document.querySelector(".tc-stage-col.is-day").getBoundingClientRect().left; const tick = () => { if (!run) return; const pages = [...document.querySelectorAll(".tc-day-lane > .tc-slide")].map((s) => s.getBoundingClientRect().left); const page = pages.reduce((a, x) => (Math.abs(x - home) < Math.abs(a - home) ? x : a), Infinity); const days = [...document.querySelectorAll(".tc-stage-col.is-timeline .tc-items")].map((i) => [i.getBoundingClientRect().left, +getComputedStyle(i).opacity]).filter((d) => d[1] > 0.001); const col = document.querySelector(".tc-stage-col.is-timeline"); window.__tcCal.push({ t: performance.now() - t0, page, cal: days, opacity: +getComputedStyle(col).opacity * +getComputedStyle(col.querySelector(".tc-stage-body")).opacity }); requestAnimationFrame(tick); }; requestAnimationFrame(tick); window.__tcCalStop = () => { run = false; return window.__tcCal; }; return 1; })()`;
+
+/** The first frame the calendar changes. */
+const calMovesAt = (frames) => frames.findIndex((f, i) => i > 0 && JSON.stringify(f.cal) !== JSON.stringify(frames[i - 1].cal));
 
 /** The first frame from which `value` stays as it ends. */
 function restsAt(frames, value) {
@@ -53,6 +56,7 @@ export default {
 
 		const on = await run(0.7, 60);
 		t.expect(on.every((f) => f.opacity === 1), `the calendar never dims: ${JSON.stringify(on.filter((f) => f.opacity !== 1).slice(0, 2))}`);
+		t.expect(on.slice(0, calMovesAt(on)).every((f) => f.cal.length === 1 && f.cal[0][1] === 1), `held, the calendar's day stands whole: ${JSON.stringify(on.slice(0, 3))}`);
 		t.expect(on.every((f) => f.cal.length <= 1), `never two days in the calendar: ${JSON.stringify(on.filter((f) => f.cal.length > 1).slice(0, 2))}`);
 		const pageMoves = on.findIndex((f, i) => i > 0 && f.page !== on[i - 1].page);
 		const calMoves = on.findIndex((f, i) => i > 0 && JSON.stringify(f.cal) !== JSON.stringify(on[i - 1].cal));
