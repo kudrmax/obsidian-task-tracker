@@ -4,7 +4,7 @@ import { addDays } from "../domain/LocalDate";
 import { type FunnelAt, stepFunnel } from "./screenPlaces";
 import type { LocalDate } from "../domain/Task";
 import type { DayChange, DayOpening, DayService, DaySide, TaskService } from "./contracts";
-import { daySide, dayNamed, daysFrom, weekdayName, weekOf } from "./dayWords";
+import { clockOf, daySide, dayNamed, daysFrom, hourLabels, weekdayName, weekOf } from "./dayWords";
 import { boundaryOf } from "./documentText";
 import type { Clock, SettingsStore, Ticker } from "./ports";
 
@@ -77,6 +77,14 @@ export class DayServiceImpl implements DayService {
 
 	side(date: LocalDate): DaySide {
 		return daySide(date, this.today());
+	}
+
+	clockAt(minute: number): string {
+		return clockOf(this.boundary(), minute);
+	}
+
+	hourLabels(): readonly string[] {
+		return hourLabels(this.boundary());
 	}
 
 	onDayChange(listener: Listener, ready: () => boolean = () => true): () => void {

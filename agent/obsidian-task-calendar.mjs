@@ -4048,6 +4048,8 @@ function swipeLanding(moved2, distance, speed) {
 
 // core/application/dayWords.ts
 var DAYS_IN_WEEK = 7;
+var HOUR_MINUTES3 = 60;
+var DAY_HOURS2 = MINUTES_PER_DAY / HOUR_MINUTES3;
 var DATE_RE2 = /^\d{4}-\d{2}-\d{2}$/;
 var SHIFT_RE = /^([+-])(\d{1,4})$/;
 var NAMED = { today: 0, tomorrow: 1, yesterday: -1 };
@@ -4071,6 +4073,13 @@ function weekdayName(date) {
 function daySide(date, today) {
   if (date === today) return "today";
   return date < today ? "past" : "future";
+}
+function clockOf(boundary, minute) {
+  const clock = boundary.startHour * HOUR_MINUTES3 + Math.floor(minute);
+  return minutesToHHMM((clock % MINUTES_PER_DAY + MINUTES_PER_DAY) % MINUTES_PER_DAY);
+}
+function hourLabels(boundary) {
+  return Array.from({ length: DAY_HOURS2 }, (_, i) => String(boundary.hourAt(i)).padStart(2, "0"));
 }
 
 // core/domain/Lists.ts
@@ -4134,7 +4143,7 @@ function columnGroups(doc, column, today, boundary = DayBoundary.MIDNIGHT) {
 }
 
 // core/domain/operations.ts
-var HOUR_MINUTES3 = 60;
+var HOUR_MINUTES4 = 60;
 var MINUTE_MS4 = 6e4;
 function newTask(text, patch2 = {}) {
   return { status: "todo", statusChar: STATUS_CHARS.todo, text: taskTitle(text), dueDate: null, slot: null, reminder: DEFAULT_REMINDER, repeat: null, priority: null, labels: [], projects: [], collapsed: false, children: [], ...patch2 };
@@ -4304,7 +4313,7 @@ function clearSlot(doc, entry) {
 }
 function snoozedSlot(slot, now, minutes) {
   const at = new Date(now.getTime() + minutes * MINUTE_MS4);
-  const start2 = at.getHours() * HOUR_MINUTES3 + at.getMinutes();
+  const start2 = at.getHours() * HOUR_MINUTES4 + at.getMinutes();
   return { date: localDateOf(at), start: start2, end: slot.end === null ? null : start2 + (slot.end - slot.start) };
 }
 function toList(doc, entry, date, today) {
@@ -4744,6 +4753,12 @@ var DayServiceImpl = class {
   }
   side(date) {
     return daySide(date, this.today());
+  }
+  clockAt(minute) {
+    return clockOf(this.boundary(), minute);
+  }
+  hourLabels() {
+    return hourLabels(this.boundary());
   }
   onDayChange(listener, ready = () => true) {
     if (this.listeners.size === 0) this.watch();
@@ -7064,6 +7079,26 @@ function acceptsDrop(target, origins) {
       return origins.every((from) => from === "inbox" || from === "backlog" || from === "soon" || from === "new");
   }
 }
+function dropTarget(to, parentOrigin) {
+  switch (to.kind) {
+    case "time":
+      return "timeline";
+    case "clearSlot":
+      return "day";
+    case "list":
+    case "place":
+      return to.column;
+    case "group":
+    case "title":
+      return to.list === "now" || to.date !== null ? "day" : to.list;
+    case "nest":
+      return parentOrigin(to.parent);
+  }
+}
+function takesDrop(origins, to, parentOrigin) {
+  const target = dropTarget(to, parentOrigin);
+  return target !== null && acceptsDrop(target, origins);
+}
 function placesInGap(column, from, grouped) {
   return from === "new" || from === column || grouped;
 }
@@ -7258,10 +7293,10 @@ var AgentError = class extends Error {
   }
 };
 var HOUR = 60;
-var DAY_HOURS2 = 24;
+var DAY_HOURS3 = 24;
 var pad22 = (n) => String(n).padStart(2, "0");
 function clockTime(minutes) {
-  return `${pad22(Math.floor(minutes / HOUR) % DAY_HOURS2)}:${pad22(minutes % HOUR)}`;
+  return `${pad22(Math.floor(minutes / HOUR) % DAY_HOURS3)}:${pad22(minutes % HOUR)}`;
 }
 function localMoment(at) {
   return `${at.getFullYear()}-${pad22(at.getMonth() + 1)}-${pad22(at.getDate())}T${pad22(at.getHours())}:${pad22(at.getMinutes())}`;
@@ -7911,10 +7946,14 @@ var TaskRules = class {
    * its place with its line. Throws StaleTaskError when it is gone, or no longer the task it was.
    */
   entryOf(doc, key) {
-    const byId = this.named(doc, key);
-    const entry = byId === void 0 ? this.atPlace(doc, key) : byId;
+    const entry = this.found(doc, key);
     if (!entry) throw new StaleTaskError();
     return entry;
+  }
+  /** The task a key names in `doc`, as `entryOf` finds it; null when it is gone, or no longer the task it was. */
+  found(doc, key) {
+    const byId = this.named(doc, key);
+    return (byId === void 0 ? this.atPlace(doc, key) : byId) ?? null;
   }
   /**
    * The task a key names by its id, when the rules find keys by id: the task with that id wherever writes took it, when its
@@ -9045,6 +9084,39 @@ var TaskReads = class {
   stretch(item, day, edge, minute) {
     return this.timeline().stretched(slotted(item), day, edge, minute);
   }
+  resizedSlot(item, day, edge, minute, minDurationMin) {
+    return this.timeline().resized(slotted(item), day, edge, minute, minDurationMin);
+  }
+  /** Whether `to` takes the tasks carried from `origins` (`takesDrop`); a place under a task reads that task. */
+  takesRead(origins, to) {
+    return { reads: to.kind === "nest", missing: () => false, answer: (s) => this.takes(s, origins, to) };
+  }
+  takes(s, origins, to) {
+    return takesDrop(origins, to, (parent) => s ? this.originAt(s.doc, parent) : null);
+  }
+  /** Whether `column` on `day` opens a gap for every task carried from `origins` (`placesInGap`). */
+  opensGaps(origins, column, day) {
+    const grouped = this.columnSections(column, day) !== null;
+    return origins.every((from) => placesInGap(column, from, grouped));
+  }
+  /** Every task of the file, its subtasks at every depth, as `screen` under `filter` draws it, by its id. */
+  itemsRead(filter) {
+    return { reads: true, missing: () => /* @__PURE__ */ new Map(), answer: (s) => this.itemsById(s, filter) };
+  }
+  itemsById(s, filter) {
+    const { item } = this.filtered(s, filter);
+    const byId = /* @__PURE__ */ new Map();
+    const visit = (found) => {
+      byId.set(found.id, found);
+      found.allSubtasks.forEach(visit);
+    };
+    for (const list of SEARCH_ORDER) s.doc.tasks(list).forEach((entry) => visit(item(entry)));
+    return byId;
+  }
+  originAt(doc, key) {
+    const entry = this.rules.found(doc, key);
+    return entry ? originOf({ list: entry.section, slot: entry.task.slot, dueDate: entry.task.dueDate }) : null;
+  }
   /** The timeline's rules by the clock and the day's boundary now. */
   timeline() {
     return new TimelineSpans(this.rules.moment().boundary, this.clock.now());
@@ -9700,6 +9772,57 @@ function snapMinute(minute, hourPx, tolerance) {
   return Math.min(MINUTES_PER_DAY, Math.max(0, Math.round(minute / step) * step));
 }
 
+// core/application/SnapshotReader.ts
+var SnapshotReader = class {
+  constructor(reads, writes, answer2, filter, carry) {
+    this.reads = reads;
+    this.writes = writes;
+    this.answer = answer2;
+    this.filter = filter;
+    this.carry = carry;
+    this.screens = /* @__PURE__ */ new Map();
+    this.items = null;
+  }
+  screen(date) {
+    const kept = this.screens.get(date);
+    if (kept) return kept;
+    const screen = this.answer(this.reads.screenRead(date, this.filter));
+    this.screens.set(date, screen);
+    return screen;
+  }
+  columnView(column, date) {
+    return this.reads.columnView(this.screen(date), column);
+  }
+  item(id) {
+    this.items ??= this.answer(this.reads.itemsRead(this.filter));
+    return this.items.get(id) ?? null;
+  }
+  dropPreview(tasks, to, day) {
+    return this.answer(this.writes.dropPreview(tasks, to, day, this.filter, this.carry()));
+  }
+  takes(origins, to) {
+    return this.answer(this.reads.takesRead(origins, to));
+  }
+  menu(id, from, day) {
+    const item = this.item(id);
+    if (!item) return null;
+    const screen = this.screen(day);
+    return this.reads.menu(item, from, { today: this.reads.today(), day, offer: screen.offer, projects: screen.projectTree });
+  }
+  stretch(id, day, edge, minute) {
+    const item = this.slotted(id);
+    return item && this.reads.stretch(item, day, edge, minute);
+  }
+  resizedSlot(id, day, edge, minute, minDurationMin) {
+    const item = this.slotted(id);
+    return item && this.reads.resizedSlot(item, day, edge, minute, minDurationMin);
+  }
+  slotted(id) {
+    const item = this.item(id);
+    return item?.slot ? item : null;
+  }
+};
+
 // core/application/TaskServiceImpl.ts
 var TaskServiceImpl = class {
   constructor(store, settings, clock, history = null, legacyProjects = NO_PROJECTS, projectsScreenStore = memoryProjectsScreen(), identity = new TaskIdentity()) {
@@ -10163,6 +10286,20 @@ var TaskServiceImpl = class {
   dropPreview(tasks, to, day, filter) {
     return this.ask(this.writes.dropPreview(tasks, to, day, filter, this.projectsScreenStore.get().carry));
   }
+  takes(origins, to) {
+    return this.ask(this.reads.takesRead(origins, to));
+  }
+  opensGaps(origins, column, day) {
+    return this.reads.opensGaps(origins, column, day);
+  }
+  resizedSlot(item, day, edge, minute, minDurationMin) {
+    return this.reads.resizedSlot(item, day, edge, minute, minDurationMin);
+  }
+  async reader(filter) {
+    await this.normalize();
+    const s = await this.snapshotOrNull();
+    return new SnapshotReader(this.reads, this.writes, (read) => this.answerOver(s, read), filter ?? null, () => this.projectsScreenStore.get().carry);
+  }
   async normalize() {
     const text = await this.store.read();
     if (text === null) return;
@@ -10203,7 +10340,11 @@ var TaskServiceImpl = class {
   async ask(read) {
     if (read.tidies) await this.normalize();
     if (!read.reads) return read.answer(null);
-    const s = await this.snapshotOrNull();
+    return this.answerOver(await this.snapshotOrNull(), read);
+  }
+  /** A read over the file as `s` read it: missing without a file, or failing. */
+  answerOver(s, read) {
+    if (!read.reads) return read.answer(null);
     if (s) return read.answer(s);
     if (read.missing) return read.missing();
     throw new TasksFileMissingError(this.settings.get().tasksFile);
@@ -10687,8 +10828,8 @@ function withinBounds(value, bounds) {
 }
 
 // core/application/TaskReminders.ts
-var HOUR_MINUTES4 = 60;
-function clockOf(date, minutes) {
+var HOUR_MINUTES5 = 60;
+function clockOf2(date, minutes) {
   const [year, month, day] = date.split("-").map(Number);
   return new Date(year, month - 1, day, 0, minutes);
 }
@@ -10729,8 +10870,8 @@ var TaskReminders = class {
       endMinute: slot.end,
       kind: entry.task.reminder === "none" ? "notification" : entry.task.reminder,
       date: slot.date,
-      start: clockOf(slot.date, slot.start),
-      dayEnd: clockOf(nextDay, at.boundary.startHour * HOUR_MINUTES4)
+      start: clockOf2(slot.date, slot.start),
+      dayEnd: clockOf2(nextDay, at.boundary.startHour * HOUR_MINUTES5)
     };
   }
 };
@@ -10923,6 +11064,9 @@ var TASKS = {
   drop: (c, [tasks, to, day, filter]) => c.run(c.ask(c.writes.drop(tasks, to, day, filter, c.projectsScreen.carry))),
   landing: (c, [tasks, to, day, filter]) => c.ask(c.writes.landing(tasks, to, day, filter, c.projectsScreen.carry)),
   dropPreview: (c, [tasks, to, day, filter]) => c.ask(c.writes.dropPreview(tasks, to, day, filter, c.projectsScreen.carry)),
+  takes: (c, [origins, to]) => c.ask(c.reads.takesRead(origins, to)),
+  opensGaps: (c, [origins, column, day]) => c.reads.opensGaps(origins, column, day),
+  resizedSlot: (c, [item, day, edge, minute, min]) => c.reads.resizedSlot(item, day, edge, minute, min),
   normalize: (c) => c.normalize(),
   createFile: (c) => {
     if (c.hasTasks()) throw new DoorError("failed", "the tasks file is there already");
@@ -10963,6 +11107,8 @@ var DAYS = {
   dayNamed: (c, [text]) => dayNamed(String(text), c.rules.today()),
   weekday: (_c, [date]) => weekdayName(date),
   side: (c, [date]) => daySide(date, c.rules.today()),
+  clockAt: (c, [minute]) => clockOf(boundaryOf2(c), minute),
+  hourLabels: (c) => hourLabels(boundaryOf2(c)),
   /** Where a day begins: the hour it starts at. The `boundary.*` calls place by it. */
   boundary: (c) => ({ startHour: boundaryOf2(c).startHour })
 };
@@ -11227,7 +11373,9 @@ var RULES = {
   repeatValue,
   repeatSentence,
   onTheDay,
-  canPick
+  canPick,
+  listCardMenuFrom,
+  originOf
 };
 var CONSTANTS = { PROJECTS_HOVER_MS, PROJECTS_INDENT, REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, CLEAR_COLOR, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS, DEFAULT_ZOOM_LEVELS, DEFAULT_ZOOM_HOUR, SHOWN_LISTS, FUNNEL_PLACES, ROW_LISTS, VIEW_WORDS, SWIPE_FLICK_SPEED, CARD_HEIGHTS, CARD_GAPS, DEFAULT_CARD_SIZE, LIST_WIDTHS, REPEAT_WORDS, DIVIDER_SNAP, MOST_CARD_COLORS, NO_DAY_EVENTS };
 var TIMELINE = {

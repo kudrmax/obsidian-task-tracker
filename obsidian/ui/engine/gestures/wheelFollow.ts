@@ -63,6 +63,8 @@ export class WheelFollow {
 	private last = -Infinity;
 	private recent: { readonly t: number; readonly d: number }[] = [];
 	private lifted = -Infinity;
+	/** What a `tick` ended by the page's clock (the wheel end): the gesture's next event, stamped within its own gap, goes on with it. */
+	private ended: State | null = null;
 
 	constructor(tuning: WheelFollowTuning = WHEEL_FOLLOW) {
 		this.tuning = tuning;
@@ -79,7 +81,13 @@ export class WheelFollow {
 		const d = Math.abs(e.dx) / (prev && e.t - prev.t <= MOMENTUM_GAP_MS ? Math.max(1, Math.round((e.t - prev.t) / FRAME_MS)) : 1);
 		const dir = Math.sign(e.dx);
 		const turned = dir !== this.dir;
-		if (this.state === "idle" || turned || e.t - this.last > (this.state === "momentum" ? MOMENTUM_GAP_MS : this.tuning.quietMs)) {
+		/** Ended by the page's clock while the gesture's events still waited: by their own times it goes on, its momentum read as before, its fingers the same stroke. */
+		const ended = this.ended;
+		this.ended = null;
+		const goesOn = ended !== null && !turned && e.t - this.last <= (ended === "momentum" ? MOMENTUM_GAP_MS : this.tuning.quietMs);
+		if (goesOn && ended === "momentum") this.state = "momentum";
+		if (goesOn && ended === "fingers") cues.push(this.begin(e, false));
+		else if (this.state === "idle" || turned || e.t - this.last > (this.state === "momentum" ? MOMENTUM_GAP_MS : this.tuning.quietMs)) {
 			if (this.state === "fingers") cues.push(this.release(this.last, 0));
 			cues.push(this.begin(e, true));
 		} else if (this.state === "momentum" && prev) {
@@ -102,8 +110,14 @@ export class WheelFollow {
 
 	/** The fingers quiet past `quietMs`: they let go where they stand, without speed. */
 	tick(now: number): WheelCue[] {
-		if (this.state === "fingers" && now - this.last > this.tuning.quietMs) return [this.release(this.last + this.tuning.quietMs, 0)];
-		if (this.state === "momentum" && now - this.last > (this.tailing() ? TAIL_GAP_MS : MOMENTUM_GAP_MS)) this.state = "idle";
+		if (this.state === "fingers" && now - this.last > this.tuning.quietMs) {
+			this.ended = "fingers";
+			return [this.release(this.last + this.tuning.quietMs, 0)];
+		}
+		if (this.state === "momentum" && now - this.last > (this.tailing() ? TAIL_GAP_MS : MOMENTUM_GAP_MS)) {
+			this.ended = "momentum";
+			this.state = "idle";
+		}
 		return [];
 	}
 
