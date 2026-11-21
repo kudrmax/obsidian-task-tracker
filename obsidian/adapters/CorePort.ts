@@ -1,4 +1,4 @@
-import { sameSlot, type CalendarService, dividerAt, type DividerStop, LIST_WIDTHS, listShareOf, type ListWidths, listWidths, type Clock, type DayEvents, type DayService, type DropColumn, type DroppedTask, type DropTo, type LocalDate, listCardMenuFrom, type MenuFrom as CoreMenuFrom, originOf, type ScreenReader, type ShownChange, type TaskItem, type TaskService, type UndoOutcome, projectNodeOf, type ProjectsNodeId, type UndoService } from "../../core/application/contracts";
+import { sameSlot, type CalendarService, dividerAt, type DividerStop, LIST_WIDTHS, listShareOf, type ListWidths, listWidths, type Clock, type DayEvents, type DayService, type DropColumn, type DroppedTask, type DropTo, type LocalDate, listCardMenuFrom, type MenuFrom as CoreMenuFrom, originOf, type ScreenReader, type ShownChange, type TaskItem, type TaskService, type UndoOutcome, undoNotice, projectNodeOf, type ProjectsNodeId, type UndoService } from "../../core/application/contracts";
 import type { ScreenContext, Destination, Edge, EntryBar, EntryCommit, EntryDraft, EntryField, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, RenameStart, ScreenData, ScreenPort } from "../ui/engine/port";
 import { CoreEntry } from "./CoreEntry";
 import { ListCards } from "./ListCards";
@@ -44,7 +44,9 @@ export class CorePort implements ScreenPort {
 	private readonly drawing: ScreenDrawing;
 	private readonly entry: CoreEntry;
 	private readonly offs: (() => void)[];
-	/** The core's held read for each context the screen was drawn in (the chosen project's name, `EVERY` for none), each taken anew together. */
+	/** The core's held read of the file, every task. */
+	private base: ScreenReader;
+	/** The same read within each context the screen was drawn in (`ScreenReader.within`), kept until the next read. */
 	private readonly readers = new Map<string, ScreenReader>();
 	/** The context the screen was last drawn in: what a write and a menu go by. */
 	private context = EVERY;
@@ -56,17 +58,15 @@ export class CorePort implements ScreenPort {
 		private readonly core: CorePortServices,
 		base: ScreenReader,
 	) {
-		this.readers.set(EVERY, base);
+		this.base = base;
 		this.drawing = new ScreenDrawing(core.tasks, core.days, core.calendars);
 		this.entry = new CoreEntry(core, this.drawing, () => this.reader, () => this.refresh(), core.onError, () => this.filter());
 		this.offs = [core.tasks.onChange(() => void this.refresh()), core.tasks.onShownChange((change) => this.settingsChanged(change)), core.days.onDayChange(() => void this.refresh()), core.undo.onChange(() => this.changed()), core.calendars.onChange(() => this.forgetEvents())];
 	}
 
-	/** The port over `core`, once the file is read in every context the screen may be drawn in. */
+	/** The port over `core`, once the file is read. */
 	static async open(core: CorePortServices): Promise<CorePort> {
-		const port = new CorePort(core, await core.tasks.reader(null));
-		await port.refresh();
-		return port;
+		return new CorePort(core, await core.tasks.reader(null));
 	}
 
 	/** Lets go of the core's subscriptions: the screen is gone. */
@@ -193,10 +193,8 @@ export class CorePort implements ScreenPort {
 		return outcome;
 	}
 
-	/** The old screen's notice (`CalendarScreen`): a step the file changed under is refused, and says so. The core words no outcome. */
 	undoNotice(step: "undo" | "redo", outcome: UndoOutcome): string | null {
-		if (outcome !== "conflict") return null;
-		return step === "undo" ? "Can’t undo: the tasks file changed" : "Can’t redo: the tasks file changed";
+		return undoNotice(step, outcome);
 	}
 
 	clockAt(minute: number): string {
@@ -361,29 +359,20 @@ export class CorePort implements ScreenPort {
 		this.changed();
 	}
 
-	/** The held read of the context the screen is drawn in; the whole file's until the context's is read. */
+	/** The held read within the context the screen is drawn in: the same read, another filter, at once. */
 	private get reader(): ScreenReader {
-		return this.readers.get(this.context) ?? this.readers.get(EVERY)!;
+		if (this.context === EVERY) return this.base;
+		let within = this.readers.get(this.context);
+		if (!within) {
+			within = this.base.within(projectNodeOf(this.context));
+			this.readers.set(this.context, within);
+		}
+		return within;
 	}
 
-	/**
-	 * The screen drawn in `context` from now on. Every project's held read is taken with the file's (`refresh`), so a
-	 * context changed is drawn at once; one the tree did not have then is read when first asked for, the screen told once
-	 * it is in.
-	 */
+	/** The screen drawn in `context` (every task when absent) from now on. */
 	private use(context: ScreenContext | undefined): void {
-		const key = context?.project ?? EVERY;
-		this.context = key;
-		if (this.readers.has(key)) return;
-		void this.core.tasks.reader(this.nodeOf(key)).then((reader) => {
-			if (this.readers.has(key)) return;
-			this.readers.set(key, reader);
-			this.changed();
-		});
-	}
-
-	private nodeOf(key: string): ProjectsNodeId | null {
-		return key === EVERY ? null : projectNodeOf(key);
+		this.context = context?.project ?? EVERY;
 	}
 
 	/** The project the screen is filtered by, as the quick entry and a drop take it; null for every task. */
@@ -396,9 +385,8 @@ export class CorePort implements ScreenPort {
 		if (this.queued) return this.queued;
 		const run = this.reads.then(async () => {
 			this.queued = null;
-			const keys = [...new Set([...this.readers.keys(), ...this.core.tasks.projects().map((project) => project.name)])];
-			const readers = await Promise.all(keys.map((key) => this.core.tasks.reader(this.nodeOf(key))));
-			keys.forEach((key, i) => this.readers.set(key, readers[i]));
+			this.base = await this.core.tasks.reader(null);
+			this.readers.clear();
 			this.changed();
 		});
 		this.queued = run;
