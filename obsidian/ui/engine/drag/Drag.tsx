@@ -677,10 +677,11 @@ export function SortableList({ list, ids, children }: { readonly list: ListId; r
 /**
  * A list's own drop target, for when no row of it is under the pointer: the whole room the list scrolls in, the empty
  * room under its last card included (Decision 27: a block carried under Today's last card stays on the calendar
- * otherwise). Goes on the list's scroller.
+ * otherwise). Goes on the list's scroller. A day's page drawn beside the shown day (`away`, its day) gets a target of its
+ * own, off: dnd-kit keeps one target an id, and a page going away took the shown day's target with it (Decision 129).
  */
-export function useListTarget(list: ListId, ids: readonly string[]): (element: HTMLElement | null) => void {
-	return useDroppable({ id: `${LIST_TARGET}${list}`, data: { items: ids } }).setNodeRef;
+export function useListTarget(list: ListId, ids: readonly string[], away: number | null = null): (element: HTMLElement | null) => void {
+	return useDroppable({ id: away === null ? `${LIST_TARGET}${list}` : `${LIST_TARGET}${list}@${away}`, disabled: away !== null, data: { items: ids } }).setNodeRef;
 }
 
 /**

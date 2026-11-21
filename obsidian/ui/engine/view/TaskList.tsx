@@ -55,7 +55,9 @@ export const TaskList = memo(function TaskList({ list }: { readonly list: ListId
 	/** Every row is in the sortable list: headers move aside like cards; a card goes after a header into its section. */
 	const ids = useMemo(() => withPlus.map((row) => row.id), [withPlus]);
 	const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
-	const target = useListTarget(list, ids);
+	/** A day's page beside the shown one (the day turn draws them ahead) is no place to drop on: its target stands apart. */
+	const away = useScreen((s) => (day !== null && day !== s.dayOffset ? day : null));
+	const target = useListTarget(list, ids, away);
 	const setRoom = useCallback(
 		(element: HTMLDivElement | null) => {
 			setScroller(element);
