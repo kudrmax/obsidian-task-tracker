@@ -1,6 +1,5 @@
 import { type App, Component, FileSystemAdapter, ItemView, MarkdownRenderChild, MarkdownRenderer, Platform, Plugin, Scope, type TFile, type WorkspaceLeaf } from "obsidian";
-import { MacTrackpadFingers } from "../infrastructure/trackpad/MacTrackpadFingers";
-import { TRACKPAD_MODULE } from "../infrastructure/trackpad/module";
+import type { MacTrackpadFingers } from "../infrastructure/trackpad/MacTrackpadFingers";
 import { KEYS, takesKeys } from "../ui/engine/keys";
 import { type MountedScreen, mountScreen } from "../ui/engine/mount";
 import type { Stop } from "../ui/engine/store";
@@ -190,7 +189,7 @@ export default class TaskCalendarStand extends Plugin {
 		};
 		(window as unknown as { __tcStand?: StandApi }).__tcStand = api;
 		this.register(() => delete (window as unknown as { __tcStand?: StandApi }).__tcStand);
-		this.fingers = this.hearFingers();
+		this.fingers = await this.hearFingers();
 		this.register(() => {
 			this.fingers?.dispose();
 			this.fingers = null;
@@ -213,10 +212,12 @@ export default class TaskCalendarStand extends Plugin {
 		for (const delay of WRITE_DELAYS) this.addCommand({ id: `delay-${delay}`, name: `Write delay ${delay} ms`, callback: () => this.source.setDelay(delay) });
 	}
 
-	private hearFingers(): MacTrackpadFingers | null {
+	/** Loaded only on the Mac's desktop app: the module reads Node's files, which the phone's Obsidian refuses at the plugin's load. */
+	private async hearFingers(): Promise<MacTrackpadFingers | null> {
 		const adapter = this.app.vault.adapter;
 		if (!Platform.isDesktopApp || !Platform.isMacOS || !(adapter instanceof FileSystemAdapter) || !this.manifest.dir) return null;
 		const host = window as unknown as { require?: (id: string) => unknown };
+		const [{ MacTrackpadFingers }, { TRACKPAD_MODULE }] = await Promise.all([import("../infrastructure/trackpad/MacTrackpadFingers"), import("../infrastructure/trackpad/module")]);
 		return MacTrackpadFingers.load(
 			TRACKPAD_MODULE,
 			{
