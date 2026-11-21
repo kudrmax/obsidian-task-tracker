@@ -45,6 +45,22 @@ const DECISIONS: readonly { readonly name: string; readonly pattern: RegExp }[] 
 ];
 
 /**
+ * The same tripwire over the engine's own port fields (`engine/port.ts`: `CardFace`, `Row`, `Block`, `Destination`, the
+ * entry's field), the plan's step 5: the engine draws a card's face, a row's depth, a place, never decides with them.
+ * Drawing (a class, a mark) reads them freely; what a tap writes, which place refuses, which list a day's task goes to and
+ * whether a card counts as a subtask are the port's answers. Watched in the engine alone.
+ */
+const ENGINE_DECISIONS: readonly { readonly name: string; readonly pattern: RegExp }[] = [
+	{ name: "what a status tile writes, picked by the card's face", pattern: /\bid:\s*[\w.]*\.(?:inProgress|folded|step)\s*\?|kind:\s*"status"[^}]*\?\s*"/g },
+	{ name: "a menu's offer picked by the card's face", pattern: /\.(?:inProgress|folded|step|due|description|count)\s*\?\s*(?:\[|\{\s*kind\b)/g },
+	{ name: "a subtask told by its depth", pattern: /\.depth\s*(?:>|>=|[!=]==)\s*0\b/g },
+	{ name: "a card's subtasks counted done", pattern: /\.count\??\.(?:done|total)\s*(?:[!=]==|[<>]=?|-)/g },
+	{ name: "a day's list told by its offset", pattern: /\bdayOffset\s*(?:<=|>=|<|>)\s*0\b/g },
+];
+
+const ENGINE = "obsidian/ui/engine";
+
+/**
  * Today's hits, by file, with the package of the layers review that removes them. A count may only go down: lower it
  * here when a hit goes, delete the file's line when it reaches zero. Never raise one or add a file.
  */
@@ -64,11 +80,12 @@ function withoutComments(text: string): string {
 	return text.replace(/\/\*[\s\S]*?\*\//g, (block) => block.replace(/[^\n]/g, "")).replace(/(^|[^:"'`])\/\/.*$/gm, "$1");
 }
 
-/** Each hit of a file as `line: what it decides`. */
-function hitsIn(text: string): string[] {
+/** Each hit of a file as `line: what it decides`; the engine's files are watched for its port's fields too. */
+function hitsIn(text: string, engine = false): string[] {
+	const watched = engine ? [...DECISIONS, ...ENGINE_DECISIONS] : DECISIONS;
 	return withoutComments(text)
 		.split("\n")
-		.flatMap((line, i) => DECISIONS.flatMap((d) => [...line.matchAll(d.pattern)].map(() => `${i + 1}: ${d.name}`)));
+		.flatMap((line, i) => watched.flatMap((d) => [...line.matchAll(d.pattern)].map(() => `${i + 1}: ${d.name}`)));
 }
 
 /**
@@ -81,7 +98,7 @@ const BUILT = ["agent/build.mjs", "agent/obsidian-task-calendar.mjs"];
 const HITS: Readonly<Record<string, string[]>> = Object.fromEntries(
 	WATCHED.flatMap(files)
 		.filter((file) => !BUILT.includes(file))
-		.map((file) => [file, hitsIn(readFileSync(join(ROOT, file), "utf8"))] as const)
+		.map((file) => [file, hitsIn(readFileSync(join(ROOT, file), "utf8"), file.startsWith(ENGINE))] as const)
 		.filter(([, hits]) => hits.length > 0),
 );
 
@@ -105,6 +122,17 @@ describe("the UI decides nothing", () => {
 	it("watches the program and its answers", () => {
 		const watched = WATCHED.flatMap(files);
 		expect(watched).toEqual(expect.arrayContaining(["agent/main.ts", "agent/compose.ts", "agent/nodePorts.ts", "core/application/agent/AgentReads.ts", "core/application/agent/agentWire.ts"]));
+	});
+
+	it("trips on the engine's port fields used to decide, and not on drawing them", () => {
+		expect(hitsIn('pick({ kind: "status", id: face.inProgress ? "stopProgress" : "inProgress" });', true)).toEqual(["1: what a status tile writes, picked by the card's face"]);
+		expect(hitsIn("const rows = face.folded ? [{ kind: \"row\" }] : [];", true)).toEqual(["1: a menu's offer picked by the card's face"]);
+		expect(hitsIn("if (row.depth > 0) noPlace();", true)).toEqual(["1: a subtask told by its depth"]);
+		expect(hitsIn("const all = face.count.done === face.count.total;", true)).toEqual(["1: a card's subtasks counted done"]);
+		expect(hitsIn('const list = to.dayOffset <= 0 ? "now" : "soon"; if (dayOffset > 0) a();', true)).toEqual(["1: a day's list told by its offset", "1: a day's list told by its offset"]);
+		expect(hitsIn('if (to.list === "inbox") refuse();', true)).toEqual(["1: which list a task is in"]);
+		expect(hitsIn('<div data-status={face.inProgress ? "inProgress" : "open"} className={face.step !== null ? "is-two-line" : ""} style={{ level: row.depth }} />', true)).toEqual([]);
+		expect(hitsIn("if (row.depth > 0) noPlace();")).toEqual([]);
 	});
 
 	it("trips on the forms it watches and not on drawing", () => {
