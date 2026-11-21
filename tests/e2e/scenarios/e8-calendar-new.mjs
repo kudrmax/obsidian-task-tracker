@@ -33,7 +33,7 @@ export default {
 		await t.sleep(500);
 		const walk = await cal.timeOf("Вечерняя прогулка");
 		const now = await t.oracle.tasks("Now");
-		t.expect(walk?.start === 16 * 60 + 30 && walk.end === null && now.some((task) => task.title === "Вечерняя прогулка" && task.dated), `written today at 21:30 without a length: ${JSON.stringify(walk)}`);
+		t.expect(walk?.start === 16 * 60 + 30 && walk.end === null && now.some((task) => task.title === "Вечерняя прогулка" && (t.port === "core" ? task.timed && !task.dated : task.dated)), `written today at 21:30 without a length: ${JSON.stringify(walk)}`);
 		t.expect((await cal.blockBy("Вечерняя прогулка")) !== null && !(await field()), "it stands on the calendar, the field closed");
 
 		/** Review 12: the plus onto the calendar takes its own top as the start (the pointer less where it took the button), as a card does. */

@@ -211,7 +211,8 @@ export interface EntryBar {
 	readonly project: ProjectPage;
 	/** What the place button shows, and the places its panel offers. */
 	readonly where: { readonly id: PlaceId; readonly title: string } | null;
-	readonly places: readonly { readonly id: PlaceId; readonly title: string; readonly on: boolean }[];
+	/** `title` null: Date, whose word is the bar's own look. */
+	readonly places: readonly { readonly id: PlaceId; readonly title: string | null; readonly on: boolean }[];
 	/** The month page of Date: today, and the day the field stands on (`YYYY-MM-DD`). */
 	readonly date: { readonly today: string; readonly picked: string | null };
 }
@@ -331,6 +332,8 @@ export interface ScreenPort {
 	preview(id: string, to: Destination, context?: ScreenContext): ScreenData;
 	/** Whether `to` takes the task: a place that refuses opens no place for it, and the card's place stays where it was. */
 	takes(id: string, to: Destination): boolean;
+	/** Whether letting the task go at `to` changes anything: false where it stands already (a card let go where it was lifted, a block at its own minute), and nothing is written. */
+	changes(id: string, to: Destination): boolean;
 	/**
 	 * The screen while the `edge` dot of the calendar's task `id` is held at `minute` (from the shown day's start): the
 	 * task drawn stretched as far as the rules let it (the end no earlier than the start; the start no later than the end,
@@ -351,8 +354,10 @@ export interface ScreenPort {
 	newTaskPlace(dayOffset: number, shown: readonly ListId[]): Destination;
 	/** The end of `list` (the day's of `dayOffset`), in its last section, at the top level: where a double click on its free room opens a new task's field. */
 	listEnd(list: ListId, dayOffset: number): Destination;
-	/** Where Add subtask opens the field of a new last subtask of `id` in its list (F124): under its last subtask, a level deeper. */
-	subtaskPlace(id: string, dayOffset: number): Destination;
+	/** Where Add subtask opens the field of a new last subtask of `id` opened `from` there: in its list under its last subtask, a level deeper (F124); a calendar task's in its menu's stack (F108). */
+	subtaskPlace(id: string, dayOffset: number, from: MenuFrom): EntryField;
+	/** The field shifted a level in (1) or out (-1) as the rules let it (its depth fitted between its neighbours), with what is set and typed; null where it can't go. */
+	entryShift(field: EntryField, draft: EntryDraft, text: string, by: 1 | -1): EntryField | null;
 	/** The bar of `field`, with what is set (`draft`) and typed (`text`). */
 	entryBar(field: EntryField, draft: EntryDraft, text: string): EntryBar;
 	/**
@@ -374,8 +379,8 @@ export interface ScreenPort {
 	 * (a name of nothing, a folder's).
 	 */
 	newProject(name: string): Promise<string | null>;
-	/** What the menu of the task or event `id` offers, opened `from` there. */
-	menu(id: string, from: MenuFrom): MenuModel;
+	/** What the menu of the task or event `id` offers, opened `from` there on the screen of the day `dayOffset` days from today. */
+	menu(id: string, from: MenuFrom, dayOffset: number): MenuModel;
 	/**
 	 * The screen's own steps taken back and done again, as the core's `UndoService` keeps them (F267–F270): one action one
 	 * step, an edit from outside none. Whether there is one to take back (Undo is dim without one) or to do again; a change
@@ -389,11 +394,11 @@ export interface ScreenPort {
 	/** What the notice says after `step` came out as `outcome` («Can’t undo: the tasks file changed»); null: no notice. */
 	undoNotice(step: "undo" | "redo", outcome: UndoOutcome): string | null;
 	/**
-	 * Writes what was tapped in the menu of `id` opened `from` there (a status tile of a folded block writes its step);
+	 * Writes what was tapped in the menu of `id` opened `from` there on the day `dayOffset` (a status tile of a folded block writes its step);
 	 * resolves once written and read back, to the task's id as the file now has it (the core's key is fresh after a
 	 * write, so a menu left open on its page goes on with it), null once it is gone.
 	 */
-	act(id: string, action: MenuAction, from?: MenuFrom): Promise<string | null>;
+	act(id: string, action: MenuAction, from: MenuFrom, dayOffset: number): Promise<string | null>;
 	/** The day list's width beside the calendar (the core's `listWidth`, core audit pair E8): its bounds on a phone, the width `share` draws in a window `viewWidth` wide. */
 	readonly listBounds: { readonly min: number; readonly max: number };
 	listWidths(share: number, viewWidth: number, dividerWidth: number): ListWidths;

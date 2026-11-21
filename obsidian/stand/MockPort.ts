@@ -234,8 +234,27 @@ export class MockPort implements ScreenPort {
 		return { list, section: !last || last.name === null ? null : last.id, before: null, dayOffset, depth: 0 };
 	}
 
+	/** A calendar's task types its subtask into its menu's stack; a list's card under its last subtask. */
+	subtaskPlace(id: string, dayOffset: number, from: MenuFrom): EntryField {
+		if (from === "calendar") return { at: { list: "day", before: null, dayOffset, under: id }, renaming: null, stack: true };
+		return { at: this.listSubtaskPlace(id, dayOffset), renaming: null, stack: false };
+	}
+
+	/** The stand's rule for a shift: a level in or out while the bar offers it, never above the top level. */
+	entryShift(field: EntryField, draft: EntryDraft, text: string, by: 1 | -1): EntryField | null {
+		const shift = by > 0 ? "indent" : "outdent";
+		const offered = this.entryBar(field, draft, text).bar.some((group) => group.actions.some((action) => action.id === shift && !action.disabled));
+		return offered ? { ...field, at: { ...field.at, under: undefined, depth: Math.max(0, (field.at.depth ?? 0) + by) } } : null;
+	}
+
+	/** The stand's rule: a move changes something unless the screen it leaves is the screen as it stands. */
+	changes(id: string, to: Destination): boolean {
+		const shape = (data: ScreenData) => JSON.stringify([data.lists, data.day.blocks.map((b) => [b.id, b.start, b.length])]);
+		return shape(this.preview(id, to)) !== shape(this.read(to.dayOffset));
+	}
+
 	/** Under its last subtask, at any depth, in the list the task's card stands in. */
-	subtaskPlace(id: string, dayOffset: number): Destination {
+	private listSubtaskPlace(id: string, dayOffset: number): Destination {
 		const data = this.read(dayOffset);
 		for (const list of ["inbox", "soon", "day"] as const) {
 			const rows = data.lists[list].rows;

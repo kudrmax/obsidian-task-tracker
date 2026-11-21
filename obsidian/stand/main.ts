@@ -1,14 +1,15 @@
 import { type App, Component, Notice, FileSystemAdapter, ItemView, MarkdownRenderChild, MarkdownRenderer, Platform, Plugin, Scope, type TFile, type WorkspaceLeaf } from "obsidian";
-import { MacTrackpadFingers } from "../infrastructure/trackpad/MacTrackpadFingers";
-import { TRACKPAD_MODULE } from "../infrastructure/trackpad/module";
+import type { MacTrackpadFingers } from "../infrastructure/trackpad/MacTrackpadFingers";
 import { KEYS, takesKeys } from "../ui/engine/keys";
 import { type MountedScreen, mountScreen } from "../ui/engine/mount";
 import type { Stop } from "../ui/engine/store";
+import { failureText } from "../ui/failureText";
 import { detectHaptics, type HapticsHost } from "../ui/haptics";
 import { clearPriorityColors, showPriorityColors } from "../ui/priorityColors";
 import { addWindowDocument } from "../ui/windowDocuments";
 import { type ListKey, MOCK_PROJECTS } from "./mockData";
-import { keptListShare, keptZoom, LIST_SHARE_KEY, MockPort, WRITE_DELAYS, type WriteDelay, ZOOM_KEY } from "./MockPort";
+import { keptListShare, keptZoom, LIST_SHARE_KEY, WRITE_DELAYS, type WriteDelay, ZOOM_KEY } from "./MockPort";
+import { coreSource, mockSource, type StandPortKind, type StandSource } from "./standSource";
 import { STAND_STEPS, type StandStep, WHOLE_SCREEN } from "./steps";
 
 /** The stand's own view type and code block language: never the plugin's. */
@@ -79,7 +80,7 @@ class StandView extends ItemView {
 		this.unmount();
 		this.contentEl.empty();
 		this.contentEl.addClass("tc-view");
-		this.screen = mountScreen(this.contentEl, { port: this.stand.port, place: "leaf", app: this.app, sourcePath: "", haptics: haptics(), zoom: this.stand.zoom(), listShare: this.stand.listShare(), markdown: markdownOf(this.app), desk: !Platform.isMobile, notice: (text) => new Notice(text), fingers: this.stand.fingers });
+		this.screen = mountScreen(this.contentEl, { port: this.stand.source.port, place: "leaf", app: this.app, sourcePath: "", haptics: haptics(), zoom: this.stand.zoom(), listShare: this.stand.listShare(), markdown: markdownOf(this.app), desk: !Platform.isMobile, notice: (text) => new Notice(text), fingers: this.stand.fingers });
 		this.screen.store.getState().setStop(this.stand.step.stop);
 		this.stand.screens.add(this.screen);
 	}
@@ -105,7 +106,7 @@ class StandBlock extends MarkdownRenderChild {
 
 	override onload(): void {
 		this.containerEl.addClass("tc-stand-block");
-		this.screen = mountScreen(this.containerEl, { port: this.stand.port, place: "note", app: this.stand.app, sourcePath: this.path, haptics: haptics(), zoom: this.stand.zoom(), listShare: this.stand.listShare(), markdown: markdownOf(this.stand.app), desk: !Platform.isMobile, notice: (text) => new Notice(text), fingers: this.stand.fingers });
+		this.screen = mountScreen(this.containerEl, { port: this.stand.source.port, place: "note", app: this.stand.app, sourcePath: this.path, haptics: haptics(), zoom: this.stand.zoom(), listShare: this.stand.listShare(), markdown: markdownOf(this.stand.app), desk: !Platform.isMobile, notice: (text) => new Notice(text), fingers: this.stand.fingers });
 		this.stand.screens.add(this.screen);
 	}
 
@@ -118,6 +119,8 @@ class StandBlock extends MarkdownRenderChild {
 
 /** What the checks and a person debugging reach on `window.__tcStand`: the made-up tasks' file and the stand's switches; never the screen's own state. */
 export interface StandApi {
+	/** Which port the screen runs on: the stand's made-up rules, or the core's. */
+	readonly port: StandPortKind;
 	fileText(): string;
 	reset(): void;
 	setDelay(delay: WriteDelay): void;
@@ -136,7 +139,8 @@ export interface StandApi {
  * and a vault of its own on the phone. It opens the screen in a leaf, a pop-out window and a note's block.
  */
 export default class TaskCalendarStand extends Plugin {
-	readonly port = new MockPort();
+	/** The tasks behind the screen: the stand's `MockPort`, or the core's rules over the made-up file in memory (`CorePort`). */
+	source: StandSource = mockSource();
 	readonly screens = new Set<MountedScreen>();
 	/** The step a leaf shows: the whole screen, or the tasks of a step and the ribbon standing where they are. */
 	step: StandStep = WHOLE_SCREEN;
@@ -162,18 +166,33 @@ export default class TaskCalendarStand extends Plugin {
 	/** Shows `step` in every open leaf, with its tasks. */
 	private showStep(step: StandStep): void {
 		this.step = step;
-		this.port.reset(step.file?.());
+		this.source.reset(step.file?.());
+		this.remountLeaves();
+	}
+
+	/** The screen run on `kind`'s port from now on, every open leaf drawn again over it; a note's block takes it when drawn next. */
+	private async useSource(kind: StandPortKind): Promise<void> {
+		if (this.source.kind === kind) return;
+		this.source.dispose();
+		this.source = kind === "core" ? await coreSource((error) => new Notice(failureText(error))) : mockSource();
+		this.remountLeaves();
+	}
+
+	private remountLeaves(): void {
 		for (const leaf of this.app.workspace.getLeavesOfType(STAND_VIEW)) if (leaf.view instanceof StandView) leaf.view.remount();
 	}
 
 	override async onload(): Promise<void> {
-		const port = this.port;
+		const stand = this;
 		const api: StandApi = {
-			fileText: () => port.fileText(),
-			reset: () => port.reset(),
-			setDelay: (delay) => (port.delay = delay),
-			addFromOutside: (list, title) => port.addFromOutside(list, title),
-			moveFromOutside: (title, list, before) => port.moveFromOutside(title, list, before),
+			get port() {
+				return stand.source.kind;
+			},
+			fileText: () => this.source.fileText(),
+			reset: () => this.source.reset(),
+			setDelay: (delay) => this.source.setDelay(delay),
+			addFromOutside: (list, title) => this.source.addFromOutside(list, title),
+			moveFromOutside: (title, list, before) => this.source.moveFromOutside(title, list, before),
 			setStop: (stop) => this.screens.forEach((screen) => screen.store.getState().setStop(stop)),
 			setProject: (project) => this.screens.forEach((screen) => screen.store.getState().setContext({ project })),
 			debug: () => [...this.screens].map((screen) => {
@@ -183,13 +202,14 @@ export default class TaskCalendarStand extends Plugin {
 		};
 		(window as unknown as { __tcStand?: StandApi }).__tcStand = api;
 		this.register(() => delete (window as unknown as { __tcStand?: StandApi }).__tcStand);
-		this.fingers = this.hearFingers();
+		this.fingers = await this.hearFingers();
 		this.register(() => {
 			this.fingers?.dispose();
 			this.fingers = null;
 		});
 		showPriorityColors([]);
 		this.register(clearPriorityColors);
+		this.register(() => this.source.dispose());
 		this.followWindows();
 
 		this.registerView(STAND_VIEW, (leaf) => new StandView(leaf, this));
@@ -199,17 +219,21 @@ export default class TaskCalendarStand extends Plugin {
 		this.addCommand({ id: "open", name: "Open the screen", callback: () => void this.open() });
 		if (!Platform.isMobile) this.addCommand({ id: "open-window", name: "Open the screen in a new window", callback: () => void this.open(true) });
 		this.addCommand({ id: "open-note", name: "Open the note with the screen's block", callback: () => void this.openNote() });
-		this.addCommand({ id: "new-tasks", name: "New made-up tasks", callback: () => port.reset() });
+		this.addCommand({ id: "new-tasks", name: "New made-up tasks", callback: () => this.source.reset() });
+		this.addCommand({ id: "port-core", name: "Run on the core's rules (CorePort)", callback: () => void this.useSource("core") });
+		this.addCommand({ id: "port-mock", name: "Run on the stand's made-up rules (MockPort)", callback: () => void this.useSource("mock") });
 		for (const step of STAND_STEPS) this.addCommand({ id: step.id, name: step.name, callback: () => this.showStep(step) });
 		for (const project of MOCK_PROJECTS.filter((p) => !p.folder)) this.addCommand({ id: `project-${project.name}`, name: `Choose the project «${project.name}»`, callback: () => api.setProject(project.name) });
 		this.addCommand({ id: "project-none", name: "Choose no project", callback: () => api.setProject(null) });
-		for (const delay of WRITE_DELAYS) this.addCommand({ id: `delay-${delay}`, name: `Write delay ${delay} ms`, callback: () => (port.delay = delay) });
+		for (const delay of WRITE_DELAYS) this.addCommand({ id: `delay-${delay}`, name: `Write delay ${delay} ms`, callback: () => this.source.setDelay(delay) });
 	}
 
-	private hearFingers(): MacTrackpadFingers | null {
+	/** Loaded only on the Mac's desktop app: the module reads Node's files, which the phone's Obsidian refuses at the plugin's load. */
+	private async hearFingers(): Promise<MacTrackpadFingers | null> {
 		const adapter = this.app.vault.adapter;
 		if (!Platform.isDesktopApp || !Platform.isMacOS || !(adapter instanceof FileSystemAdapter) || !this.manifest.dir) return null;
 		const host = window as unknown as { require?: (id: string) => unknown };
+		const [{ MacTrackpadFingers }, { TRACKPAD_MODULE }] = await Promise.all([import("../infrastructure/trackpad/MacTrackpadFingers"), import("../infrastructure/trackpad/module")]);
 		return MacTrackpadFingers.load(
 			TRACKPAD_MODULE,
 			{

@@ -6,6 +6,9 @@ import { useHost } from "./host";
 import { Icon } from "./Icon";
 import { NewProjectRow, ProjectNameField, ProjectRows } from "./Projects";
 import { keepsTyping } from "./QuickAdd";
+
+/** The Date tile's word: the bar's own, as its icon is (the port names the lists only). */
+const DATE_WORD = "Date";
 import { MonthGrid, PLACE_ICONS, TileGroup, tileRows } from "./TaskMenu";
 
 /** A button of the bar as the port offers it now: off, lit. */
@@ -114,7 +117,7 @@ export const QuickBar = memo(function QuickBar({ reach }: { readonly reach: read
 							)}
 						</BarPanel>
 						<BarPanel open={panel === "where"} onClose={close} reference={anchors.where ?? null} capsule={desk ? capsule : null} away={away} className="is-place">
-							<TileGroup kind="is-place" rows={[bar.places.map((choice) => ({ label: choice.title, icon: PLACE_ICONS[choice.id], on: choice.on, onPick: () => (choice.id === "date" ? setPanel("date") : (api.getState().entryPlace(choice.id, null, reach), close())) }))]} />
+							<TileGroup kind="is-place" rows={[bar.places.map((choice) => ({ label: choice.title ?? DATE_WORD, icon: PLACE_ICONS[choice.id], on: choice.on, onPick: () => (choice.id === "date" ? setPanel("date") : (api.getState().entryPlace(choice.id, null, reach), close())) }))]} />
 						</BarPanel>
 						<BarPanel open={panel === "date"} onClose={close} reference={anchors.where ?? null} capsule={desk ? capsule : null} away={away} className="is-picker">
 							<MonthGrid today={bar.date.today} picked={bar.date.picked} onPick={(date) => (api.getState().entryPlace("date", date, reach), close())} />
