@@ -18,6 +18,8 @@ interface CoreDrop {
 	readonly tasks: readonly DroppedTask[];
 	readonly to: DropTo;
 	readonly day: LocalDate;
+	/** Let go where it was lifted from: nothing changes, nothing is written. */
+	readonly home: boolean;
 }
 
 const COLUMNS: Readonly<Record<ListId, DropColumn>> = { inbox: "inbox", soon: "soon", day: "day" };
@@ -86,7 +88,7 @@ export class CorePort implements ScreenPort {
 	preview(id: string, to: Destination): ScreenData {
 		const drop = this.dropOf(id, to);
 		const date = this.dateOf(to.dayOffset);
-		if (!drop) return this.read(to.dayOffset);
+		if (!drop || drop.home) return this.read(to.dayOffset);
 		const { screen } = this.reader.dropPreview(drop.tasks, drop.to, drop.day);
 		return this.drawing.draw({ date, screen, lists: this.drawing.listsOf(screen), events: this.eventsOf(date) });
 	}
@@ -118,7 +120,7 @@ export class CorePort implements ScreenPort {
 		if (to.at !== undefined && to.end !== undefined) await this.core.tasks.setSlot(item.key, this.core.days.boundary().slotAt(day, to.at, to.end));
 		else {
 			const drop = this.dropOf(id, to);
-			if (!drop) return;
+			if (!drop || drop.home) return;
 			await this.core.tasks.drop(drop.tasks, drop.to, drop.day);
 		}
 		await this.refresh();
@@ -229,10 +231,11 @@ export class CorePort implements ScreenPort {
 		if (!item || !from) return null;
 		const day = this.dateOf(to.dayOffset);
 		const tasks = [{ key: item.key, from }];
-		if (to.at !== undefined) return { tasks, to: { kind: "time", start: to.at }, day };
+		if (to.at !== undefined) return { tasks, to: { kind: "time", start: to.at }, day, home: false };
 		const column = COLUMNS[to.list];
-		const place = this.core.tasks.opensGaps([from], column, day) ? new ListCards(this.reader.columnView(column, day), id).placeOf(to) : null;
-		return { tasks, to: { kind: "place", column, place }, day };
+		if (!this.core.tasks.opensGaps([from], column, day)) return { tasks, to: { kind: "place", column, place: null }, day, home: false };
+		const place = new ListCards(this.reader.columnView(column, day), id).dropOf(to);
+		return { tasks, to: { kind: "place", column, place }, day, home: place === null };
 	}
 
 	private eventsOf(date: LocalDate): DayEvents | null {
