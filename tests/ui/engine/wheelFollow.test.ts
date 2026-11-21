@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { FollowPager } from "../../../obsidian/ui/engine/gestures/followPager";
 import { WheelFollow } from "../../../obsidian/ui/engine/gestures/wheelFollow";
 // @ts-expect-error the e2e checks' shared replay of the rule is plain JavaScript
 import { followSteps } from "../../e2e/lib/follow.mjs";
@@ -96,6 +97,34 @@ describe("the trackpad followed as a finger", () => {
 		const strokes = ROUND_SIX[file];
 		const { steps } = run(file);
 		expect(common(steps, strokes) / Math.max(steps.length, strokes.length)).toBeGreaterThanOrEqual(share);
+	});
+
+	/**
+	 * A page busy past @use-gesture's wheel end (its 140 ms timer, on the page's clock) asks the rule to let go while the
+	 * gesture's next events, stamped by the OS a frame apart, still wait in the queue: they are the same gesture going on,
+	 * by their own times, never a new touch that could take the columns a second place (Max, «one swipe, one place»).
+	 */
+	it("takes a gesture's events delayed past the wheel end as the same gesture, by their own times", () => {
+		const push = [2, 8, 20, 40, 54, 60];
+		const events: Wheel[] = push.map((d, i) => ({ dx: d, dy: 0, t: i * 8 }));
+		let d = 60;
+		for (let t = push.length * 8; d >= 1; t += 8) events.push({ dx: (d *= 0.965), dy: 0, t });
+		const steadily = new WheelFollow();
+		const plain = events.flatMap((e) => steadily.feed(e)).map((c) => c.kind);
+		const stalled = new WheelFollow();
+		const cues = events.flatMap((e, i) => [...(i === 20 || i === 4 ? stalled.tick(Infinity) : []), ...stalled.feed(e)]).map((c) => c.kind);
+		expect(plain.filter((k) => k === "begin")).toHaveLength(1);
+		expect(cues.filter((k) => k === "begin" || k === "release")).toEqual(["begin", "release", "begin", "release"]);
+		const stalled2 = new WheelFollow();
+		const pager = new FollowPager(1, Infinity);
+		let at = 1;
+		for (const [i, e] of events.entries())
+			for (const cue of [...(i === 20 || i === 4 ? stalled2.tick(Infinity) : []), ...stalled2.feed(e)]) {
+				if (cue.kind === "begin") pager.begin(at, cue.fresh);
+				else if (cue.kind === "move") at = pager.move(cue.dx, 200);
+				else at = pager.release(at, cue.speed, 200);
+			}
+		expect(at).toBe(2);
 	});
 
 	it("turns nothing for a vertical scroll or a pinch", () => {
