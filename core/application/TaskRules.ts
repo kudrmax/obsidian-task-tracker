@@ -218,10 +218,15 @@ export class TaskRules {
 	 * its place with its line. Throws StaleTaskError when it is gone, or no longer the task it was.
 	 */
 	entryOf(doc: TaskDocument, key: TaskKey): TaskEntry {
-		const byId = this.named(doc, key);
-		const entry = byId === undefined ? this.atPlace(doc, key) : byId;
+		const entry = this.found(doc, key);
 		if (!entry) throw new StaleTaskError();
 		return entry;
+	}
+
+	/** The task a key names in `doc`, as `entryOf` finds it; null when it is gone, or no longer the task it was. */
+	found(doc: TaskDocument, key: TaskKey): TaskEntry | null {
+		const byId = this.named(doc, key);
+		return (byId === undefined ? this.atPlace(doc, key) : byId) ?? null;
 	}
 
 	/**

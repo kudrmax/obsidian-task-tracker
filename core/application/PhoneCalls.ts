@@ -1,5 +1,5 @@
 import { firstStepProjects, firstStepScreen } from "./firstStepTyping";
-import { dayNamed, daySide, daysFrom, weekdayName, weekOf } from "./dayWords";
+import { clockOf, dayNamed, daySide, daysFrom, hourLabels, weekdayName, weekOf } from "./dayWords";
 import type { DayBoundary } from "../domain/DayBoundary";
 import { GROUPED_LISTS } from "../domain/Lists";
 import { dayRelation } from "../domain/Days";
@@ -51,7 +51,8 @@ import { SourceProblemError } from "./EventSource";
 import { branchOf, carriedMiddle, gapBranch, levelAt, placeAt } from "./listDrop";
 import { grownStart, wholeWidth } from "./wholeCard";
 import { onTheDay, REPEAT_WORDS, repeatSentence, repeatValue } from "./repeatWords";
-import { canPick } from "./menus";
+import { canPick, listCardMenuFrom } from "./menus";
+import { originOf } from "./projectsLift";
 import { allColumnsDividerAt, allColumnsShare, allColumnsWidthAt, allColumnsWidths, DIVIDER_SNAP, dividerAt, LIST_WIDTHS, listShareOf, listWidths } from "./listWidth";
 import { type LinkQuery, linkQuery, noteOfLink, noteSuggestions, type VaultNote, withNoteLink } from "./notes";
 import { fitLevel, gapAt, gapOfPlace, groupPlaceOf, type Header, levelRange, type ListCard, placeOfDrop, placeOfGap, sameGap, shiftLevel } from "./nesting";
@@ -555,6 +556,9 @@ const TASKS: Readonly<Record<string, Handler>> = {
 	drop: (c, [tasks, to, day, filter]) => c.run(c.ask(c.writes.drop(tasks as A, to as A, day as string, filter as A, c.projectsScreen.carry))),
 	landing: (c, [tasks, to, day, filter]) => c.ask(c.writes.landing(tasks as A, to as A, day as string, filter as A, c.projectsScreen.carry)),
 	dropPreview: (c, [tasks, to, day, filter]) => c.ask(c.writes.dropPreview(tasks as A, to as A, day as string, filter as A, c.projectsScreen.carry)),
+	takes: (c, [origins, to]) => c.ask(c.reads.takesRead(origins as A, to as A)),
+	opensGaps: (c, [origins, column, day]) => c.reads.opensGaps(origins as A, column as A, day as string),
+	resizedSlot: (c, [item, day, edge, minute, min]) => c.reads.resizedSlot(item as A, day as string, edge as A, minute as number, min as number),
 	normalize: (c) => c.normalize(),
 	createFile: (c) => {
 		if (c.hasTasks()) throw new DoorError("failed", "the tasks file is there already");
@@ -562,8 +566,8 @@ const TASKS: Readonly<Record<string, Handler>> = {
 	},
 };
 
-/** The TaskService methods the door leaves to the host: it is the host that watches its files. */
-export const HOST_TASK_METHODS: readonly string[] = ["onChange"];
+/** The TaskService methods the door leaves to the host: it is the host that watches its files and holds a read of them. */
+export const HOST_TASK_METHODS: readonly string[] = ["onChange", "reader"];
 
 /**
  * Door names an app may still call whose methods left the services (CLAUDE.md: the door keeps its functions' names),
@@ -611,6 +615,8 @@ const DAYS: Readonly<Record<string, Handler>> = {
 	dayNamed: (c, [text]) => dayNamed(String(text), c.rules.today()),
 	weekday: (_c, [date]) => weekdayName(date as string),
 	side: (c, [date]) => daySide(date as string, c.rules.today()),
+	clockAt: (c, [minute]) => clockOf(boundaryOf(c), minute as number),
+	hourLabels: (c) => hourLabels(boundaryOf(c)),
 	/** Where a day begins: the hour it starts at. The `boundary.*` calls place by it. */
 	boundary: (c) => ({ startHour: boundaryOf(c).startHour }),
 };
@@ -932,6 +938,8 @@ const RULES: Readonly<Record<string, (...args: A[]) => unknown>> = {
 	repeatSentence,
 	onTheDay,
 	canPick,
+	listCardMenuFrom,
+	originOf,
 };
 
 /** contracts.ts's runtime constants, as the UI reads them. */
@@ -1110,6 +1118,7 @@ export const DOOR_COVERAGE: Readonly<Record<string, DoorCoverage>> = {
 	PolledScreen: { hostOwned: "the frontend implements it for keepFresh, which is the host's" },
 	CalendarPoll: { hostOwned: "keepFresh answers it, and polling is the host's" },
 	SecretField: { hostOwned: "the frontend implements it for bindClientSecret, which is the host's" },
+	ScreenReader: { hostOwned: "the door answers each call over the text handed in, so every call is one read already; a read held across calls is the host's (`TaskService.reader`)" },
 	AssistantService: { hostOwned: "no Apple app asks a model yet: prepare and finish come into the door with the iPhone app's assistant (assistant spec, «Platforms»)" },
 };
 

@@ -1,9 +1,12 @@
-import { addDays, isValidLocalDate, weekdayOf } from "../domain/LocalDate";
+import type { DayBoundary } from "../domain/DayBoundary";
+import { addDays, isValidLocalDate, MINUTES_PER_DAY, minutesToHHMM, weekdayOf } from "../domain/LocalDate";
 import type { LocalDate } from "../domain/Task";
 import type { DaySide } from "./contracts";
 import { REPEAT_WORDS } from "./repeatWords";
 
 const DAYS_IN_WEEK = 7;
+const HOUR_MINUTES = 60;
+const DAY_HOURS = MINUTES_PER_DAY / HOUR_MINUTES;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const SHIFT_RE = /^([+-])(\d{1,4})$/;
 const NAMED: Readonly<Record<string, number>> = { today: 0, tomorrow: 1, yesterday: -1 };
@@ -37,4 +40,15 @@ export function weekdayName(date: LocalDate): string {
 export function daySide(date: LocalDate, today: LocalDate): DaySide {
 	if (date === today) return "today";
 	return date < today ? "past" : "future";
+}
+
+/** The clock `minute` minutes after the start of a day beginning at `boundary`: `"14:15"`; past midnight from `"00:00"` again. */
+export function clockOf(boundary: DayBoundary, minute: number): string {
+	const clock = boundary.startHour * HOUR_MINUTES + Math.floor(minute);
+	return minutesToHHMM(((clock % MINUTES_PER_DAY) + MINUTES_PER_DAY) % MINUTES_PER_DAY);
+}
+
+/** The labels of a day's hour lines, from the hour it starts at: `"05"`, `"06"`, …, `"04"`. */
+export function hourLabels(boundary: DayBoundary): readonly string[] {
+	return Array.from({ length: DAY_HOURS }, (_, i) => String(boundary.hourAt(i)).padStart(2, "0"));
 }

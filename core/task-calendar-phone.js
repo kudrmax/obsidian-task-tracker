@@ -2910,6 +2910,8 @@ ${e.calendar}`;
 
   // core/application/dayWords.ts
   var DAYS_IN_WEEK = 7;
+  var HOUR_MINUTES4 = 60;
+  var DAY_HOURS2 = MINUTES_PER_DAY / HOUR_MINUTES4;
   var DATE_RE2 = /^\d{4}-\d{2}-\d{2}$/;
   var SHIFT_RE = /^([+-])(\d{1,4})$/;
   var NAMED = { today: 0, tomorrow: 1, yesterday: -1 };
@@ -2933,6 +2935,13 @@ ${e.calendar}`;
   function daySide(date, today) {
     if (date === today) return "today";
     return date < today ? "past" : "future";
+  }
+  function clockOf(boundary, minute) {
+    const clock = boundary.startHour * HOUR_MINUTES4 + Math.floor(minute);
+    return minutesToHHMM((clock % MINUTES_PER_DAY + MINUTES_PER_DAY) % MINUTES_PER_DAY);
+  }
+  function hourLabels(boundary) {
+    return Array.from({ length: DAY_HOURS2 }, (_, i) => String(boundary.hourAt(i)).padStart(2, "0"));
   }
 
   // core/domain/RepeatDraft.ts
@@ -4958,6 +4967,10 @@ ${key.title}`.toLowerCase();
   }
   var A_LIST_CARD = { kind: "task", from: "day" };
   var COLUMNS2 = /* @__PURE__ */ new Set(["day", "soon", "inbox", "backlog"]);
+  var LIST_CARD_MENU = { now: "day", soon: "soon", inbox: "inbox", backlog: "backlog", done: "done" };
+  function listCardMenuFrom(item) {
+    return LIST_CARD_MENU[item.list];
+  }
   function canPick(from) {
     return COLUMNS2.has(from);
   }
@@ -6180,6 +6193,26 @@ ${key.title}`.toLowerCase();
         return origins.every((from) => from === "inbox" || from === "backlog" || from === "soon" || from === "new");
     }
   }
+  function dropTarget(to, parentOrigin) {
+    switch (to.kind) {
+      case "time":
+        return "timeline";
+      case "clearSlot":
+        return "day";
+      case "list":
+      case "place":
+        return to.column;
+      case "group":
+      case "title":
+        return to.list === "now" || to.date !== null ? "day" : to.list;
+      case "nest":
+        return parentOrigin(to.parent);
+    }
+  }
+  function takesDrop(origins, to, parentOrigin) {
+    const target = dropTarget(to, parentOrigin);
+    return target !== null && acceptsDrop(target, origins);
+  }
   function placesInGap(column, from, grouped) {
     return from === "new" || from === column || grouped;
   }
@@ -7391,6 +7424,39 @@ ${key.title}`.toLowerCase();
     stretch(item, day, edge, minute) {
       return this.timeline().stretched(slotted(item), day, edge, minute);
     }
+    resizedSlot(item, day, edge, minute, minDurationMin) {
+      return this.timeline().resized(slotted(item), day, edge, minute, minDurationMin);
+    }
+    /** Whether `to` takes the tasks carried from `origins` (`takesDrop`); a place under a task reads that task. */
+    takesRead(origins, to) {
+      return { reads: to.kind === "nest", missing: () => false, answer: (s) => this.takes(s, origins, to) };
+    }
+    takes(s, origins, to) {
+      return takesDrop(origins, to, (parent) => s ? this.originAt(s.doc, parent) : null);
+    }
+    /** Whether `column` on `day` opens a gap for every task carried from `origins` (`placesInGap`). */
+    opensGaps(origins, column, day) {
+      const grouped = this.columnSections(column, day) !== null;
+      return origins.every((from) => placesInGap(column, from, grouped));
+    }
+    /** Every task of the file, its subtasks at every depth, as `screen` under `filter` draws it, by its id. */
+    itemsRead(filter) {
+      return { reads: true, missing: () => /* @__PURE__ */ new Map(), answer: (s) => this.itemsById(s, filter) };
+    }
+    itemsById(s, filter) {
+      const { item } = this.filtered(s, filter);
+      const byId = /* @__PURE__ */ new Map();
+      const visit = (found) => {
+        byId.set(found.id, found);
+        found.allSubtasks.forEach(visit);
+      };
+      for (const list of SEARCH_ORDER) s.doc.tasks(list).forEach((entry) => visit(item(entry)));
+      return byId;
+    }
+    originAt(doc, key) {
+      const entry = this.rules.found(doc, key);
+      return entry ? originOf({ list: entry.section, slot: entry.task.slot, dueDate: entry.task.dueDate }) : null;
+    }
     /** The timeline's rules by the clock and the day's boundary now. */
     timeline() {
       return new TimelineSpans(this.rules.moment().boundary, this.clock.now());
@@ -7598,10 +7664,14 @@ ${key.title}`.toLowerCase();
      * its place with its line. Throws StaleTaskError when it is gone, or no longer the task it was.
      */
     entryOf(doc, key) {
-      const byId = this.named(doc, key);
-      const entry = byId === void 0 ? this.atPlace(doc, key) : byId;
+      const entry = this.found(doc, key);
       if (!entry) throw new StaleTaskError();
       return entry;
+    }
+    /** The task a key names in `doc`, as `entryOf` finds it; null when it is gone, or no longer the task it was. */
+    found(doc, key) {
+      const byId = this.named(doc, key);
+      return (byId === void 0 ? this.atPlace(doc, key) : byId) ?? null;
     }
     /**
      * The task a key names by its id, when the rules find keys by id: the task with that id wherever writes took it, when its
@@ -8057,8 +8127,8 @@ ${key.title}`.toLowerCase();
   };
 
   // core/application/TaskReminders.ts
-  var HOUR_MINUTES4 = 60;
-  function clockOf(date, minutes) {
+  var HOUR_MINUTES5 = 60;
+  function clockOf2(date, minutes) {
     const [year, month, day] = date.split("-").map(Number);
     return new Date(year, month - 1, day, 0, minutes);
   }
@@ -8099,8 +8169,8 @@ ${key.title}`.toLowerCase();
         endMinute: slot.end,
         kind: entry.task.reminder === "none" ? "notification" : entry.task.reminder,
         date: slot.date,
-        start: clockOf(slot.date, slot.start),
-        dayEnd: clockOf(nextDay, at.boundary.startHour * HOUR_MINUTES4)
+        start: clockOf2(slot.date, slot.start),
+        dayEnd: clockOf2(nextDay, at.boundary.startHour * HOUR_MINUTES5)
       };
     }
   };
@@ -9090,6 +9160,9 @@ ${key.title}`.toLowerCase();
     drop: (c, [tasks, to, day, filter]) => c.run(c.ask(c.writes.drop(tasks, to, day, filter, c.projectsScreen.carry))),
     landing: (c, [tasks, to, day, filter]) => c.ask(c.writes.landing(tasks, to, day, filter, c.projectsScreen.carry)),
     dropPreview: (c, [tasks, to, day, filter]) => c.ask(c.writes.dropPreview(tasks, to, day, filter, c.projectsScreen.carry)),
+    takes: (c, [origins, to]) => c.ask(c.reads.takesRead(origins, to)),
+    opensGaps: (c, [origins, column, day]) => c.reads.opensGaps(origins, column, day),
+    resizedSlot: (c, [item, day, edge, minute, min]) => c.reads.resizedSlot(item, day, edge, minute, min),
     normalize: (c) => c.normalize(),
     createFile: (c) => {
       if (c.hasTasks()) throw new DoorError("failed", "the tasks file is there already");
@@ -9130,6 +9203,8 @@ ${key.title}`.toLowerCase();
     dayNamed: (c, [text]) => dayNamed(String(text), c.rules.today()),
     weekday: (_c, [date]) => weekdayName(date),
     side: (c, [date]) => daySide(date, c.rules.today()),
+    clockAt: (c, [minute]) => clockOf(boundaryOf2(c), minute),
+    hourLabels: (c) => hourLabels(boundaryOf2(c)),
     /** Where a day begins: the hour it starts at. The `boundary.*` calls place by it. */
     boundary: (c) => ({ startHour: boundaryOf2(c).startHour })
   };
@@ -9394,7 +9469,9 @@ ${key.title}`.toLowerCase();
     repeatValue,
     repeatSentence,
     onTheDay,
-    canPick
+    canPick,
+    listCardMenuFrom,
+    originOf
   };
   var CONSTANTS = { PROJECTS_HOVER_MS, PROJECTS_INDENT, REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, CLEAR_COLOR, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS, DEFAULT_ZOOM_LEVELS, DEFAULT_ZOOM_HOUR, SHOWN_LISTS, FUNNEL_PLACES, ROW_LISTS, VIEW_WORDS, SWIPE_FLICK_SPEED, CARD_HEIGHTS, CARD_GAPS, DEFAULT_CARD_SIZE, LIST_WIDTHS, REPEAT_WORDS, DIVIDER_SNAP, MOST_CARD_COLORS, NO_DAY_EVENTS };
   var TIMELINE = {
