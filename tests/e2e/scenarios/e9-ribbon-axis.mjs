@@ -10,7 +10,7 @@ export default {
 	name: "e9-ribbon-axis",
 	features: ["Step 7: swipe the columns (one axis a stroke)"],
 	async run(t) {
-		await t.cdp.eval(`(async () => { window.__tcStand.step("step-swipe"); await new Promise((r) => setTimeout(r, 500)); return 1; })()`);
+		await t.cdp.eval(`(async () => { window.__tcStand.step("whole-screen"); await new Promise((r) => setTimeout(r, 500)); return 1; })()`);
 		await t.setStop("soon");
 		const list = await t.oracle.rect('[data-list="soon"]');
 		const at = { x: list.left + list.width * 0.5, y: list.top + list.height * 0.4 };

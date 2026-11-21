@@ -1,6 +1,5 @@
 import { AxisLock } from "./axisLock";
-import type { WheelCue } from "./wheelFollow";
-import type { WheelSample } from "./wheelStrokes";
+import type { WheelCue, WheelSample } from "./wheelFollow";
 
 /**
  * What macOS says of the fingers on the trackpad, each at the moment of its own event on the page's clock (the wheel

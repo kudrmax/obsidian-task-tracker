@@ -1,18 +1,15 @@
 import { useGesture, useWheel } from "@use-gesture/react";
 import { animate, type AnimationPlaybackControls, type MotionValue, useMotionValue, useTransform } from "motion/react";
 import { createContext, type RefObject, useEffect, useRef, useState } from "react";
-import { STOPS, type Stop, useScreen, useScreenApi } from "../store";
+import { CALENDAR, placeOf, standAt } from "../layout/columns";
+import { useScreen, useScreenApi } from "../store";
 import { type ChangeTiming, changeLook, changeTiming, type DayChange } from "./dayChange";
 import { FollowPager, LANDING, landingAt, landingVelocity } from "./followPager";
 import { type FingerSignal, TrackpadFollow, type TrackpadFingers } from "./trackpadFollow";
-import type { WheelSample } from "./wheelStrokes";
-import { type WheelCue, WheelFollow } from "./wheelFollow";
+import { type WheelCue, WheelFollow, type WheelSample } from "./wheelFollow";
 
 /** Where the landing counts as done, in places: under a pixel at any width the ribbon has. */
 const REST = 0.001;
-
-/** The ribbon's last stop, the day and its calendar: past it the places are the days, one a day. */
-const CALENDAR = STOPS.length - 1;
 
 /**
  * The days a turn draws past the calendar (Max, 2026-11-21; Decision 127): the strip stands; the day's list turns as a
@@ -46,9 +43,6 @@ export interface FollowGestures {
 	readonly turn: DayTurn;
 	readonly bind: ReturnType<typeof useGesture>;
 }
-
-/** Where the ribbon stands at a stop and day, in places: the stops 0–2, past the calendar one place a day. */
-const placeOf = (stop: Stop, dayOffset: number) => STOPS.indexOf(stop) + (stop === "calendar" ? Math.max(0, dayOffset) : 0);
 
 const sameDays = (a: readonly number[], b: readonly number[]) => a.length === b.length && a.every((day, i) => day === b[i]);
 
@@ -164,7 +158,7 @@ export function useFollowRibbon(ribbon: RefObject<HTMLElement | null>, win: Wind
 		setChange(null);
 	};
 
-	/** A stop or day set from outside (a scenario's setup): the ribbon goes there by the same landing. Read as the store stands once the render is in: a finger's lift sets the stop and the day one after the other. */
+	/** A stop or day set from outside (a key, a place picked for a new task, a scenario's setup): the ribbon goes there by the same landing. Read as the store stands once the render is in: a finger's lift sets the stop and the day one after the other. */
 	useEffect(() => {
 		const now = api.getState();
 		const to = placeOf(now.stop, now.dayOffset);
@@ -185,8 +179,7 @@ export function useFollowRibbon(ribbon: RefObject<HTMLElement | null>, win: Wind
 		landing.current = false;
 		settle();
 		pager.current.begin(along.get(), fresh);
-		screen.setStop(STOPS[Math.min(pager.current.stop, CALENDAR)]);
-		screen.showDay(Math.max(0, pager.current.stop - CALENDAR));
+		standAt(screen, pager.current.stop);
 		draw(true);
 		return true;
 	};
@@ -200,8 +193,7 @@ export function useFollowRibbon(ribbon: RefObject<HTMLElement | null>, win: Wind
 		if (!pager.current.following) return;
 		const to = pager.current.release(along.get(), speed, column());
 		const screen = api.getState();
-		screen.setStop(STOPS[Math.min(to, CALENDAR)]);
-		screen.showDay(Math.max(0, to - CALENDAR));
+		standAt(screen, to);
 		screen.release("ribbon");
 		draw(true);
 		land(to, speed);

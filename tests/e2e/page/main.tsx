@@ -1,6 +1,7 @@
 import type { App } from "obsidian";
 import { keptZoom, MockPort, type WriteDelay, ZOOM_KEY } from "../../../obsidian/stand/MockPort";
-import { calendarFile, type ListKey, longListsFile, type MockFile, oneColumnFile, sectionsFile, subtasksFile, twoColumnsFile } from "../../../obsidian/stand/mockData";
+import type { ListKey } from "../../../obsidian/stand/mockData";
+import { STAND_STEPS, type StandStep, WHOLE_SCREEN } from "../../../obsidian/stand/steps";
 import { KEYS, takesKeys } from "../../../obsidian/ui/engine/keys";
 import type { Place } from "../../../obsidian/ui/engine/layout/Layout";
 import { type MountedScreen, mountScreen } from "../../../obsidian/ui/engine/mount";
@@ -14,19 +15,6 @@ import { showPriorityColors } from "../../../obsidian/ui/priorityColors";
  * screen's key table on the window as the stand's view scope has it, and `window.__tcStand` as the stand plugin gives it,
  * with `step(id)` for the stand's step commands and `openNote()` for the note's block.
  */
-
-const STEPS: Readonly<Record<string, { place: Place; file?: () => MockFile }>> = {
-	"step-one-column": { place: "column", file: oneColumnFile },
-	"step-two-columns": { place: "twoColumns", file: twoColumnsFile },
-	"step-subtasks": { place: "twoColumns", file: subtasksFile },
-	"step-sections": { place: "twoColumns", file: sectionsFile },
-	"step-long-lists": { place: "twoColumns", file: longListsFile },
-	"step-calendar": { place: "calendar", file: () => calendarFile(new Date()) },
-	"step-swipe": { place: "follow" },
-	"step-menu": { place: "calendar", file: () => calendarFile(new Date()) },
-	"step-quick-add": { place: "leaf" },
-	"whole-screen": { place: "leaf" },
-};
 
 /** The device's storage for the calendar's zoom, as Obsidian's local storage keeps it; a page whose storage is blocked keeps nothing. */
 const load = (): unknown => {
@@ -61,26 +49,25 @@ class StandPage {
 	readonly port = new MockPort();
 	private readonly screens = new Set<MountedScreen>();
 	private leafScreen: MountedScreen | null = null;
-	private leafPlace: Place = "leaf";
 	private readonly app = {} as App;
 	private readonly haptics = detectHaptics(window as unknown as HapticsHost);
 
 	constructor(private readonly leaf: HTMLElement) {}
 
-	showLeaf(place: Place): void {
+	showLeaf(step: StandStep): void {
 		this.clear();
-		this.leafPlace = place;
 		const content = this.leaf.ownerDocument.createElement("div");
 		content.className = "view-content tc-view";
 		this.leaf.appendChild(content);
-		this.leafScreen = this.mount(content, place, "");
+		this.leafScreen = this.mount(content, "leaf", "");
+		this.leafScreen.store.getState().setStop(step.stop);
 	}
 
 	showStep(id: string): void {
-		const step = STEPS[id];
+		const step = STAND_STEPS.find((s) => s.id === id);
 		if (!step) throw new Error(`no stand step ${id}`);
 		this.port.reset(step.file?.());
-		this.showLeaf(step.place);
+		this.showLeaf(step);
 	}
 
 	openNote(): void {
@@ -105,8 +92,7 @@ class StandPage {
 		if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
 		const key = KEYS.find((k) => k.key === event.key && k.modifiers.length === 0);
 		const screen = this.leafScreen?.store.getState();
-		/** The step of the ribbon as a gallery has no keys yet, as on the stand. */
-		if (!key || !screen || !takesKeys(screen) || this.leafPlace === "follow") return;
+		if (!key || !screen || !takesKeys(screen)) return;
 		key.run(screen);
 		event.preventDefault();
 	};
@@ -154,4 +140,4 @@ document.body.appendChild(leaf);
 const stand = new StandPage(leaf);
 window.addEventListener("keydown", stand.onKey);
 (window as unknown as { __tcStand: ReturnType<StandPage["api"]> }).__tcStand = stand.api();
-stand.showLeaf("leaf");
+stand.showLeaf(WHOLE_SCREEN);

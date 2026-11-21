@@ -1,23 +1,18 @@
 import { type CSSProperties, memo, type ReactNode, useContext, useRef } from "react";
 import { DayTurnContext, useFollowRibbon } from "../gestures/FollowRibbon";
-import { RibbonTrack, useRibbon } from "../gestures/Ribbon";
+import { RibbonTrack } from "../gestures/RibbonTrack";
 import type { ListId } from "../port";
 import { DayContext, STOP_LISTS, useData, useScreen } from "../store";
 import { useHost } from "../view/host";
 import { PlusButton } from "../view/QuickAdd";
-import { DaySlide, Slide } from "../view/Slide";
+import { DaySlide } from "../view/Slide";
 import { TaskList } from "../view/TaskList";
 import { TaskMenu } from "../view/TaskMenu";
 import { Timeline } from "../view/Timeline";
 import { COLUMN_SHARE, STRIP_WIDTH } from "./columns";
 
-/**
- * Where a screen is mounted: Obsidian's leaf (the main screen, a pop-out), a note's block, or the stand's steps alone:
- * one column (a list and drag, nothing else on screen), then two columns side by side (drag between them), then Soon,
- * the day's list and the day's calendar side by side (drag onto and off the calendar), then the ribbon's three stops
- * swiped as a gallery (`follow`: the strip follows a finger and two on the trackpad alike, nothing else of the ribbon).
- */
-export type Place = "leaf" | "note" | "column" | "twoColumns" | "calendar" | "follow";
+/** Where a screen is mounted: Obsidian's leaf (the main screen, a pop-out) or a note's block. */
+export type Place = "leaf" | "note";
 
 /**
  * Where things stand (spec, «The owners»): the place's columns. The only module that reads the place. A leaf shows the
@@ -25,31 +20,13 @@ export type Place = "leaf" | "note" | "column" | "twoColumns" | "calendar" | "fo
  * strip, the strip slides by its own percent. At Inbox and at Soon the two columns split the window in half (CLAUDE.md,
  * «Behaviours Max had to ask for twice»); at the day's calendar too until the divider comes (E2).
  */
-/** The lists a screen mounted at `place` can bring into sight: the ribbon turns to any; a fixed layout shows its own. */
+/** The lists a screen mounted at `place` can bring into sight: the ribbon turns to any; a note's block shows Inbox. */
 export function reachOf(place: Place): readonly ListId[] {
-	switch (place) {
-		case "note":
-		case "column":
-			return ["inbox"];
-		case "twoColumns":
-			return ["inbox", "soon"];
-		case "calendar":
-			return ["soon", "day"];
-		default:
-			return ["inbox", "soon", "day"];
-	}
+	return place === "note" ? ["inbox"] : ["inbox", "soon", "day"];
 }
 
 export const Layout = memo(function Layout({ place }: { readonly place: Place }) {
 	const stop = useScreen((s) => s.stop);
-	if (place === "column" || place === "twoColumns" || place === "calendar" || place === "follow")
-		return (
-			<>
-				{place === "column" ? <NoteColumn /> : place === "twoColumns" ? <TwoColumns /> : place === "calendar" ? <CalendarColumns /> : <FollowColumns />}
-				<PlusButton shown={place === "column" ? ["inbox"] : place === "twoColumns" ? ["inbox", "soon"] : place === "calendar" ? ["soon", "day"] : STOP_LISTS[stop]} />
-				<TaskMenu />
-			</>
-		);
 	return (
 		<>
 			{place === "leaf" ? <RibbonColumns /> : <NoteColumn />}
@@ -59,49 +36,13 @@ export const Layout = memo(function Layout({ place }: { readonly place: Place })
 	);
 });
 
-function RibbonColumns() {
-	const ribbon = useRef<HTMLDivElement>(null);
-	const { win } = useHost();
-	const { at, bind } = useRibbon(ribbon, win);
-	const dayOffset = useScreen((s) => s.dayOffset);
-	const way = useScreen((s) => s.dayWay);
-	return (
-		<div className="tc-ribbon" ref={ribbon} {...bind()}>
-			<RibbonTrack at={at} className="tc-ribbon-track" width={STRIP_WIDTH} share={COLUMN_SHARE}>
-				<ListColumn list="inbox" />
-				<ListColumn list="soon" />
-				<ColumnBox className="is-day">
-					<Slide id={`day-${dayOffset}`} way={way} className="tc-slide">
-						<DayContext.Provider value={dayOffset}>
-							<ColumnHead title={<DayTitle />} />
-							<div className="tc-stage-body">
-								<TaskList list="day" />
-							</div>
-						</DayContext.Provider>
-					</Slide>
-				</ColumnBox>
-				<ColumnBox className="is-timeline">
-					<Slide id={`timeline-${dayOffset}`} way={way} className="tc-slide">
-						<DayContext.Provider value={dayOffset}>
-							<ColumnHead title={null} />
-							<div className="tc-stage-body">
-								<Timeline />
-							</div>
-						</DayContext.Provider>
-					</Slide>
-				</ColumnBox>
-			</RibbonTrack>
-		</div>
-	);
-}
-
 /**
- * The stand's step of the ribbon as a gallery (stage0.md, «Round seven»): the four columns at their widths, the strip
- * standing at three stops; past the calendar the days, one place a day (Max, 2026-11-21; Decision 127): the strip stands,
- * the day's list turns under the fingers as a page with its header, and the calendar, standing on its day while they hold
- * it, changes to the new day on the list's own landing.
+ * The ribbon (spec, «Gestures that are not drag»; Decisions 64, 126, 127): the four columns at their widths on one strip,
+ * standing at three stops, following a finger on glass and two on the trackpad as one gallery; past the calendar the days,
+ * one place a day: the strip stands, the day's list turns under the fingers as a page with its header, and the calendar,
+ * standing on its day while they hold it, changes to the new day on the list's own landing.
  */
-function FollowColumns() {
+function RibbonColumns() {
 	const ribbon = useRef<HTMLDivElement>(null);
 	const { win, fingers } = useHost();
 	const { at, turn, bind } = useFollowRibbon(ribbon, win, fingers);
@@ -161,34 +102,6 @@ function NoteColumn() {
 
 /** A note's one column takes the whole block. */
 const WHOLE = 100;
-/** Two columns standing still side by side split the room in half. */
-const HALF = 50;
-/** Three columns standing still share the room in three. */
-const THIRD = 100 / 3;
-
-function TwoColumns() {
-	return (
-		<div className="tc-note-column">
-			<ListColumn list="inbox" share={HALF} />
-			<ListColumn list="soon" share={HALF} />
-		</div>
-	);
-}
-
-function CalendarColumns() {
-	return (
-		<div className="tc-note-column">
-			<ListColumn list="soon" share={THIRD} />
-			<ListColumn list="day" share={THIRD} />
-			<ColumnBox className="is-timeline" share={THIRD}>
-				<ColumnHead title={null} />
-				<div className="tc-stage-body">
-					<Timeline />
-				</div>
-			</ColumnBox>
-		</div>
-	);
-}
 
 const ListColumn = memo(function ListColumn({ list, share = COLUMN_SHARE }: { readonly list: ListId; readonly share?: number }) {
 	const title = useData((d) => d.lists[list].title);
@@ -214,7 +127,3 @@ function ColumnHead({ title }: { readonly title: ReactNode }) {
 	return <header className="tc-stage-head">{title === null ? null : <div className="tc-head-title">{title}</div>}</header>;
 }
 
-function DayTitle() {
-	const title = useData((d) => d.day.title);
-	return <span className="tc-day-title">{title}</span>;
-}

@@ -480,13 +480,18 @@ interface Owner {
 	readonly owners: readonly string[];
 }
 
+/** The one ribbon's landing: the only Motion spring started by hand, from where the fingers let the strip go (Decisions 64, 126). */
+const RIBBON_LANDING = `${ENGINE}gestures/FollowRibbon.ts`;
+/** The ribbon's files that draw with Motion: its landing, its strip and the calendar's quick day change (Decision 127). */
+const RIBBON_MOTION = [RIBBON_LANDING, `${ENGINE}gestures/RibbonTrack.tsx`, `${ENGINE}gestures/dayChange.ts`];
+
 const OWNERS: readonly Owner[] = [
 	{ concern: "Screen state: Zustand", imports: (t) => t === "zustand" || t.startsWith("zustand/"), owners: [`${ENGINE}store/`] },
 	{ concern: "Drag and drop: dnd-kit", imports: (t) => t.startsWith("@dnd-kit/"), owners: [`${ENGINE}drag/`] },
 	{ concern: "Gestures that are not drag: @use-gesture", imports: (t) => t.startsWith("@use-gesture/"), owners: [`${ENGINE}gestures/`] },
 	{ concern: "Layers and focus: Floating UI", imports: (t) => t.startsWith("@floating-ui/"), owners: [`${ENGINE}layers/`] },
-	/** Motion: the rows that move and the regions that slide; the gestures let go into its springs (the table's gestures row). */
-	{ concern: "Rows that move, regions that slide: Motion", imports: (t) => t === "motion" || t.startsWith("motion/") || t === "framer-motion", owners: [`${ENGINE}view/MovingRow.tsx`, `${ENGINE}view/Slide.tsx`, `${ENGINE}gestures/`] },
+	/** Motion: the rows that move and the regions that slide; of the gestures, only the ribbon's own files: its landing spring, its strip and the calendar's day change (the table's gestures row). */
+	{ concern: "Rows that move, regions that slide: Motion", imports: (t) => t === "motion" || t.startsWith("motion/") || t === "framer-motion", owners: [`${ENGINE}view/MovingRow.tsx`, `${ENGINE}view/Slide.tsx`, ...RIBBON_MOTION] },
 	{ concern: "Long lists: TanStack Virtual", imports: (t) => t.startsWith("@tanstack/"), owners: [`${ENGINE}view/TaskList.tsx`] },
 	{ concern: "Text fields: Obsidian's editor", imports: (t) => t === "obsidian/ui/markdown/EmbeddedEditor.ts", owners: [`${ENGINE}view/ObsidianEditor.tsx`] },
 	/** The overlay of a carried card goes in a portal (stage 0, «Integration findings» 1); the root is made by the mount. */
@@ -510,7 +515,7 @@ const BY_HAND: readonly { readonly name: string; readonly pattern: RegExp; reado
 	{ name: "a listener added by hand", pattern: /\baddEventListener\s*\(/, allowed: [] },
 	{ name: "a size read from the page", pattern: /\bgetBoundingClientRect\s*\(|\bgetClientRects\s*\(|\bgetComputedStyle\s*\(/, allowed: [] },
 	{ name: "an animation frame", pattern: /\brequestAnimationFrame\s*\(/, allowed: [] },
-	{ name: "an animation by hand", pattern: /(?<![.\w])animate\s*\(|\.animate\s*\(/, allowed: [`${ENGINE}gestures/`] },
+	{ name: "an animation by hand", pattern: /(?<![.\w])animate\s*\(|\.animate\s*\(/, allowed: [RIBBON_LANDING] },
 	{ name: "a timer", pattern: /\bset(?:Timeout|Interval)\s*\(/, allowed: [`${ENGINE}store/`] },
 	{ name: "an observer", pattern: /\b(?:Resize|Mutation|Intersection)Observer\b/, allowed: [] },
 	{ name: "a scroll set by hand", pattern: /\.scrollTop\s*=(?!=)|\.scrollLeft\s*=(?!=)|\bscrollTo\s*\(|\bscrollBy\s*\(/, allowed: [] },
@@ -599,10 +604,11 @@ describe("the engine's owners", () => {
 
 describe("the owners' guard itself", () => {
 	it("finds a library imported outside its owner", () => {
-		const imports: Record<string, string[]> = { [`${ENGINE}view/Card.tsx`]: ["@dnd-kit/core", "motion/react", "react"], [`${ENGINE}drag/Sortable.tsx`]: ["@dnd-kit/sortable"], [`${ENGINE}view/MovingRow.tsx`]: ["motion/react"] };
+		const imports: Record<string, string[]> = { [`${ENGINE}view/Card.tsx`]: ["@dnd-kit/core", "motion/react", "react"], [`${ENGINE}drag/Sortable.tsx`]: ["@dnd-kit/sortable"], [`${ENGINE}view/MovingRow.tsx`]: ["motion/react"], [`${ENGINE}gestures/Zoom.ts`]: ["motion/react"] };
 		expect(ownerViolations(Object.keys(imports), (f) => imports[f])).toEqual([
 			`${ENGINE}view/Card.tsx → @dnd-kit/core (Drag and drop: dnd-kit: only ${ENGINE}drag/)`,
-			`${ENGINE}view/Card.tsx → motion/react (Rows that move, regions that slide: Motion: only ${ENGINE}view/MovingRow.tsx, ${ENGINE}view/Slide.tsx, ${ENGINE}gestures/)`,
+			`${ENGINE}view/Card.tsx → motion/react (Rows that move, regions that slide: Motion: only ${ENGINE}view/MovingRow.tsx, ${ENGINE}view/Slide.tsx, ${RIBBON_MOTION.join(", ")})`,
+			`${ENGINE}gestures/Zoom.ts → motion/react (Rows that move, regions that slide: Motion: only ${ENGINE}view/MovingRow.tsx, ${ENGINE}view/Slide.tsx, ${RIBBON_MOTION.join(", ")})`,
 		]);
 	});
 
@@ -610,7 +616,8 @@ describe("the owners' guard itself", () => {
 		expect(byHandIn(`${ENGINE}view/Card.tsx`, "el.addEventListener('x', f); const r = el.getBoundingClientRect(); requestAnimationFrame(f); animate(x, 1); setTimeout(f, 1); new ResizeObserver(f); el.scrollTop = 4; <div onKeyDown={f} />")).toEqual(
 			["a listener added by hand", "a size read from the page", "an animation frame", "an animation by hand", "a timer", "an observer", "a scroll set by hand", "a key handled outside the host's key table"].map((name) => `${ENGINE}view/Card.tsx: ${name}`),
 		);
-		expect(byHandIn(`${ENGINE}gestures/useRibbon.ts`, "animate(x, 1, spring)")).toEqual([]);
+		expect(byHandIn(RIBBON_LANDING, "animate(x, 1, spring)")).toEqual([]);
+		expect(byHandIn(`${ENGINE}gestures/Zoom.ts`, "animate(x, 1, spring)")).toEqual([`${ENGINE}gestures/Zoom.ts: an animation by hand`]);
 		expect(byHandIn(`${ENGINE}store/screenStore.ts`, "setTimeout(tick, 60000)")).toEqual([]);
 		expect(byHandIn(`${ENGINE}view/Card.tsx`, "// el.addEventListener('x', f)\nconst a = el.scrollTop === 3;")).toEqual([]);
 	});

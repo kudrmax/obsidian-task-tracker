@@ -1,5 +1,5 @@
 import type { ListId } from "../port";
-import type { Stop } from "../store";
+import { type Screen, STOPS, type Stop } from "../store";
 
 /** The strip of columns the ribbon slides, left to right. */
 export type Column = ListId | "timeline";
@@ -20,3 +20,16 @@ export function shownAt(stop: Stop): readonly [Column, Column] {
 
 /** How far the strip stands from its start at a stop, in columns: where the ribbon's gestures take it. */
 export const offsetOf = (stop: Stop): number => STRIP.indexOf(shownAt(stop)[0]);
+
+/** The ribbon's last stop, the day and its calendar, in places: past it the places are the days, one a day. */
+export const CALENDAR = offsetOf("calendar");
+
+/** Where the ribbon stands at a stop and day, in places: the stops' offsets, past the calendar one place a day. */
+export const placeOf = (stop: Stop, dayOffset: number): number => offsetOf(stop) + (stop === "calendar" ? Math.max(0, dayOffset) : 0);
+
+/** The ribbon stood at `place` (never before the first): the stop, and past the calendar the day, the screen shows from now on. */
+export function standAt(screen: Pick<Screen, "setStop" | "showDay">, place: number): void {
+	const at = Math.max(0, place);
+	screen.setStop(STOPS.find((stop) => offsetOf(stop) === Math.min(at, CALENDAR)) ?? "calendar");
+	screen.showDay(Math.max(0, at - CALENDAR));
+}

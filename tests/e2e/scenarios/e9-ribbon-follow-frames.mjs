@@ -34,7 +34,7 @@ export default {
 	features: ["Step 7: swipe the columns (the trackpad, frame by frame)"],
 	platforms: ["desktop"],
 	async run(t) {
-		await t.cdp.eval(`(async () => { window.__tcStand.step("step-swipe"); await new Promise((r) => setTimeout(r, 500)); return 1; })()`);
+		await t.cdp.eval(`(async () => { window.__tcStand.step("whole-screen"); await new Promise((r) => setTimeout(r, 500)); return 1; })()`);
 		/** From the day's calendar back to Soon: the landing place lies between two others, so nothing bounds a drift past it. */
 		await t.setStop("calendar");
 		const ribbon = await t.oracle.rect(".tc-ribbon");

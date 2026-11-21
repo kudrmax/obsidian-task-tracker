@@ -1,28 +1,5 @@
-import { AnimatePresence, type MotionValue, motion, useMotionValue, useTransform } from "motion/react";
+import { type MotionValue, motion, useMotionValue, useTransform } from "motion/react";
 import type { CSSProperties, ReactNode } from "react";
-
-/**
- * Regions that slide (spec, «The owners»): a whole region gives way to the next, in from the side it comes from, as one
- * move: the day after slides in from the right, the day before from the left. Motion's `AnimatePresence` with the
- * direction as `custom`, as its docs build a slideshow.
- */
-export function Slide({ id, way, className, children }: { readonly id: string; readonly way: -1 | 0 | 1; readonly className: string; readonly children: ReactNode }) {
-	return (
-		<AnimatePresence initial={false} custom={way}>
-			<motion.div key={id} className={className} custom={way} variants={VARIANTS} initial="enter" animate="center" exit="exit" transition={SLIDE}>
-				{children}
-			</motion.div>
-		</AnimatePresence>
-	);
-}
-
-const VARIANTS = {
-	enter: (way: number) => ({ x: `${way * 100}%` }),
-	center: { x: "0%" },
-	exit: (way: number) => ({ x: `${-way * 100}%` }),
-};
-
-const SLIDE = { type: "spring", stiffness: 1400, damping: 75 } as const;
 
 /**
  * How a day's region is seen while the days turn: through its own box (`own`, the calendar's items), through the
@@ -32,10 +9,11 @@ const SLIDE = { type: "spring", stiffness: 1400, damping: 75 } as const;
 export type DayWindow = "own" | "now" | "lane";
 
 /**
- * One day's region as the days turn (docs/plugin/screen.md, «Свайп по экрану и дни»): it stands as far from its place as
- * the days stand from it (`at`, in days from today), a whole width of its own a day, so the day going out and the day
- * coming in move as one picture; what draws every day (a header, the hours) stands still around it. Motion's motion
- * value drives it frame by frame, React drawing nothing while the fingers move.
+ * Regions that slide (spec, «The owners»): one day's region as the days turn. It stands as far from its place as the
+ * days stand from it (`at`, in days from today), a whole width of its own a day, so the day going out and the day coming
+ * in move as one picture (the day's list), or nudged and faded as the calendar switches day (`offset`, `dayChange.ts`);
+ * what draws every day (a header, the hours) stands still around it. Motion's values drive it frame by frame, React
+ * drawing nothing while the fingers move.
  */
 export function DaySlide({ day, at, offset = null, window: seen, className, style, children }: { readonly day: number; readonly at: MotionValue<number> | null; readonly offset?: DayOffset | null; readonly window: DayWindow; readonly className: string; readonly style?: CSSProperties; readonly children: ReactNode }) {
 	const still = useMotionValue(0);
