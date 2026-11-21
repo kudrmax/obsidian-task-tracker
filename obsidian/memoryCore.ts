@@ -2,7 +2,7 @@ import { composeCore, type Core } from "../core/application/composeCore";
 import { type CalendarEvent, TasksFileMissingError } from "../core/application/contracts";
 import type { CalendarFile } from "../core/application/calendarFile";
 import type { EventFile } from "../core/application/EventSource";
-import type { Clock, SettingsStore, TaskFileStore } from "../core/application/ports";
+import type { Clock, ProjectsScreenStore, SettingsStore, TaskFileStore } from "../core/application/ports";
 import { DEFAULT_SETTINGS, type TaskCalendarSettings } from "../core/settings";
 
 /**
@@ -81,8 +81,11 @@ export interface MemoryCore {
 	readonly clock: Clock;
 }
 
-/** The core over `text` as its tasks file, `events` as the Google calendar's, the settings' defaults over `settings`. */
-export function memoryCore(text: string, clock: Clock, settings: Partial<TaskCalendarSettings> = {}, events: readonly CalendarEvent[] = []): MemoryCore {
+/**
+ * The core over `text` as its tasks file, `events` as the Google calendar's, the settings' defaults over `settings`; the
+ * device's Projects screen in `projectsScreen` (kept in memory when left out).
+ */
+export function memoryCore(text: string, clock: Clock, settings: Partial<TaskCalendarSettings> = {}, events: readonly CalendarEvent[] = [], projectsScreen?: ProjectsScreenStore): MemoryCore {
 	const file = new MemoryTasksFile(text);
 	const core = composeCore({
 		tasksFile: file,
@@ -97,6 +100,7 @@ export function memoryCore(text: string, clock: Clock, settings: Partial<TaskCal
 		feeds: [],
 		work: { export: () => undefined },
 		isPhone: () => false,
+		...(projectsScreen && { projectsScreen }),
 	});
 	return { core, file, clock };
 }
