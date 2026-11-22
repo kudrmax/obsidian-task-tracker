@@ -131,7 +131,7 @@ describe("the host's source", () => {
 	it("opened after the plugin unloaded, its port is let go at once", async () => {
 		const dispose = vi.fn();
 		let open: () => void = () => undefined;
-		const plugin = Object.assign(new Plugin({ workspace: { iterateAllLeaves: () => undefined, on: () => () => undefined } }), {
+		const plugin = Object.assign(new (Plugin as unknown as new (app: unknown) => object)({ workspace: { iterateAllLeaves: () => undefined, on: () => () => undefined } }), {
 			manifest: { id: "task-calendar" },
 			ends: [] as (() => void)[],
 			register(end: () => void) {
