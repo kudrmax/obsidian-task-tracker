@@ -61,9 +61,10 @@ describe("the host's leaf", () => {
 
 /** A Markdown view of `path` in Live Preview, with the editor's sizer the block stands in. */
 function noteView(path: string): MarkdownView {
-	const view = new MarkdownView({ app: {} }) as MarkdownView & { file: { path: string }; getMode(): string };
-	view.file = { path };
-	view.getMode = () => "source";
+	const view = new MarkdownView({ app: {} } as never);
+	const settable = view as unknown as { file: { path: string }; getMode(): string };
+	settable.file = { path };
+	settable.getMode = () => "source";
 	const sizer = view.containerEl.appendChild(document.createElement("div"));
 	sizer.className = "markdown-source-view";
 	const cm = sizer.appendChild(document.createElement("div"));
@@ -110,14 +111,14 @@ describe("a project note's block", () => {
 
 	it("follows its note renamed, the same block, never a new one", async () => {
 		const fake = fakeHost();
-		const view = noteView("Дружба.md") as MarkdownView & { file: { path: string } };
+		const view = noteView("Дружба.md");
 		const { app, fire } = fakeApp([view]);
 		const blocks = new NoteBlocks(app as never, { projectNoteView, onChange: () => () => undefined }, fake.host);
 		blocks.load();
 		fake.arrive();
 		await settled();
 		await settled();
-		view.file = { path: "Друзья.md" };
+		(view as unknown as { file: { path: string } }).file = { path: "Друзья.md" };
 		fire("rename", { path: "Друзья.md" }, "Дружба.md");
 		await settled();
 		await settled();
