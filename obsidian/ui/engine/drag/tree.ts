@@ -1,5 +1,5 @@
 import { arrayMove } from "@dnd-kit/sortable";
-import type { Row } from "../port";
+import type { LevelRange, Row } from "../port";
 
 /** How far a sideways swipe goes for one level deeper or shallower (Max, 2026-11-18: «try 20»). */
 export const SWIPE_STEP = 20;
@@ -99,21 +99,26 @@ export function slotOf(rows: readonly Row[], order: readonly string[], id: strin
 	return { section, before: next?.kind === "task" ? next.id : null };
 }
 
-/** The level a card asking for `wanted` takes between the row `above` and the row `below` its place. */
-export function levelBetween(above: Row | undefined, below: Row | undefined, wanted: number): number {
-	const deepest = above ? Math.max(0, depthOf(above) + 1) : 0;
-	const shallowest = below ? Math.max(0, depthOf(below)) : 0;
-	return Math.max(shallowest, Math.min(deepest, Math.max(0, wanted)));
+/** The core's nesting, asked through the port: the levels a card may take between a card at `above` and one at `below` (null: none or a header). */
+export type Levels = (above: number | null, below: number | null) => LevelRange;
+
+/** A row's level as the nesting reads it: a task's depth; null for none or a section's header. */
+const levelOf = (row: Row | undefined): number | null => (row?.kind === "task" ? row.depth : null);
+
+/** The level a card asking for `wanted` takes between the row `above` and the row `below` its place: as near `wanted` as the core's nesting allows. */
+export function levelBetween(levels: Levels, above: Row | undefined, below: Row | undefined, wanted: number): number {
+	const { min, max } = levels(levelOf(above), levelOf(below));
+	return Math.max(min, Math.min(max, Math.max(0, wanted)));
 }
 
 /** The level the carried card `activeId` takes when it stands where `overId` is now, asking for `wanted`. */
-export function levelAt(rows: readonly Row[], activeId: string, overId: string, wanted: number): number {
+export function levelAt(levels: Levels, rows: readonly Row[], activeId: string, overId: string, wanted: number): number {
 	const from = rows.findIndex((row) => row.id === activeId);
 	if (from < 0) return 0;
 	const found = rows.findIndex((row) => row.id === overId);
 	const to = found < 0 ? from : found;
 	const moved = arrayMove([...rows], from, to);
-	return levelBetween(moved[to - 1], moved[to + 1], wanted);
+	return levelBetween(levels, moved[to - 1], moved[to + 1], wanted);
 }
 
 /** The rows under `id` (its subtasks, theirs…): they fold away while it is carried and travel with it. */

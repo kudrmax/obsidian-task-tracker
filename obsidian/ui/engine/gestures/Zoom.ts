@@ -151,5 +151,5 @@ export function zoomAfterPinch(hourPx: number, wholeDay: number): Zoom {
 /** The hour's height a zoom draws at, held between the whole day and the largest hour. */
 export function hourOf(zoom: Zoom, fit: number | null, most: number): number {
 	const whole = fit ?? DESIGN.hourPx / 2;
-	return TimeScale.within(zoom === "wholeDay" ? whole : zoom, whole, most).hourPx;
+	return Math.max(whole, Math.min(most, zoom === "wholeDay" ? whole : zoom));
 }

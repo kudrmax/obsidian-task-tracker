@@ -2,7 +2,7 @@ import { DESIGN } from "../../shared/design";
 import { createStore, type StoreApi } from "zustand/vanilla";
 import { EVERY_TASK } from "../port";
 import { type Stop, stopShowing } from "../layout/columns";
-import type { Destination, DividerStop, Edge, ScreenContext, UndoOutcome, EntryBar, EntryDraft, EntryField, FieldActionId, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, MenuStatusId, ScreenData, ScreenPort } from "../port";
+import type { Destination, DividerStop, Edge, ScreenContext, UndoOutcome, EntryBar, EntryDraft, EntryField, FieldActionId, LevelRange, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, MenuStatusId, ScreenData, ScreenPort } from "../port";
 import { share } from "./share";
 
 export type { Stop };
@@ -261,6 +261,10 @@ interface ScreenActions {
 	/** Undo, the button or ⌘Z (F267): the port takes its last step back, and the cards move as any change moves them. */
 	/** Creates the missing tasks file (F6); the screen reads it once written. */
 	createFile(): void;
+	/** The core's snap, through the port (E3): the time scale lands every gesture by it. */
+	snap(minute: number, hourPx: number, tolerancePx: number): number;
+	/** The core's nesting, through the port (E7): the levels a carried card may take between two rows. */
+	levels(above: number | null, below: number | null): LevelRange;
 	undo(): void;
 	/** ⌘⇧Z (F268): the step last taken back, done again. */
 	redo(): void;
@@ -703,6 +707,8 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 			createFile() {
 				void port.createFile();
 			},
+			snap: (minute, hourPx, tolerancePx) => port.snap(minute, hourPx, tolerancePx),
+			levels: (above, below) => port.levels(above, below),
 			undo() {
 				retrace("undo");
 			},

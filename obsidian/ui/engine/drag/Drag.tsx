@@ -10,7 +10,7 @@ import { cssEase, FLY } from "../layers/motion";
 import { useScreen, useScreenApi } from "../store";
 import { EdgeHeading } from "./edgeHeading";
 import { holdsPointer, LONG_PRESS_TOLERANCE_PX, NEW_SLOT, PLUS, PlusTouchSensor, type PressOptions, PressMouseSensor, PressTouchSensor, TouchPresses } from "./sensors";
-import { descendantsOf, finalOrder, levelAt, levelBetween, spotKey, shiftOf, type Slot, slotOf, SwipeLevel } from "./tree";
+import { descendantsOf, finalOrder, levelAt, levelBetween, type Levels, spotKey, shiftOf, type Slot, slotOf, SwipeLevel } from "./tree";
 
 /**
  * Drag and drop (spec, «The owners»): one `DndContext` per screen, one `DragOverlay`, one `onDragEnd` that makes one write
@@ -198,6 +198,7 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 	const rowsOf = (list: string) => api.getState().shown.lists[list as ListId]?.rows ?? [];
 	/** The carried card's (or plus's) level on the place it stands at, by its sideways swipes there (`SwipeLevel`). */
 	const swipe = useRef(new SwipeLevel(null, 0, 0, 0));
+	const levels: Levels = (above, below) => api.getState().levels(above, below);
 	const sideLevel = (event: { readonly activatorEvent: Event; readonly delta: { readonly x: number } }, spot: string, allowed: (wanted: number) => number): number => swipe.current.at((getEventCoordinates(event.activatorEvent)?.x ?? 0) + event.delta.x, gestureNow(), spot, allowed);
 	/** The level the carried plus's field would take where the plus stands now among its list's rows: drawn by its place. */
 	const plusLevel = (plus: Sortable, over: Sortable | null, wanted: number): number | null => {
@@ -206,7 +207,7 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 		const rows = rowsOf(container);
 		const byId = new Map(rows.map((row) => [row.id, row]));
 		const order = itemsOf(plus).map((id): Row => byId.get(id) ?? { kind: "task", id, depth: 0 });
-		return levelAt(order, PLUS, over ? String(over.id) : PLUS, wanted);
+		return levelAt(levels, order, PLUS, over ? String(over.id) : PLUS, wanted);
 	};
 	/** The level the carried card takes where it stands now, among the rows of its list, its own subtasks folded away. */
 	const projected = (lifted: Sortable, over: Sortable | null, wanted: number): number | null => {
@@ -216,7 +217,7 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 		const rows = rowsOf(container);
 		const under = descendantsOf(rows, id);
 		const visible = under.size === 0 ? rows : rows.filter((row) => !under.has(row.id));
-		return levelAt(visible, id, over ? String(over.id) : id, wanted);
+		return levelAt(levels, visible, id, over ? String(over.id) : id, wanted);
 	};
 	/**
 	 * The carried plus comes into a list the way a card crosses into another (dnd-kit's «multiple containers»): it becomes
@@ -265,7 +266,7 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 		const rows = rowsOf(list);
 		const index = order.indexOf(PLUS);
 		const near = (id: string | undefined) => rows.find((row) => row.id === id);
-		const depth = sideLevel(event, spotKey(list, order, PLUS), (wanted) => levelBetween(near(order[index - 1]), near(order[index + 1]), wanted));
+		const depth = sideLevel(event, spotKey(list, order, PLUS), (wanted) => levelBetween(levels, near(order[index - 1]), near(order[index + 1]), wanted));
 		api.getState().openEntry({ list: list as ListId, ...slotOf(rows, order, PLUS), dayOffset: api.getState().dayOffset, depth });
 	};
 	/**
@@ -402,7 +403,7 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 		const rows = rowsOf(into.list);
 		const id = String(lifted.id);
 		const order = [...into.order.slice(0, into.index), id, ...into.order.slice(into.index)];
-		const to: Destination = { list: into.list as ListId, ...slotOf(rows, order, id), dayOffset: api.getState().dayOffset, depth: sideLevel(event, spotKey(into.list, order, id), (wanted) => levelBetween(rows[into.index - 1], rows[into.index], wanted)) };
+		const to: Destination = { list: into.list as ListId, ...slotOf(rows, order, id), dayOffset: api.getState().dayOffset, depth: sideLevel(event, spotKey(into.list, order, id), (wanted) => levelBetween(levels, rows[into.index - 1], rows[into.index], wanted)) };
 		if (!api.getState().takes(id, to)) return refused();
 		refusedNow.current = false;
 		carriedAt.current = null;

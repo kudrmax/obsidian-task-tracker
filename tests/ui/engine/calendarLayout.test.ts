@@ -4,45 +4,46 @@ import { EdgeHeading } from "../../../obsidian/ui/engine/drag/edgeHeading";
 import { edgeMinute, leastLength } from "../../../obsidian/ui/engine/gestures/Resize";
 import { hourOf, roomMeasure, zoomAfterPinch } from "../../../obsidian/ui/engine/gestures/Zoom";
 import { CARD, layEvents, layTasks, opening, shadesOn, stackEnd } from "../../../obsidian/ui/engine/layout/calendar";
-import { BASE_SCALE, TimeScale } from "../../../obsidian/ui/engine/layout/timeScale";
+import { TimeScale } from "../../../obsidian/ui/engine/layout/timeScale";
 import type { Block } from "../../../obsidian/ui/engine/port";
+import { coreSnap } from "./coreRules";
 
-const y = (minute: number) => BASE_SCALE.y(minute);
+const y = (minute: number) => new TimeScale(DESIGN.hourPx, coreSnap).y(minute);
 
 /** The design's «Задачи на таймлайне»: the stack, read as the boards draw it. */
 describe("the calendar's tasks", () => {
 	it("a task without a length is a card's height at its time; with one, its length's height (F91)", () => {
-		const [bare, long] = layTasks([{ start: 60, length: null }, { start: 300, length: 120 }], [], BASE_SCALE);
+		const [bare, long] = layTasks([{ start: 60, length: null }, { start: 300, length: 120 }], [], new TimeScale(DESIGN.hourPx, coreSnap));
 		expect(bare).toMatchObject({ top: y(60) + DESIGN.itemInset, height: CARD.height, stacked: false });
 		expect(long).toMatchObject({ top: y(300) + DESIGN.itemInset, height: y(420) - DESIGN.itemInset - (y(300) + DESIGN.itemInset), stacked: false });
 	});
 	it("tasks standing close stack, one gap under the head before, all of the stack writing their start (F92)", () => {
-		const boxes = layTasks([{ start: 60, length: 30 }, { start: 65, length: null }, { start: 600, length: null }], [], BASE_SCALE);
+		const boxes = layTasks([{ start: 60, length: 30 }, { start: 65, length: null }, { start: 600, length: null }], [], new TimeScale(DESIGN.hourPx, coreSnap));
 		expect(boxes[1].top).toBe(boxes[0].top + CARD.height + CARD.gap);
 		expect(boxes.map((b) => b.stacked)).toEqual([true, true, false]);
 		expect(boxes.map((b) => b.rank)).toEqual([0, 1, 2]);
 	});
 	it("a short length is written on the card (F93)", () => {
-		const [short, tall] = layTasks([{ start: 60, length: 30 }, { start: 300, length: 90 }], [], BASE_SCALE);
+		const [short, tall] = layTasks([{ start: 60, length: 30 }, { start: 300, length: 90 }], [], new TimeScale(DESIGN.hourPx, coreSnap));
 		expect(short.shortLength).toBe(true);
 		expect(tall.shortLength).toBe(false);
 	});
 	it("a task starting on a long task's body lies over it, further in", () => {
-		const [long, over] = layTasks([{ start: 120, length: 120 }, { start: 180, length: null }], [], BASE_SCALE);
+		const [long, over] = layTasks([{ start: 120, length: 120 }, { start: 180, length: null }], [], new TimeScale(DESIGN.hourPx, coreSnap));
 		expect(over.left).toBe(long.left + LAYOUT.overlayInset);
 		expect(over.stacked).toBe(false);
 	});
 	it("a task over an event lies right of it, as deep as the events under it (F87)", () => {
-		const events = layEvents([{ start: 420, end: 510 }, { start: 450, end: 480 }], BASE_SCALE);
+		const events = layEvents([{ start: 420, end: 510 }, { start: 450, end: 480 }], new TimeScale(DESIGN.hourPx, coreSnap));
 		expect(events.map((e) => [e.level, e.layer])).toEqual([
 			[0, 0],
 			[1, 1],
 		]);
-		const [task] = layTasks([{ start: 460, length: null }], events, BASE_SCALE);
+		const [task] = layTasks([{ start: 460, length: null }], events, new TimeScale(DESIGN.hourPx, coreSnap));
 		expect(task.left).toBe(2 * LAYOUT.overlayInset);
 	});
 	it("a stack past midnight lengthens the day", () => {
-		const boxes = layTasks([{ start: 1430, length: null }, { start: 1430, length: null }], [], BASE_SCALE);
+		const boxes = layTasks([{ start: 1430, length: null }, { start: 1430, length: null }], [], new TimeScale(DESIGN.hourPx, coreSnap));
 		expect(stackEnd(boxes)).toBeGreaterThan(y(1440));
 	});
 });
@@ -54,7 +55,7 @@ describe("the calendar's tasks", () => {
  */
 /** Decision 60: a card lying on another casts its shade on that card alone, where it lies on it. */
 describe("the shade a card casts on the card under it", () => {
-	const boxes = layTasks([{ start: 120, length: 120 }, { start: 150, length: 30 }, { start: 600, length: null }], [], BASE_SCALE);
+	const boxes = layTasks([{ start: 120, length: 120 }, { start: 150, length: 30 }, { start: 600, length: null }], [], new TimeScale(DESIGN.hourPx, coreSnap));
 	it("falls only on the card it lies on, in that card's own box", () => {
 		const shades = shadesOn(boxes, boxes.map((b) => b.rank));
 		expect(shades[0]).toEqual([{ top: boxes[1].top - boxes[0].top, left: boxes[1].left - boxes[0].left, height: boxes[1].height }]);
@@ -86,20 +87,20 @@ describe("overlapping events", () => {
 	const abs = (b: { top: number; blockTop: number }) => b.top + b.blockTop;
 
 	it("form a cluster when one starts before the cluster's last end; a lone event stands alone", () => {
-		const boxes = layEvents(evening, BASE_SCALE);
+		const boxes = layEvents(evening, new TimeScale(DESIGN.hourPx, coreSnap));
 		expect(boxes.map((b) => b.lane)).toEqual([0, 0, 1, 2]);
 		expect(boxes.map((b) => b.lanesAfter)).toEqual([0, 2, 1, 0]);
-		const chained = layEvents([{ start: 60, end: 180 }, { start: 120, end: 300 }, { start: 240, end: 330 }, { start: 330, end: 360 }], BASE_SCALE);
+		const chained = layEvents([{ start: 60, end: 180 }, { start: 120, end: 300 }, { start: 240, end: 330 }, { start: 330, end: 360 }], new TimeScale(DESIGN.hourPx, coreSnap));
 		expect(chained.map((b) => b.lane)).toEqual([0, 1, 2, 0]);
 	});
 
 	it("stand in lanes a bar and its gap apart, the later higher, in the order given whatever the times", () => {
-		const boxes = layEvents([...evening].reverse(), BASE_SCALE).reverse();
+		const boxes = layEvents([...evening].reverse(), new TimeScale(DESIGN.hourPx, coreSnap)).reverse();
 		expect(boxes.map((b) => b.left)).toEqual([DESIGN.itemInset, DESIGN.itemInset, DESIGN.itemInset + DESIGN.eventLane, DESIGN.itemInset + 2 * DESIGN.eventLane]);
 		expect(boxes.map((b) => b.layer)).toEqual([0, 1, 2, 3]);
 	});
 
-	for (const scale of [BASE_SCALE, new TimeScale(23)])
+	for (const scale of [new TimeScale(DESIGN.hourPx, coreSnap), new TimeScale(23, coreSnap)])
 		describe(`at ${scale.hourPx} px an hour`, () => {
 			const [, plan, call, sync] = layEvents(evening, scale);
 			it("each top is the true start; a block starts there unless an earlier title's text reaches it, then the micro gap under that text", () => {
@@ -125,16 +126,16 @@ describe("overlapping events", () => {
 		});
 
 	it("at the base zoom, «Звонок с клиентом» holds its start's line and «Синк с Олей» goes only just under its title's text", () => {
-		const [, plan, call, sync] = layEvents(evening, BASE_SCALE);
+		const [, plan, call, sync] = layEvents(evening, new TimeScale(DESIGN.hourPx, coreSnap));
 		expect(call.blockTop).toBe(0);
 		expect(abs(call) - abs(plan)).toBe(28);
 		expect(abs(sync)).toBe(abs(call) + clear);
-		expect(sync.blockTop).toBeCloseTo(clear - BASE_SCALE.y(15));
+		expect(sync.blockTop).toBeCloseTo(clear - new TimeScale(DESIGN.hourPx, coreSnap).y(15));
 		expect(clear).toBe(21);
 	});
 
 	it("a later block clear of an earlier title's text stands at its true start, though inside the title's whole line (Max: «Микрозазора будет достаточно»)", () => {
-		const scale = new TimeScale(60);
+		const scale = new TimeScale(60, coreSnap);
 		const [first, second] = layEvents([{ start: 600, end: 720 }, { start: 622, end: 660 }], scale);
 		expect(second.top - first.top).toBe(22);
 		expect(second.top - first.top).toBeLessThan(DESIGN.eventLabel + DESIGN.itemGap);
@@ -144,14 +145,14 @@ describe("overlapping events", () => {
 	});
 
 	it("at the whole day, the titles push down and a block may reach below its end", () => {
-		const scale = new TimeScale(23);
+		const scale = new TimeScale(23, coreSnap);
 		const [, , call, sync] = layEvents(evening, scale);
 		expect(call.blockTop).toBeGreaterThan(0);
 		expect(sync.top + sync.drawnHeight).toBeGreaterThan(sync.top + sync.height);
 	});
 
 	it("a lone event is drawn as ever: its block at its start, its height, tiny when shorter than a line", () => {
-		const [lone, short] = layEvents([{ start: 60, end: 120 }, { start: 600, end: 615 }], BASE_SCALE);
+		const [lone, short] = layEvents([{ start: 60, end: 120 }, { start: 600, end: 615 }], new TimeScale(DESIGN.hourPx, coreSnap));
 		expect(lone).toMatchObject({ lane: 0, lanesAfter: 0, blockTop: 0, drawnHeight: lone.height, labelRoom: lone.height - under, left: DESIGN.itemInset, tiny: false });
 		expect(short.tiny).toBe(true);
 		expect(short.drawnHeight).toBe(short.height);
@@ -167,8 +168,8 @@ describe("a dot's gesture", () => {
 		expect(edgeMinute({ ...block, length: 45 }, "end")).toBe(645);
 	});
 	it("keeps no length at a card and its gap or less (the plugin's 35 + 2 px)", () => {
-		expect(leastLength(BASE_SCALE)).toBeCloseTo((37 / 56) * 60);
-		expect(leastLength(new TimeScale(112))).toBeCloseTo((37 / 112) * 60);
+		expect(leastLength(new TimeScale(DESIGN.hourPx, coreSnap))).toBeCloseTo((37 / 56) * 60);
+		expect(leastLength(new TimeScale(112, coreSnap))).toBeCloseTo((37 / 112) * 60);
 	});
 });
 

@@ -128,6 +128,12 @@ export interface ScreenData {
 	readonly missing: MissingFile | null;
 }
 
+/** The levels a place allows, shallowest and deepest. */
+export interface LevelRange {
+	readonly min: number;
+	readonly max: number;
+}
+
 /** The words the screen shows without a tasks file: where it was looked for, and the button's. */
 export interface MissingFile {
 	readonly text: string;
@@ -366,6 +372,10 @@ export interface ScreenPort {
 	subtaskPlace(id: string, dayOffset: number, from: MenuFrom): EntryField;
 	/** The field shifted a level in (1) or out (-1) as the rules let it (its depth fitted between its neighbours), with what is set and typed; null where it can't go. */
 	entryShift(field: EntryField, draft: EntryDraft, text: string, by: 1 | -1): EntryField | null;
+	/** The minute a gesture lands on: `minute` snapped to the step the hour's height `hourPx` allows a finger moving `tolerancePx` (the core's snap, E3). */
+	snap(minute: number, hourPx: number, tolerancePx: number): number;
+	/** The levels a card may take between a card at level `above` and one at level `below` (null: none, or a section's header): the core's nesting (E7). */
+	levels(above: number | null, below: number | null): LevelRange;
 	/** Creates the tasks file with its five empty sections (F6); the screen reads it once written. */
 	createFile(): Promise<void>;
 	/** What a new task's field at `field` starts with set: in a project's screen its project, in a list's part that part's (the core's quick entry). */

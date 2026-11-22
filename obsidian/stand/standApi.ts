@@ -14,7 +14,7 @@ export interface StandApi {
 	setStop(stop: Stop): void;
 	/** Chooses a made-up project on every open screen (null: none): a change of context, as the projects panel will make it. */
 	setProject(project: string | null): void;
-	/** For a person debugging on the stand (the checks never read it): each open screen's stop, gesture slot, carried task and layer. */
+	/** Each open screen's stop, gesture slot, carried task, layer and the task its menu is open over (a check reads `menuOf` alone: whose menu a tap opened). */
 	debug(): readonly object[];
 }
 
@@ -31,7 +31,7 @@ export function standApi(source: StandSource, screens: () => readonly MountedScr
 		debug: () =>
 			screens().map((screen) => {
 				const { stop, gesture, lifted, layer, entry, pending, dayOffset, menuLifted, selected } = screen.store.getState();
-				return { stop, gesture, lifted, layer: layer?.kind ?? null, entry, pending, dayOffset, menuLifted, selected };
+				return { stop, gesture, lifted, layer: layer?.kind ?? null, menuOf: layer?.kind === "menu" ? layer.id : null, entry, pending, dayOffset, menuLifted, selected };
 			}),
 	};
 }

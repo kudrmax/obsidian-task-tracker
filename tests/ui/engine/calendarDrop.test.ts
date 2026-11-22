@@ -2,10 +2,11 @@
 import { describe, expect, it } from "vitest";
 import { calendarFile } from "../../../obsidian/stand/mockData";
 import { DESIGN } from "../../../obsidian/ui/shared/design";
-import { BASE_SCALE, TimeScale } from "../../../obsidian/ui/engine/layout/timeScale";
+import { TimeScale } from "../../../obsidian/ui/engine/layout/timeScale";
 import type { ScreenData, ScreenPort } from "../../../obsidian/ui/engine/port";
 import { createScreenStore } from "../../../obsidian/ui/engine/store";
 import { settled, standPort } from "./standPort";
+import { coreSnap } from "./coreRules";
 
 const NOW = new Date(2026, 10, 18, 14, 20);
 
@@ -26,29 +27,29 @@ const dayTitles = (screen: ScreenData) => screen.lists.day.rows.flatMap((row) =>
 
 describe("the calendar's time scale: a carried task's top to its start", () => {
 	it("snaps to the 15-minute step at the base zoom", () => {
-		expect(BASE_SCALE.start(0)).toBe(0);
-		expect(BASE_SCALE.start(DESIGN.hourPx)).toBe(60);
-		expect(BASE_SCALE.start(DESIGN.hourPx * 1.1)).toBe(60);
-		expect(BASE_SCALE.start(DESIGN.hourPx * 1.2)).toBe(75);
+		expect(new TimeScale(DESIGN.hourPx, coreSnap).start(0)).toBe(0);
+		expect(new TimeScale(DESIGN.hourPx, coreSnap).start(DESIGN.hourPx)).toBe(60);
+		expect(new TimeScale(DESIGN.hourPx, coreSnap).start(DESIGN.hourPx * 1.1)).toBe(60);
+		expect(new TimeScale(DESIGN.hourPx, coreSnap).start(DESIGN.hourPx * 1.2)).toBe(75);
 	});
 	it("stays within the day", () => {
-		expect(BASE_SCALE.start(-200)).toBe(0);
-		expect(BASE_SCALE.start(DESIGN.hourPx * 30)).toBe(TimeScale.DAY - BASE_SCALE.step);
+		expect(new TimeScale(DESIGN.hourPx, coreSnap).start(-200)).toBe(0);
+		expect(new TimeScale(DESIGN.hourPx, coreSnap).start(DESIGN.hourPx * 30)).toBe(TimeScale.DAY - new TimeScale(DESIGN.hourPx, coreSnap).step);
 	});
 	it("the snap follows the zoom (F100): 30 minutes small, 15 normal, 5 large", () => {
-		expect(new TimeScale(28).step).toBe(30);
-		expect(new TimeScale(56).step).toBe(15);
-		expect(new TimeScale(112).step).toBe(5);
-		expect(new TimeScale(224).step).toBe(5);
-		expect(new TimeScale(112).start(112 * 1.1)).toBe(65);
+		expect(new TimeScale(28, coreSnap).step).toBe(30);
+		expect(new TimeScale(56, coreSnap).step).toBe(15);
+		expect(new TimeScale(112, coreSnap).step).toBe(5);
+		expect(new TimeScale(224, coreSnap).step).toBe(5);
+		expect(new TimeScale(112, coreSnap).start(112 * 1.1)).toBe(65);
 	});
 	it("finer marks come with the zoom (F99): only hours at 56, «:30» at 112, quarters and bare 5-minute lines at 224", () => {
-		expect(new TimeScale(56).marks()).toEqual([]);
-		expect(new TimeScale(112).marks().slice(0, 2)).toEqual([
+		expect(new TimeScale(56, coreSnap).marks()).toEqual([]);
+		expect(new TimeScale(112, coreSnap).marks().slice(0, 2)).toEqual([
 			{ minute: 30, label: ":30" },
 			{ minute: 90, label: ":30" },
 		]);
-		const fine = new TimeScale(224).marks().filter((m) => m.minute < 60);
+		const fine = new TimeScale(224, coreSnap).marks().filter((m) => m.minute < 60);
 		expect(fine.filter((m) => m.label !== null).map((m) => m.label)).toEqual([":15", ":30", ":45"]);
 		expect(fine.length).toBe(11);
 	});

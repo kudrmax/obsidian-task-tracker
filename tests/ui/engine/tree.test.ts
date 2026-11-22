@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { descendantsOf, finalOrder, levelAt, levelBetween, spotKey, SWIPE_REST_MS, SWIPE_STEP, shiftOf, slotOf, SwipeLevel } from "../../../obsidian/ui/engine/drag/tree";
 import type { Row } from "../../../obsidian/ui/engine/port";
+import { coreLevels } from "./coreRules";
 
 const task = (id: string, depth = 0): Row => ({ kind: "task", id, depth });
 
@@ -8,19 +9,19 @@ describe("a carried card's level where it stands", () => {
 	const rows = [task("a"), task("b"), task("b1", 1), task("b2", 1), task("c")];
 
 	it("no deeper than one under the row above its place", () => {
-		expect(levelAt(rows, "c", "c", 5)).toBe(2);
-		expect(levelAt(rows, "b", "b", 5)).toBe(1);
+		expect(levelAt(coreLevels, rows, "c", "c", 5)).toBe(2);
+		expect(levelAt(coreLevels, rows, "b", "b", 5)).toBe(1);
 	});
 	it("no shallower than the subtask below its place", () => {
-		expect(levelBetween(task("b"), task("b1", 1), 0)).toBe(1);
+		expect(levelBetween(coreLevels, task("b"), task("b1", 1), 0)).toBe(1);
 	});
 	it("at the top of a list, or right under a section's header, a task", () => {
-		expect(levelAt(rows, "c", "a", 3)).toBe(0);
-		expect(levelBetween({ kind: "section", id: "s", title: "Идеи" }, task("x"), 3)).toBe(0);
+		expect(levelAt(coreLevels, rows, "c", "a", 3)).toBe(0);
+		expect(levelBetween(coreLevels, { kind: "section", id: "s", title: "Идеи" }, task("x"), 3)).toBe(0);
 	});
 	it("takes the level asked for where it now stands", () => {
-		expect(levelAt(rows, "a", "b2", 2)).toBe(2);
-		expect(levelAt(rows, "a", "b2", 0)).toBe(0);
+		expect(levelAt(coreLevels, rows, "a", "b2", 2)).toBe(2);
+		expect(levelAt(coreLevels, rows, "a", "b2", 0)).toBe(0);
 	});
 });
 

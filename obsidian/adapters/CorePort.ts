@@ -1,5 +1,5 @@
-import { sameSlot, type CalendarService, dividerAt, type DividerStop, LIST_WIDTHS, listShareOf, type ListWidths, listWidths, type Clock, type DayEvents, type DayService, type DropColumn, type DroppedTask, type DropTo, type LocalDate, listCardMenuFrom, type MenuFrom as CoreMenuFrom, originOf, type ScreenReader, type ShownChange, type TaskItem, type TaskService, type UndoOutcome, undoNotice, projectNodeOf, type ProjectsNodeId, type UndoService } from "../../core/application/contracts";
-import type { ScreenContext, Destination, Edge, EntryBar, EntryCommit, EntryDraft, EntryField, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, RenameStart, ScreenData, ScreenPort } from "../ui/engine/port";
+import { levelRange, sameSlot, type CalendarService, dividerAt, type DividerStop, LIST_WIDTHS, listShareOf, type ListWidths, listWidths, type Clock, type DayEvents, type DayService, type DropColumn, type DroppedTask, type DropTo, type LocalDate, listCardMenuFrom, type MenuFrom as CoreMenuFrom, originOf, type ScreenReader, type ShownChange, type TaskItem, type TaskService, type UndoOutcome, undoNotice, projectNodeOf, type ProjectsNodeId, type UndoService } from "../../core/application/contracts";
+import type { ScreenContext, Destination, Edge, EntryBar, EntryCommit, EntryDraft, EntryField, LevelRange, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, RenameStart, ScreenData, ScreenPort } from "../ui/engine/port";
 import { CoreEntry } from "./CoreEntry";
 import { WriteQueue } from "./WriteQueue";
 import { ListCards } from "./ListCards";
@@ -349,6 +349,15 @@ export class CorePort implements ScreenPort {
 
 	entryShift(field: EntryField, draft: EntryDraft, text: string, by: 1 | -1): EntryField | null {
 		return this.entry.shift(field, draft, text, by);
+	}
+
+	snap(minute: number, hourPx: number, tolerancePx: number): number {
+		return this.core.tasks.snap(minute, hourPx, tolerancePx);
+	}
+
+	levels(above: number | null, below: number | null): LevelRange {
+		const cards = [...(above === null ? [] : [{ level: above, group: null }]), ...(below === null ? [] : [{ level: below, group: null }])];
+		return levelRange(cards, above === null ? 0 : 1, null);
 	}
 
 	async createFile(): Promise<void> {
