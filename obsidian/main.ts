@@ -27,8 +27,6 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 	private pluginSettings!: PluginSettings<StoredSettings>;
 	/** The real services, once built: open for a look from the console. */
 	services: Services | null = null;
-	/** The screen's port over the services, once the first screen opens. */
-	private port: CorePort | null = null;
 
 	override async onload(): Promise<void> {
 		this.pluginSettings = new PluginSettings(
@@ -53,13 +51,12 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 		const host = new ScreenHost(this, {
 			look: { type: VIEW_TYPE, title: "Task Calendar", icon: "calendar-days" },
 			source: async () => {
-				this.port = await CorePort.open({ ...services, clock: systemClock, onError: (error) => new Notice(failureText(error)) });
-				return { port: this.port, device: new DeviceSettings({ get: () => this.get(), update: (patch) => this.update(patch) }, services.tasks, () => this.get().zoomLevels) };
+				const port = await CorePort.open({ ...services, clock: systemClock, onError: (error) => new Notice(failureText(error)), tasksFile: () => this.get().tasksFile });
+				return { port, device: new DeviceSettings({ get: () => this.get(), update: (patch) => this.update(patch) }, services.tasks, () => this.get().zoomLevels) };
 			},
 			paint: new ScreenSettingsImpl(this),
 		});
 		host.load();
-		this.register(() => this.port?.dispose());
 		this.addChild(new NoteBlocks(this.app, services.tasks, host));
 		this.addRibbonIcon("calendar-days", "Task Calendar", () => void host.open());
 		this.addCommand({ id: "open", name: "Open Task Calendar", callback: () => void host.open() });

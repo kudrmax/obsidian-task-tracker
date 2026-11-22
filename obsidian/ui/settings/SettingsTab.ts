@@ -1,7 +1,7 @@
 import { ExtraButtonComponent, Notice, Plugin, PluginSettingTab, Setting, TextComponent, type App, type EventRef } from "obsidian";
 import { type AssistantService, type CalendarService, type CountField, type GoogleAccount, isPresetColor, type LabelColor, type LabelPaint, labelTitle, type Marker, PRIORITY_COLORS, type PresetColor, type PriorityColor, type SectionNames, type SettingsForm, type SettingsService, type Theme, type WorkCalendarSetup } from "../../../core/application/contracts";
 import { inkOf, showPriorityColors, tintOf } from "../paint/priorityColors";
-import { Button } from "./Button";
+import { Swatch } from "./Swatch";
 import { el } from "./dom";
 import { RowReorder } from "./RowReorder";
 import { SettingsPage } from "./SettingsPage";
@@ -222,8 +222,7 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 			const swatches = row.createDiv("tc-swatches");
 			for (const color of spec.swatches) {
 				const tint = tintOf(color);
-				const swatch = Button.create(swatches, {
-					kind: "swatch",
+				const swatch = new Swatch(swatches, {
 					label: tint ?? "No colour",
 					cls: tint ? undefined : "tc-swatch-clear",
 					onPress: () => void this.redrawn(spec.recolour(index, color)),

@@ -27,8 +27,6 @@ export interface StandSource {
 	addFromOutside(list: ListKey, title: string): void;
 	/** A task moved from outside: the one titled `title` before the one titled `before` (null: its list's first section's end). */
 	moveFromOutside(title: string, list: ListKey, before: string | null): void;
-	/** Lets go of what the port holds: the stand unloads. */
-	dispose(): void;
 }
 
 /** The made-up file as the core reads it: its lists, then the made-up projects' tree (`## Projects`, a folder marked 🗃️). */
@@ -46,7 +44,7 @@ export async function standSource(device: DeviceViewKeys, onError: (error: unkno
 	const first = given ?? mockFile(now);
 	const made = memoryCore(coreText(first, now), { now: clock }, {}, standEvents(first, now));
 	const { core, file, events } = made;
-	const port = await CorePort.open({ ...core, clock: { now: clock }, onError });
+	const port = await CorePort.open({ ...core, clock: { now: clock }, onError, tasksFile: () => made.settings.get().tasksFile });
 	return {
 		port,
 		device: new DeviceSettings(device, core.tasks, () => made.settings.get().zoomLevels),
@@ -60,7 +58,6 @@ export async function standSource(device: DeviceViewKeys, onError: (error: unkno
 		setDelay: (delay) => (file.delay = delay),
 		addFromOutside: (list, title) => file.replace(withLine(file, list, `- [ ] ${title}${list === "now" ? ` 📅 ${dateOf(dayOf(clock()))}` : ""}`)),
 		moveFromOutside: (title, list, before) => file.replace(movedLine(file, title, list, before)),
-		dispose: () => port.dispose(),
 	};
 }
 const isTaskOf = (line: string, title: string) => new RegExp(`^\\s*- \\[.\\] (?:p\\d )?${title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?: |$)`).test(line);

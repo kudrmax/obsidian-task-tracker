@@ -1,5 +1,5 @@
 import { type App, Component, MarkdownView, type TAbstractFile, type WorkspaceLeaf } from "obsidian";
-import { type FunnelView, projectNodeOf, type TaskService } from "../../core/application/contracts";
+import type { FunnelView, TaskService } from "../../core/application/contracts";
 import type { ScreenContext } from "../ui/engine/port";
 import { ScreenBlock } from "./ScreenBlock";
 import type { ScreenHost } from "./ScreenHost";
@@ -10,10 +10,10 @@ const BLOCK_LIFT = "--tc-block-lift";
 /** The block's own place at a note's end (boards D5, T6). */
 const PROJECT_BLOCK = "tc-project-block";
 
-/** The project a note's view shows, as the screen's context; null where the note is no project's. */
+/** The project a note's view shows (the core's own: its filter's project), as the screen's context; null where the note is no project's. */
 function contextOf(view: FunnelView | null): ScreenContext | null {
-	const filter = view?.filter;
-	return filter && projectNodeOf(filter.title) === filter.node ? { project: filter.title } : null;
+	const project = view?.filter?.menu?.project.name;
+	return project === undefined ? null : { project };
 }
 
 /** A project note's block: `TaskScreen` in the note's project, and the note's path it was made for. */
@@ -23,7 +23,7 @@ class ProjectBlock {
 	shown = false;
 
 	constructor(
-		readonly path: string,
+		public path: string,
 		readonly project: string | null,
 		host: ScreenHost,
 		context: ScreenContext,
@@ -59,7 +59,7 @@ export class NoteBlocks extends Component {
 		this.registerEvent(workspace.on("layout-change", sync));
 		this.registerEvent(workspace.on("file-open", sync));
 		this.registerEvent(workspace.on("active-leaf-change", sync));
-		this.registerEvent(vault.on("rename", (_file: TAbstractFile) => sync()));
+		this.registerEvent(vault.on("rename", (file: TAbstractFile, from: string) => this.renamed(from, file.path)));
 		/** A note may have become a project's or stopped being one; a block that stays where it stands is left alone. */
 		this.register(this.tasks.onChange(sync));
 		workspace.onLayoutReady(sync);
@@ -67,6 +67,12 @@ export class NoteBlocks extends Component {
 
 	override onunload(): void {
 		for (const [view, block] of [...this.blocks]) this.drop(view, block);
+	}
+
+	/** A note renamed or moved: its block follows it at once, and is kept or dropped once the core has the new path. */
+	private renamed(from: string, to: string): void {
+		for (const block of this.blocks.values()) if (block.path === from) block.path = to;
+		this.sync();
 	}
 
 	private sync(): void {

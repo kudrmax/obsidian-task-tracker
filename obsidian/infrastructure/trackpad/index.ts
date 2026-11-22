@@ -11,14 +11,14 @@ export function trackpadSwitch(app: App): TrackpadSwitch {
 }
 
 /**
- * macOS's touch and lift on the trackpad for the plugin's screens (Decision 126), or null: on the phone, on Windows and
- * Linux, with the switch off, and wherever the module can't load (the ribbon then reads the trackpad by its scrolling).
+ * macOS's touch and lift on the trackpad for the plugin's screens (Decision 126), or null: on the phone (and the Mac's
+ * Obsidian showing its phone view), on Windows and Linux, with the switch off, and wherever the module can't load (the ribbon then reads the trackpad by its scrolling).
  * The module's code is imported only on the Mac's desktop app: it reads Node's files, which the phone refuses. It ends
  * with the plugin and with the window's page; `dispose` may end it sooner.
  */
 export async function trackpadFingers(app: App, plugin: Plugin): Promise<MacTrackpadFingers | null> {
 	const toggle = trackpadSwitch(app);
-	if (!Platform.isDesktopApp || !Platform.isMacOS || !toggle.on) return null;
+	if (!Platform.isDesktopApp || !Platform.isMacOS || Platform.isMobile || !toggle.on) return null;
 	const [{ MacTrackpadFingers }, { TRACKPAD_MODULE }] = await Promise.all([import("./MacTrackpadFingers"), import("./module")]);
 	const host = window as unknown as { require?: (id: string) => unknown };
 	const fingers = MacTrackpadFingers.load(

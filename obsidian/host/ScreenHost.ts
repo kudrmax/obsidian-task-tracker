@@ -1,13 +1,14 @@
 import { Component, MarkdownRenderer, Notice, Platform, type Plugin, type WorkspaceLeaf } from "obsidian";
 import type { ScreenSettingsStore } from "../../core/application/contracts";
+import type { CorePort } from "../adapters/CorePort";
 import type { DeviceSettings } from "../adapters/DeviceSettings";
 import type { TrackpadFingers } from "../ui/engine/gestures/trackpadFollow";
 import { trackpadFingers } from "../infrastructure/trackpad";
 import { KEYS } from "../ui/engine/keys";
 import type { MountedScreen } from "../ui/engine/mount";
-import type { ScreenPort } from "../ui/engine/port";
-import { clearCardSize, showCardSize } from "../ui/paint/cardSize";
-import { clearPriorityColors, showLabelPaint, showPriorityColors } from "../ui/paint/priorityColors";
+import { clearCardSize } from "../ui/paint/cardSize";
+import { clearPriorityColors } from "../ui/paint/priorityColors";
+import { showScreenPaint } from "../ui/paint/screenPaint";
 import { addWindowDocument } from "../ui/paint/windowDocuments";
 import { detectHaptics, type HapticsHost } from "./haptics";
 import { type LeafLook, leafFor, ScreenLeaf } from "./ScreenLeaf";
@@ -15,7 +16,7 @@ import { ScreenMounts } from "./ScreenMounts";
 
 /** What a host's screens draw from: the port and what the device keeps, opened once, at the first screen. */
 export interface ScreenSource {
-	readonly port: ScreenPort;
+	readonly port: CorePort;
 	readonly device: DeviceSettings;
 }
 
@@ -94,8 +95,10 @@ export class ScreenHost {
 
 	private async assemble(): Promise<ScreenMounts> {
 		const [source, fingers] = await Promise.all([this.options.source(), trackpadFingers(this.plugin.app, this.plugin)]);
-		if (this.ended) fingers?.dispose();
-		else this.fingers = fingers;
+		if (this.ended) {
+			fingers?.dispose();
+			source.port.dispose();
+		} else this.fingers = fingers;
 		const app = this.plugin.app;
 		this.assembled = new ScreenMounts({
 			port: source.port,
@@ -120,19 +123,17 @@ export class ScreenHost {
 
 	private end(): void {
 		this.ended = true;
-		void this.ready?.then((mounts) => mounts.dispose());
+		void this.ready?.then((mounts) => {
+			mounts.dispose();
+			mounts.parts.port.dispose();
+		});
 		this.fingers?.dispose();
 		this.fingers = null;
 	}
 
 	/** The settings' levels, labels and card size on every window's body, as they change. */
 	private paint(): void {
-		const show = () => {
-			const shown = this.options.paint.get();
-			showCardSize({ height: shown.cardHeight, gap: shown.cardGap });
-			showPriorityColors(shown.priorities, shown.labels);
-			showLabelPaint(shown.labelPaint);
-		};
+		const show = () => showScreenPaint(this.options.paint.get());
 		show();
 		this.plugin.register(this.options.paint.onChange(show));
 		this.plugin.register(clearCardSize);

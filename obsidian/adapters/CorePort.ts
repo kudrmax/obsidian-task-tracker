@@ -1,6 +1,7 @@
 import { sameSlot, type CalendarService, dividerAt, type DividerStop, LIST_WIDTHS, listShareOf, type ListWidths, listWidths, type Clock, type DayEvents, type DayService, type DropColumn, type DroppedTask, type DropTo, type LocalDate, listCardMenuFrom, type MenuFrom as CoreMenuFrom, originOf, type ScreenReader, type ShownChange, type TaskItem, type TaskService, type UndoOutcome, undoNotice, projectNodeOf, type ProjectsNodeId, type UndoService } from "../../core/application/contracts";
 import type { ScreenContext, Destination, Edge, EntryBar, EntryCommit, EntryDraft, EntryField, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, RenameStart, ScreenData, ScreenPort } from "../ui/engine/port";
 import { CoreEntry } from "./CoreEntry";
+import { WriteQueue } from "./WriteQueue";
 import { ListCards } from "./ListCards";
 import { menuModelOf } from "./menuModel";
 import { ScreenDrawing, type ScreenSource } from "./ScreenDrawing";
@@ -14,6 +15,8 @@ export interface CorePortServices {
 	readonly clock: Clock;
 	/** A write that failed: the host says so, as the old screen does (a notice). */
 	readonly onError: (error: unknown) => void;
+	/** Where the tasks file is looked for, as the settings name it: what the screen says when it is missing. */
+	readonly tasksFile: () => string;
 }
 
 /**
@@ -31,48 +34,179 @@ const EVERY = "";
 const COLUMNS: Readonly<Record<ListId, DropColumn>> = { inbox: "inbox", soon: "soon", day: "day" };
 
 /**
- * The engine's port over the core (spec 2026-11-18, Part 2.3; the audit, «What the core serves the port»): every read is
- * the core's held read (`TaskService.reader`), taken anew when the core says the tasks changed; every write a call of the
- * core's services; every rule the core's. It decides nothing: it turns the engine's words (a list, a card it goes before,
- * a depth, a minute) into the core's (a column, a gap, a key, a slot) and back.
+ * What every screen's port over the core shares (Decision 145): the core's held read of the file, taken anew when the
+ * core says the tasks changed, its reads within each project, the calendars' events, the one write queue, and the core's
+ * subscriptions. Each mounted screen has a port of its own over it (`CorePort.within`), in that screen's context.
  */
-export class CorePort implements ScreenPort {
-	private readonly listeners = new Set<() => void>();
-	private readonly cache = new Map<string, ScreenData>();
+class CoreReads {
+	readonly drawing: ScreenDrawing;
+	readonly queue: WriteQueue;
+	private readonly views = new Set<CorePort>();
 	private readonly events = new Map<LocalDate, DayEvents>();
 	private readonly asked = new Set<LocalDate>();
-	private readonly drawing: ScreenDrawing;
-	private readonly entry: CoreEntry;
 	private readonly offs: (() => void)[];
-	/** The core's held read of the file, every task. */
-	private base: ScreenReader;
-	/** The same read within each context the screen was drawn in (`ScreenReader.within`), kept until the next read. */
+	/** The same read within each project a screen is drawn in (`ScreenReader.within`), kept until the next read. */
 	private readonly readers = new Map<string, ScreenReader>();
-	/** The context the screen was last drawn in: what a write and a menu go by. */
-	private context = EVERY;
 	/** The next held read asked for and not begun yet: every ask before it begins shares it. */
 	private queued: Promise<void> | null = null;
 	private reads: Promise<void> = Promise.resolve();
 
-	private constructor(
-		private readonly core: CorePortServices,
-		base: ScreenReader,
+	constructor(
+		readonly core: CorePortServices,
+		/** The core's held read of the file, every task. */
+		private base: ScreenReader,
 	) {
-		this.base = base;
-		this.drawing = new ScreenDrawing(core.tasks, core.days, core.calendars);
-		this.entry = new CoreEntry(core, this.drawing, () => this.reader, () => this.refresh(), core.onError, () => this.filter());
+		this.drawing = new ScreenDrawing(core.tasks, core.days, core.calendars, core.tasksFile);
+		this.queue = new WriteQueue(core.onError);
 		this.offs = [core.tasks.onChange(() => void this.refresh()), core.tasks.onShownChange((change) => this.settingsChanged(change)), core.days.onDayChange(() => void this.refresh()), core.undo.onChange(() => this.changed()), core.calendars.onChange(() => this.forgetEvents())];
 	}
 
-	/** The port over `core`, once the file is read. */
-	static async open(core: CorePortServices): Promise<CorePort> {
-		return new CorePort(core, await core.tasks.reader(null));
+	/** A screen's port in `context`, told of every change from now on. */
+	view(context: string): CorePort {
+		const view = new CorePort(this, context);
+		this.views.add(view);
+		return view;
 	}
 
-	/** Lets go of the core's subscriptions: the screen is gone. */
+	release(view: CorePort): void {
+		this.views.delete(view);
+	}
+
 	dispose(): void {
 		for (const off of this.offs) off();
+		this.views.clear();
+	}
+
+	/** The held read within `context`: the same read, another filter, at once. */
+	reader(context: string): ScreenReader {
+		if (context === EVERY) return this.base;
+		let within = this.readers.get(context);
+		if (!within) {
+			within = this.base.within(projectNodeOf(context));
+			this.readers.set(context, within);
+		}
+		return within;
+	}
+
+	/** A held read of the file begun after this ask, every screen told once it is in; asks before it begins share it. */
+	refresh(): Promise<void> {
+		if (this.queued) return this.queued;
+		const run = this.reads.then(async () => {
+			this.queued = null;
+			this.base = await this.core.tasks.reader(null);
+			this.readers.clear();
+			this.changed();
+		});
+		this.queued = run;
+		this.reads = run.catch(() => undefined);
+		return run;
+	}
+
+	eventsOf(date: LocalDate): DayEvents | null {
+		const kept = this.events.get(date);
+		if (kept || this.asked.has(date)) return kept ?? null;
+		this.asked.add(date);
+		const ask = this.core.calendars.events(date, "open");
+		if (ask.cached) this.events.set(date, ask.cached);
+		void ask.fresh?.().then((fresh) => {
+			this.events.set(date, fresh);
+			this.changed();
+		});
+		return ask.cached;
+	}
+
+	eventNamed(id: string) {
+		for (const day of this.events.values()) {
+			const found = day.events.find((event) => event.id === id);
+			if (found) return found;
+		}
+		return null;
+	}
+
+	/** A setting the screen shows changed: the tasks are read anew by `onChange`; what is drawn straight from the settings is drawn anew here, the calendars' events fetched anew. */
+	private settingsChanged(change: ShownChange): void {
+		if (change.calendars) this.forgetEvents();
+		if (change.drawn || change.cards || change.timeline || change.gestures) void this.refresh();
+	}
+
+	private forgetEvents(): void {
+		this.events.clear();
+		this.asked.clear();
+		this.changed();
+	}
+
+	private changed(): void {
+		for (const view of this.views) view.changed();
+	}
+}
+
+/**
+ * The engine's port over the core (spec 2026-11-18, Part 2.3; the audit, «What the core serves the port»): every read is
+ * the core's held read (`TaskService.reader`), taken anew when the core says the tasks changed; every write a call of the
+ * core's services; every rule the core's. It decides nothing: it turns the engine's words (a list, a card it goes before,
+ * a depth, a minute) into the core's (a column, a gap, a key, a slot) and back. One port per mounted screen, in that
+ * screen's context: what it reads, what a drop or a new task writes, go by its own context, never another screen's.
+ */
+export class CorePort implements ScreenPort {
+	private readonly listeners = new Set<() => void>();
+	private readonly cache = new Map<string, ScreenData>();
+	private readonly entry: CoreEntry;
+
+	/** @internal Made by `CoreReads.view`. */
+	constructor(
+		private readonly shared: CoreReads,
+		/** The context this screen is drawn in: what its writes and menus go by. */
+		private context: string,
+	) {
+		this.entry = new CoreEntry(shared.core, shared.drawing, () => this.reader, () => this.refresh(), shared.queue, () => this.filter());
+	}
+
+	/** The port over `core`, once the file is read, in every task's context. */
+	static async open(core: CorePortServices): Promise<CorePort> {
+		return new CoreReads(core, await core.tasks.reader(null)).view(EVERY);
+	}
+
+	/** Another screen's port over the same read, in `context` (every task when absent). */
+	within(context?: ScreenContext): CorePort {
+		return this.shared.view(context?.project ?? EVERY);
+	}
+
+	/** This screen's port is let go: its screen is gone. */
+	release(): void {
 		this.listeners.clear();
+		this.shared.release(this);
+	}
+
+	/** Lets go of the core's subscriptions: every screen is gone (the plugin unloads). */
+	dispose(): void {
+		this.listeners.clear();
+		this.shared.dispose();
+	}
+
+	/** @internal The read changed: drawn anew. */
+	changed(): void {
+		this.cache.clear();
+		for (const listener of this.listeners) listener();
+	}
+
+	private get core(): CorePortServices {
+		return this.shared.core;
+	}
+
+	private get drawing(): ScreenDrawing {
+		return this.shared.drawing;
+	}
+
+	private get reader(): ScreenReader {
+		return this.shared.reader(this.context);
+	}
+
+	private refresh(): Promise<void> {
+		return this.shared.refresh();
+	}
+
+	private eventsOf(date: LocalDate): DayEvents | null {
+		return this.shared.eventsOf(date);
 	}
 
 	read(dayOffset: number, context?: ScreenContext): ScreenData {
@@ -217,6 +351,15 @@ export class CorePort implements ScreenPort {
 		return this.entry.shift(field, draft, text, by);
 	}
 
+	async createFile(): Promise<void> {
+		await this.core.tasks.createFile();
+		await this.refresh();
+	}
+
+	entryDraft(field: EntryField): EntryDraft {
+		return this.entry.draft(field);
+	}
+
 	entryBar(field: EntryField, draft: EntryDraft, text: string): EntryBar {
 		return this.entry.bar(field, draft, text);
 	}
@@ -238,7 +381,7 @@ export class CorePort implements ScreenPort {
 	}
 
 	menu(id: string, from: MenuFrom, dayOffset: number): MenuModel {
-		const event = this.eventNamed(id);
+		const event = this.shared.eventNamed(id);
 		if (event) return { kind: "event", title: event.title };
 		const item = this.itemOf(id);
 		const model = this.reader.menu(id, this.coreFrom(item, from), this.dateOf(dayOffset));
@@ -326,50 +469,6 @@ export class CorePort implements ScreenPort {
 		return place === "home" ? { kind: "home" } : { kind: "drop", tasks, to: { kind: "place", column, place }, day };
 	}
 
-	private eventsOf(date: LocalDate): DayEvents | null {
-		const kept = this.events.get(date);
-		if (kept || this.asked.has(date)) return kept ?? null;
-		this.asked.add(date);
-		const ask = this.core.calendars.events(date, "open");
-		if (ask.cached) this.events.set(date, ask.cached);
-		void ask.fresh?.().then((fresh) => {
-			this.events.set(date, fresh);
-			this.changed();
-		});
-		return ask.cached;
-	}
-
-	private eventNamed(id: string) {
-		for (const day of this.events.values()) {
-			const found = day.events.find((event) => event.id === id);
-			if (found) return found;
-		}
-		return null;
-	}
-
-	/** A setting the screen shows changed: the tasks are read anew by `onChange`; what is drawn straight from the settings is drawn anew here, the calendars' events fetched anew. */
-	private settingsChanged(change: ShownChange): void {
-		if (change.calendars) this.forgetEvents();
-		if (change.drawn || change.cards || change.timeline || change.gestures) void this.refresh();
-	}
-
-	private forgetEvents(): void {
-		this.events.clear();
-		this.asked.clear();
-		this.changed();
-	}
-
-	/** The held read within the context the screen is drawn in: the same read, another filter, at once. */
-	private get reader(): ScreenReader {
-		if (this.context === EVERY) return this.base;
-		let within = this.readers.get(this.context);
-		if (!within) {
-			within = this.base.within(projectNodeOf(this.context));
-			this.readers.set(this.context, within);
-		}
-		return within;
-	}
-
 	/** The screen drawn in `context` (every task when absent) from now on. */
 	private use(context: ScreenContext | undefined): void {
 		this.context = context?.project ?? EVERY;
@@ -378,24 +477,5 @@ export class CorePort implements ScreenPort {
 	/** The project the screen is filtered by, as the quick entry and a drop take it; null for every task. */
 	private filter(): { readonly node: ProjectsNodeId; readonly project: string | null } | null {
 		return this.context === EVERY ? null : { node: projectNodeOf(this.context), project: this.context };
-	}
-
-	/** A held read of the file begun after this ask, the screen told once it is in; asks before it begins share it. */
-	private refresh(): Promise<void> {
-		if (this.queued) return this.queued;
-		const run = this.reads.then(async () => {
-			this.queued = null;
-			this.base = await this.core.tasks.reader(null);
-			this.readers.clear();
-			this.changed();
-		});
-		this.queued = run;
-		this.reads = run.catch(() => undefined);
-		return run;
-	}
-
-	private changed(): void {
-		this.cache.clear();
-		for (const listener of this.listeners) listener();
 	}
 }

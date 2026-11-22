@@ -31,6 +31,8 @@ export function leafFor(look: LeafLook): new (leaf: WorkspaceLeaf, host: ScreenH
 export abstract class ScreenLeaf extends ItemView {
 	private screen: MountedScreen | null = null;
 	private letStatusBarGo: (() => void) | null = null;
+	/** Closed: a screen whose mounts come after this is never drawn. */
+	private closed = false;
 
 	constructor(
 		leaf: WorkspaceLeaf,
@@ -59,11 +61,13 @@ export abstract class ScreenLeaf extends ItemView {
 	}
 
 	override async onOpen(): Promise<void> {
+		this.closed = false;
 		this.letStatusBarGo = StatusBarRoom.hold(this.containerEl.ownerDocument);
 		await this.remount();
 	}
 
 	override async onClose(): Promise<void> {
+		this.closed = true;
 		this.letStatusBarGo?.();
 		this.letStatusBarGo = null;
 		this.unmount();
@@ -72,6 +76,7 @@ export abstract class ScreenLeaf extends ItemView {
 	/** The screen drawn anew: the leaf opened, or the host asks every leaf to draw again (the stand's step). */
 	async remount(): Promise<void> {
 		const mounts = await this.host.mounts();
+		if (this.closed) return;
 		this.unmount();
 		this.contentEl.empty();
 		this.contentEl.addClass("tc-view");

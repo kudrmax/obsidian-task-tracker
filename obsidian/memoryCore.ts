@@ -117,7 +117,7 @@ export interface MemoryCore {
  * The core over `text` as its tasks file, `events` as the Google calendar's, the settings' defaults over `settings`; the
  * device's Projects screen in `projectsScreen` (kept in memory when left out).
  */
-export function memoryCore(text: string, clock: Clock, settings: Partial<TaskCalendarSettings> = {}, events: readonly CalendarEvent[] = [], projectsScreen?: ProjectsScreenStore): MemoryCore {
+export function memoryCore(text: string | null, clock: Clock, settings: Partial<TaskCalendarSettings> = {}, events: readonly CalendarEvent[] = [], projectsScreen?: ProjectsScreenStore): MemoryCore {
 	const file = new MemoryTasksFile(text);
 	const calendar = new MemoryEvents(events, clock);
 	const store = new MemorySettings({ ...DEFAULT_SETTINGS, ...settings });

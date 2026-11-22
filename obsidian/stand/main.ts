@@ -33,7 +33,6 @@ export default class TaskCalendarStand extends Plugin {
 			),
 			(error) => new Notice(failureText(error)),
 		);
-		this.register(() => source.dispose());
 		const host = new ScreenHost(this, {
 			look: { type: STAND_VIEW, title: "Task Calendar Stand", icon: "flask-conical" },
 			source: async () => source,

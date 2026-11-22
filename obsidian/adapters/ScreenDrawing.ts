@@ -23,6 +23,7 @@ export class ScreenDrawing {
 		private readonly tasks: TaskService,
 		private readonly days: DayService,
 		private readonly calendars: CalendarService,
+		private readonly tasksFile: () => string,
 	) {}
 
 	/** A column of `screen` as it draws: the one way a list is read here (`TaskService.columnView`). */
@@ -45,6 +46,7 @@ export class ScreenDrawing {
 				day: this.list(title, lists.day, screen, cards, date),
 			},
 			cards,
+			missing: screen.missing ? { text: `No tasks file at ${this.tasksFile()}`, create: "Create file" } : null,
 			day: {
 				title,
 				isToday: this.days.relation(date) === "today",

@@ -259,6 +259,8 @@ interface ScreenActions {
 	/** Another context (a project chosen, or none): the shown day and the days drawn beside it read again in it, drawn in place. */
 	setContext(context: ScreenContext): void;
 	/** Undo, the button or ⌘Z (F267): the port takes its last step back, and the cards move as any change moves them. */
+	/** Creates the missing tasks file (F6); the screen reads it once written. */
+	createFile(): void;
 	undo(): void;
 	/** ⌘⇧Z (F268): the step last taken back, done again. */
 	redo(): void;
@@ -543,7 +545,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 				const layer = get().layer;
 				if (!layer) return;
 				const entry = port.subtaskPlace(layer.id, get().dayOffset, layer.from);
-				set({ entry, draft: NO_DRAFT, entryText: "", entrySeq: get().entrySeq + 1, entryPanel: null, layer: entry.stack ? { ...layer, asking: null } : null });
+				set({ entry, draft: port.entryDraft(entry), entryText: "", entrySeq: get().entrySeq + 1, entryPanel: null, layer: entry.stack ? { ...layer, asking: null } : null });
 			},
 			menuPage(page) {
 				const layer = get().layer;
@@ -585,7 +587,8 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 				if (get().layer) set(closed(get()));
 			},
 			openEntry(at) {
-				set({ entry: at && { at, renaming: null, stack: false }, entrySeq: get().entrySeq + 1, entryPanel: null, layer: null, entryText: "", draft: NO_DRAFT });
+				const entry = at && { at, renaming: null, stack: false };
+				set({ entry, entrySeq: get().entrySeq + 1, entryPanel: null, layer: null, entryText: "", draft: entry ? port.entryDraft(entry) : NO_DRAFT });
 			},
 			liftMenu(menuLifted) {
 				if (get().menuLifted !== menuLifted) set({ menuLifted });
@@ -696,6 +699,9 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 				const next = port.read(s.dayOffset, context);
 				const left = Object.fromEntries(Object.keys(s.left).map((day) => [day, ((data) => ({ shown: data, read: data }))(port.read(Number(day), context))]));
 				set({ context, contextSeq: s.contextSeq + 1, read: next, shown: next, left, pending: false, readSeq: s.readSeq + 1, fresh: NONE, gone: NONE, selected: null, ...menuOver(s, next) });
+			},
+			createFile() {
+				void port.createFile();
 			},
 			undo() {
 				retrace("undo");

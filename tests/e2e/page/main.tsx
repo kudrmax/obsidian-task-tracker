@@ -7,8 +7,7 @@ import { type StandSource, standSource } from "../../../obsidian/stand/standSour
 import { STAND_STEPS, type StandStep, WHOLE_SCREEN } from "../../../obsidian/stand/steps";
 import { KEYS, takesKeys } from "../../../obsidian/ui/engine/keys";
 import type { MountedScreen } from "../../../obsidian/ui/engine/mount";
-import { showCardSize } from "../../../obsidian/ui/paint/cardSize";
-import { showLabelPaint, showPriorityColors } from "../../../obsidian/ui/paint/priorityColors";
+import { showScreenPaint } from "../../../obsidian/ui/paint/screenPaint";
 
 /**
  * The end-to-end checks' page: the stand (obsidian/stand) off Obsidian. The engine over `CorePort` and the core over the
@@ -148,10 +147,7 @@ const leaf = document.createElement("div");
 leaf.className = "workspace-leaf-content";
 document.body.appendChild(leaf);
 void standSource(keptDevice(() => load(DEVICE_KEY), (value) => save(DEVICE_KEY, value)), (error) => console.error("write failed", error)).then((source) => {
-	const shown = source.paint.get();
-	showCardSize({ height: shown.cardHeight, gap: shown.cardGap });
-	showPriorityColors(shown.priorities, shown.labels);
-	showLabelPaint(shown.labelPaint);
+	showScreenPaint(source.paint.get());
 	const stand = new StandPage(leaf, source);
 	window.addEventListener("keydown", stand.onKey);
 	(window as unknown as { __tcStand: ReturnType<StandPage["api"]> }).__tcStand = stand.api();

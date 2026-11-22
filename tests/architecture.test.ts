@@ -71,14 +71,14 @@ const MAY_IMPORT: Readonly<Record<Layer, (target: string) => boolean>> = {
 	agentMain: (t) => t === "core/application/contracts.ts",
 	settings: (t) => under(t, "domain"),
 	root: (t) => !under(t, "stand"),
-	/** `CorePort`: the contract, the engine's port and the plugin's write queue; nothing else of the core, the engine or the old screen. */
+	/** `CorePort`: the contract and the engine's port; nothing else of the core or the engine. */
 	adapters: (t) => t.startsWith(ADAPTERS) || t === "core/application/contracts.ts" || t === ENGINE_PORT,
 	/** The host: the engine and the rest of the plugin's UI, the adapters, the trackpad's module, the contract; nothing of the stand. */
 	host: (t) => t.startsWith(HOST) || under(t, "ui") || t.startsWith(ADAPTERS) || t.startsWith(STAND_TRACKPAD) || t === "core/application/contracts.ts" || OBSIDIAN_PACKAGES.includes(t),
 	/**
-	 * The stand (`obsidian/stand`, docs/superpowers/specs/2026-11-18-ui-engine.md): the engine over `MockPort`, never the core;
-	 * nothing imports it. Of the infrastructure only the trackpad's native module, as the plugin gets it (Decision 126).
-	 * The core only through `CorePort` over the core in memory (Decision 135), never a module of the core itself.
+	 * The stand (`obsidian/stand`, docs/superpowers/specs/2026-11-18-ui-engine.md): the engine mounted by the plugin's host
+	 * (Decision 142) over `CorePort` and the core over its made-up file in memory (Decision 143), never a module of the core
+	 * itself; nothing imports it. Of the infrastructure only the trackpad's native module, as the plugin gets it (Decision 126).
 	 */
 	stand: (t) => under(t, "stand") || under(t, "ui") || t.startsWith(HOST) || t.startsWith(STAND_TRACKPAD) || t.startsWith(ADAPTERS) || t === MEMORY_CORE || OBSIDIAN_PACKAGES.includes(t) || UI_PACKAGES.includes(t),
 };
