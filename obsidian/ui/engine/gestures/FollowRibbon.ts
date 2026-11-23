@@ -67,9 +67,10 @@ const sameDays = (a: readonly number[], b: readonly number[]) => a.length === b.
  * wheel deltas become a finger's cues in `TrackpadFollow` by macOS's own touch and lift when the host hears them
  * (`fingers`, Decision 126), else in `WheelFollow` (the lift read from macOS's momentum, which then moves nothing;
  * @use-gesture's wheel end, its 140 ms of quiet, lets go fingers that stopped without momentum). Both read the one gesture
- * slot; the stop the store keeps is where the strip lands.
+ * slot; the stop the store keeps is where the strip lands. In a mode with no ribbon (`swipes` false) nothing of the hand
+ * moves it: the strip stands at the day and its calendar, and only the day's arrows turn the days, on the same turn (F22, F38).
  */
-export function useFollowRibbon(ribbon: RefObject<HTMLElement | null>, calendar: RefObject<HTMLElement | null>, win: Window, fingers: TrackpadFingers | null): FollowGestures {
+export function useFollowRibbon(ribbon: RefObject<HTMLElement | null>, calendar: RefObject<HTMLElement | null>, win: Window, fingers: TrackpadFingers | null, swipes = true): FollowGestures {
 	const api = useScreenApi();
 	const stop = useScreen((s) => s.stop);
 	const dayOffset = useScreen((s) => s.dayOffset);
@@ -272,13 +273,13 @@ export function useFollowRibbon(ribbon: RefObject<HTMLElement | null>, calendar:
 
 	/** macOS's touch and lift, in this window's time: the ribbon's when the pointer is over it. */
 	useEffect(() => {
-		if (!fingers) return;
+		if (!fingers || !swipes) return;
 		return fingers.listen(win, (signal: FingerSignal) => {
 			const cues = trackpad.current.signal(signal, landing.current && over.current);
 			if (api.getState().gesture === "drag") return;
 			cues.forEach(cue);
 		});
-	}, [fingers, win]);
+	}, [fingers, win, swipes]);
 
 	const fed = (sample: WheelSample) => {
 		const cues = trackpad.current.feed(sample);
@@ -314,7 +315,7 @@ export function useFollowRibbon(ribbon: RefObject<HTMLElement | null>, calendar:
 		},
 		{
 			window: win,
-			enabled: !dragging,
+			enabled: !dragging && swipes,
 			drag: {
 				/** The pointer is followed on the view's window, not captured by the card under the finger: a long press there can hand it to the drag mid-swipe, and the ribbon's gesture still ends. */
 				pointer: { capture: false },
@@ -335,7 +336,7 @@ export function useFollowRibbon(ribbon: RefObject<HTMLElement | null>, calendar:
 			cues.forEach(cue);
 		},
 		/** On the ribbon itself and not passive (React's own wheel listener is): the ribbon's stroke keeps its wheel events from scrolling the lists. */
-		{ target: ribbon, enabled: !dragging, eventOptions: { passive: false } },
+		{ target: ribbon, enabled: !dragging && swipes, eventOptions: { passive: false } },
 	);
 	/** A card carried: only the shown day is drawn, so a day out of sight never lies under it as a place to drop on. */
 	const drawnNow = dragging ? [dayOffset] : days;

@@ -32,14 +32,21 @@ export function shownAt(stop: Stop): readonly [Column, Column] {
 	return [STRIP[at], STRIP[at + 1]];
 }
 
-/** What each stop shows (the one place it is said): the lists a screen mounted at `place` shows at `stop`; a note's block shows its Inbox alone. */
-export function columnsOf(place: Place, stop: Stop): readonly ListId[] {
-	return place === "note" ? ["inbox"] : shownAt(stop).flatMap((column) => LISTS_OF[column]);
+/** Every list, as the modes without the ribbon show them side by side or stacked (All columns, Rows; F16, F17). */
+const ALL_LISTS: readonly ListId[] = ["inbox", "backlog", "soon", "day"];
+
+/**
+ * What each stop shows (the one place it is said): the lists a screen mounted at `place` shows at `stop`; a note's block
+ * shows its Inbox alone; a mode that is no ribbon (`ribbon` false) every list at once.
+ */
+export function columnsOf(place: Place, stop: Stop, ribbon = true): readonly ListId[] {
+	if (place === "note") return ["inbox"];
+	return ribbon ? shownAt(stop).flatMap((column) => LISTS_OF[column]) : ALL_LISTS;
 }
 
 /** The lists a screen mounted at `place` can bring into sight: the ribbon turns to any; a note's block shows its Inbox. */
-export function reachOf(place: Place): readonly ListId[] {
-	return [...new Set(STOPS.flatMap((stop) => columnsOf(place, stop)))];
+export function reachOf(place: Place, ribbon = true): readonly ListId[] {
+	return [...new Set(STOPS.flatMap((stop) => columnsOf(place, stop, ribbon)))];
 }
 
 /** The stop that brings `list` into sight from `stop`: the same while it shows it, else the last of the lists' own stops (Inbox–Soon, Soon–day) that does. */

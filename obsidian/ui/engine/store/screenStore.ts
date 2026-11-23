@@ -2,7 +2,7 @@ import { DESIGN } from "../../shared/design";
 import { createStore, type StoreApi } from "zustand/vanilla";
 import { EVERY_TASK } from "../port";
 import { type Stop, stopShowing } from "../layout/columns";
-import type { Destination, SectionNameEnd, DividerStop, Edge, ScreenContext, UndoOutcome, EntryBar, EntryDraft, EntryField, FieldActionId, LevelRange, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, MenuStatusId, ScreenData, ScreenPort } from "../port";
+import type { ScreenView, ViewMode, Destination, SectionNameEnd, DividerStop, Edge, ScreenContext, UndoOutcome, EntryBar, EntryDraft, EntryField, FieldActionId, LevelRange, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, MenuStatusId, ScreenData, ScreenPort } from "../port";
 import { share } from "./share";
 
 export type { Stop };
@@ -68,6 +68,10 @@ interface ScreenState {
 	/** The present minute from today's start, ticking each minute (spec, «Time»). */
 	readonly now: Now;
 	readonly layer: Layer | null;
+	/** The view the screen draws (the port's, F10–F14). */
+	readonly view: ScreenView;
+	/** The view button's menu is open (F11): one layer at a time, a task's menu closed while it is. */
+	readonly viewMenu: boolean;
 	/**
 	 * The field a task is typed in, open while not null (the plugin's one quick entry): a new task's or a rename's, where it
 	 * stands; in a list, on the calendar, or in an open menu's stack.
@@ -141,6 +145,13 @@ interface ScreenActions {
 	 * day turned away from kept for its page still in sight.
 	 */
 	showDay(offset: number): void;
+	/** The view button tapped: its menu opens (F11). */
+	openViewMenu(): void;
+	closeViewMenu(): void;
+	/** A mode picked: the menu closes, the mode is kept and the screen redraws in it, in place (F10, F23). */
+	pickViewMode(mode: ViewMode): void;
+	/** The Subprojects row tapped: the menu closes and the check turns over (F13). */
+	toggleSubprojects(): void;
 	/** A day arrow (F41): the day before or after the shown one, past the calendar where the days turn; the ribbon turns there as a swipe does, a tap while it turns waiting its turn (F46). */
 	turnDay(shift: -1 | 1): void;
 	/** The day's title tapped (F42): back to today, in one turn from however far (F45); today's title does nothing. */
@@ -311,7 +322,7 @@ const HALVES = 0.5;
 export const sectionKey = (list: ListId, id: string): string => `${list}/${id}`;
 
 /** One store per mounted screen, over its port (spec, «Screen state»); `zoom`, the calendar's zoom the host kept. */
-export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, listShare = HALVES, opening: ScreenContext = EVERY_TASK): ScreenStore {
+export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, listShare = HALVES, opening: ScreenContext = EVERY_TASK, wide = false): ScreenStore {
 	/** Writes of the screen's own not yet read back: their reads come together once the last is in. */
 	let writing = 0;
 	/** The screen as it stood when the carried task was lifted: its place's home, a drop's in-flight write drawn in it. */
@@ -344,6 +355,15 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 			if (!layer || layer.model.kind !== "task") return {};
 			return layer.id in data.cards ? { layer: { ...layer, model: port.menu(layer.id, layer.from, s.dayOffset) } } : closed(s);
 		};
+		/**
+		 * The view as the port now gives it: another mode is another context, drawn in place (principle 3); a mode that is no
+		 * ribbon stands at the day and its calendar, where the day's list and the calendar turn.
+		 */
+		const viewed = (s: Screen): Partial<Screen> => {
+			const view = port.view(wide);
+			if (JSON.stringify(view) === JSON.stringify(s.view)) return {};
+			return view.mode === s.view.mode ? { view } : { view, contextSeq: s.contextSeq + 1, ...(view.ribbon ? {} : { stop: "calendar" as const }) };
+		};
 		/** The port's data again; held while a drag or a drop's write keeps the screen still (spec, principle 5). */
 		const refresh = () => {
 			const s = get();
@@ -358,7 +378,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 			const came = Object.keys(next.cards).filter((id) => !(id in known));
 			const went = Object.keys(known).filter((id) => !(id in next.cards));
 			const menu = menuOver(s, next);
-			const undo = { canUndo: port.canUndo(), canRedo: port.canRedo() };
+			const undo = { canUndo: port.canUndo(), canRedo: port.canRedo(), ...viewed(s) };
 			if (same) return set({ shown: share(s.shown, next), pending: false, ...menu, ...undo });
 			set({ read: next, shown: share(s.shown, next), pending: false, readSeq: s.readSeq + 1, fresh: came.length === 0 ? NONE : new Set(came), gone: went.length === 0 ? NONE : new Set(went), ...menu, ...undo });
 		};
@@ -421,6 +441,22 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 			left: {},
 			dayOffset: 0,
 			stop: "calendar",
+			view: port.view(wide),
+			viewMenu: false,
+			openViewMenu() {
+				set({ viewMenu: true, layer: null, selected: null });
+			},
+			closeViewMenu() {
+				if (get().viewMenu) set({ viewMenu: false });
+			},
+			pickViewMode(mode) {
+				set({ viewMenu: false });
+				if (mode !== get().view.mode) write(port.setViewMode(mode));
+			},
+			toggleSubprojects() {
+				set({ viewMenu: false });
+				write(port.toggleSubprojects());
+			},
 			gesture: null,
 			lifted: null,
 			liftedDepth: null,
@@ -721,7 +757,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 				if (to.at.dayOffset !== get().dayOffset) get().showDay(to.at.dayOffset);
 				const where = to.at.list;
 				/** Another day than today stands past the calendar, where the ribbon turns the days (Decision 127); a list out of sight, the stop that shows it. */
-				const next = to.at.dayOffset !== 0 ? "calendar" : stopShowing(stop, where);
+				const next = to.at.dayOffset !== 0 || !get().view.ribbon ? "calendar" : stopShowing(stop, where);
 				/** The field opens again at its new place, with what was typed (a new field brought into sight, F193). */
 				set({ entry: to, entrySeq: get().entrySeq + 1, entryPanel: null, ...(next === stop ? {} : { stop: next }) });
 			},

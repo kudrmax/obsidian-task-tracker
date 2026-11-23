@@ -38,7 +38,7 @@ export interface MountedScreen {
 /** The engine's screen in `el`: its own store over the port, in the element's own document and window. */
 export function mountScreen(el: HTMLElement, { port, place, app, sourcePath, haptics, zoom, listShare, markdown, desk, notice, fingers = null, context }: MountOptions): MountedScreen {
 	const doc = el.ownerDocument;
-	const store = createScreenStore(port, zoom.kept ?? DESIGN.hourPx, listShare.kept ?? undefined, context);
+	const store = createScreenStore(port, zoom.kept ?? DESIGN.hourPx, listShare.kept ?? undefined, context, desk);
 	const keep = store.subscribe((s, was) => {
 		if (s.zoom !== was.zoom && s.gesture !== "zoom") zoom.keep(s.zoom);
 		else if (was.gesture === "zoom" && s.gesture !== "zoom") zoom.keep(s.zoom);

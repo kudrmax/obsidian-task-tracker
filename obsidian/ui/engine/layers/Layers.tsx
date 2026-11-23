@@ -1,4 +1,4 @@
-import { autoUpdate, flip, FloatingFocusManager, FloatingOverlay, FloatingPortal, hide, type Middleware, type MiddlewareState, offset, type Placement, useDismiss, useFloating, useInteractions, useRole, useTransitionStatus } from "@floating-ui/react";
+import { autoUpdate, flip, FloatingFocusManager, FloatingOverlay, FloatingPortal, hide, type Middleware, type MiddlewareState, offset, type Placement, shift, useDismiss, useFloating, useInteractions, useRole, useTransitionStatus } from "@floating-ui/react";
 import { type CSSProperties, createContext, type MouseEvent as ReactMouseEvent, type MutableRefObject, type ReactNode, type RefObject, useContext, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { DESIGN, PROPERTY } from "../../shared/design";
 import type { ListId, MenuFrom } from "../port";
@@ -432,5 +432,46 @@ export function BarPanel({ open, onClose, reference, capsule, away, className, c
 		>
 			{children}
 		</div>
+	);
+}
+
+/**
+ * A menu over a control of the bottom row (the view button's «View», F11; the old `ViewMenu` on the board V1DeskCols): the
+ * backdrop, a copy of the control standing where it stands over it, and the panel over the control, centred on it and kept
+ * inside the window (Floating UI's `top` and `shift`), its title over its groups. It fades in and out as every menu does;
+ * Escape and a click on the backdrop close it (`useDismiss`).
+ */
+export function ControlMenu({ open, onClose, root, reference, label, title, copy, groups }: { readonly open: boolean; readonly onClose: () => void; readonly root: HTMLElement; readonly reference: HTMLElement | null; readonly label: string; readonly title: string; readonly copy: ReactNode; readonly groups: readonly ReactNode[] }) {
+	const { refs, context, floatingStyles, isPositioned } = useFloating({
+		open,
+		onOpenChange: (next) => {
+			if (!next) onClose();
+		},
+		placement: "top",
+		strategy: "fixed",
+		transform: false,
+		middleware: [offset(DESIGN.menuGap), shift({ padding: DESIGN.wholeMargin })],
+		whileElementsMounted: autoUpdate,
+		elements: { reference },
+	});
+	/** The copy of the control right over it: Floating UI's offset back by the control's own height. */
+	const copyAt = useFloating({ placement: "bottom", strategy: "fixed", transform: false, middleware: [offset(({ rects }) => -rects.reference.height)], whileElementsMounted: autoUpdate, elements: { reference } });
+	const { getFloatingProps } = useInteractions([useDismiss(context, { outsidePressEvent: "click" }), useRole(context, { role: "menu" })]);
+	const { isMounted, status } = useTransitionStatus(context, { duration: { open: LAYER_MS.open, close: LAYER_MS.close } });
+	if (!isMounted || !reference) return null;
+	const motion = motionClass(status, isPositioned);
+	return (
+		<FloatingPortal root={root}>
+			<FloatingOverlay className={`tc-backdrop tc-menu-layer${motion}`} />
+			<div ref={copyAt.refs.setFloating} style={copyAt.floatingStyles} className={`tc-pinned tc-control-copy tc-menu-layer${motion}`} aria-hidden="true">
+				{copy}
+			</div>
+			<FloatingFocusManager context={context} modal={false} initialFocus={-1}>
+				<div ref={refs.setFloating} style={floatingStyles} role="menu" aria-label={label} className={`tc-panel is-view tc-menu-layer${motion}`} {...getFloatingProps()}>
+					<div className="tc-menu-title">{title}</div>
+					{groups}
+				</div>
+			</FloatingFocusManager>
+		</FloatingPortal>
 	);
 }
