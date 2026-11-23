@@ -1425,7 +1425,9 @@ body.theme-light .tc-menu-over .tc-event { --tc-event-bg: var(--tc-event-bg-ligh
 button.tc-select-menu svg { stroke: none; fill: currentColor; }
 button.tc-btn.tc-select-menu.is-off { background: var(--tc-track-bg); color: var(--tc-ink-dim); }
 .tc-capsule button.tc-select-num { font-size: var(--tc-font-count-big); font-weight: var(--tc-weight-bold); font-variant-numeric: tabular-nums; }
-.task-calendar > .is-raised { z-index: var(--tc-layer-panel); }
+.tc-control-copy { position: fixed; z-index: var(--tc-layer-panel); pointer-events: none; opacity: 0; transition: opacity var(--tc-duration-menu) var(--tc-ease-out); }
+.tc-control-copy.is-shown { opacity: 1; }
+.tc-control-copy.is-closing { opacity: 0; transition-duration: var(--tc-duration-collapse); }
 
 /* A list card's circle: out of sight, and in Select tasks on a list whose cards can be picked, before the title; picked, the accent with its check. */
 .tc-card > .tc-pick { order: -1; display: flex; width: 0; height: var(--tc-pick-size); flex-shrink: 0; box-sizing: border-box; margin-right: 0; border: 0 solid var(--tc-muted); border-radius: var(--tc-radius-circle); color: var(--tc-on-accent); align-items: center; justify-content: center; opacity: 0; overflow: hidden; transition: width var(--tc-duration-collapse) var(--tc-ease-out), margin var(--tc-duration-collapse) var(--tc-ease-out), border-width var(--tc-duration-collapse) var(--tc-ease-out), opacity var(--tc-duration-collapse) var(--tc-ease-out), background-color var(--tc-duration-collapse) var(--tc-ease-out); }
@@ -1471,6 +1473,7 @@ button.tc-btn.tc-select-menu.is-off { background: var(--tc-track-bg); color: var
 .tc-search-bar { position: absolute; left: 0; right: 0; bottom: var(--tc-search-bottom); height: var(--tc-bar-h); box-sizing: border-box; padding: 0 var(--tc-space-8); background: var(--tc-bg); display: flex; align-items: center; gap: var(--tc-space-8); }
 .tc-search-field { flex: 1; min-width: 0; height: var(--tc-bar-btn-h); box-sizing: border-box; padding: 0 var(--tc-search-field-pad); border-radius: var(--tc-radius-bar-btn); background: var(--tc-card-bg); color: var(--tc-muted); display: flex; align-items: center; gap: var(--tc-space-6); cursor: text; }
 .tc-search-field svg { width: var(--tc-icon-m); height: var(--tc-icon-m); flex-shrink: 0; stroke: currentColor; stroke-width: var(--tc-stroke-ring); }
+.task-calendar .tc-search-field .tc-quick-field.tc-search-input { min-height: 0; padding: 0; border-radius: 0; background: none; box-shadow: none; }
 .tc-search-field .tc-search-input { flex: 1; min-width: 0; font-size: var(--tc-font-body); line-height: var(--tc-leading-card); color: var(--tc-text); caret-color: var(--tc-accent); white-space: nowrap; overflow: hidden; -webkit-user-select: text; user-select: text; }
 .tc-search-bar > button.tc-search-cancel { height: var(--tc-bar-btn-h); flex-shrink: 0; color: var(--tc-accent-ui); font-size: var(--tc-font-count-big); }
 .tc-search-empty { margin: auto 0; text-align: center; color: var(--tc-muted); font-size: var(--tc-font-body); }

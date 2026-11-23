@@ -41,7 +41,7 @@ function SearchBody({ desk, onCancel }: { readonly desk: boolean; readonly onCan
 			<Icon name="search" />
 			<ObsidianEditor
 				text=""
-				className="tc-search-input"
+				className="tc-quick-field tc-title-field tc-search-input"
 				placeholder="Search tasks"
 				onChange={(text) => api.getState().searchFor(text)}
 				onEnter={() => {

@@ -44,7 +44,7 @@ export function AnswerPopup({ answer, onGone }: { readonly answer: Answer; reado
 					<ObsidianEditor
 						text=""
 						lines
-						className="tc-answer-field"
+						className="tc-quick-field tc-title-field tc-answer-field"
 						placeholder={field.placeholder}
 						onChange={(typed) => {
 							setText(typed);

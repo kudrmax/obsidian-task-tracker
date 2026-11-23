@@ -4,16 +4,17 @@ import { type Placement, Popover } from "../layers/Popover";
 import type { MenuAction } from "../port";
 import { type Layer, useScreen, useScreenApi } from "../store";
 import { useHost } from "./host";
+import { ControlCopy } from "./Capsule";
 import { taskGroups } from "./TaskMenu";
 
 /**
  * Where the menu for every picked task stands (the design's «Массовые действия», «Выбор задач»): over the circle in the
  * plus's place by its right edge, over the capsule's count by its left, beside the card clicked on the Mac.
  */
-function placementBy(element: Element | null): Placement {
-	if (element?.closest(".tc-capsule")) return "top-start";
-	if (element?.closest("[data-picked-menu]")) return "top-end";
-	return "right-start";
+function standingBy(element: Element | null): { readonly placement: Placement; readonly copy: "picks" | "circle" | null } {
+	if (element?.closest(".tc-capsule")) return { placement: "top-start", copy: "picks" };
+	if (element?.closest("[data-picked-menu]")) return { placement: "top-end", copy: "circle" };
+	return { placement: "right-start", copy: null };
 }
 
 /**
@@ -32,8 +33,9 @@ export const BulkMenu = memo(function BulkMenu() {
 	if (!shown || shown.layer.model.kind !== "task") return null;
 	const model = shown.layer.model;
 	const steps = { ...api.getState(), pick: (action: MenuAction) => api.getState().pick(action) };
+	const by = standingBy(shown.reference);
 	return (
-		<Popover open={layer !== null} onClose={() => api.getState().closeLayer()} onGone={api.getState().layerGone} root={layerRoot} reference={shown.reference} placement={placementBy(shown.reference)} label="Picked tasks menu" className={`is-menu is-task is-bulk${shown.layer.page === "picker" ? " is-picker" : ""}`}>
+		<Popover open={layer !== null} onClose={() => api.getState().closeLayer()} onGone={api.getState().layerGone} root={layerRoot} reference={shown.reference} placement={by.placement} copy={by.copy ? <ControlCopy of={by.copy} /> : null} label="Picked tasks menu" className={`is-menu is-task is-bulk${shown.layer.page === "picker" ? " is-picker" : ""}`}>
 			<div className="tc-menu-title">{model.title}</div>
 			{taskGroups(shown.layer, false, model, steps)}
 		</Popover>

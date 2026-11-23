@@ -22,18 +22,20 @@ export interface PopoverProps {
 	readonly className: string;
 	/** The closed layer has faded out: what was tapped in it may happen now. */
 	readonly onGone?: () => void;
+	/** A copy of the control it opens from, standing over the backdrop right where the control stands (the design's copy of the capsule over the blur); none beside a card. */
+	readonly copy?: ReactNode;
 	readonly children: ReactNode;
 }
 
 /**
  * A panel opened from a control of the screen (the design's «⋯» menu over the capsule, the menu for every picked task over
- * the circle or beside the card clicked; F137, F139, F261), as Floating UI builds a popover: the backdrop under it, the
- * control it opens from kept over the backdrop where it stands (`is-raised`), the panel placed against it a menu's gap
+ * the circle or beside the card clicked; F137, F139, F261), as Floating UI builds a popover: the backdrop under it, a copy
+ * of the control it opens from over the backdrop where the control stands (`copy`), the panel placed against it a menu's gap
  * away (`offset`, `flip`, `shift`, kept to the window's room by `size`), growing from the control's corner; Escape and a
  * press beside it close it (`useDismiss`), the focus kept inside (`FloatingFocusManager`). It opens and closes in the
  * layers' own time (`LAYER_MS`).
  */
-export function Popover({ open, onClose, root, reference, placement, label, className, onGone, children }: PopoverProps) {
+export function Popover({ open, onClose, root, reference, placement, label, className, onGone, copy = null, children }: PopoverProps) {
 	const { refs, context, floatingStyles, isPositioned, placement: placed } = useFloating({
 		open,
 		onOpenChange: (next) => {
@@ -53,7 +55,8 @@ export function Popover({ open, onClose, root, reference, placement, label, clas
 	});
 	const { getFloatingProps } = useInteractions([useDismiss(context, { outsidePressEvent: "click" }), useRole(context, { role: "menu" })]);
 	const { isMounted, status } = useTransitionStatus(context, { duration: { open: LAYER_MS.open, close: LAYER_MS.close } });
-	useRaised(reference, isMounted);
+	/** The copy's place: the control's own box (its top left corner on the control's). */
+	const over = useFloating({ open, placement: "bottom-start", strategy: "fixed", transform: false, middleware: [offset(({ rects }) => -rects.reference.height)], whileElementsMounted: autoUpdate, elements: { reference } });
 	const gone = useRef(onGone);
 	gone.current = onGone;
 	useEffect(() => {
@@ -64,6 +67,11 @@ export function Popover({ open, onClose, root, reference, placement, label, clas
 	return (
 		<FloatingPortal root={root}>
 			<FloatingOverlay className={`tc-backdrop tc-menu-layer${motion}`} />
+			{copy ? (
+				<div ref={over.refs.setFloating} className={`tc-control-copy${motion}`} style={over.floatingStyles as CSSProperties} aria-hidden="true">
+					{copy}
+				</div>
+			) : null}
 			<FloatingFocusManager context={context} modal={false} initialFocus={-1}>
 				<div ref={refs.setFloating} role="menu" aria-label={label} tabIndex={-1} className={`tc-panel tc-popover ${className}${motion}`} data-from={placed} style={floatingStyles as CSSProperties} {...getFloatingProps()}>
 					{children}
@@ -71,15 +79,6 @@ export function Popover({ open, onClose, root, reference, placement, label, clas
 			</FloatingFocusManager>
 		</FloatingPortal>
 	);
-}
-
-/** The control a layer opens from stands over its backdrop while the layer is there (the design's copy of the capsule over the blur). */
-function useRaised(reference: Element | null, on: boolean): void {
-	useEffect(() => {
-		if (!on || !reference) return;
-		reference.classList.add("is-raised");
-		return () => reference.classList.remove("is-raised");
-	}, [reference, on]);
 }
 
 export interface SearchLayerProps {
