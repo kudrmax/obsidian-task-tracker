@@ -856,6 +856,10 @@ body:has(> .tc-backdrop.is-shown) > .suggestion-container, body:has(> .tc-backdr
 .tc-card.is-first-step { height: auto; min-height: var(--tc-card-h); padding-top: calc((var(--tc-card-h) - var(--tc-leading-card-over) - var(--tc-leading-card)) / 2); padding-bottom: calc((var(--tc-card-h) - var(--tc-leading-card-over) - var(--tc-leading-card)) / 2); }
 .tc-block-card.is-first-step { bottom: auto; min-height: 100%; padding-bottom: var(--tc-block-pad-top); }
 .tc-block:has(> .tc-block-card.is-first-step) { z-index: var(--tc-layer-selected); }
+.tc-card[data-collapsed="true"].is-first-step { box-shadow: var(--tc-ring-selected), var(--tc-shadow-fold); }
+.tc-first-step { flex: 1; min-width: 0; }
+.tc-card-lines > .tc-first-step { flex: none; }
+.task-calendar .tc-first-step .tc-quick-field { min-height: 0; padding: 0; border-radius: 0; background: none; box-shadow: none; }
 /* A renamed task in progress keeps its dot at the field's left, over the field. */
 .tc-quick-row > .tc-progress-dot { z-index: var(--tc-layer-progress-dot); }
 

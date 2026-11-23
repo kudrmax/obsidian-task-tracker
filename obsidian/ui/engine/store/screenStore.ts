@@ -140,6 +140,8 @@ interface ScreenState {
 	readonly full: { readonly ids: readonly string[]; readonly task: FullTask; readonly notesFocus: number } | null;
 	/** Where the full screen draws the open field (the port's answer for the field and the task shown), null for none. */
 	readonly fullAt: FullEntryAt | null;
+	/** The task First step's field is open on (F199): its card's step line is the field; null while none is. */
+	readonly firstStep: string | null;
 	/** Something on the full screen is typed in: Done shows, the bottom row hides. */
 	readonly fullTyping: boolean;
 	/** A card to take the keyboard's focus, once per `seq`: the one a rename ended on by a key (Decision 58). */
@@ -298,6 +300,10 @@ interface ScreenActions {
 	saveNotes(): void;
 	/** The project under the full screen's title: the screen closes, that project chosen (F243). */
 	showProject(name: string): void;
+	/** First step from the menu (F199): the menu closes and in the same tap the task folds, its card's step line the field. */
+	startFirstStep(): void;
+	/** First step's field ended: Enter or a tap elsewhere with `text` writes it as the first subtask (F200); null (Escape) writes nothing, the card as it was. */
+	endFirstStep(text: string | null): void;
 	/** The full screen's plus: a new last subtask of the task shown (F245). */
 	fullPlus(): void;
 	/** Undo, the button or ⌘Z (F267): the port takes its last step back, and the cards move as any change moves them. */
@@ -528,6 +534,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 			contextSeq: 0,
 			reveal: null,
 			focusCard: null,
+			firstStep: null,
 			full: null,
 			fullAt: null,
 			fullTyping: false,
@@ -668,6 +675,19 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 			},
 			setFullTyping(fullTyping) {
 				if (get().fullTyping !== fullTyping) set({ fullTyping });
+			},
+			startFirstStep() {
+				const layer = get().layer;
+				if (!layer) return;
+				set({ ...closed(get()), firstStep: layer.id, selected: null });
+				port.firstStepOn(layer.id);
+			},
+			endFirstStep(text) {
+				const id = get().firstStep;
+				if (id === null) return;
+				set({ firstStep: null });
+				if (text === null) port.firstStepOn(null);
+				else write(port.firstStep(id, text));
 			},
 			fullPlus() {
 				const full = get().full;

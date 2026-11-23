@@ -41,6 +41,7 @@ interface MenuSteps {
 	menuRepeat(change: RepeatChange): void;
 	openFullFromMenu(): void;
 	openFull(id: string): void;
+	startFirstStep(): void;
 }
 
 interface ActionLook {
@@ -54,8 +55,8 @@ interface ActionLook {
 	readonly onPick: (action: Offered, steps: MenuSteps) => void;
 }
 
-/** A tap that leaves the menu for the action's own screen, part 2's: on the stand it closes the menu and writes nothing. */
-const leave = (action: Offered, steps: MenuSteps) => steps.pick({ kind: "row", id: action.id });
+/** Open in Obsidian: the menu closes and the host opens the tasks file at the task's line (F126). */
+const openInObsidian = (_: Offered, steps: MenuSteps) => steps.pick({ kind: "row", id: "openInObsidian" });
 const day = (action: Offered, steps: MenuSteps) => steps.pick({ kind: "date", date: action.date });
 
 /**
@@ -80,9 +81,9 @@ const MENU_ACTIONS: Readonly<Record<TaskMenuActionId, ActionLook | { readonly ti
 	project: { label: "Project", icon: "project", onPick: (_, steps) => steps.menuPage("projects") },
 	section: { label: "Section", icon: "section", onPick: (_, steps) => steps.menuPage("sections") },
 	subtask: { label: "Subtask", icon: "subtask", onPick: (_, steps) => steps.startSubtask(), tile: "steps" },
-	firstStep: { label: "First step", icon: "firstStep", onPick: leave, tile: "steps" },
+	firstStep: { label: "First step", icon: "firstStep", onPick: (_, steps) => steps.startFirstStep(), tile: "steps" },
 	openFull: { label: "Open full screen", icon: "fullScreen", onPick: (_, steps) => steps.openFullFromMenu(), tile: "opens" },
-	openInObsidian: { label: "Open in Obsidian", icon: "openFile", onPick: leave, tile: "opens" },
+	openInObsidian: { label: "Open in Obsidian", icon: "openFile", onPick: openInObsidian, tile: "opens" },
 	delete: { label: "Delete", icon: "delete", onPick: (action, steps) => (action.asks ? steps.ask("delete") : steps.pick({ kind: "delete" })) },
 };
 

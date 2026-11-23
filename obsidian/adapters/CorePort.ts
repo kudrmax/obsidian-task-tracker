@@ -1,4 +1,4 @@
-import { levelRange, sameSlot, type CalendarEvent, type CalendarService, dividerAt, type DividerStop, LIST_WIDTHS, listShareOf, type ListWidths, listWidths, type Clock, type DayEvents, type DayService, type DropColumn, type DroppedTask, type DropTo, type LocalDate, listCardMenuFrom, type MenuFrom as CoreMenuFrom, originOf, type ScreenReader, type ShownChange, type TaskItem, type TaskService, type UndoOutcome, undoNotice, projectNodeOf, type ProjectsNodeId, RepeatPage as CoreRepeatPage, type RepeatRule, type UndoService } from "../../core/application/contracts";
+import { levelRange, sameSlot, type CalendarEvent, type CalendarService, dividerAt, type DividerStop, LIST_WIDTHS, listShareOf, type ListWidths, listWidths, type Clock, type DayEvents, type DayService, type DropColumn, type DroppedTask, type DropTo, type LocalDate, listCardMenuFrom, type MenuFrom as CoreMenuFrom, originOf, type ScreenReader, type ScreenView, type ShownChange, type TaskItem, type TaskService, type UndoOutcome, undoNotice, projectNodeOf, type ProjectsNodeId, RepeatPage as CoreRepeatPage, type RepeatRule, type UndoService } from "../../core/application/contracts";
 import type { FullEntryAt, FullTask, RepeatChange, RepeatPage, ScreenContext, Destination, Edge, EntryBar, EntryCommit, EntryDraft, EntryField, LevelRange, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, RenameStart, ScreenData, ScreenPort } from "../ui/engine/port";
 import { CoreEntry } from "./CoreEntry";
 import { FullScreens } from "./FullScreens";
@@ -171,6 +171,8 @@ export class CorePort implements ScreenPort {
 	private readonly cache = new Map<string, ScreenData>();
 	private readonly entry: CoreEntry;
 	private readonly fulls: FullScreens;
+	/** The task First step's field is open on: the screen is read with it folded (the core's `firstStepScreen`). */
+	private stepping: string | null = null;
 
 	/** @internal Made by `CoreReads.view`. */
 	constructor(
@@ -232,12 +234,12 @@ export class CorePort implements ScreenPort {
 
 	read(dayOffset: number, context?: ScreenContext): ScreenData {
 		this.use(context);
-		const key = `${dayOffset}@${this.now().minute}#${this.context}`;
+		const key = `${dayOffset}@${this.now().minute}#${this.context}>${this.stepping}`;
 		let data = this.cache.get(key);
 		if (!data) {
 			if (this.cache.size > 16) this.cache.clear();
 			const date = this.dateOf(dayOffset);
-			const screen = this.reader.screen(date);
+			const screen = this.stepped(this.reader.screen(date));
 			data = this.drawing.draw({ date, screen, lists: this.drawing.listsOf(screen), events: this.eventsOf(date) });
 			this.cache.set(key, data);
 		}
@@ -410,6 +412,25 @@ export class CorePort implements ScreenPort {
 		return this.entry.commit(field, text, draft, next);
 	}
 
+	firstStepOn(id: string | null): void {
+		if (this.stepping === id) return;
+		this.stepping = id;
+		this.changed();
+	}
+
+	async firstStep(id: string, text: string): Promise<void> {
+		const item = this.reader.item(id);
+		try {
+			if (item) await this.core.tasks.firstStep(item.key, text);
+		} catch (error) {
+			this.core.onError(error);
+		} finally {
+			this.stepping = null;
+			await this.refresh();
+			this.changed();
+		}
+	}
+
 	full(id: string): FullTask | null {
 		return this.fulls.task(id);
 	}
@@ -505,6 +526,12 @@ export class CorePort implements ScreenPort {
 	/** The day `dayOffset` days from today, as the core steps days. */
 	private dateOf(dayOffset: number): LocalDate {
 		return this.core.days.step(this.core.days.today(), dayOffset);
+	}
+
+	/** A screen as drawn while First step's field is open on a task: that task folded, its card the field's. */
+	private stepped(screen: ScreenView): ScreenView {
+		const item = this.stepping === null ? null : this.reader.item(this.stepping);
+		return item ? this.core.tasks.firstStepScreen(screen, item.key) : screen;
 	}
 
 	/** The held read's screen of `date`, a task held by a dot drawn at `held`. */

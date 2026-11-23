@@ -392,8 +392,8 @@ export type MenuAction =
 	/** «New project…» named `name` (F220): made at the tree's top unless the tree has it, and the task gets it (the core's `newProject`). */
 	| { readonly kind: "newProject"; readonly name: string }
 	| { readonly kind: "delete" }
-	/** An action whose own screen is part 2's (Repeat, Section, First step, the opens, Open in Calendar): on the stand it closes the menu and writes nothing. */
-	| { readonly kind: "row"; readonly id: TaskActionId | "calendar" };
+	/** A row that leaves the screen for another tab or app: Open in Obsidian (the tasks file at the task's line), Open in Calendar (an event's). */
+	| { readonly kind: "row"; readonly id: "openInObsidian" | "calendar" };
 
 /**
  * What the screen is drawn in besides the day: the chosen project (null: every task). Another one is a change of context,
@@ -475,6 +475,14 @@ export interface ScreenPort {
 	 * (a name of nothing, a folder's).
 	 */
 	newProject(name: string): Promise<string | null>;
+	/**
+	 * First step's field open on the task `id` (null: closed): from now on the screen is read with that task folded, its
+	 * subtasks gone from the lists, its card two lines, its title small over an empty step line (the core's
+	 * `firstStepScreen`, F199); fires `subscribe`.
+	 */
+	firstStepOn(id: string | null): void;
+	/** First step's text written as the task's first subtask, the task folded on it (the core's `firstStep`, F200); the field closed. Resolves once written and read back. */
+	firstStep(id: string, text: string): Promise<void>;
 	/** The task `id` on the full screen, as the file now has it; null once it is gone from its place (F248). */
 	full(id: string): FullTask | null;
 	/** Where the full screen of `id` draws the open field (`EntryField.full`); null where it draws none. */

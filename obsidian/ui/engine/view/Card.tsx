@@ -2,7 +2,8 @@ import { type CSSProperties, type HTMLAttributes, memo, type ReactNode, useRef }
 import { PROPERTY } from "../../shared/design";
 import type { BlockLook } from "../layers/Layers";
 import type { CardFace as Face } from "../port";
-import { useData } from "../store";
+import { useData, useScreen } from "../store";
+import { FirstStepLine } from "./FirstStep";
 import { Icon } from "./Icon";
 import { useLeaving } from "./MovingRow";
 
@@ -24,13 +25,15 @@ export interface CardProps {
  */
 export const Card = memo(function Card({ id, depth = 0, copy = false, block }: CardProps) {
 	const read = useData((d) => d.cards[id]);
+	/** First step's field is open on it (F199): its step line, or a block's one line, is the field. */
+	const stepping = useScreen((s) => s.firstStep === id) && !copy;
 	const leaving = useLeaving();
 	const last = useRef(read);
 	if (read) last.current = read;
 	const face = read ?? (leaving ? last.current : undefined);
 	if (!face) return null;
 	const marked = copy ? { "data-copy": id } : block ? { "data-block": id, "data-own-press": "" } : { "data-id": id };
-	return <CardFace face={face} block={block} className={block ? "tc-block-card" : "tc-card"} {...marked} data-collapsed={!block && face.folded ? "true" : undefined} style={block ? undefined : ({ [PROPERTY.level]: String(depth) } as CSSProperties)} />;
+	return <CardFace face={face} block={block} stepField={stepping} className={`${block ? "tc-block-card" : "tc-card"}${stepping ? " is-first-step" : ""}`} {...marked} data-collapsed={!block && face.folded ? "true" : undefined} style={block ? undefined : ({ [PROPERTY.level]: String(depth) } as CSSProperties)} />;
 });
 
 /** The element's own attributes besides the face: its marks (`data-…`), its handlers and its style. */
@@ -41,10 +44,10 @@ type FaceAttributes = Omit<HTMLAttributes<HTMLDivElement>, "className" | "childr
  * over a menu's backdrop and a card of a menu's stack. Its status and level on the element, two lines for a folded task's
  * step in a list; `children` after its insides (a task's notes in the menu's copy).
  */
-export function CardFace({ face, block, className, children, ...attributes }: { readonly face: Face; readonly block?: BlockLook; readonly className: string; readonly children?: ReactNode } & FaceAttributes) {
+export function CardFace({ face, block, stepField = false, className, children, ...attributes }: { readonly face: Face; readonly block?: BlockLook; readonly stepField?: boolean; readonly className: string; readonly children?: ReactNode } & FaceAttributes) {
 	return (
 		<div className={`${className}${!block && face.step !== null ? " is-two-line" : ""}`} data-status={face.inProgress ? "inProgress" : "open"} data-priority={face.color ?? undefined} {...attributes}>
-			<CardInsides face={face} block={block} />
+			<CardInsides face={face} block={block} stepField={stepField} />
 			{children}
 		</div>
 	);
@@ -55,17 +58,20 @@ export function CardFace({ face, block, className, children, ...attributes }: { 
  * the step alone, F94), the counter and the description's mark, the date in a list, its look on
  * the calendar. The card and its copy over a menu's backdrop draw the same insides.
  */
-function CardInsides({ face, block }: { readonly face: Face; readonly block?: BlockLook }) {
+function CardInsides({ face, block, stepField }: { readonly face: Face; readonly block?: BlockLook; readonly stepField: boolean }) {
+	const step = stepField ? <FirstStepLine /> : <div className="tc-card-title">{face.step}</div>;
 	return (
 		<>
-			{block || face.step === null ? (
+			{block && stepField ? (
+				<FirstStepLine />
+			) : block || face.step === null ? (
 				<div className="tc-card-title">{face.step ?? face.title}</div>
 			) : (
 				<div className="tc-card-lines">
 					<div className="tc-card-over">
 						<span className="tc-card-over-text">{face.title}</span>
 					</div>
-					<div className="tc-card-title">{face.step}</div>
+					{step}
 				</div>
 			)}
 			{face.count || face.description ? (
