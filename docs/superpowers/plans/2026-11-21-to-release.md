@@ -30,6 +30,8 @@ And the project's:
 
 ## How each batch runs
 
+Max, 2026-11-23: «уменьшим количество бесполезных проверок… проверять будем, но чтобы это не было с перебором». So: targeted scenarios while building; one `reviewer` pass per batch, no re-review after its fixes unless they were large; the full `npm test` and full e2e run once, at the merge into the integration branch.
+
 A batch is one row of a step, at most ~10 F-items. It starts from the integration branch with `origin/master` merged. It ends with: a «F → scenario → status» table in the spec; every e2e scenario and every recording of Max's run again; a `reviewer` pass whose first question is «a second path?», plus jscpd; the docs updated; merged back.
 
 ## Steps
