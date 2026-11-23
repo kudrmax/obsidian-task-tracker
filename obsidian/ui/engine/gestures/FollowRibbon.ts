@@ -1,7 +1,7 @@
 import { useGesture, useWheel } from "@use-gesture/react";
 import { animate, type AnimationPlaybackControls, type MotionValue, useMotionValue, useTransform } from "motion/react";
 import { createContext, type RefObject, useEffect, useRef, useState } from "react";
-import { CALENDAR, drawnWidths, landingWidth, type PlaceWidths, placeOf, placesAfter, standAt } from "../layout/columns";
+import { CALENDAR, drawnWidths, firstPlace, landingWidth, type PlaceWidths, placeOf, placesAfter, standAt } from "../layout/columns";
 import { useScreen, useScreenApi } from "../store";
 import { type ChangeTiming, changeLook, changeTiming, type DayChange } from "./dayChange";
 import { FollowPager, LANDING, landingAt, landingVelocity } from "./followPager";
@@ -106,6 +106,7 @@ export function useFollowRibbon(ribbon: RefObject<HTMLElement | null>, calendar:
 	const drawnDays = useRef(days);
 	const glide = useRef<AnimationPlaybackControls | null>(null);
 	const pager = useRef(new FollowPager(placeOf(stop, dayOffset), Infinity));
+	pager.current.first = firstPlace(stop);
 	const wheelFingers = useRef(new WheelFollow());
 	/** Without macOS's signals: the wheel gesture has begun a stroke of the ribbon, so it scrolls nothing else until it ends. */
 	const wheelLocked = useRef(false);

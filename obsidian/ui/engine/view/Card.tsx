@@ -1,8 +1,8 @@
-import { type CSSProperties, type HTMLAttributes, memo, type ReactNode, useRef } from "react";
+import { type CSSProperties, type HTMLAttributes, memo, type ReactNode, type Ref, useRef } from "react";
 import { PROPERTY } from "../../shared/design";
 import type { BlockLook } from "../layers/Layers";
 import type { CardFace as Face } from "../port";
-import { useData } from "../store";
+import { useData, useScreen } from "../store";
 import { Icon } from "./Icon";
 import { useLeaving } from "./MovingRow";
 
@@ -27,11 +27,27 @@ export const Card = memo(function Card({ id, depth = 0, copy = false, block }: C
 	const leaving = useLeaving();
 	const last = useRef(read);
 	if (read) last.current = read;
+	/** Picked for actions on several tasks (F135, F138): the selection's ground, and in Select tasks the circle's check. */
+	const picked = useScreen((s) => !block && s.picked.includes(id));
+	/** The task the search led to: the ring until the screen is touched (F256). */
+	const ringed = useScreen((s) => !copy && s.ringed === id);
 	const face = read ?? (leaving ? last.current : undefined);
 	if (!face) return null;
 	const marked = copy ? { "data-copy": id } : block ? { "data-block": id, "data-own-press": "" } : { "data-id": id };
-	return <CardFace face={face} block={block} className={block ? "tc-block-card" : "tc-card"} {...marked} data-collapsed={!block && face.folded ? "true" : undefined} style={block ? undefined : ({ [PROPERTY.level]: String(depth) } as CSSProperties)} />;
+	const marks = `${picked ? " is-selected" : ""}${ringed ? " is-found" : ""}`;
+	return (
+		<CardFace face={face} block={block} className={`${block ? "tc-block-card" : "tc-card"}${marks}`} {...marked} data-collapsed={!block && face.folded ? "true" : undefined} style={block ? undefined : ({ [PROPERTY.level]: String(depth) } as CSSProperties)}>
+			{block ? null : PICK_CIRCLE}
+		</CardFace>
+	);
 });
+
+/** The circle Select tasks shows at a list card's start (the design's «Выбор задач»): empty, or the accent with a check once picked; out of sight otherwise. */
+const PICK_CIRCLE = (
+	<span className="tc-pick" aria-hidden="true">
+		<Icon name="check" />
+	</span>
+);
 
 /** The element's own attributes besides the face: its marks (`data-…`), its handlers and its style. */
 type FaceAttributes = Omit<HTMLAttributes<HTMLDivElement>, "className" | "children"> & { readonly [mark: `data-${string}`]: string | undefined };
@@ -41,11 +57,45 @@ type FaceAttributes = Omit<HTMLAttributes<HTMLDivElement>, "className" | "childr
  * over a menu's backdrop and a card of a menu's stack. Its status and level on the element, two lines for a folded task's
  * step in a list; `children` after its insides (a task's notes in the menu's copy).
  */
-export function CardFace({ face, block, className, children, ...attributes }: { readonly face: Face; readonly block?: BlockLook; readonly className: string; readonly children?: ReactNode } & FaceAttributes) {
+export function CardFace({ face, block, lines, className, children, ref, ...attributes }: { readonly face: Face; readonly block?: BlockLook; readonly lines?: FoundLines; readonly className: string; readonly children?: ReactNode; readonly ref?: Ref<HTMLDivElement> } & FaceAttributes) {
+	const twoLine = !block && (face.step !== null || (lines?.over ?? null) !== null);
 	return (
-		<div className={`${className}${!block && face.step !== null ? " is-two-line" : ""}`} data-status={face.inProgress ? "inProgress" : "open"} data-priority={face.color ?? undefined} {...attributes}>
-			<CardInsides face={face} block={block} />
+		<div ref={ref} className={`${className}${twoLine ? " is-two-line" : ""}`} data-status={face.inProgress ? "inProgress" : "open"} data-priority={face.color ?? undefined} {...attributes}>
+			<CardInsides face={face} block={block} lines={lines} />
 			{children}
+		</div>
+	);
+}
+
+/**
+ * A found task's title lines on its card (the search, F252, F254): its found words picked out (`title`, null: as the card
+ * draws it), its place among the projects small over it (`over`, in place of a folded task's own title), the found line of
+ * its project's name or its notes under it (`under`).
+ */
+export interface FoundLines {
+	readonly over: string | null;
+	readonly title: ReactNode | null;
+	readonly under: ReactNode | null;
+}
+
+function FoundTitle({ face, lines }: { readonly face: Face; readonly lines: FoundLines }) {
+	const over = lines.over ?? (face.step === null ? null : face.title);
+	const title = <div className="tc-card-title">{face.step === null ? (lines.title ?? face.title) : face.step}</div>;
+	const main = lines.under ? (
+		<div className="tc-hit-text">
+			{title}
+			{lines.under}
+		</div>
+	) : (
+		title
+	);
+	if (over === null) return main;
+	return (
+		<div className="tc-card-lines">
+			<div className="tc-card-over">
+				<span className="tc-card-over-text">{over}</span>
+			</div>
+			{main}
 		</div>
 	);
 }
@@ -55,10 +105,12 @@ export function CardFace({ face, block, className, children, ...attributes }: { 
  * the step alone, F94), the counter and the description's mark, the date in a list, its look on
  * the calendar. The card and its copy over a menu's backdrop draw the same insides.
  */
-function CardInsides({ face, block }: { readonly face: Face; readonly block?: BlockLook }) {
+function CardInsides({ face, block, lines }: { readonly face: Face; readonly block?: BlockLook; readonly lines?: FoundLines }) {
 	return (
 		<>
-			{block || face.step === null ? (
+			{lines ? (
+				<FoundTitle face={face} lines={lines} />
+			) : block || face.step === null ? (
 				<div className="tc-card-title">{face.step ?? face.title}</div>
 			) : (
 				<div className="tc-card-lines">

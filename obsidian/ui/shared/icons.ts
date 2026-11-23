@@ -69,6 +69,9 @@ export type IconName = keyof typeof DRAWINGS;
 
 export const ICONS: Readonly<Record<IconName, IconSpec>> = DRAWINGS;
 
+/** Whether `name`, given by the core (an assistant's row), is one of the drawings. */
+export const isIconName = (name: string): name is IconName => name in DRAWINGS;
+
 function path(svg: SVGSVGElement, d: string): SVGPathElement {
 	const shape = document.createElementNS(NS, "path");
 	shape.setAttribute("d", d);

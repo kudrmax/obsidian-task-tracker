@@ -55,7 +55,7 @@ export abstract class ScreenLeaf extends ItemView {
 	runKey(id: string): boolean {
 		const screen = this.screen?.store.getState();
 		const key = KEYS.find((k) => k.id === id);
-		if (!screen || !key || !takesKeys(screen)) return true;
+		if (!screen || !key || !takesKeys(screen, key)) return true;
 		key.run(screen);
 		return false;
 	}

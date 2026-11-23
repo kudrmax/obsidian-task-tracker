@@ -2,7 +2,7 @@ import { DESIGN } from "../../shared/design";
 import { createStore, type StoreApi } from "zustand/vanilla";
 import { EVERY_TASK } from "../port";
 import { type Stop, stopShowing } from "../layout/columns";
-import type { Destination, DividerStop, Edge, ScreenContext, UndoOutcome, EntryBar, EntryDraft, EntryField, FieldActionId, LevelRange, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, MenuStatusId, ScreenData, ScreenPort } from "../port";
+import type { Destination, DividerStop, Edge, ScreenContext, UndoOutcome, EntryBar, EntryDraft, EntryField, FieldActionId, FoundGroup, LevelRange, ListId, MenuAction, MenuFrom, MenuModel, MoreRow, Now, PlaceId, MenuStatusId, ScreenData, ScreenPort, ShownList } from "../port";
 import { share } from "./share";
 
 export type { Stop };
@@ -10,6 +10,8 @@ export type { Stop };
 /** Nothing came or went: one object, so a selector of it draws nothing again. */
 const NONE: ReadonlySet<string> = new Set();
 const NO_DRAFT: EntryDraft = { level: null, projects: [], descriptionLine: null, section: false };
+/** The search with nothing typed: nothing shows (F253). */
+const NOTHING_FOUND = { query: "", groups: [] } as const;
 /** No field open: what closing one leaves. */
 const NO_ENTRY = { entry: null, draft: NO_DRAFT, entryText: "", entryPanel: null } as const;
 
@@ -43,7 +45,12 @@ export interface Layer {
 	readonly stack: { readonly of: string; readonly ids: readonly string[] } | null;
 	/** The question last taken back by Cancel: what asked it takes the focus again. */
 	readonly asked: Asking | null;
+	/** The menu for the tasks picked at once (F137–F144): their ids; null for one task's or an event's menu. */
+	readonly many: readonly string[] | null;
 }
+
+/** A layer of the screen besides a task's menu (spec, «Layers and focus»): «⋯»'s menu over the capsule (F261), the search (F251). */
+export type Sheet = "more" | "search";
 
 interface ScreenState {
 	/** What the screen draws: the last read, or a drop's preview until its write is read back. */
@@ -130,6 +137,19 @@ interface ScreenState {
 	readonly focusCard: { readonly id: string; readonly seq: number } | null;
 	/** A task to bring into sight in its list, once per `seq`. */
 	readonly reveal: { readonly id: string; readonly seq: number } | null;
+	/** «⋯»'s menu or the search, open over the screen; null for neither. */
+	readonly sheet: Sheet | null;
+	/** What the search found for what is typed in it, and what is typed (F252, F253). */
+	readonly found: { readonly query: string; readonly groups: readonly FoundGroup[] };
+	/** The task the search led to: its card wears the ring until the screen is touched (F256). */
+	readonly ringed: string | null;
+	/** «⋯»'s rows the assistant offers (the port's), and whether its run waits: the dots spin (F261–F263). */
+	readonly moreRows: readonly MoreRow[];
+	readonly busy: boolean;
+	/** Select tasks is on (F135): every list card shows its circle, a tap picks it. */
+	readonly picking: boolean;
+	/** The tasks picked, in the order they were picked (F135, F138); the menu for them all opens over them. */
+	readonly picked: readonly string[];
 }
 
 interface ScreenActions {
@@ -270,6 +290,39 @@ interface ScreenActions {
 	redo(): void;
 	/** The screen has drawn the read `seq`: what came in it no longer comes in. */
 	drawn(seq: number): void;
+	/** «⋯» tapped: its menu over the capsule (F261); null closes it, or the search. */
+	openSheet(sheet: Sheet | null): void;
+	/** The search's field typed (F252): what it finds comes in as the port answers, an older answer never over a newer. */
+	searchFor(query: string): void;
+	/**
+	 * A found task picked (F255): the search closes and the screen goes where the port shows the task, its card ringed and
+	 * brought into sight; a project chosen that hides it is let go, a found task of Done brings Done into sight.
+	 */
+	goToFound(id: string): void;
+	/** The screen touched: the found task's ring goes (F256). */
+	touched(): void;
+	/** An assistant's row of «⋯» tapped: «⋯» closes and the run starts, or stops while it runs (F262, F263). */
+	pressMore(id: string): void;
+	/** Select tasks on (F135), or off: the picked tasks go (F137). */
+	setPicking(on: boolean): void;
+	/** A card picked or let go: a tap in Select tasks, ⌘-click (F135, F138). */
+	togglePick(id: string): void;
+	/** Shift-click (F138): the run of `list`'s cards from the one picked last to this one joins; without one in that list, only this one. */
+	pickRun(id: string, list: ShownList): void;
+	/** The picked tasks let go, and Select tasks ends (F137, F145). */
+	clearPicks(): void;
+	/** Whether a card of `list` can be picked (the port's, F135). */
+	canPick(list: ShownList): boolean;
+	/** The menu for every picked task (F137, F139). */
+	openBulk(): void;
+	/**
+	 * A list card tapped or clicked, with the keys held (F135–F139): in Select tasks it is picked or let go; ⌘ picks it, Shift
+	 * a run; a click on one of several picked opens their menu. Whether the selection took the tap; else the picks go and
+	 * the card's own menu opens.
+	 */
+	tapPick(id: string, list: ShownList, keys: { readonly mod: boolean; readonly shift: boolean }): boolean;
+	/** The picked tasks that go along with `id` carried (the port's, F149): none when it is not picked. */
+	carriedWith(id: string): readonly string[];
 	/** Starts following the port and the clock; returns the stop. Called by the screen as it mounts. */
 	start(): () => void;
 }
@@ -297,6 +350,8 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 	/** The edge a carried card heads into, and the wait before its room may scroll. */
 	let scrollEdge: string | null = null;
 	let scrollWait = 0;
+	/** Counts the searches asked: an answer to an older one comes too late to show. */
+	let searches = 0;
 	/** What was tapped in a closing menu, written once the menu has faded out (`layerGone`). */
 	let picked: (() => void) | null = null;
 	/** A context chosen while a drag or a resize held the screen still: set as it ends. */
@@ -318,7 +373,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 		/** The open menu over `data`: it shows its task as it now stands (a subtask typed into its stack, F108); a menu whose task is no longer shown closes. */
 		const menuOver = (s: Screen, data: ScreenData): Partial<Screen> => {
 			const layer = s.layer;
-			if (!layer || layer.model.kind !== "task") return {};
+			if (!layer || layer.model.kind !== "task" || layer.many) return {};
 			return layer.id in data.cards ? { layer: { ...layer, model: port.menu(layer.id, layer.from, s.dayOffset) } } : closed(s);
 		};
 		/** The port's data again; held while a drag or a drop's write keeps the screen still (spec, principle 5). */
@@ -328,16 +383,19 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 				if (!s.pending) set({ pending: true });
 				return;
 			}
-			const next = share(s.read, port.read(s.dayOffset, s.context));
+			/** Done left behind (the ribbon went on to Inbox): it is drawn no more, in place, from the next read on (F257). */
+		const context = s.context.done && s.stop !== "done" ? { ...s.context, done: false } : s.context;
+		const next = share(s.read, port.read(s.dayOffset, context));
 			const known = s.read.cards;
 			/** A read that changed nothing (a write's read-back after its own change came) keeps what came and went in the last one. */
 			const same = next === s.read;
 			const came = Object.keys(next.cards).filter((id) => !(id in known));
 			const went = Object.keys(known).filter((id) => !(id in next.cards));
 			const menu = menuOver(s, next);
-			const undo = { canUndo: port.canUndo(), canRedo: port.canRedo() };
+			const undo = { canUndo: port.canUndo(), canRedo: port.canRedo(), moreRows: port.moreRows(), busy: port.busy(), ...(context === s.context ? {} : { context }) };
 			if (same) return set({ shown: share(s.shown, next), pending: false, ...menu, ...undo });
-			set({ read: next, shown: share(s.shown, next), pending: false, readSeq: s.readSeq + 1, fresh: came.length === 0 ? NONE : new Set(came), gone: went.length === 0 ? NONE : new Set(went), ...menu, ...undo });
+			const picked = s.picked.filter((id) => id in next.cards);
+		set({ read: next, shown: share(s.shown, next), pending: false, readSeq: s.readSeq + 1, ...(picked.length === s.picked.length ? {} : { picked }), fresh: came.length === 0 ? NONE : new Set(came), gone: went.length === 0 ? NONE : new Set(went), ...menu, ...undo });
 		};
 
 		const write = (done: Promise<unknown>) => {
@@ -472,6 +530,13 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 			contextSeq: 0,
 			reveal: null,
 			focusCard: null,
+			sheet: null,
+			found: NOTHING_FOUND,
+			ringed: null,
+			moreRows: port.moreRows(),
+			busy: port.busy(),
+			picking: false,
+			picked: [],
 
 			setStop(stop) {
 				set({ stop });
@@ -533,7 +598,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 				const over = get().layer;
 				const stack = from !== "stack" || !over ? null : (over.stack ?? (over.model.kind === "task" ? { of: over.id, ids: over.model.subtasks } : null));
 				const model = port.menu(id, from, get().dayOffset);
-				set({ layer: { kind: "menu", id, from, model, page: "menu", asking: null, asked: null, stack }, ...(from === "list" ? { selected: null } : {}) });
+				set({ layer: { kind: "menu", id, from, model, page: "menu", asking: null, asked: null, stack, many: null }, ...(from === "list" ? { selected: null } : {}) });
 			},
 			startRename() {
 				const layer = get().layer;
@@ -566,7 +631,9 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 				set({ layer: null });
 				let done: () => void = () => undefined;
 				write(new Promise<void>((resolve) => (done = resolve)));
-				picked = () => void port.act(layer.id, action, layer.from, get().dayOffset).finally(done);
+				const many = layer.many;
+			if (many) get().clearPicks();
+			picked = () => void (many ? port.actAll(many, action, get().dayOffset) : port.act(layer.id, action, layer.from, get().dayOffset)).finally(done);
 			},
 			layerGone() {
 				const run = picked;
@@ -581,7 +648,18 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 					const now = get().layer;
 					if (id !== null && now && now.id === layer.id && id !== layer.id) set({ layer: { ...now, id } });
 				};
-				write(port.act(layer.id, action, layer.from, get().dayOffset).then(follow));
+				if (layer.many) {
+				/** A label or a project on them all keeps the menu and the picks for the next (F143, F144): the menu drawn for them as they now stand. */
+				const many = layer.many;
+				return write(
+					port.actAll(many, action, get().dayOffset).then((ids) => {
+						const kept = ids.flatMap((id) => (id === null ? [] : [id]));
+						const now = get().layer;
+						if (now?.many === many && kept.length > 0) set({ layer: { ...now, many: kept, model: port.bulkMenu(kept, get().dayOffset) } });
+					}),
+				);
+			}
+			write(port.act(layer.id, action, layer.from, get().dayOffset).then(follow));
 			},
 			nameMenuProject(name) {
 				if (port.blankProjectName(name)) get().menuPage("projects");
@@ -699,13 +777,84 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 				/** What the finger holds stays still under it (principle 5): another context waits for the drag or the resize, and its write, to end. */
 				if (HOLDING.includes(s.gesture) || writing > 0) return void (waitingContext = context);
 				waitingContext = null;
-				if (s.context.project === context.project) return void (s.pending && refresh());
+				if (s.context.project === context.project && !!s.context.done === !!context.done) return void (s.pending && refresh());
 				const next = port.read(s.dayOffset, context);
 				const left = Object.fromEntries(Object.keys(s.left).map((day) => [day, ((data) => ({ shown: data, read: data }))(port.read(Number(day), context))]));
 				set({ context, contextSeq: s.contextSeq + 1, read: next, shown: next, left, pending: false, readSeq: s.readSeq + 1, fresh: NONE, gone: NONE, selected: null, ...menuOver(s, next) });
 			},
 			createFile() {
 				void port.createFile();
+			},
+			openSheet(sheet) {
+				if (get().sheet === sheet) return;
+				set({ sheet, layer: null, ...(sheet === "search" ? { found: NOTHING_FOUND } : {}) });
+			},
+			searchFor(query) {
+				const asked = ++searches;
+				if (query === "") return set({ found: NOTHING_FOUND });
+				void port.search(query).then((groups) => {
+					if (asked === searches && get().sheet === "search") set({ found: { query, groups } });
+				});
+			},
+			goToFound(id) {
+				searches++;
+				set({ sheet: null, found: NOTHING_FOUND });
+				write(
+					port.reveal(id).then((at) => {
+						if (!at) return;
+						get().setContext(at.context);
+						get().showDay(at.day ?? 0);
+						get().setStop(at.day === null ? stopShowing(get().stop, at.list) : "calendar");
+						set({ ringed: id, reveal: { id, seq: (get().reveal?.seq ?? 0) + 1 } });
+					}),
+				);
+			},
+			touched() {
+				if (get().ringed !== null) set({ ringed: null });
+			},
+			pressMore(id) {
+				set({ sheet: null });
+				port.pressMore(id);
+			},
+			setPicking(picking) {
+				if (picking) set({ picking, sheet: null });
+				else get().clearPicks();
+			},
+			togglePick(id) {
+				const { picked } = get();
+				set({ picked: picked.includes(id) ? picked.filter((other) => other !== id) : [...picked, id] });
+			},
+			pickRun(id, list) {
+				const { picked, shown } = get();
+				const cards = shown.lists[list].rows.flatMap((row) => (row.kind === "task" ? [row.id] : []));
+				const from = cards.indexOf(picked[picked.length - 1] ?? "");
+				const to = cards.indexOf(id);
+				if (from < 0 || to < 0) return get().togglePick(id);
+				const run = cards.slice(Math.min(from, to), Math.max(from, to) + 1).filter((other) => !picked.includes(other) && other !== id);
+				set({ picked: [...picked, ...run, ...(picked.includes(id) ? [] : [id])] });
+			},
+			clearPicks() {
+				if (get().picking || get().picked.length > 0) set({ picking: false, picked: [] });
+			},
+			canPick(list) {
+				return port.canPick(list);
+			},
+			openBulk() {
+				const { picked, dayOffset } = get();
+				if (picked.length === 0) return;
+				set({ sheet: null, layer: { kind: "menu", id: picked[0], from: "list", model: port.bulkMenu(picked, dayOffset), page: "menu", asking: null, asked: null, stack: null, many: picked } });
+			},
+			tapPick(id, list, keys) {
+				const s = get();
+				const pickable = port.canPick(list);
+				const took = s.picking ? (pickable ? () => s.togglePick(id) : () => undefined) : pickable && keys.mod ? () => s.togglePick(id) : pickable && keys.shift && s.picked.length > 0 ? () => s.pickRun(id, list) : s.picked.includes(id) && s.picked.length > 1 ? () => s.openBulk() : null;
+				if (took) took();
+				else s.clearPicks();
+				return took !== null;
+			},
+			carriedWith(id) {
+				const { picked } = get();
+				return picked.includes(id) ? port.carriedWith(id, picked) : [];
 			},
 			snap: (minute, hourPx, tolerancePx) => port.snap(minute, hourPx, tolerancePx),
 			levels: (above, below) => port.levels(above, below),

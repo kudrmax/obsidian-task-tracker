@@ -4,7 +4,7 @@ import { CSS, getEventCoordinates } from "@dnd-kit/utilities";
 import { createContext, type CSSProperties, memo, type ReactNode, type TouchEvent as ReactTouchEvent, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ROW_PX } from "../layout/columns";
-import type { Destination, ListId, Row } from "../port";
+import type { Destination, ListId, Row, ShownList } from "../port";
 import { secondaryClick, useFocusWhen } from "../layers/Layers";
 import { cssEase, FLY } from "../layers/motion";
 import { useScreen, useScreenApi } from "../store";
@@ -588,7 +588,7 @@ function crossing(active: Sortable & { readonly rect: { readonly current: { read
 }
 
 /** A list's sortable tasks: `ids` keeps its identity between draws, or dnd-kit stops gliding (stage 0, finding 4). */
-export function SortableList({ list, ids, children }: { readonly list: ListId; readonly ids: readonly string[]; readonly children: ReactNode }) {
+export function SortableList({ list, ids, children }: { readonly list: ShownList; readonly ids: readonly string[]; readonly children: ReactNode }) {
 	const strategy = useMemo(() => finalOrderStrategy(ids), [ids]);
 	return (
 		<SortableContext id={list} items={ids as string[]} strategy={strategy}>
@@ -603,13 +603,22 @@ export function SortableList({ list, ids, children }: { readonly list: ListId; r
  * otherwise). Goes on the list's scroller. A day's page drawn beside the shown day (`away`, its day) gets a target of its
  * own, off: dnd-kit keeps one target an id, and a page going away took the shown day's target with it (Decision 129).
  */
-export function useListTarget(list: ListId, ids: readonly string[], away: number | null = null): (element: HTMLElement | null) => void {
+export function useListTarget(list: ShownList, ids: readonly string[], away: number | null = null): (element: HTMLElement | null) => void {
 	return useDroppable({ id: away === null ? `${LIST_TARGET}${list}` : `${LIST_TARGET}${list}@${away}`, disabled: away !== null, data: { items: ids } }).setNodeRef;
 }
 
 /** What a carried row tells dnd-kit besides its place (its sortable `data`): how it opens its menu, from the row pressed, held or tapped. */
+/** The keys held with a mouse's click on a row: ⌘ (Ctrl elsewhere) and Shift pick cards (F138). */
+export interface TapKeys {
+	readonly mod: boolean;
+	readonly shift: boolean;
+}
+
+/** A row's tap: the row, whether a held press let go unmoved, and the keys held with a mouse's click. */
+export type RowTap = (row: Element, held: boolean, keys?: TapKeys) => void;
+
 interface RowData {
-	readonly press?: (row: Element, held: boolean) => void;
+	readonly press?: RowTap;
 }
 
 /**
@@ -618,8 +627,9 @@ interface RowData {
  * A section's header moves aside like cards but is not carried (`onTap` absent): a card goes after it into its section.
  * A calendar's block is `placed`: its box says where it stands, so dnd-kit never moves it (its box glides by CSS).
  */
-export const SortableRow = memo(function SortableRow({ id, onTap, gap = false, placed = false, children }: { readonly id: string; readonly onTap?: (row: Element, held: boolean) => void; readonly gap?: boolean; readonly placed?: boolean; readonly children: ReactNode }) {
-	const carried = onTap !== undefined;
+export const SortableRow = memo(function SortableRow({ id, onTap, gap = false, placed = false, still = false, children }: { readonly id: string; readonly onTap?: RowTap; readonly gap?: boolean; readonly placed?: boolean; readonly still?: boolean; readonly children: ReactNode }) {
+	/** A card of Done is tapped, never carried (F257, `still`). */
+	const carried = onTap !== undefined && !still;
 	const data = useMemo((): RowData => ({ press: onTap }), [onTap]);
 	const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({ id, data, disabled: { draggable: !carried, droppable: false }, animateLayoutChanges: placed ? STAY : undefined });
 	const style: CSSProperties = placed ? {} : { transform: CSS.Translate.toString(transform), transition };
@@ -634,7 +644,7 @@ export const SortableRow = memo(function SortableRow({ id, onTap, gap = false, p
 		[setNodeRef],
 	);
 	return (
-		<div ref={hold} className={`tc-drag-source${isDragging || gap ? " is-lifted" : ""}`} style={style} {...(carried ? attributes : {})} {...(carried ? listeners : {})} onClick={carried ? (event) => onTap(event.currentTarget, false) : undefined} onContextMenu={carried ? (event) => secondaryClick(event) && onTap(event.currentTarget, false) : undefined}>
+		<div ref={hold} className={`tc-drag-source${isDragging || gap ? " is-lifted" : ""}`} style={style} {...(carried ? attributes : {})} {...(carried ? listeners : {})} onClick={onTap ? (event) => onTap(event.currentTarget, false, { mod: event.metaKey || event.ctrlKey, shift: event.shiftKey }) : undefined} onContextMenu={onTap ? (event) => secondaryClick(event) && onTap(event.currentTarget, false) : undefined}>
 			{children}
 		</div>
 	);

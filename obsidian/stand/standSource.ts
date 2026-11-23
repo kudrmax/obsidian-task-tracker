@@ -1,7 +1,7 @@
-import { CorePort } from "../adapters/CorePort";
+import { CorePort, type MoreAssistant } from "../adapters/CorePort";
 import { DeviceSettings, type DeviceViewKeys } from "../adapters/DeviceSettings";
 import type { ScreenHostOptions } from "../host/ScreenHost";
-import { memoryCore, type MemoryTasksFile } from "../memoryCore";
+import { type MemoryCore, memoryCore, type MemoryModel, type MemoryTasksFile } from "../memoryCore";
 import { dateOf, dayOf, fileText, LIST_NAMES, type ListKey, type MockFile, mockFile } from "./mockData";
 import { standEvents } from "./standEvents";
 
@@ -35,16 +35,22 @@ function coreText(file: MockFile, now: Date): string {
 	return `${fileText(file, now)}\n## Projects\n\n${tree.join("\n")}\n`;
 }
 
+/** The assistant on the stand (the desktop's): its model in memory, answered by hand, and «⋯»'s side of its runs over the core's. */
+export interface StandAssistant {
+	readonly model: MemoryModel;
+	readonly more: (service: MemoryCore["core"]["assistant"]) => MoreAssistant;
+}
+
 /**
  * The core over the stand's made-up file (`given`, or the whole made-up file around now) as a tasks file in memory, its
  * calendar the stand's events; the screen on `CorePort`, the device's keys in `device`.
  */
-export async function standSource(device: DeviceViewKeys, onError: (error: unknown) => void, clock: () => Date = () => new Date(), given?: MockFile): Promise<StandSource> {
+export async function standSource(device: DeviceViewKeys, onError: (error: unknown) => void, clock: () => Date = () => new Date(), given?: MockFile, assistant?: StandAssistant): Promise<StandSource> {
 	const now = clock();
 	const first = given ?? mockFile(now);
-	const made = memoryCore(coreText(first, now), { now: clock }, {}, standEvents(first, now));
+	const made = memoryCore(coreText(first, now), { now: clock }, {}, standEvents(first, now), undefined, assistant?.model.models);
 	const { core, file, events } = made;
-	const port = await CorePort.open({ ...core, clock: { now: clock }, onError, tasksFile: () => made.settings.get().tasksFile });
+	const port = await CorePort.open({ ...core, ...(assistant && { more: assistant.more(core.assistant) }), clock: { now: clock }, onError, tasksFile: () => made.settings.get().tasksFile });
 	return {
 		port,
 		device: new DeviceSettings(device, core.tasks, () => made.settings.get().zoomLevels),

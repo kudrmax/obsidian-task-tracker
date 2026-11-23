@@ -98,6 +98,7 @@ body {
 	--tc-stroke-2-4: 2.4px;
 	--tc-stroke-2-6: 2.6px;
 	--tc-stroke-2-8: 2.8px;
+	--tc-stroke-3-4: 3.4px;
 	--tc-stroke-3-6: 3.6px;
 	/* A capsule: the corners take half the card's height. */
 	--tc-radius-card: calc(var(--tc-card-h) / 2);
@@ -494,6 +495,7 @@ body {
 	--tc-text-13: 13px;
 	--tc-text-15: 15px;
 	--tc-text-16: 16px;
+	--tc-text-17: 17px;
 	--tc-text-20: 20px;
 	--tc-font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, system-ui, sans-serif;
 	--tc-font-inherit: inherit;
@@ -601,6 +603,35 @@ body {
 	--tc-duration-keyboard: 300ms;
 	--tc-ease-keyboard: cubic-bezier(0.12, 0, 0.44, 0.99);
 	/* A description's screen rises this far as it fades in. */
+	/* Select tasks' circle at a list card's start (the design's «Выбор задач»): its size, its check, its ring and how far it stands from the card's edge and from the title. */
+	--tc-pick-size: var(--tc-icon-m);
+	--tc-pick-check: 12px;
+	--tc-pick-ring: var(--tc-select-ring);
+	--tc-stroke-pick: var(--tc-stroke-3-4);
+	--tc-pick-pad-start: 9px;
+	--tc-pick-gap: var(--tc-space-8);
+	/* The count of picked tasks in the capsule (17 / 700). */
+	--tc-font-count-big: var(--tc-text-17);
+	/* The search (the design's «Поиск»): the desktop's panel width, the field's inner gap; on the phone the bar over the keyboard, where the quick bar stands. */
+	--tc-search-w: 520px;
+	--tc-search-field-pad: var(--tc-space-10);
+	--tc-search-bottom: calc(var(--tc-bar-bottom) + var(--tc-nav-room));
+	--tc-layer-sheet: 20;
+	/* The phone's search rises this far as it fades in. */
+	--tc-search-rise: 12px;
+	/* The ring that spins in «⋯» and in its row while the assistant's question waits. */
+	--tc-duration-spin: 900ms;
+	--tc-spinner-capsule: var(--tc-icon-l);
+	--tc-spinner-row: var(--tc-icon-m);
+	--tc-stroke-spinner: var(--tc-stroke-2);
+	/* The menu for picked tasks: its first row, «N tasks». */
+	--tc-menu-title-h: 40px;
+	/* The answer: its title, the line under its card, its field, its buttons' gap. */
+	--tc-font-answer-title: var(--tc-font-caption);
+	--tc-answer-notice-gap: var(--tc-space-6);
+	--tc-answer-field-pad-y: calc((var(--tc-row) - var(--tc-leading-card)) / 2);
+	--tc-answer-field-pad-x: var(--tc-card-pad-start);
+	--tc-answer-foot-gap: var(--tc-space-8);
 }
 
 /* The light theme follows Obsidian's: the same roles, the values of the board «Палитра» (docs/design/README.md, «Светлая тема»). */
@@ -1123,7 +1154,7 @@ body:has(> .tc-backdrop.is-shown) > .suggestion-container, body:has(> .tc-backdr
 :is(.is-phone, .tc-level-rows.is-wrapped) .tc-level-row .tc-level-hex { order: 2; }
 
 .tc-card.has-snippet { height: auto; min-height: var(--tc-card-h); padding-top: var(--tc-space-6); padding-bottom: var(--tc-space-6); }
-.tc-card.is-found, .tc-block.is-found .tc-block-card { box-shadow: var(--tc-ring-selected); }
+.tc-card.is-found, .tc-block-card.is-found { box-shadow: var(--tc-ring-selected); }
 
 /* A row of More opens its page: the whole row answers, like Obsidian's own rows that lead on. */
 .setting-item.tc-settings-link { cursor: pointer; }
@@ -1376,3 +1407,75 @@ body.theme-light .tc-menu-over .tc-event { --tc-event-bg: var(--tc-event-bg-ligh
 /* A part of the menu too tall for its room scrolls under the finger or the wheel without a scrollbar of its own: the question it asks is brought into sight as it opens. */
 .tc-level.tc-menu-layer .tc-panel { scrollbar-width: none; }
 .tc-level.tc-menu-layer .tc-panel::-webkit-scrollbar { display: none; }
+
+
+/* Done, left of Inbox (F257, the design's «Колонка Done»): a column of the strip standing left of its first, in sight while the ribbon stands one place before Inbox. */
+.tc-ribbon-track { position: relative; }
+.tc-ribbon-track > .tc-stage-col.is-done { position: absolute; right: 100%; top: 0; bottom: 0; }
+
+/* Select tasks (the design's «Выбор задач»): the capsule with the cross and the count, the accent circle with «⋯» in the plus's place; the control a layer opens from stands over its backdrop. */
+.task-calendar > button.tc-select-menu { position: absolute; right: var(--tc-space-16); bottom: calc(var(--tc-chrome-room) + var(--tc-foot-gap) + (var(--tc-wheel) - var(--tc-plus-size)) / 2 - var(--tc-keyboard-room)); z-index: var(--tc-layer-plus); transition: opacity var(--tc-duration-collapse) var(--tc-ease-out), transform var(--tc-duration-collapse) var(--tc-ease-out), visibility 0s linear 0s; }
+.task-calendar > button.tc-select-menu.is-hidden { opacity: 0; transform: scale(var(--tc-menu-scale)); visibility: hidden; pointer-events: none; transition: opacity var(--tc-duration-collapse) var(--tc-ease-out), transform var(--tc-duration-collapse) var(--tc-ease-out), visibility 0s linear var(--tc-duration-collapse); }
+button.tc-select-menu svg { stroke: none; fill: currentColor; }
+button.tc-btn.tc-select-menu.is-off { background: var(--tc-track-bg); color: var(--tc-ink-dim); }
+.tc-capsule button.tc-select-num { font-size: var(--tc-font-count-big); font-weight: var(--tc-weight-bold); font-variant-numeric: tabular-nums; }
+.task-calendar > .is-raised { z-index: var(--tc-layer-panel); }
+
+/* A list card's circle: out of sight, and in Select tasks on a list whose cards can be picked, before the title; picked, the accent with its check. */
+.tc-card > .tc-pick { order: -1; display: flex; width: 0; height: var(--tc-pick-size); flex-shrink: 0; box-sizing: border-box; margin-right: 0; border: 0 solid var(--tc-muted); border-radius: var(--tc-radius-circle); color: var(--tc-on-accent); align-items: center; justify-content: center; opacity: 0; overflow: hidden; transition: width var(--tc-duration-collapse) var(--tc-ease-out), margin var(--tc-duration-collapse) var(--tc-ease-out), border-width var(--tc-duration-collapse) var(--tc-ease-out), opacity var(--tc-duration-collapse) var(--tc-ease-out), background-color var(--tc-duration-collapse) var(--tc-ease-out); }
+.tc-pick svg { width: var(--tc-pick-check); height: var(--tc-pick-check); stroke: currentColor; stroke-width: var(--tc-stroke-pick); visibility: hidden; }
+.task-calendar.is-selecting .tc-list.is-pickable .tc-card > .tc-pick { width: var(--tc-pick-size); margin-right: var(--tc-pick-gap); border-width: var(--tc-pick-ring); opacity: 1; }
+.task-calendar.is-selecting .tc-list.is-pickable .tc-card { padding-left: var(--tc-pick-pad-start); }
+.task-calendar.is-selecting .tc-list.is-pickable .tc-card > .tc-progress-dot { opacity: 0; }
+.tc-card.is-selected > .tc-pick { border-color: transparent; background: var(--tc-accent); }
+.tc-card.is-selected > .tc-pick svg { visibility: visible; }
+
+/* A panel opened from a control: «⋯»'s menu and the menu for picked tasks, scrolling within the room it has. */
+.tc-panel.tc-popover { overflow-y: auto; overscroll-behavior: contain; transform-origin: 0 100%; }
+.tc-panel.tc-popover[data-from^="top-end"] { transform-origin: 100% 100%; }
+.tc-panel.tc-popover[data-from^="right"] { transform-origin: 0 0; }
+.tc-panel.is-bulk { width: var(--tc-menu-w); }
+.tc-panel .tc-menu-title { height: var(--tc-menu-title-h); box-sizing: border-box; padding: 0 var(--tc-space-16); border-bottom: var(--tc-band); display: flex; align-items: center; font-size: var(--tc-font-body); font-weight: var(--tc-weight-semibold); }
+
+/* The assistant's ring: in «⋯» in its dots' place and in its row in the icon's. */
+.tc-spinner { display: block; flex-shrink: 0; box-sizing: border-box; border: var(--tc-stroke-spinner) solid var(--tc-muted); border-top-color: transparent; border-radius: var(--tc-radius-circle); animation: tc-spin var(--tc-duration-spin) linear infinite; }
+.tc-capsule .tc-more-open > .tc-spinner { width: var(--tc-spinner-capsule); height: var(--tc-spinner-capsule); }
+.tc-menu-row > .tc-spinner { width: var(--tc-spinner-row); height: var(--tc-spinner-row); margin: 0 calc((var(--tc-menu-icon) - var(--tc-spinner-row)) / 2); }
+
+/* The answer's parts (F264, F312). */
+.tc-answer-title { font-size: var(--tc-font-answer-title); font-weight: var(--tc-weight-semibold); color: var(--tc-muted); }
+.tc-answer-card { cursor: default; }
+.tc-answer-notice, .tc-answer-failed { margin-top: calc(var(--tc-answer-notice-gap) - var(--tc-answer-gap)); font-size: var(--tc-font-caption); line-height: var(--tc-leading-card); color: var(--tc-muted); }
+.tc-panel.is-answer .tc-answer-note { overflow: visible; }
+.tc-answer-note > :first-child { margin-top: 0; }
+.tc-answer-note > :last-child { margin-bottom: 0; }
+.tc-answer-foot { display: flex; gap: var(--tc-answer-foot-gap); }
+.tc-panel.is-answer .tc-answer-foot > button.tc-btn { flex: 1; min-width: 0; }
+.tc-panel.is-answer .tc-answer-field { width: 100%; min-height: var(--tc-row); box-sizing: border-box; padding: var(--tc-answer-field-pad-y) var(--tc-answer-field-pad-x); border-radius: var(--tc-radius-menu-tile); background: var(--tc-menu-tile-bg); font-size: var(--tc-font-body); line-height: var(--tc-leading-card); color: var(--tc-text); caret-color: var(--tc-accent); overflow-wrap: anywhere; -webkit-user-select: text; user-select: text; }
+.tc-panel.is-answer .tc-answer-field:focus-within { box-shadow: var(--tc-ring-selected); }
+
+/* The search (the design's «Поиск», F251–F254): on the phone the whole view, its bar over the keyboard; on the desktop a panel hanging from the view's top. */
+.task-calendar > .tc-search { position: absolute; inset: 0; z-index: var(--tc-layer-sheet); background: var(--tc-bg); opacity: 0; transform: translate3d(0, var(--tc-search-rise), 0); transition: opacity var(--tc-duration-menu) var(--tc-ease-out), transform var(--tc-duration-menu) var(--tc-ease-out); }
+.task-calendar > .tc-search.is-shown { opacity: 1; transform: none; }
+.tc-search.is-closing { transition-duration: var(--tc-duration-collapse); }
+.tc-search-results { display: flex; flex-direction: column; gap: var(--tc-card-gap); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; overflow-anchor: none; }
+.task-calendar > .tc-search > .tc-search-results { position: absolute; left: 0; right: 0; top: 0; bottom: calc(var(--tc-search-bottom) + var(--tc-bar-h)); box-sizing: border-box; padding: var(--tc-space-16) var(--tc-space-10) var(--tc-space-8); }
+.tc-search-results > * { flex-shrink: 0; }
+.tc-search-results > .tc-group-head:first-child { margin-top: 0; }
+.tc-search-bar { position: absolute; left: 0; right: 0; bottom: var(--tc-search-bottom); height: var(--tc-bar-h); box-sizing: border-box; padding: 0 var(--tc-space-8); background: var(--tc-bg); display: flex; align-items: center; gap: var(--tc-space-8); }
+.tc-search-field { flex: 1; min-width: 0; height: var(--tc-bar-btn-h); box-sizing: border-box; padding: 0 var(--tc-search-field-pad); border-radius: var(--tc-radius-bar-btn); background: var(--tc-card-bg); color: var(--tc-muted); display: flex; align-items: center; gap: var(--tc-space-6); cursor: text; }
+.tc-search-field svg { width: var(--tc-icon-m); height: var(--tc-icon-m); flex-shrink: 0; stroke: currentColor; stroke-width: var(--tc-stroke-ring); }
+.tc-search-field .tc-search-input { flex: 1; min-width: 0; font-size: var(--tc-font-body); line-height: var(--tc-leading-card); color: var(--tc-text); caret-color: var(--tc-accent); white-space: nowrap; overflow: hidden; -webkit-user-select: text; user-select: text; }
+.tc-search-bar > button.tc-search-cancel { height: var(--tc-bar-btn-h); flex-shrink: 0; color: var(--tc-accent-ui); font-size: var(--tc-font-count-big); }
+.tc-search-empty { margin: auto 0; text-align: center; color: var(--tc-muted); font-size: var(--tc-font-body); }
+.tc-search.is-desk { position: fixed; z-index: var(--tc-layer-panel); width: var(--tc-search-w); max-width: calc(100% - 2 * var(--tc-whole-margin)); box-sizing: border-box; padding: var(--tc-space-8); border-radius: var(--tc-radius-panel); background: var(--tc-panel-bg); box-shadow: var(--tc-shadow-panel); color: var(--tc-text); font-family: var(--tc-font-ui); display: flex; flex-direction: column; gap: var(--tc-space-8); opacity: 0; transform-origin: 50% 0; transform: translate3d(0, calc(-1 * var(--tc-menu-rise)), 0) scale(var(--tc-menu-scale)); transition: opacity var(--tc-duration-menu) var(--tc-ease-out), transform var(--tc-duration-menu) var(--tc-ease-out); }
+.tc-search.is-desk.is-shown { opacity: 1; transform: none; }
+.tc-search.is-desk .tc-search-field { flex: none; background: var(--tc-track-bg); }
+.tc-search.is-desk > .tc-search-results { min-height: 0; }
+.tc-search.is-desk > .tc-search-results:empty { display: none; }
+mark.tc-hit { background: var(--tc-selection); color: inherit; font-weight: var(--tc-weight-semibold); }
+.tc-hit-card { cursor: pointer; }
+.tc-hit-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.tc-hit-desc { display: flex; align-items: center; gap: var(--tc-space-4); white-space: nowrap; overflow: hidden; font-size: var(--tc-font-block); line-height: var(--tc-leading-block); color: var(--tc-muted); -webkit-mask-image: var(--tc-fade-card-end); mask-image: var(--tc-fade-card-end); }
+.tc-hit-desc > svg { width: var(--tc-pick-check); height: var(--tc-pick-check); flex-shrink: 0; stroke: currentColor; }
+.tc-hit-card.is-picked { box-shadow: var(--tc-ring-selected); }

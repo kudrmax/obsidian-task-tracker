@@ -6,6 +6,9 @@ import type { TrackpadFingers } from "./gestures/trackpadFollow";
 import type { ScreenContext, ScreenPort } from "./port";
 import { createScreenStore, type ScreenStore, type Zoom } from "./store";
 import { TaskScreen } from "./view/TaskScreen";
+import { AnswerPopup } from "./view/AnswerPopup";
+import { HostContext } from "./view/host";
+import type { Answer } from "./port";
 
 export interface MountOptions {
 	readonly port: ScreenPort;
@@ -53,4 +56,28 @@ export function mountScreen(el: HTMLElement, { port, place, app, sourcePath, hap
 			root.unmount();
 		},
 	};
+}
+
+/** What an answer's popup is drawn with: the host's parts a screen gets, but the place, the port and the fingers. */
+export type AnswerHost = Pick<MountOptions, "app" | "haptics" | "markdown" | "notice" | "desk"> & { readonly zoomMost: number };
+
+/**
+ * The assistant's answer in the middle of `doc`'s window (F264): it belongs to the window, not to a screen, so it comes
+ * even when the view was closed; it is taken off once it has faded out.
+ */
+export function showAnswer(doc: Document, host: AnswerHost, answer: Answer): void {
+	const el = doc.createElement("div");
+	doc.body.appendChild(el);
+	const root = createRoot(el);
+	const gone = () =>
+		queueMicrotask(() => {
+			root.unmount();
+			el.remove();
+		});
+	const screenHost = { doc, win: doc.defaultView ?? window, layerRoot: doc.body, app: host.app, sourcePath: "", haptics: host.haptics, zoomMost: host.zoomMost, desk: host.desk, markdown: host.markdown, notice: host.notice, fingers: null };
+	root.render(
+		<HostContext.Provider value={screenHost}>
+			<AnswerPopup answer={answer} onGone={gone} />
+		</HostContext.Provider>,
+	);
 }

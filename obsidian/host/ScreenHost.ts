@@ -10,6 +10,7 @@ import { clearCardSize } from "../ui/paint/cardSize";
 import { clearPriorityColors } from "../ui/paint/priorityColors";
 import { showScreenPaint } from "../ui/paint/screenPaint";
 import { addWindowDocument } from "../ui/paint/windowDocuments";
+import type { AnswerPlace } from "./AssistantAnswers";
 import { detectHaptics, type HapticsHost } from "./haptics";
 import { type LeafLook, leafFor, ScreenLeaf } from "./ScreenLeaf";
 import { ScreenMounts } from "./ScreenMounts";
@@ -62,6 +63,12 @@ export class ScreenHost {
 	mounts(): Promise<ScreenMounts> {
 		this.ready ??= this.assemble();
 		return this.ready;
+	}
+
+	/** Where the assistant's answer is drawn once it comes (F264): the window in front, over the host's port and parts. */
+	async answerPlace(): Promise<AnswerPlace> {
+		const mounts = await this.mounts();
+		return { port: mounts.parts.port, host: mounts.answerHost(), doc: activeDocument };
 	}
 
 	/** Every screen open now, in a leaf or a note's block. */

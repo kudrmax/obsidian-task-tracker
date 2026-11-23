@@ -3,9 +3,10 @@ import { DESIGN } from "../../shared/design";
 import { useDivider } from "../gestures/Divider";
 import { DayTurnContext, type FollowGestures, useFollowRibbon } from "../gestures/FollowRibbon";
 import { RibbonTrack, StripColumn, StripRule } from "../gestures/RibbonTrack";
-import type { ListId } from "../port";
+import type { ShownList } from "../port";
 import { DayContext, useData, useScreen } from "../store";
-import { Capsule } from "../view/Capsule";
+import { BulkMenu } from "../view/BulkMenu";
+import { Capsule, PickedButton } from "../view/Capsule";
 import { useHost } from "../view/host";
 import { PlusButton } from "../view/QuickAdd";
 import { DaySlide } from "../view/Slide";
@@ -31,8 +32,10 @@ export const Layout = memo(function Layout({ place }: { readonly place: Place })
 		<>
 			{place === "leaf" ? <RibbonColumns /> : <NoteColumn list={columnsOf(place, stop)[0]} />}
 			<PlusButton shown={columnsOf(place, stop)} />
+			<PickedButton />
 			<Capsule />
 			<TaskMenu />
+			<BulkMenu />
 		</>
 	);
 });
@@ -52,6 +55,8 @@ function RibbonColumns() {
 		<div className="tc-ribbon" ref={ribbon} {...bind()}>
 			<DayTurnContext.Provider value={turn}>
 				<RibbonTrack at={at} className="tc-ribbon-track" width={STRIP_WIDTH} share={COLUMN_SHARE}>
+					<ListColumn list="done" />
+					<ColumnRule at={at} stop="done" />
 					<ListColumn list="inbox" />
 					<ColumnRule at={at} stop="inbox" />
 					<ListColumn list="soon" />
@@ -165,7 +170,7 @@ function DayListTitle() {
 	return <span className="tc-day-title">{title}</span>;
 }
 
-function NoteColumn({ list }: { readonly list: ListId }) {
+function NoteColumn({ list }: { readonly list: ShownList }) {
 	return (
 		<div className="tc-note-column">
 			<ListColumn list={list} share={WHOLE} />
@@ -176,7 +181,7 @@ function NoteColumn({ list }: { readonly list: ListId }) {
 /** A note's one column takes the whole block. */
 const WHOLE = 100;
 
-const ListColumn = memo(function ListColumn({ list, share = COLUMN_SHARE }: { readonly list: ListId; readonly share?: number }) {
+const ListColumn = memo(function ListColumn({ list, share = COLUMN_SHARE }: { readonly list: ShownList; readonly share?: number }) {
 	const title = useData((d) => d.lists[list].title);
 	return (
 		<ColumnBox className={`is-${list}`} share={share}>

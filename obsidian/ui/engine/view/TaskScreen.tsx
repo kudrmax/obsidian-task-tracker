@@ -1,4 +1,4 @@
-import { type CSSProperties, type MouseEvent, type PointerEvent, type TouchEvent, useEffect, useId, useRef } from "react";
+import { type CSSProperties, type MouseEvent, type PointerEvent, type TouchEvent, useEffect, useId, useRef, useState } from "react";
 import { PROPERTY } from "../../shared/design";
 import { Drag, type Grab, type Landing, useTouchPresses } from "../drag/Drag";
 import { Layers } from "../layers/Layers";
@@ -8,6 +8,7 @@ import { Card } from "./Card";
 import { RowScreen } from "./MovingRow";
 import { MissingFile } from "./MissingFile";
 import { QuickBar } from "./QuickBar";
+import { Search } from "./Search";
 import { Icon } from "./Icon";
 import { HostContext, type ScreenHost, useHost } from "./host";
 
@@ -75,6 +76,9 @@ function useDrawn(store: ScreenStore) {
 	}, [notice, show]);
 }
 
+/** What a press keeps the ⌘-picked cards on (F145): a card, the menu over them, a carried stack. */
+const KEEPS_PICKS = ".tc-card, .tc-panel, .tc-backdrop, .tc-carried";
+
 /** Where a press keeps the typing going: the field itself, its bar and the bar's panels. */
 const TYPING = ".tc-quick-row, .tc-quick-bar, .tc-quick-panel";
 
@@ -82,6 +86,8 @@ const TYPING = ".tc-quick-row, .tc-quick-bar, .tc-quick-panel";
 function Root({ place, store }: { readonly place: Place; readonly store: ScreenStore }) {
 	/** A task typed: a new one, or one renamed in place (both the plugin's quick entry). */
 	const entering = useScreen((s) => s.entry !== null);
+	const picking = useScreen((s) => s.picking);
+	const [view, setView] = useState<HTMLDivElement | null>(null);
 	const touches = useTouchPresses();
 	useDrawn(store);
 	/**
@@ -90,6 +96,10 @@ function Root({ place, store }: { readonly place: Place; readonly store: ScreenS
 	 */
 	const ending = useRef(false);
 	const pressed = (event: PointerEvent) => {
+		const s = store.getState();
+		/** Any touch of the screen lets the found task's ring go (F256); a press beside the cards lets the ⌘-picked ones go (F145), Select tasks keeps them. */
+		s.touched();
+		if (!s.picking && s.picked.length > 0 && !(event.target as Element).closest?.(KEEPS_PICKS)) s.clearPicks();
 		ending.current = event.pointerType === "touch" && store.getState().entry !== null && !(event.target as Element).closest?.(TYPING);
 	};
 	const clicked = (event: MouseEvent) => {
@@ -100,10 +110,11 @@ function Root({ place, store }: { readonly place: Place; readonly store: ScreenS
 		if (s.entry && !s.entry.stack) s.commitEntry(s.entryText, false);
 	};
 	return (
-		<div className={`task-calendar is-engine is-${place}${entering ? " is-entering" : ""}`} onPointerDownCapture={pressed} onClickCapture={clicked} {...touches} onTouchStart={keepTouch} onTouchMove={keepTouch} onTouchEnd={keepTouch} onClick={(event) => letSelectionGo(event, store)}>
+		<div ref={setView} className={`task-calendar is-engine is-${place}${entering ? " is-entering" : ""}${picking ? " is-selecting" : ""}`} onPointerDownCapture={pressed} onClickCapture={clicked} {...touches} onTouchStart={keepTouch} onTouchMove={keepTouch} onTouchEnd={keepTouch} onClick={(event) => letSelectionGo(event, store)}>
 			<Layout place={place} />
 			<QuickBar reach={reachOf(place)} />
 			<MissingFile />
+			<Search view={view} />
 		</div>
 	);
 }

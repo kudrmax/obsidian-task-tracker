@@ -1,5 +1,6 @@
 import { Notice, Platform, Plugin, type TFile } from "obsidian";
-import { keptDevice } from "../memoryCore";
+import { keptDevice, MemoryModel } from "../memoryCore";
+import { AssistantAnswers } from "../host/AssistantAnswers";
 import { failureText } from "../host/failureText";
 import { ScreenBlock } from "../host/ScreenBlock";
 import { ScreenHost } from "../host/ScreenHost";
@@ -26,21 +27,26 @@ export default class TaskCalendarStand extends Plugin {
 	private step: StandStep = WHOLE_SCREEN;
 
 	override async onload(): Promise<void> {
+		/** The assistant answers on the Mac's desktop only, as the plugin's Claude does; its model is the stand's own, answered by hand. */
+		const model = Platform.isDesktopApp && Platform.isMacOS ? new MemoryModel() : null;
 		const source = await standSource(
 			keptDevice(
 				() => this.app.loadLocalStorage(DEVICE_KEY),
 				(value) => this.app.saveLocalStorage(DEVICE_KEY, value),
 			),
 			(error) => new Notice(failureText(error)),
+			undefined,
+			undefined,
+			model ? { model, more: (service) => new AssistantAnswers(service, () => host.answerPlace()) } : undefined,
 		);
-		const host = new ScreenHost(this, {
+		const host: ScreenHost = new ScreenHost(this, {
 			look: { type: STAND_VIEW, title: "Task Calendar Stand", icon: "flask-conical" },
 			source: async () => source,
 			paint: source.paint,
 			opened: (screen) => screen.store.getState().setStop(this.step.stop),
 		});
 		host.load();
-		const api = standApi(source, () => host.openScreens());
+		const api = standApi(source, () => host.openScreens(), model);
 		(window as unknown as { __tcStand?: StandApi }).__tcStand = api;
 		this.register(() => delete (window as unknown as { __tcStand?: StandApi }).__tcStand);
 

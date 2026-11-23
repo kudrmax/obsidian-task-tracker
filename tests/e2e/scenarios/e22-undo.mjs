@@ -34,7 +34,7 @@ export default {
 		};
 		t.expect(await dim(), "Undo is dim while there is nothing to take back");
 		const capsule = await t.cdp.eval(`(() => { const c = document.querySelector(".task-calendar > .tc-capsule"); const r = c.getBoundingClientRect(); return { width: r.width, height: r.height, cells: [...c.children].map((b) => b.getAttribute("aria-label") + (b.getAttribute("aria-disabled") === "true" ? " off" : "")) }; })()`);
-		t.expect(capsule.width === 80 && capsule.height === 44 && JSON.stringify(capsule.cells) === JSON.stringify(["Undo off", "More off"]), `the capsule is two cells, Undo and «⋯», each off for now: ${JSON.stringify(capsule)}`);
+		t.expect(capsule.width === 80 && capsule.height === 44 && JSON.stringify(capsule.cells) === JSON.stringify(["Undo off", "More"]), `the capsule is two cells, Undo (off with nothing to take back) and «⋯»: ${JSON.stringify(capsule)}`);
 
 		if (item === "outside") {
 			await t.stand(`addFromOutside("now", "Пришла со стороны")`);

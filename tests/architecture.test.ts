@@ -561,7 +561,7 @@ const BY_HAND: readonly { readonly name: string; readonly pattern: RegExp; reado
 	{ name: "the focus moved outside the layers", pattern: /\.focus\s*\(/, allowed: [`${ENGINE}layers/`] },
 	{ name: "an observer", pattern: /\b(?:Resize|Mutation|Intersection)Observer\b/, allowed: [] },
 	{ name: "a scroll set by hand", pattern: /\.scrollTop\s*=(?!=)|\.scrollLeft\s*=(?!=)|\bscrollTo\s*\(|\bscrollBy\s*\(/, allowed: [] },
-	{ name: "a reveal that is not TanStack Virtual's or the browser's", pattern: /\bscrollIntoView\s*\(/, allowed: [`${ENGINE}view/Timeline.tsx`] },
+	{ name: "a reveal that is not TanStack Virtual's or the browser's", pattern: /\bscrollIntoView\s*\(/, allowed: [`${ENGINE}view/Timeline.tsx`, `${ENGINE}view/Search.tsx`] },
 	{ name: "a key handled outside the host's key table", pattern: /\bonKey(?:Down|Up|Press)\b|["']key(?:down|up|press)["']|\bnew Scope\b|\baddCommand\s*\(/, allowed: [] },
 ];
 

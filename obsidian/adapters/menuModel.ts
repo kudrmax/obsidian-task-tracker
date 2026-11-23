@@ -1,4 +1,4 @@
-import type { GroupedList, LocalDate, MenuProject, TaskItem, TaskMenuActionId, TaskMenuModel as CoreMenuModel } from "../../core/application/contracts";
+import type { BulkActionId, GroupedList, LocalDate, MenuProject, TaskItem, TaskMenuActionId, TaskMenuModel as CoreMenuModel } from "../../core/application/contracts";
 import type { ListPlaceId, ProjectPage, TaskMenuModel } from "../ui/engine/port";
 
 /** A Project page in the engine's words, from the core's `MenuProject` as it is. */
@@ -27,5 +27,26 @@ export function menuModelOf(item: TaskItem, model: CoreMenuModel<TaskMenuActionI
 		project: projectPageOf(model.project),
 		peek: model.peek?.description ?? null,
 		subtasks,
+	};
+}
+
+/**
+ * The menu of `count` tasks picked at once (F140–F144) in the engine's words, from the core's bulk menu as it is: its title
+ * «N tasks», the groups the table of task actions gives the bulk menu, the tiles and pages with what is on for them all.
+ */
+export function bulkMenuModelOf(count: number, model: CoreMenuModel<BulkActionId>, names: ListNames, today: LocalDate): TaskMenuModel {
+	return {
+		kind: "task",
+		title: `${count} tasks`,
+		statusTitle: `${count} tasks`,
+		layout: model.layout,
+		levels: model.levels.tiles.map((tile) => ({ prefix: tile.level.prefix, color: tile.level.color, on: tile.on })),
+		labels: model.labels.tiles.map((tile) => ({ name: tile.label.name, color: tile.label.color, on: tile.on })),
+		date: { today, picked: model.dueDate, removable: model.removeDue },
+		places: model.places.flatMap((choice) => (choice.kind === "date" ? [] : [{ id: choice.kind as ListPlaceId, title: names(choice.kind), on: choice.on }])),
+		reminders: [],
+		project: projectPageOf(model.project),
+		peek: null,
+		subtasks: [],
 	};
 }

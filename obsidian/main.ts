@@ -11,6 +11,7 @@ import { ScreenSettingsImpl } from "../core/application/ScreenSettingsImpl";
 import { CorePort } from "./adapters/CorePort";
 import { DeviceSettings } from "./adapters/DeviceSettings";
 import { createServices, type Services, type ServicesHost } from "./compose";
+import { AssistantAnswers } from "./host/AssistantAnswers";
 import { failureText } from "./host/failureText";
 import { NoteBlocks } from "./host/NoteBlocks";
 import { ScreenHost } from "./host/ScreenHost";
@@ -51,7 +52,8 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 		const host = new ScreenHost(this, {
 			look: { type: VIEW_TYPE, title: "Task Calendar", icon: "calendar-days" },
 			source: async () => {
-				const port = await CorePort.open({ ...services, clock: systemClock, onError: (error) => new Notice(failureText(error)), tasksFile: () => this.get().tasksFile });
+				const more = new AssistantAnswers(services.assistant, () => host.answerPlace());
+				const port = await CorePort.open({ ...services, more, clock: systemClock, onError: (error) => new Notice(failureText(error)), tasksFile: () => this.get().tasksFile });
 				return { port, device: new DeviceSettings({ get: () => this.get(), update: (patch) => this.update(patch) }, services.tasks, () => this.get().zoomLevels) };
 			},
 			paint: new ScreenSettingsImpl(this),

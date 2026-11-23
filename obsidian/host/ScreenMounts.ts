@@ -3,7 +3,7 @@ import type { CorePort } from "../adapters/CorePort";
 import type { DeviceSettings } from "../adapters/DeviceSettings";
 import type { TrackpadFingers } from "../ui/engine/gestures/trackpadFollow";
 import type { Place } from "../ui/engine/layout/Layout";
-import { type MountedScreen, mountScreen } from "../ui/engine/mount";
+import { type AnswerHost, type MountedScreen, mountScreen } from "../ui/engine/mount";
 import type { ScreenContext } from "../ui/engine/port";
 import type { Haptics } from "./haptics";
 
@@ -47,6 +47,12 @@ export class ScreenMounts {
 		this.screens.delete(screen);
 		screen.unmount();
 		port.release();
+	}
+
+	/** What the assistant's answer is drawn with (F264): the same parts as every screen. */
+	answerHost(): AnswerHost {
+		const { app, haptics, markdown, notice, desk, device } = this.parts;
+		return { app, haptics, markdown, notice, desk, zoomMost: device.zoom().most };
 	}
 
 	/** Every open screen. */

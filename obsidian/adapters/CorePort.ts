@@ -1,9 +1,9 @@
-import { levelRange, sameSlot, type CalendarService, dividerAt, type DividerStop, LIST_WIDTHS, listShareOf, type ListWidths, listWidths, type Clock, type DayEvents, type DayService, type DropColumn, type DroppedTask, type DropTo, type LocalDate, listCardMenuFrom, type MenuFrom as CoreMenuFrom, originOf, type ScreenReader, type ShownChange, type TaskItem, type TaskService, type UndoOutcome, undoNotice, projectNodeOf, type ProjectsNodeId, type UndoService } from "../../core/application/contracts";
-import type { ScreenContext, Destination, Edge, EntryBar, EntryCommit, EntryDraft, EntryField, LevelRange, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, RenameStart, ScreenData, ScreenPort } from "../ui/engine/port";
+import { type AssistantOffer, type AssistantOutcome, canPick, keyId, levelRange, sameSlot, type CalendarService, dividerAt, type DividerStop, LIST_WIDTHS, listShareOf, type ListWidths, listWidths, type Clock, type DayEvents, type DayService, type DropColumn, type DroppedTask, type DropTo, type LocalDate, listCardMenuFrom, type MenuFrom as CoreMenuFrom, originOf, type ScreenReader, type ShownChange, type TaskItem, type TaskService, type UndoOutcome, undoNotice, projectNodeOf, type ProjectsNodeId, type UndoService } from "../../core/application/contracts";
+import type { Answer, AnswerField, ShownList, FoundGroup, MoreRow, Revealed, TaskMenuModel, ScreenContext, Destination, Edge, EntryBar, EntryCommit, EntryDraft, EntryField, LevelRange, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, RenameStart, ScreenData, ScreenPort } from "../ui/engine/port";
 import { CoreEntry } from "./CoreEntry";
 import { WriteQueue } from "./WriteQueue";
 import { ListCards } from "./ListCards";
-import { menuModelOf } from "./menuModel";
+import { bulkMenuModelOf, menuModelOf } from "./menuModel";
 import { ScreenDrawing, type ScreenSource } from "./ScreenDrawing";
 
 /** The core's services `CorePort` forwards to, as `composeCore` gives them. */
@@ -17,6 +17,20 @@ export interface CorePortServices {
 	readonly onError: (error: unknown) => void;
 	/** Where the tasks file is looked for, as the settings name it: what the screen says when it is missing. */
 	readonly tasksFile: () => string;
+	/** The assistant's rows of «⋯» and their runs, as the host keeps them; none where no model is served. */
+	readonly more?: MoreAssistant;
+}
+
+/**
+ * What «⋯» gets of the assistant (F261–F266): the core's offers for «⋯», whether a run waits, their changes, and a tap on
+ * a row, which the host runs and whose answer it shows wherever Max is by then.
+ */
+export interface MoreAssistant {
+	offers(): readonly AssistantOffer[];
+	readonly busy: boolean;
+	onChange(listener: () => void): () => void;
+	press(actionId: string): void;
+	stop(actionId: string): void;
 }
 
 /**
@@ -31,7 +45,12 @@ type CoreMove =
 /** The context of every task: no project chosen. */
 const EVERY = "";
 
+/** The lists a task is dropped into; Done takes none (F257: its cards are only tapped). */
 const COLUMNS: Readonly<Record<ListId, DropColumn>> = { inbox: "inbox", soon: "soon", day: "day" };
+/** Whether a found task's list draws Done in sight. */
+const SHOWS_DONE: Readonly<Record<ShownList, boolean>> = { done: true, inbox: false, soon: false, day: false };
+/** The list a found task's screen shows it in: Backlog's under Inbox. */
+const FOUND_LIST: Readonly<Record<"done" | "inbox" | "backlog" | "soon", ShownList>> = { done: "done", inbox: "inbox", backlog: "inbox", soon: "soon" };
 
 /**
  * What every screen's port over the core shares (Decision 145): the core's held read of the file, taken anew when the
@@ -58,7 +77,7 @@ class CoreReads {
 	) {
 		this.drawing = new ScreenDrawing(core.tasks, core.days, core.calendars, core.tasksFile);
 		this.queue = new WriteQueue(core.onError);
-		this.offs = [core.tasks.onChange(() => void this.refresh()), core.tasks.onShownChange((change) => this.settingsChanged(change)), core.days.onDayChange(() => void this.refresh()), core.undo.onChange(() => this.changed()), core.calendars.onChange(() => this.forgetEvents())];
+		this.offs = [core.tasks.onChange(() => void this.refresh()), core.tasks.onShownChange((change) => this.settingsChanged(change)), core.days.onDayChange(() => void this.refresh()), core.undo.onChange(() => this.changed()), core.calendars.onChange(() => this.forgetEvents()), ...(core.more ? [core.more.onChange(() => this.changed())] : [])];
 	}
 
 	/** A screen's port in `context`, told of every change from now on. */
@@ -151,6 +170,8 @@ export class CorePort implements ScreenPort {
 	private readonly listeners = new Set<() => void>();
 	private readonly cache = new Map<string, ScreenData>();
 	private readonly entry: CoreEntry;
+	/** Done is drawn: the screen stands at it. */
+	private done = false;
 
 	/** @internal Made by `CoreReads.view`. */
 	constructor(
@@ -211,13 +232,13 @@ export class CorePort implements ScreenPort {
 
 	read(dayOffset: number, context?: ScreenContext): ScreenData {
 		this.use(context);
-		const key = `${dayOffset}@${this.now().minute}#${this.context}`;
+		const key = `${dayOffset}@${this.now().minute}#${this.context}${this.done ? "+done" : ""}`;
 		let data = this.cache.get(key);
 		if (!data) {
 			if (this.cache.size > 16) this.cache.clear();
 			const date = this.dateOf(dayOffset);
 			const screen = this.reader.screen(date);
-			data = this.drawing.draw({ date, screen, lists: this.drawing.listsOf(screen), events: this.eventsOf(date) });
+			data = this.drawing.draw({ date, screen, lists: this.drawing.listsOf(screen), events: this.eventsOf(date), done: this.done });
 			this.cache.set(key, data);
 		}
 		return data;
@@ -438,6 +459,116 @@ export class CorePort implements ScreenPort {
 		return this.reader.item(id) ? id : null;
 	}
 
+	async search(query: string): Promise<readonly FoundGroup[]> {
+		const groups = await this.core.tasks.search(query);
+		const paths = this.context !== EVERY;
+		return groups.map((group) => ({
+			title: this.core.tasks.listName(group.list),
+			hits: group.hits.map((hit) => ({
+				id: hit.item.id,
+				face: this.drawing.face(hit.item, null),
+				title: hit.title,
+				line: hit.project ? { kind: "project", parts: hit.project } : hit.description ? { kind: "notes", parts: hit.description } : null,
+				path: paths ? hit.projectPath : null,
+			})),
+		}));
+	}
+
+	async reveal(id: string): Promise<Revealed | null> {
+		const item = this.reader.item(id) ?? this.shared.reader(EVERY).item(id);
+		if (!item) return null;
+		const screen = await this.core.tasks.reveal(item);
+		const filter = this.filter();
+		const hides = filter !== null && (await this.core.tasks.filterHides(item, filter.node));
+		await this.refresh();
+		const context = { project: hides ? null : (filter?.project ?? null) };
+		if (screen.kind === "day") return { list: "day", day: this.core.days.offset(this.core.days.today(), screen.date), context };
+		const list = FOUND_LIST[screen.list];
+		return { list, day: null, context: { ...context, done: SHOWS_DONE[list] } };
+	}
+
+	moreRows(): readonly MoreRow[] {
+		return (this.core.more?.offers() ?? []).map((offer) => ({ id: offer.actionId, label: offer.label, icon: offer.icon, running: offer.running }));
+	}
+
+	busy(): boolean {
+		return this.core.more?.busy ?? false;
+	}
+
+	pressMore(id: string): void {
+		const assistant = this.core.more;
+		const offer = assistant?.offers().find((row) => row.actionId === id);
+		if (!assistant || !offer) return;
+		if (offer.running) assistant.stop(id);
+		else assistant.press(id);
+	}
+
+	canPick(list: ShownList): boolean {
+		return canPick(list === "done" ? "done" : COLUMNS[list]);
+	}
+
+	bulkMenu(ids: readonly string[], dayOffset: number): TaskMenuModel {
+		const day = this.dateOf(dayOffset);
+		const screen = this.reader.screen(day);
+		const items = ids.flatMap((id) => this.reader.item(id) ?? []);
+		const model = this.core.tasks.bulkMenu(items.map((item) => ({ item, from: listCardMenuFrom(item) })), { today: this.core.days.today(), day, offer: screen.offer, projects: screen.projectTree });
+		return bulkMenuModelOf(items.length, model, (list) => this.core.tasks.listName(list), this.core.days.today());
+	}
+
+	async actAll(ids: readonly string[], action: MenuAction): Promise<readonly (string | null)[]> {
+		const items = ids.flatMap((id) => this.reader.item(id) ?? []);
+		const keys = items.map((item) => item.key);
+		const tasks = this.core.tasks;
+		switch (action.kind) {
+			case "status":
+				await tasks.pickStatus(keys, action.id);
+				break;
+			case "priority":
+				await tasks.togglePriority(keys, action.prefix);
+				break;
+			case "label":
+				await tasks.toggleLabel(keys, action.name);
+				break;
+			case "date":
+				await (action.date === null ? tasks.removeDue(keys) : tasks.postponeAll(keys, action.date));
+				break;
+			case "sendTo":
+				await tasks.sendTo(keys, { kind: action.list });
+				break;
+			case "project":
+				await (action.name === null ? tasks.setProject(keys, null) : tasks.toggleProject(keys, action.name));
+				break;
+			case "newProject":
+				await tasks.newProject(action.name, keys);
+				break;
+			case "delete":
+				await tasks.removeAll(keys);
+				break;
+			default:
+				return ids;
+		}
+		await this.refresh();
+		return ids.map((id) => (this.reader.item(id) ? id : null));
+	}
+
+	carriedWith(lifted: string, picked: readonly string[]): readonly string[] {
+		const item = this.reader.item(lifted);
+		if (!item) return [];
+		const byKey = new Map(picked.flatMap((id) => {
+			const found = this.reader.item(id);
+			return found ? [[keyId(found.key), id] as const] : [];
+		}));
+		return this.core.tasks.carried(item.key, picked.flatMap((id) => this.reader.item(id)?.key ?? [])).flatMap((key) => byKey.get(keyId(key)) ?? []);
+	}
+
+	/** What an assistant's run came to in the engine's words (F264, F265): the chosen task's card as the list draws it; `field`, the answer's field for what the model missed. */
+	answerOf(outcome: Exclude<AssistantOutcome, { kind: "stopped" }>, field: AnswerField | null): Answer {
+		if (outcome.kind === "failed") return { kind: "failed", title: outcome.title, words: outcome.words };
+		const face = this.drawing.face(outcome.task, null);
+		const { over, title } = outcome.card;
+		return { kind: "task", title: outcome.title, face: { ...face, title: over ?? title, step: over === null ? null : title }, notice: outcome.notice, note: outcome.note, field };
+	}
+
 	/** The day `dayOffset` days from today, as the core steps days. */
 	private dateOf(dayOffset: number): LocalDate {
 		return this.core.days.step(this.core.days.today(), dayOffset);
@@ -469,18 +600,28 @@ export class CorePort implements ScreenPort {
 		if (!item || !from) return null;
 		const day = this.dateOf(to.dayOffset);
 		if (to.at !== undefined && to.end !== undefined) return { kind: "slot", key: item.key, slot: this.core.days.boundary().slotAt(day, to.at, to.end), day };
-		const tasks = [{ key: item.key, from }];
+		const tasks = [{ key: item.key, from }, ...this.droppedAlong(to.along ?? [])];
 		if (to.at !== undefined) return { kind: "drop", tasks, to: { kind: "time", start: to.at }, day };
 		const column = COLUMNS[to.list];
-		if (!this.core.tasks.opensGaps([from], column, day)) return { kind: "drop", tasks, to: { kind: "place", column, place: null }, day };
+		if (!this.core.tasks.opensGaps(tasks.map((task) => task.from), column, day)) return { kind: "drop", tasks, to: { kind: "place", column, place: null }, day };
 		const place = new ListCards(this.drawing.column(this.reader.screen(day), column), id).dropOf(to);
 		if (place === null) return null;
 		return place === "home" ? { kind: "home" } : { kind: "drop", tasks, to: { kind: "place", column, place }, day };
 	}
 
+	/** The picked tasks carried along with another (F149), each from where it stands. */
+	private droppedAlong(ids: readonly string[]): DroppedTask[] {
+		return ids.flatMap((id) => {
+			const item = this.reader.item(id);
+			const from = item && originOf(item);
+			return item && from ? [{ key: item.key, from }] : [];
+		});
+	}
+
 	/** The screen drawn in `context` (every task when absent) from now on. */
 	private use(context: ScreenContext | undefined): void {
 		this.context = context?.project ?? EVERY;
+		this.done = context?.done === true;
 	}
 
 	/** The project the screen is filtered by, as the quick entry and a drop take it; null for every task. */

@@ -31,6 +31,10 @@ export interface ObsidianEditorProps {
 	readonly onTab?: (shift: boolean) => void;
 	/** ⌥Tab: the new task's field switches to a new section's name and back (the bar's New section). */
 	readonly onNewSection?: () => void;
+	/** ⌘Enter: held over Obsidian's own ⌘Enter while the field has the focus (the answer's Save and ask again, F312). */
+	readonly onModEnter?: () => void;
+	/** The arrows down (1) and up (-1): the search walks its rows with them (F251). */
+	readonly onArrow?: (step: 1 | -1) => void;
 	/** The text changed as typed. */
 	readonly onChange?: (text: string) => void;
 	/**
@@ -49,11 +53,11 @@ export interface ObsidianEditorProps {
  * scope stands over Obsidian's hotkeys (Decision 133). Made once as it mounts, given
  * the focus, destroyed as it goes.
  */
-export function ObsidianEditor({ text, className, placeholder, priority = null, lines = false, onEnter, onEscape, onTab, onNewSection, onChange, onLeave }: ObsidianEditorProps) {
+export function ObsidianEditor({ text, className, placeholder, priority = null, lines = false, onEnter, onEscape, onTab, onNewSection, onModEnter, onArrow, onChange, onLeave }: ObsidianEditorProps) {
 	const { app, sourcePath } = useHost();
 	const container = useRef<HTMLDivElement>(null);
-	const handlers = useRef({ onEnter, onEscape, onTab, onNewSection, onChange });
-	handlers.current = { onEnter, onEscape, onTab, onNewSection, onChange };
+	const handlers = useRef({ onEnter, onEscape, onTab, onNewSection, onModEnter, onArrow, onChange });
+	handlers.current = { onEnter, onEscape, onTab, onNewSection, onModEnter, onArrow, onChange };
 	const editorRef = useRef<EmbeddedEditor | null>(null);
 	useEffect(() => {
 		if (!container.current) return;
@@ -61,11 +65,17 @@ export function ObsidianEditor({ text, className, placeholder, priority = null, 
 			extensions: [...(lines ? [] : [EditorState.transactionFilter.of(oneLine)]), ...(placeholder ? [hint(placeholder)] : [])],
 			onChange: () => handlers.current.onChange?.(editor.value),
 			/** While it has the focus no hotkey of Obsidian's runs on what is typed, nor a command that changes the line (F194, Decision 133). */
-			ownScope: { hotkeys: onNewSection ? [{ modifiers: ["Alt"], key: "Tab", run: () => handlers.current.onNewSection?.() }] : [] },
+			ownScope: {
+				hotkeys: [
+					...(onNewSection ? [{ modifiers: ["Alt"] as const, key: "Tab", run: () => handlers.current.onNewSection?.() }] : []),
+					...(onModEnter ? [{ modifiers: ["Mod"] as const, key: "Enter", run: () => handlers.current.onModEnter?.() }] : []),
+				],
+			},
 			keys: [
 				...(handlers.current.onEnter ? [{ key: "Enter", run: () => handlers.current.onEnter?.(editor.value) }] : []),
 				{ key: "Escape", run: () => handlers.current.onEscape() },
 				...(onTab ? [{ key: "Tab", run: () => handlers.current.onTab?.(false), shift: () => handlers.current.onTab?.(true) }] : []),
+				...(onArrow ? [{ key: "ArrowDown", run: () => handlers.current.onArrow?.(1) }, { key: "ArrowUp", run: () => handlers.current.onArrow?.(-1) }] : []),
 			],
 		});
 		editorRef.current = editor;

@@ -30,6 +30,8 @@ export class FollowPager {
 	private moved = 0;
 
 	private readonly last: number;
+	/** The first place a stroke may reach: Inbox's, or Done's while the screen stands at Done (F257). */
+	first = 0;
 
 	constructor(stop: number, last: number) {
 		this.stop = stop;
@@ -61,7 +63,7 @@ export class FollowPager {
 		const drawn = Math.sign(this.moved);
 		const flick = Math.abs(speed) >= FLICK_SPEED ? Math.sign(speed) : 0;
 		const step = flick !== 0 ? (flick === drawn ? flick : 0) : nearest(at - this.stop, widthOf(scale));
-		this.stop = Math.min(this.last, Math.max(0, this.origin - 1, Math.min(this.origin + 1, this.stop + step)));
+		this.stop = Math.min(this.last, Math.max(this.first, this.origin - 1, Math.min(this.origin + 1, this.stop + step)));
 		this.before = this.origin;
 		this.origin = null;
 		return this.stop;
@@ -69,7 +71,7 @@ export class FollowPager {
 
 	private bounded(at: number): number {
 		const origin = this.origin ?? this.stop;
-		return Math.min(this.last, origin + 1, Math.max(0, origin - 1, at));
+		return Math.min(this.last, origin + 1, Math.max(this.first, origin - 1, at));
 	}
 }
 

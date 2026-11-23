@@ -14,7 +14,8 @@ import type { ListId } from "../port";
  */
 export const PlusButton = memo(function PlusButton({ shown }: { readonly shown: readonly ListId[] }) {
 	const api = useScreenApi();
-	const open = useScreen((s) => s.entry !== null);
+	/** A field open, or Select tasks on: the circle for the picked tasks stands in its place (F136). */
+	const open = useScreen((s) => s.entry !== null || s.picking);
 	const inList = useScreen((s) => s.plusAt !== null);
 	if (inList) return RING;
 	return (

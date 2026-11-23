@@ -1,7 +1,8 @@
 import type { App } from "obsidian";
 import { detectHaptics, type HapticsHost } from "../../../obsidian/host/haptics";
 import { ScreenMounts } from "../../../obsidian/host/ScreenMounts";
-import { keptDevice } from "../../../obsidian/memoryCore";
+import { keptDevice, MemoryModel } from "../../../obsidian/memoryCore";
+import { AssistantAnswers } from "../../../obsidian/host/AssistantAnswers";
 import { standApi } from "../../../obsidian/stand/standApi";
 import { type StandSource, standSource } from "../../../obsidian/stand/standSource";
 import { STAND_STEPS, type StandStep, WHOLE_SCREEN } from "../../../obsidian/stand/steps";
@@ -52,7 +53,7 @@ class StandPage {
 	private beside: HTMLElement | null = null;
 	/** The notices shown, in order, as Obsidian's `Notice` would show them. */
 	private readonly notices: string[] = [];
-	private readonly mounts: ScreenMounts;
+	readonly mounts: ScreenMounts;
 
 	constructor(
 		private readonly leaf: HTMLElement,
@@ -112,14 +113,14 @@ class StandPage {
 		const held = [...(event.metaKey || event.ctrlKey ? ["Mod"] : []), ...(event.shiftKey ? ["Shift"] : []), ...(event.altKey ? ["Alt"] : [])];
 		const key = KEYS.find((k) => k.key.toLowerCase() === event.key.toLowerCase() && k.modifiers.length === held.length && k.modifiers.every((m) => held.includes(m)));
 		const screen = this.leafScreen?.store.getState();
-		if (!key || !screen || !takesKeys(screen)) return;
+		if (!key || !screen || !takesKeys(screen, key)) return;
 		key.run(screen);
 		event.preventDefault();
 	};
 
-	api() {
+	api(model: MemoryModel | null) {
 		return {
-			...standApi(this.source, () => this.mounts.open),
+			...standApi(this.source, () => this.mounts.open, model),
 			step: (id: string) => this.showStep(id),
 			notices: () => [...this.notices],
 			openNote: () => this.openNote(),
@@ -146,10 +147,18 @@ document.body.classList.add(params.get("theme") === "light" ? "theme-light" : "t
 const leaf = document.createElement("div");
 leaf.className = "workspace-leaf-content";
 document.body.appendChild(leaf);
-void standSource(keptDevice(() => load(DEVICE_KEY), (value) => save(DEVICE_KEY, value)), (error) => console.error("write failed", error)).then((source) => {
+/** The assistant answers on the desktop only, as the plugin's Claude does (F266); its model is the page's own, answered by the checks. */
+const model = phone ? null : new MemoryModel();
+let shown: { readonly stand: StandPage; readonly source: StandSource } | null = null;
+const place = async () => {
+	if (!shown) throw new Error("the page is not up yet");
+	return { port: shown.source.port, host: shown.stand.mounts.answerHost(), doc: document };
+};
+void standSource(keptDevice(() => load(DEVICE_KEY), (value) => save(DEVICE_KEY, value)), (error) => console.error("write failed", error), undefined, undefined, model ? { model, more: (service) => new AssistantAnswers(service, place) } : undefined).then((source) => {
 	showScreenPaint(source.paint.get());
 	const stand = new StandPage(leaf, source);
+	shown = { stand, source };
 	window.addEventListener("keydown", stand.onKey);
-	(window as unknown as { __tcStand: ReturnType<StandPage["api"]> }).__tcStand = stand.api();
+	(window as unknown as { __tcStand: ReturnType<StandPage["api"]> }).__tcStand = stand.api(model);
 	stand.showLeaf(WHOLE_SCREEN);
 });

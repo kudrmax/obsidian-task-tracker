@@ -3,9 +3,9 @@ import { type CSSProperties, memo, useCallback, useContext, useEffect, useLayout
 import { PROPERTY } from "../../shared/design";
 import { PLUS, SortableList, SortableRow, useListTarget } from "../drag/Drag";
 import { descendantsOf } from "../drag/tree";
-import { pressedIn, useMenuFrom } from "../layers/Layers";
+import { pressedIn, useMenuFrom, useOriginSetter } from "../layers/Layers";
 import { ROW_PX } from "../layout/columns";
-import type { EntryField as Field, ListId, Row } from "../port";
+import type { EntryField as Field, ListId, Row, ShownList } from "../port";
 import { DayContext, useData, useScreen, useScreenApi } from "../store";
 import { Card } from "./Card";
 import { MovingRow, MovingRows } from "./MovingRow";
@@ -22,12 +22,12 @@ const OVERSCAN = 6;
  * screen's context is the list's React key (spec, principle 3): another project mounts the list anew, drawn in place, its
  * rows coming in without motion and its scroll at the top.
  */
-export const TaskList = memo(function TaskList({ list }: { readonly list: ListId }) {
+export const TaskList = memo(function TaskList({ list }: { readonly list: ShownList }) {
 	const context = useScreen((s) => s.contextSeq);
 	return <ContextList key={context} list={list} context={context} />;
 });
 
-const ContextList = memo(function ContextList({ list, context }: { readonly list: ListId; readonly context: number }) {
+const ContextList = memo(function ContextList({ list, context }: { readonly list: ShownList; readonly context: number }) {
 	const api = useScreenApi();
 	const allRows = useData((d) => d.lists[list].rows);
 	const readRows = useData((d) => d.lists[list].rows, true);
@@ -115,16 +115,18 @@ const ContextList = memo(function ContextList({ list, context }: { readonly list
 	}, [reveal?.seq]);
 
 	const items = virtualizer.getVirtualItems();
+	/** Its cards show Select tasks' circle (the port's, F135): a list's, not Done's. */
+	const pickable = useMemo(() => api.getState().canPick(list), [api, list]);
 	/** Whether the pointer that pressed last was a mouse: the phone has no double click. */
 	const mouse = useRef(false);
 	return (
 		<div
-			className="tc-list"
+			className={`tc-list${pickable ? " is-pickable" : ""}`}
 			ref={setRoom}
 			data-list={list}
 			onPointerDown={(event) => void (mouse.current = event.pointerType === "mouse")}
 			/** A mouse's double click on the list's free room, between or under the cards, opens a new task at its end (F67); a card, a header or a field keeps its own. */
-			onDoubleClick={(event) => mouse.current && !(event.target as Element).closest(".tc-drag-source, .tc-group-head, .tc-quick-row") && api.getState().openAtEnd(list)}
+			onDoubleClick={(event) => mouse.current && !(event.target as Element).closest(".tc-drag-source, .tc-group-head, .tc-quick-row") && typedInto(list) && api.getState().openAtEnd(list)}
 		>
 			<div className="tc-list-items" style={{ height: virtualizer.getTotalSize() }}>
 				<div className="tc-list-block" style={{ transform: `translateY(${items[0]?.start ?? 0}px)` }}>
@@ -148,7 +150,7 @@ const ContextList = memo(function ContextList({ list, context }: { readonly list
 									);
 								return (
 									<MovingRow key={row.id} id={row.id} context={context} index={item.index} measure={virtualizer.measureElement} order={order} carried={lifted === row.id} fresh={fresh.has(row.id)} className="tc-list-item">
-										<RowFace row={row.kind === "task" && row.id === lifted && liftedDepth !== null ? { ...row, depth: liftedDepth } : row} />
+										<RowFace list={list} row={row.kind === "task" && row.id === lifted && liftedDepth !== null ? { ...row, depth: liftedDepth } : row} />
 									</MovingRow>
 								);
 							})}
@@ -161,8 +163,10 @@ const ContextList = memo(function ContextList({ list, context }: { readonly list
 });
 
 /** A row's face: a section's header, or a task's card as a drag source that opens its menu when tapped. */
-const RowFace = memo(function RowFace({ row }: { readonly row: Row }) {
+const RowFace = memo(function RowFace({ list, row }: { readonly list: ShownList; readonly row: Row }) {
+	const api = useScreenApi();
 	const openMenuFrom = useMenuFrom();
+	const standBy = useOriginSetter();
 	if (row.kind === "section")
 		return (
 			<SortableRow id={row.id}>
@@ -174,12 +178,23 @@ const RowFace = memo(function RowFace({ row }: { readonly row: Row }) {
 	return (
 		<SortableRow
 			id={row.id}
-			onTap={(target, held) => openMenuFrom(row.id, "list", pressedIn(target, "[data-id]"), null, !held)}
+			still={list === DONE}
+			onTap={(target, held, keys = NO_KEYS) => {
+				const card = pressedIn(target, "[data-id]");
+				standBy(card);
+				if (!api.getState().tapPick(row.id, list, keys)) openMenuFrom(row.id, "list", card, null, !held);
+			}}
 		>
 			<Card id={row.id} depth={row.depth} />
 		</SortableRow>
 	);
 });
+
+/** Done's cards are tapped for their menu, never carried (F257). */
+const DONE: ShownList = "done";
+const NO_KEYS = { mod: false, shift: false } as const;
+/** A list a task is typed into: any but Done. */
+const typedInto = (list: ShownList): list is ListId => list !== DONE;
 
 /** A row of the list as drawn: the list's own, or the new task's field. */
 type Drawn = Row | { readonly kind: "entry"; readonly id: string; readonly depth: number } | { readonly kind: "plus"; readonly id: string };
@@ -189,7 +204,7 @@ type Drawn = Row | { readonly kind: "entry"; readonly id: string; readonly depth
  * rename's in its card's place, the card hidden wherever the field stands (moved by the bar's place). Its level is no
  * deeper than one under the task above it.
  */
-function withEntry(all: readonly Drawn[], list: ListId, field: Field | null): readonly Drawn[] {
+function withEntry(all: readonly Drawn[], list: ShownList, field: Field | null): readonly Drawn[] {
 	if (!field) return all;
 	const entry = field.at;
 	const { list: where, section, before } = entry;

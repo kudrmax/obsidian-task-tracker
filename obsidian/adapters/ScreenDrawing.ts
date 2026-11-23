@@ -5,13 +5,17 @@ import type { AllDayEvent, Block, CardFace, DayEvent, EventPaint, ListData, List
 export interface ScreenSource {
 	readonly date: LocalDate;
 	readonly screen: ScreenView;
-	readonly lists: Readonly<Record<ListId, ColumnList>>;
+	readonly lists: Readonly<Record<ColumnId, ColumnList>>;
 	readonly events: DayEvents | null;
+	/** Done is drawn: the screen stands at it (F257); else its list is drawn empty. */
+	readonly done?: boolean;
 	/** A task held by a dot, drawn at the span the core stretches it to instead of its own. */
 	readonly held?: { readonly id: string; readonly start: number; readonly end: number | null };
 }
 
-const LIST_COLUMNS: Readonly<Record<ListId, "inbox" | "soon" | "day">> = { inbox: "inbox", soon: "soon", day: "day" };
+/** The lists that are columns of the core (`columnView`); Done is the file's Done in its order. */
+type ColumnId = ListId;
+const LIST_COLUMNS: Readonly<Record<ColumnId, "inbox" | "soon" | "day">> = { inbox: "inbox", soon: "soon", day: "day" };
 
 /**
  * The core's answers in the engine's words (`engine/port.ts`): each list as `columnView` reads it, each card as its
@@ -31,7 +35,7 @@ export class ScreenDrawing {
 		return this.tasks.columnView(screen, column);
 	}
 
-	listsOf(screen: ScreenView): Readonly<Record<ListId, ColumnList>> {
+	listsOf(screen: ScreenView): Readonly<Record<ColumnId, ColumnList>> {
 		return { inbox: this.column(screen, LIST_COLUMNS.inbox), soon: this.column(screen, LIST_COLUMNS.soon), day: this.column(screen, LIST_COLUMNS.day) };
 	}
 
@@ -44,6 +48,7 @@ export class ScreenDrawing {
 				inbox: this.list(this.tasks.listName("inbox"), lists.inbox, screen, cards, null),
 				soon: this.list(this.tasks.listName("soon"), lists.soon, screen, cards, null),
 				day: this.list(title, lists.day, screen, cards, date),
+				done: { title: this.tasks.listName("done"), rows: source.done ? screen.done.map((item) => this.row(item, cards)) : [] },
 			},
 			cards,
 			missing: screen.missing ? { text: `No tasks file at ${this.tasksFile()}`, create: "Create file" } : null,
@@ -76,6 +81,11 @@ export class ScreenDrawing {
 			step: item.card.over === null ? null : item.card.title,
 			folded: item.collapsed,
 		};
+	}
+
+	private row(item: TaskItem, cards: Record<string, CardFace>): Row {
+		cards[item.id] = this.face(item, null);
+		return { kind: "task", id: item.id, depth: 0 };
 	}
 
 	private list(title: string, column: ColumnList, screen: ScreenView, cards: Record<string, CardFace>, day: LocalDate | null): ListData {

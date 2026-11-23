@@ -36,6 +36,8 @@ export const DESIGN = {
 	menuGap: 12,
 	/** What a menu, the copy over it and a grown card keep from the window's edges. */
 	wholeMargin: 10,
+	/** The desktop's search panel hangs this far under the view's top, and keeps as far from its bottom (the design's «Поиск»). */
+	searchTop: 16,
 } as const;
 
 export type DesignMeasure = keyof typeof DESIGN;
@@ -61,6 +63,7 @@ export const DESIGN_TOKENS: Readonly<Record<DesignMeasure, string>> = {
 	gripEndLeft: "--tc-grip-end-left",
 	menuGap: "--tc-space-12",
 	wholeMargin: "--tc-space-10",
+	searchTop: "--tc-space-16",
 };
 
 /** The custom properties the code sets on elements; styles.css does the arithmetic with them. */

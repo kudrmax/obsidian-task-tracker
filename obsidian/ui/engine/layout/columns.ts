@@ -1,10 +1,13 @@
 import { DESIGN } from "../../shared/design";
-import type { ListId } from "../port";
+import type { ListId, ShownList } from "../port";
 import type { Screen } from "../store";
 
-/** Where the ribbon stands: Inbox–Soon, Soon–the day, the day–its calendar. */
-export type Stop = "inbox" | "soon" | "calendar";
+/** Where the ribbon stands: Inbox–Soon, Soon–the day, the day–its calendar; Done–Inbox while the search keeps Done in sight (F257). */
+export type Stop = "done" | "inbox" | "soon" | "calendar";
+/** The stops the ribbon goes through; Done, left of them all, only a found task of Done brings the screen to. */
 const STOPS: readonly Stop[] = ["inbox", "soon", "calendar"];
+/** Done's place: a column left of the strip's first (the design's «Колонка Done»: the whole strip one column on). */
+const DONE = -1;
 
 /** Where a screen is mounted: Obsidian's leaf (the main screen, a pop-out) or a note's block. */
 export type Place = "leaf" | "note";
@@ -12,8 +15,8 @@ export type Place = "leaf" | "note";
 /** A row counts as this tall until it is drawn and measured, by the virtualizer and the drag alike: a card and its gap at the default size. */
 export const ROW_PX = DESIGN.cardHeight + DESIGN.cardGap;
 
-/** The strip of columns the ribbon slides, left to right. */
-export type Column = ListId | "timeline";
+/** The strip of columns the ribbon slides, left to right; Done stands left of it. */
+export type Column = ShownList | "timeline";
 const STRIP: readonly Column[] = ["inbox", "soon", "day", "timeline"];
 
 /** The ribbon's window shows two columns side by side. */
@@ -25,13 +28,14 @@ export const COLUMN_SHARE = 100 / STRIP.length;
 
 /** The two columns a stop shows, left and right. */
 export function shownAt(stop: Stop): readonly [Column, Column] {
+	if (stop === "done") return ["done", "inbox"];
 	const at = stop === "inbox" ? 0 : stop === "soon" ? 1 : 2;
 	return [STRIP[at], STRIP[at + 1]];
 }
 
 /** What each stop shows (the one place it is said): the lists a screen mounted at `place` shows at `stop`; a note's block shows its Inbox alone. */
 export function columnsOf(place: Place, stop: Stop): readonly ListId[] {
-	return place === "note" ? ["inbox"] : shownAt(stop).filter((column): column is ListId => column !== "timeline");
+	return place === "note" ? ["inbox"] : shownAt(stop).filter((column): column is ListId => column !== "timeline" && column !== "done");
 }
 
 /** The lists a screen mounted at `place` can bring into sight: the ribbon turns to any; a note's block shows its Inbox. */
@@ -39,14 +43,18 @@ export function reachOf(place: Place): readonly ListId[] {
 	return [...new Set(STOPS.flatMap((stop) => columnsOf(place, stop)))];
 }
 
-/** The stop that brings `list` into sight from `stop`: the same while it shows it, else the last of the lists' own stops (Inbox–Soon, Soon–day) that does. */
-export function stopShowing(stop: Stop, list: ListId): Stop {
+/** The stop that brings `list` into sight from `stop`: the same while it shows it, else the last of the lists' own stops (Inbox–Soon, Soon–day) that does; Done's own for Done. */
+export function stopShowing(stop: Stop, list: ShownList): Stop {
+	if (list === "done") return "done";
 	if (columnsOf("leaf", stop).includes(list)) return stop;
 	return [...STOPS].reverse().find((other) => other !== "calendar" && columnsOf("leaf", other).includes(list)) ?? stop;
 }
 
 /** How far the strip stands from its start at a stop, in columns: where the ribbon's gestures take it. */
-export const offsetOf = (stop: Stop): number => STRIP.indexOf(shownAt(stop)[0]);
+export const offsetOf = (stop: Stop): number => (stop === "done" ? DONE : STRIP.indexOf(shownAt(stop)[0]));
+
+/** The first place the ribbon may stand at from `stop`: Done's while it stands there, else Inbox's; a swipe from Done leaves it for good. */
+export const firstPlace = (stop: Stop): number => (stop === "done" ? DONE : 0);
 
 /** The ribbon's last stop, the day and its calendar, in places: past it the places are the days, one a day. */
 export const CALENDAR = offsetOf("calendar");
@@ -55,9 +63,9 @@ export const CALENDAR = offsetOf("calendar");
 export const placeOf = (stop: Stop, dayOffset: number): number => offsetOf(stop) + (stop === "calendar" ? Math.max(0, dayOffset) : 0);
 
 /** The ribbon stood at `place` (never before the first): the stop, and past the calendar the day, the screen shows from now on. */
-export function standAt(screen: Pick<Screen, "setStop" | "showDay">, place: number): void {
-	const at = Math.max(0, place);
-	screen.setStop(STOPS.find((stop) => offsetOf(stop) === Math.min(at, CALENDAR)) ?? "calendar");
+export function standAt(screen: Pick<Screen, "stop" | "setStop" | "showDay">, place: number): void {
+	const at = Math.max(firstPlace(screen.stop), place);
+	screen.setStop(at === DONE ? "done" : (STOPS.find((stop) => offsetOf(stop) === Math.min(at, CALENDAR)) ?? "calendar"));
 	screen.showDay(Math.max(0, at - CALENDAR));
 }
 

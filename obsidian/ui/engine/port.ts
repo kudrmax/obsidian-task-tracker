@@ -16,6 +16,8 @@ export type { DividerStop, EntryBarGroup, FieldActionId, FieldGroup, ListWidths,
 
 /** A list the screen shows: Inbox, Soon, the shown day's. */
 export type ListId = "inbox" | "soon" | "day";
+/** Every list drawn: Done too, left of Inbox, while the search keeps it in sight (F257); its cards are tapped, never carried or typed into. */
+export type ShownList = ListId | "done";
 
 /** A card as it is drawn. */
 export interface CardFace {
@@ -121,7 +123,7 @@ export interface Now {
 
 /** What the screen shows for a day `offset` days from today. */
 export interface ScreenData {
-	readonly lists: Readonly<Record<ListId, ListData>>;
+	readonly lists: Readonly<Record<ShownList, ListData>>;
 	readonly cards: Readonly<Record<string, CardFace>>;
 	readonly day: DayData;
 	/** No tasks file (F6): what the screen says instead of its lists, and the button that creates the file; null while there is one. */
@@ -158,6 +160,8 @@ export interface Destination {
 	readonly end?: number | null;
 	/** When given, a new task goes as the last subtask of this task, wherever it stands (Add subtask on a calendar's task). */
 	readonly under?: string;
+	/** The other picked tasks carried with this one (F149): they go there too, in one write. */
+	readonly along?: readonly string[];
 	/** A new task written to Backlog, which the screen doesn't show: its field stays where it stands. */
 	readonly backlog?: boolean;
 	/** A new task written at the end of this list (the day's of `dayOffset`), which the screen as laid out can't show: its field stays where it stands. */
@@ -327,6 +331,70 @@ export type MenuAction =
  */
 export interface ScreenContext {
 	readonly project: string | null;
+	/** Done is drawn left of Inbox: the search brought the screen there (F257). Absent: it is not. */
+	readonly done?: boolean;
+}
+
+/** A piece of a found task's words; `match`, a piece the search found (drawn picked out). */
+export interface FoundPart {
+	readonly text: string;
+	readonly match: boolean;
+}
+
+/**
+ * A task the search found (the core's `SearchHit`, F252–F254): its card's face; its title in pieces (none when the
+ * title has no match); the line under it where the search found the query, its project's name or its notes; where it
+ * stands among the projects while the screen is drawn in one («Дружба», «iPhone»), null otherwise.
+ */
+export interface Found {
+	readonly id: string;
+	readonly face: CardFace;
+	readonly title: readonly FoundPart[];
+	readonly line: { readonly kind: "project" | "notes"; readonly parts: readonly FoundPart[] } | null;
+	readonly path: readonly string[] | null;
+}
+
+/** The tasks the search found in one list, under the list's name, the best first. */
+export interface FoundGroup {
+	readonly title: string;
+	readonly hits: readonly Found[];
+}
+
+/**
+ * Where a found task shows once the screen goes to it (the core's `reveal`, F255): its list (Backlog's under Inbox, a
+ * subtask's where its task stands), the day of a task on a day, and the context it shows in: a project chosen that hides
+ * it is let go.
+ */
+export interface Revealed {
+	readonly list: ShownList;
+	/** The day it stands on, in days from today: shown beside its calendar; null for a list of no day. */
+	readonly day: number | null;
+	readonly context: ScreenContext;
+}
+
+/**
+ * The field for what the model missed under an answer (F312): its words, the write of its text into the task the model
+ * chose (resolving to the line to show when it failed, null once written), and the same button pressed again.
+ */
+export interface AnswerField {
+	readonly placeholder: string;
+	readonly save: string;
+	readonly saveAndAsk: string;
+	write(text: string): Promise<string | null>;
+	again(): void;
+}
+
+/** What an assistant's run came to, ready to draw (the core's `AssistantOutcome` but Stop, which shows nothing). */
+export type Answer =
+	| { readonly kind: "task"; readonly title: string; readonly face: CardFace; readonly notice: string | null; readonly note: string; readonly field: AnswerField | null }
+	| { readonly kind: "failed"; readonly title: string; readonly words: string };
+
+/** A row of «⋯» the assistant offers (the core's `AssistantOffer`, F261–F263): Best task, or Stop while its run waits, its icon a spinning ring then. */
+export interface MoreRow {
+	readonly id: string;
+	readonly label: string;
+	readonly icon: string;
+	readonly running: boolean;
 }
 
 /** Every task: no project chosen. */
@@ -421,6 +489,24 @@ export interface ScreenPort {
 	 * write, so a menu left open on its page goes on with it), null once it is gone.
 	 */
 	act(id: string, action: MenuAction, from: MenuFrom, dayOffset: number): Promise<string | null>;
+	/** The tasks whose words hold `query`, grouped by list (the core's `search`, F252–F254); an empty query finds nothing. */
+	search(query: string): Promise<readonly FoundGroup[]>;
+	/** The found task `id` shown (the core's `reveal`, F255): its tasks unfold over it, and where the screen goes to show it. Null once it is gone. */
+	reveal(id: string): Promise<Revealed | null>;
+	/** «⋯»'s rows the assistant offers now (F261); none where no model is served (F266). */
+	moreRows(): readonly MoreRow[];
+	/** Something «⋯» started still runs: its dots are a spinning ring (F262). A change of it or of the rows fires `subscribe`. */
+	busy(): boolean;
+	/** A tap on an assistant's row of «⋯»: its run starts, or stops while it runs (F263); its answer comes as the host shows it. */
+	pressMore(id: string): void;
+	/** Whether a card of `list` can be picked for actions on several tasks (the core's `canPick`, F135): a list's, never Done's or the calendar's. */
+	canPick(list: ShownList): boolean;
+	/** The menu for the tasks `ids` picked at once (the core's `bulkMenu`, F140–F144), opened over the screen of the day `dayOffset`. */
+	bulkMenu(ids: readonly string[], dayOffset: number): TaskMenuModel;
+	/** Writes what was tapped in the bulk menu on every picked task, in one write; resolves to their ids as the file now has them (null for one gone). */
+	actAll(ids: readonly string[], action: MenuAction, dayOffset: number): Promise<readonly (string | null)[]>;
+	/** The picked tasks that go along when `lifted`, one of them, is carried (the core's `carried`, F149): the others, but those under another picked one. */
+	carriedWith(lifted: string, picked: readonly string[]): readonly string[];
 	/** The day list's width beside the calendar (the core's `listWidth`, core audit pair E8): its bounds on a phone, the width `share` draws in a window `viewWidth` wide. */
 	readonly listBounds: { readonly min: number; readonly max: number };
 	listWidths(share: number, viewWidth: number, dividerWidth: number): ListWidths;

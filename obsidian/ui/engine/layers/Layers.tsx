@@ -69,6 +69,12 @@ function useOrigin(): MutableRefObject<MenuOrigin> {
 	return origin;
 }
 
+/** Says what a menu about to open stands by (the menu for several picked tasks opened by a click on one of them, F139). */
+export function useOriginSetter(): (element: Element) => void {
+	const origin = useOrigin();
+	return useCallback((element) => void (origin.current = { element, look: null }), [origin]);
+}
+
 /** Where the menu last opened from, for the menu to stand over it. */
 export function useMenuOrigin(): MenuOrigin {
 	return useOrigin().current;

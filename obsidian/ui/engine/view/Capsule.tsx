@@ -1,24 +1,91 @@
-import { memo } from "react";
+import { memo, useState } from "react";
+import { isIconName } from "../../shared/icons";
+import { useOriginSetter } from "../layers/Layers";
+import { Popover } from "../layers/Popover";
 import { useScreen, useScreenApi } from "../store";
+import { useHost } from "./host";
 import { Icon } from "./Icon";
+import { RowGroup, type RowSpec } from "./MenuRows";
 
 /**
  * The capsule opposite the plus (the design's «Отмена» and «Поиск»; F259, F267): two cells, Undo taking the screen's last
- * action back, its icon dim while there is none, and «⋯», off until its menu comes (step 7, Decision 132). It hides with
- * the plus: while a task is typed, a card or the plus is carried.
+ * action back, its icon dim while there is none, and «⋯» opening its menu over the capsule (F261), its dots a spinning
+ * ring while the assistant's run waits (F262). In Select tasks the same capsule holds the cross that ends it and how many
+ * are picked (F136, the design's «Выбор задач»). It hides with the plus: while a task is typed, a card or the plus is
+ * carried.
  */
 export const Capsule = memo(function Capsule() {
 	const api = useScreenApi();
 	const canUndo = useScreen((s) => s.canUndo);
+	const busy = useScreen((s) => s.busy);
+	const picking = useScreen((s) => s.picking);
+	const count = useScreen((s) => s.picked.length);
 	const hidden = useScreen((s) => s.entry !== null || s.gesture === "drag");
+	const [capsule, setCapsule] = useState<HTMLDivElement | null>(null);
+	const standBy = useOriginSetter();
 	return (
-		<div className={`tc-capsule${hidden ? " is-hidden" : ""}`}>
-			<button type="button" className={`tc-btn is-icon is-plain tc-undo${canUndo ? "" : " is-off"}`} aria-label="Undo" title="Undo" aria-disabled={!canUndo} onClick={() => api.getState().undo()}>
-				<Icon name="undo" />
-			</button>
-			<button type="button" className="tc-btn is-icon is-plain tc-more-open is-off" aria-label="More" title="More" aria-disabled>
-				<Icon name="more" />
-			</button>
-		</div>
+		<>
+			<div ref={setCapsule} className={`tc-capsule${hidden || picking ? " is-hidden" : ""}`}>
+				<button type="button" className={`tc-btn is-icon is-plain tc-undo${canUndo ? "" : " is-off"}`} aria-label="Undo" title="Undo" aria-disabled={!canUndo} onClick={() => api.getState().undo()}>
+					<Icon name="undo" />
+				</button>
+				<button type="button" className={`tc-btn is-icon is-plain tc-more-open${busy ? " is-busy" : ""}`} aria-label="More" title="More" onClick={() => api.getState().openSheet("more")}>
+					{busy ? <span className="tc-spinner" /> : <Icon name="more" />}
+				</button>
+			</div>
+			<div className={`tc-capsule tc-select-capsule${hidden || !picking ? " is-hidden" : ""}`}>
+				<button type="button" className="tc-btn is-icon is-plain tc-select-exit" aria-label="Stop selecting" title="Stop selecting" onClick={() => api.getState().setPicking(false)}>
+					<Icon name="cross" />
+				</button>
+				<button type="button" className={`tc-btn is-icon is-plain tc-select-num${count === 0 ? " is-off" : ""}`} aria-label="Picked tasks" aria-disabled={count === 0} onClick={(event) => {
+						standBy(event.currentTarget);
+						api.getState().openBulk();
+					}}>
+					{count}
+				</button>
+			</div>
+			<MoreMenu capsule={capsule} />
+		</>
+	);
+});
+
+/**
+ * «⋯»'s menu over the capsule (the design's «Выбор задач»: two rows, then the assistant's): Search, Select tasks, and the
+ * rows the assistant offers, Best task with its sparkles or Stop with the spinning ring while its run waits (F261–F263).
+ * While it is open the assistant's rows follow the port: a run that ends turns Stop back into Best task.
+ */
+function MoreMenu({ capsule }: { readonly capsule: Element | null }) {
+	const api = useScreenApi();
+	const { layerRoot } = useHost();
+	const open = useScreen((s) => s.sheet === "more");
+	const offered = useScreen((s) => s.moreRows);
+	const rows: RowSpec[] = [
+		{ label: "Search", icon: "search", onPick: () => api.getState().openSheet("search") },
+		{ label: "Select tasks", icon: "select", onPick: () => api.getState().setPicking(true) },
+		...offered.map((row): RowSpec => ({ label: row.label, ...(row.running ? { busy: true } : isIconName(row.icon) ? { icon: row.icon } : {}), className: "tc-assistant-row", onPick: () => api.getState().pressMore(row.id) })),
+	];
+	return (
+		<Popover open={open} onClose={() => api.getState().openSheet(null)} root={layerRoot} reference={capsule} placement="top-start" label="More" className="is-more">
+			<RowGroup rows={rows} />
+		</Popover>
+	);
+}
+
+/**
+ * The circle in the plus's place in Select tasks (the design's «Выбор задач», `SelectRow` variant 2): «⋯» on the accent,
+ * opening the menu for every picked task over it; dim while none is picked (F136, F137).
+ */
+export const PickedButton = memo(function PickedButton() {
+	const api = useScreenApi();
+	const none = useScreen((s) => s.picked.length === 0);
+	const hidden = useScreen((s) => !s.picking || s.gesture === "drag");
+	const standBy = useOriginSetter();
+	return (
+		<button type="button" data-picked-menu="" className={`tc-btn is-round is-accent tc-select-menu${none ? " is-off" : ""}${hidden ? " is-hidden" : ""}`} aria-label="Actions for picked tasks" aria-disabled={none} onClick={(event) => {
+				standBy(event.currentTarget);
+				api.getState().openBulk();
+			}}>
+			<Icon name="more" />
+		</button>
 	);
 });

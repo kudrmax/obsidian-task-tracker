@@ -118,7 +118,8 @@ export const TaskMenu = memo(function TaskMenu() {
 	const api = useScreenApi();
 	const { layerRoot } = useHost();
 	const origin = useMenuOrigin();
-	const layer = useScreen((s) => s.layer);
+	/** The menu for several picked tasks is `BulkMenu`'s. */
+	const layer = useScreen((s) => (s.layer?.many ? null : s.layer));
 	/** A field typed in the menu itself: a stack's card renamed in its place, or a new subtask at the stack's end (F108). */
 	const typing = useScreen((s) => (s.entry?.stack ? (s.entry.renaming === null ? "subtask" : "rename") : null));
 	const last = useRef<{ layer: Layer; reference: Element | null; look: BlockLook | null; seq: number } | null>(null);
@@ -166,7 +167,7 @@ export const TaskMenu = memo(function TaskMenu() {
 });
 
 /** The groups of a task's menu on its page (the menu itself, Pick a date, the Reminder kinds, the projects and a new one's name), all under its copy. */
-function taskGroups(layer: Layer, typing: boolean, model: TaskMenuModel, steps: MenuSteps): readonly ReactNode[] {
+export function taskGroups(layer: Layer, typing: boolean, model: TaskMenuModel, steps: MenuSteps): readonly ReactNode[] {
 	const { pick } = steps;
 	/** Typing in the menu: the panel gives its room to the field (the plugin's `giveToField`). */
 	if (typing) return [];

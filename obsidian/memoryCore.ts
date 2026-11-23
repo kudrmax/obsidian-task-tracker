@@ -1,5 +1,5 @@
 import { composeCore, type Core } from "../core/application/composeCore";
-import { type CalendarEvent, type ScreenSettingsStore, TasksFileMissingError } from "../core/application/contracts";
+import { type CalendarEvent, type HostModels, type ModelQuestion, type ModelReply, type ModelTransport, type ScreenSettingsStore, type StopSignal, TasksFileMissingError } from "../core/application/contracts";
 import { ScreenSettingsImpl } from "../core/application/ScreenSettingsImpl";
 import type { CalendarFile } from "../core/application/calendarFile";
 import type { EventFile } from "../core/application/EventSource";
@@ -117,7 +117,7 @@ export interface MemoryCore {
  * The core over `text` as its tasks file, `events` as the Google calendar's, the settings' defaults over `settings`; the
  * device's Projects screen in `projectsScreen` (kept in memory when left out).
  */
-export function memoryCore(text: string | null, clock: Clock, settings: Partial<TaskCalendarSettings> = {}, events: readonly CalendarEvent[] = [], projectsScreen?: ProjectsScreenStore): MemoryCore {
+export function memoryCore(text: string | null, clock: Clock, settings: Partial<TaskCalendarSettings> = {}, events: readonly CalendarEvent[] = [], projectsScreen?: ProjectsScreenStore, models?: HostModels): MemoryCore {
 	const file = new MemoryTasksFile(text);
 	const calendar = new MemoryEvents(events, clock);
 	const store = new MemorySettings({ ...DEFAULT_SETTINGS, ...settings });
@@ -135,8 +135,57 @@ export function memoryCore(text: string | null, clock: Clock, settings: Partial<
 		work: { export: () => undefined },
 		isPhone: () => false,
 		...(projectsScreen && { projectsScreen }),
+		...(models && { models }),
 	});
 	return { core, file, events: calendar, settings: store, screenSettings: new ScreenSettingsImpl(store), clock };
+}
+
+/**
+ * A model in memory, the stand's (the plan: the assistant calls an LLM, never run against Max's data in tests — faked): «claude» served
+ * on the desktop, each question waiting until the stand answers it by hand, naming one of its candidates by title or
+ * failing; Stop and the timeout end it as Claude Code's transport does.
+ */
+export class MemoryModel implements ModelTransport {
+	private waiting: { readonly question: ModelQuestion; readonly reply: (reply: ModelReply) => void } | null = null;
+
+	/** The models the stand's core serves: Claude, by this transport. */
+	readonly models: HostModels = { ids: ["claude"], transport: () => async () => this };
+
+	ask(question: ModelQuestion, _settings: Readonly<Record<string, string>>, stop: StopSignal): Promise<ModelReply> {
+		return new Promise((resolve) => {
+			this.waiting = { question, reply: resolve };
+			stop.onStop((reason) => {
+				this.waiting = null;
+				resolve({ ok: false, failure: { kind: reason === "user" ? "stopped" : "timeout", detail: `stopped: ${reason}` } });
+			});
+		});
+	}
+
+	/** Whether a question waits for its answer. */
+	get asked(): boolean {
+		return this.waiting !== null;
+	}
+
+	/** The waiting question answered: the candidate titled `title`, with `reason`. */
+	answer(title: string, reason: string): void {
+		const waiting = this.take();
+		const candidates = (JSON.parse(waiting.question.input) as { candidates: { ref: string; title: string }[] }).candidates;
+		const chosen = candidates.find((candidate) => candidate.title === title);
+		if (!chosen) throw new Error(`no candidate «${title}» among ${candidates.map((c) => c.title).join(", ")}`);
+		waiting.reply({ ok: true, answer: { taskRef: chosen.ref, reason } });
+	}
+
+	/** The waiting question failed as an offline Claude fails. */
+	fail(): void {
+		this.take().reply({ ok: false, failure: { kind: "offline", detail: "the stand's model is offline" } });
+	}
+
+	private take(): NonNullable<MemoryModel["waiting"]> {
+		const waiting = this.waiting;
+		if (!waiting) throw new Error("no question waits");
+		this.waiting = null;
+		return waiting;
+	}
 }
 
 /**

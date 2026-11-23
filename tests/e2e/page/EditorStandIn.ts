@@ -55,7 +55,7 @@ export class EmbeddedEditor {
 	}
 
 	private readonly onKey = (event: KeyboardEvent): void => {
-		const hotkey = this.hooks.ownScope?.hotkeys.find((k) => k.key === event.key && k.modifiers.includes("Alt") === event.altKey && k.modifiers.includes("Shift") === event.shiftKey);
+		const hotkey = this.hooks.ownScope?.hotkeys.find((k) => k.key === event.key && k.modifiers.includes("Alt") === event.altKey && k.modifiers.includes("Shift") === event.shiftKey && k.modifiers.includes("Mod") === (event.metaKey || event.ctrlKey));
 		if (hotkey && !event.isComposing) {
 			hotkey.run();
 			event.preventDefault();
