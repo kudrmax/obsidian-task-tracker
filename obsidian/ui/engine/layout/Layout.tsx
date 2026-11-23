@@ -14,6 +14,7 @@ import { TaskList } from "../view/TaskList";
 import { TaskMenu } from "../view/TaskMenu";
 import { ViewButton } from "../view/ViewButton";
 import { Timeline } from "../view/Timeline";
+import { Wheel } from "../view/Wheel";
 import { COLUMN_SHARE, columnsOf, dayColumnWidth, drawnWidths, type Place, ruleShift, type Stop, STRIP_WIDTH } from "./columns";
 
 export { type Place, reachOf } from "./columns";
@@ -55,9 +56,12 @@ function ModeColumns({ mode }: { readonly mode: ViewMode }) {
 	const { win, fingers } = useHost();
 	const { at, turn, bind } = useFollowRibbon(ribbon, calendar, win, fingers, mode === "twoColumns");
 	return (
-		<div className={`tc-ribbon is-${mode}`} ref={ribbon} {...bind()}>
-			<DayTurnContext.Provider value={turn}>{mode === "allColumns" ? <AllColumns ribbon={ribbon} calendar={calendar} /> : <RibbonStrip at={at} rows={mode === "rows"} ribbon={ribbon} calendar={calendar} />}</DayTurnContext.Provider>
-		</div>
+		<>
+			<div className={`tc-ribbon is-${mode}`} ref={ribbon} {...bind()}>
+				<DayTurnContext.Provider value={turn}>{mode === "allColumns" ? <AllColumns ribbon={ribbon} calendar={calendar} /> : <RibbonStrip at={at} rows={mode === "rows"} ribbon={ribbon} calendar={calendar} />}</DayTurnContext.Provider>
+			</div>
+			{mode === "twoColumns" ? <Wheel at={at} /> : null}
+		</>
 	);
 }
 

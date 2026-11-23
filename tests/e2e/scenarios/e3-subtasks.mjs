@@ -59,12 +59,17 @@ export default {
 		inbox = levels(await file(), "Inbox");
 		t.expect(inbox[0] === "Позвонить маме:0" && inbox[1] === "Купить молоко:1", `under a task, a swipe right: its subtask (the hand far right on the way counts for nothing): ${JSON.stringify(inbox.slice(0, 3))}`);
 
+		/** Inbox is the upper half of its column (F27): on the phone the card is scrolled into its middle first, as a person would. */
+		await t.cdp.eval(`(() => { [...document.querySelectorAll('[data-list="inbox"] .tc-card[data-id]')].find((c) => c.querySelector(".tc-card-title")?.textContent === "Забронировать отель")?.scrollIntoView({ block: "center" }); return 1; })()`);
+		await t.sleep(300);
 		const hotel = await cardBy(t, "Забронировать отель", "inbox");
 		await carry(t, hotel, once(async () => ({ x: hotel.x - 30, y: hotel.y + 2 })));
 		await t.sleep(500);
 		inbox = levels(await file(), "Inbox");
 		t.expect(inbox.includes("Забронировать отель:0"), `the last subtask, a swipe left in place: a task: ${JSON.stringify(inbox.slice(2, 9))}`);
 
+		await t.cdp.eval(`(() => { document.querySelector('[data-list="inbox"]').scrollTop = 0; return 1; })()`);
+		await t.sleep(300);
 		const trip = await cardBy(t, "Спланировать отпуск", "inbox");
 		await carry(t, trip, once(async () => {
 			const parcel = await cardBy(t, "Забрать посылку", "soon");

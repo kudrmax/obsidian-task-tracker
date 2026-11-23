@@ -131,6 +131,9 @@ export class DayLine {
 	}
 }
 
+/** The ribbon stood at a stop's place (the wheel's tap and turn): that stop, today's list beside it, on the line it rests on. */
+export const standAt = (screen: Pick<Screen, "setStop" | "showDay">, place: number): void => DayLine.plain(0).standAt(screen, place);
+
 /** Where the ribbon stands at a stop and day on the line it rests on: the stops' offsets, past the calendar one place a day. */
 export const placeOf = (stop: Stop, dayOffset: number): number => DayLine.plain(dayOffset).placeOf(stop, dayAtStop(stop, dayOffset));
 

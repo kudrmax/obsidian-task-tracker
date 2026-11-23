@@ -1,5 +1,6 @@
-import { motion, type MotionValue, useTransform } from "motion/react";
-import type { CSSProperties, ReactNode } from "react";
+import { motion, type MotionValue, useMotionValueEvent, useTransform } from "motion/react";
+import type { CSSProperties, HTMLAttributes, ReactNode } from "react";
+import { PROPERTY } from "../../shared/design";
 
 /**
  * The strip of columns, `width` percent of the window, each column `share` percent of it, standing where the ribbon puts it.
@@ -35,3 +36,26 @@ export function StripRule({ at, leftAt, children }: { readonly at: MotionValue<n
 		</motion.div>
 	);
 }
+
+/**
+ * The wheel at the screen's foot, turning with the ribbon (the design's «Колёсико»: «лента колёсика крутится синхронно»):
+ * its place, `--tc-wheel-at` (0 Inbox–Soon to `last` the calendar; the days past it stand at the calendar), drawn by Motion
+ * from the ribbon's place each frame. While a finger holds it, it stands where the finger has it (`held`); let go, it
+ * rolls to the place it landed on (`settling`, the stylesheet's glide) and follows the ribbon again once the ribbon
+ * stands there too (`onSettled`).
+ */
+export function StripWheel({ at, last, held, settling, onSettled, className, children, ...rest }: { readonly at: MotionValue<number>; readonly last: number; readonly held: number | null; readonly settling: number | null; readonly onSettled: () => void; readonly className: string; readonly children: ReactNode } & Omit<HTMLAttributes<HTMLDivElement>, "className" | "children">) {
+	const turned = useTransform(at, (columns) => Math.min(last, Math.max(0, columns)));
+	useMotionValueEvent(turned, "change", (now) => {
+		if (settling !== null && Math.abs(now - settling) < ARRIVED) onSettled();
+	});
+	const shown = held ?? settling;
+	return (
+		<motion.div className={`${className}${settling !== null ? " is-settling" : ""}`} style={{ [PROPERTY.wheelAt]: shown ?? turned } as unknown as CSSProperties} {...(rest as object)}>
+			{children}
+		</motion.div>
+	);
+}
+
+/** The ribbon is at the wheel's place once this near it. */
+const ARRIVED = 0.01;

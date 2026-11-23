@@ -54,7 +54,9 @@ export default {
 		await t.sleep(500);
 		const inbox = await list("Inbox");
 		t.expect(inbox.indexOf(second) === inbox.indexOf(target) - 1, `Soon → Inbox: in the file it stands before «${target}»: ${JSON.stringify(inbox)}`);
-		t.expect(JSON.stringify(await t.oracle.cards("inbox")) === JSON.stringify(inbox), `Soon → Inbox: the screen shows the file's Inbox: ${JSON.stringify(await t.oracle.cards("inbox"))}`);
+		/** Inbox is the upper half of its column (F27): the cards in sight are the file's Inbox from its top. */
+		const inboxShown = await t.oracle.cards("inbox");
+		t.expect(inboxShown.length > 0 && JSON.stringify(inboxShown) === JSON.stringify(inbox.slice(0, inboxShown.length)), `Soon → Inbox: the screen shows the file's Inbox: ${JSON.stringify(inboxShown)}`);
 		t.expect(inboxFaults.length === 0, `Soon → Inbox frames: ${JSON.stringify(inboxFaults.slice(0, 4))}`);
 		t.expect((await t.cdp.eval(`document.querySelectorAll(".tc-card[data-id]").length`)) > 0, "the screen still stands");
 		await t.cdp.eval(`(async () => { window.__tcStand.step("whole-screen"); await new Promise((r) => setTimeout(r, 600)); return 1; })()`);

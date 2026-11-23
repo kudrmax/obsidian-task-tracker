@@ -35,16 +35,17 @@ export class ScreenDrawing {
 		return { inbox: this.column(screen, LIST_COLUMNS.inbox), backlog: this.column(screen, LIST_COLUMNS.backlog), soon: this.column(screen, LIST_COLUMNS.soon), day: this.column(screen, LIST_COLUMNS.day) };
 	}
 
-	draw(source: ScreenSource): ScreenData {
+	/** The words of an empty list's plate: the core's, under a filter (`ViewChoice.plates`, `ProjectFilter.emptyLabel`); none without one. */
+	draw(source: ScreenSource, plate: string | null = null): ScreenData {
 		const { date, screen, lists } = source;
 		const cards: Record<string, CardFace> = {};
 		const title = this.dayTitle(date);
 		return {
 			lists: {
-				inbox: this.list(this.tasks.listName("inbox"), lists.inbox, screen, cards, null),
-				backlog: this.list(this.tasks.listName("backlog"), lists.backlog, screen, cards, null),
-				soon: this.list(this.tasks.listName("soon"), lists.soon, screen, cards, null),
-				day: this.list(title, lists.day, screen, cards, date),
+				inbox: this.list(this.tasks.listName("inbox"), lists.inbox, screen, cards, null, plate),
+				backlog: this.list(this.tasks.listName("backlog"), lists.backlog, screen, cards, null, plate),
+				soon: this.list(this.tasks.listName("soon"), lists.soon, screen, cards, null, plate),
+				day: this.list(title, lists.day, screen, cards, date, plate),
 			},
 			cards,
 			missing: screen.missing ? { text: `No tasks file at ${this.tasksFile()}`, create: "Create file" } : null,
@@ -56,6 +57,7 @@ export class ScreenDrawing {
 				allDay: (source.events?.allDay ?? []).map((event) => this.allDay(event)),
 				hours: this.days.hourLabels(),
 				opensAt: this.days.openAt(this.days.step(this.days.today(), 1)).minute,
+				alert: source.events?.alert ?? "none",
 			},
 		};
 	}
@@ -79,7 +81,7 @@ export class ScreenDrawing {
 		};
 	}
 
-	private list(title: string, column: ColumnList, screen: ScreenView, cards: Record<string, CardFace>, day: LocalDate | null): ListData {
+	private list(title: string, column: ColumnList, screen: ScreenView, cards: Record<string, CardFace>, day: LocalDate | null, plate: string | null): ListData {
 		const rows: Row[] = [];
 		for (const group of column.groups) {
 			if (group.header) rows.push({ kind: "section", id: group.id, title: group.name ?? screen.offer.ungrouped, tasks: group.items.length, ungrouped: group.name === null, menu: group.menu && { rename: group.menu.rename, remove: group.menu.remove } });
@@ -88,7 +90,7 @@ export class ScreenDrawing {
 				rows.push({ kind: "task", id: item.id, depth: level });
 			}
 		}
-		return { title, rows };
+		return { title, rows, plate: rows.length === 0 ? plate : null };
 	}
 
 	private block(item: TaskItem, date: LocalDate, cards: Record<string, CardFace>, held: ScreenSource["held"]): Block {
