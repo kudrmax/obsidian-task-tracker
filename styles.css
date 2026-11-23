@@ -1164,6 +1164,8 @@ body:not(.is-mobile) .tc-stage-col.is-timeline > .tc-stage-head { padding: 0 var
 /* No tasks file (F6): what the screen says instead of its lists, over them, and the button that creates the file. */
 .tc-missing { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--tc-space-12); padding: var(--tc-space-16); background: var(--tc-bg); color: var(--tc-muted); text-align: center; }
 .task-calendar button.tc-btn.tc-missing-btn { height: var(--tc-card-h); padding: 0 var(--tc-space-16); border-radius: var(--tc-radius-card); background: var(--tc-card-bg); color: var(--tc-text); font-size: var(--tc-font-body); }
+/* Without a file there is nothing to add or take back: the plus and the capsule go, as the old screen hid its controls. */
+.task-calendar:has(> .tc-missing) > :is(button.tc-plus, .tc-plus-ring, .tc-capsule) { display: none; }
 .cm-sizer:has(> .tc-project-block) > .cm-contentContainer { flex-grow: 0; }
 .tc-project-block { margin-top: calc(var(--tc-block-top) - var(--tc-block-lift)); margin-bottom: calc(var(--tc-chrome-room) + var(--tc-block-top)); max-height: var(--tc-block-max-h); box-sizing: border-box; border: var(--tc-hairline) solid var(--tc-line); border-radius: var(--tc-radius-block); overflow: hidden; outline: none; }
 .tc-project-block > .task-calendar.is-note { --tc-chrome-room: var(--tc-block-inset); --tc-foot-gap: 0px; --tc-keyboard-room: 0px; --tc-foot-fade-day: calc(var(--tc-switch-row) + var(--tc-chrome-room) + var(--tc-space-8)); }
