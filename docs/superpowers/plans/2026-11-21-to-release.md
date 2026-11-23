@@ -30,7 +30,7 @@ And the project's:
 
 ## How each batch runs
 
-Max, 2026-11-23: «уменьшим количество бесполезных проверок… проверять будем, но чтобы это не было с перебором». So: targeted scenarios while building; one `reviewer` pass per batch, no re-review after its fixes unless they were large; the full `npm test` and full e2e run once, at the merge into the integration branch.
+Max, 2026-11-23: «уменьшим количество бесполезных проверок… я имел в виду лишнее РУЧНОЕ тестирование. Сами тесты пусть запускает когда хочет». So: automated tests (unit, e2e, Max's recordings) run as often as useful; checking by hand in the test Obsidian only where something visible changed, once per batch, the changed screens only; the full by-eye pass on both platforms and themes is step 9's acceptance.
 
 A batch is one row of a step, at most ~10 F-items. It starts from the integration branch with `origin/master` merged. It ends with: a «F → scenario → status» table in the spec; every e2e scenario and every recording of Max's run again; a `reviewer` pass whose first question is «a second path?», plus jscpd; the docs updated; merged back.
 
