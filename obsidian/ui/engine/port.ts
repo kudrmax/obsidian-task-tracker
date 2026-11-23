@@ -1,11 +1,11 @@
-import type { DividerStop, EntryBarGroup, FieldActionId, FieldGroup, ListWidths, MenuActionGroup, MenuStatusId, TaskActionId, TaskMenuActionId, TaskMenuGroup, UndoOutcome } from "../../../core/application/contracts";
+import type { DividerStop, EntryBarGroup, FieldActionId, FieldGroup, ListWidths, MenuActionGroup, MenuStatusId, RepeatChange, RepeatDraft, RepeatKind, RepeatRule, RepeatUnit, TaskActionId, TaskMenuActionId, TaskMenuGroup, UndoOutcome, Weekday } from "../../../core/application/contracts";
 
 /**
  * The task actions are the core's (`core/application/taskActions.ts`, task actions spec): the ids, the groups and the
  * offered actions a surface lays out. The port answers with them; the engine keeps only each action's look and handler,
  * an exhaustive `Record` over the surface's ids. Types only: the engine runs no code of the core.
  */
-export type { DividerStop, EntryBarGroup, FieldActionId, FieldGroup, ListWidths, MenuActionGroup, MenuStatusId, TaskActionId, TaskMenuActionId, TaskMenuGroup, UndoOutcome };
+export type { DividerStop, EntryBarGroup, FieldActionId, FieldGroup, ListWidths, MenuActionGroup, MenuStatusId, RepeatChange, RepeatDraft, RepeatKind, RepeatRule, RepeatUnit, TaskActionId, TaskMenuActionId, TaskMenuGroup, UndoOutcome, Weekday };
 
 /**
  * The screen's one port (docs/superpowers/specs/2026-11-18-ui-engine.md, «The owners», «Data and writes»): what the screen
@@ -177,6 +177,8 @@ export interface EntryDraft {
 	/** The description's line under the title: what is typed in it while it is open, null while it is closed. */
 	readonly descriptionLine: string | null;
 	readonly section: boolean;
+	/** The rule the task is written with (the bar's Repeat), none without one. */
+	readonly repeat: RepeatRule | null;
 }
 
 /**
@@ -211,6 +213,26 @@ export interface EntryCommit {
 	readonly draft: EntryDraft;
 }
 
+/** The words of the Repeat page (the core's `REPEAT_WORDS`): its kinds, «Every», its units, the weekdays short and whole, Monday first, and Remove repeat. */
+export interface RepeatWords {
+	readonly kinds: Readonly<Record<RepeatKind, string>>;
+	readonly every: string;
+	readonly units: Readonly<Record<RepeatUnit, string>>;
+	readonly weekdays: readonly { readonly short: string; readonly name: string }[];
+	readonly remove: string;
+}
+
+/**
+ * The Repeat page (F202–F204; the design's «Повторы», variant А), the menu's and the bar's alike: the core's draft of the
+ * rule (what is offered, what is chosen, whether − may go down, whether Remove repeat shows), a monthly schedule's day in
+ * words («On the 5th»), the page's words. A tap is the core's `editRepeat` through the port (`repeatEdit`).
+ */
+export interface RepeatPage {
+	readonly draft: RepeatDraft;
+	readonly monthDay: string;
+	readonly words: RepeatWords;
+}
+
 /**
  * The bar of a task being typed (F184–F189, the core's `EntryState`), as the port answers for the field where it stands
  * and what is set and typed: its buttons group by group as the table of task actions places them (`bar`, each with
@@ -229,6 +251,8 @@ export interface EntryBar {
 	readonly places: readonly { readonly id: PlaceId; readonly title: string | null; readonly on: boolean }[];
 	/** The month page of Date: today, and the day the field stands on (`YYYY-MM-DD`). */
 	readonly date: { readonly today: string; readonly picked: string | null };
+	/** The Repeat panel as it opens: the field's rule, a new one drawn from the day of the field's place (F204). */
+	readonly repeat: RepeatPage;
 }
 
 /** A project of a Project page (the bar's and the menu's), the tree in its order (the core's `MenuProjectOption`): how deep, whether the task has it, whether it can't be picked (a folder it hasn't). */
@@ -289,6 +313,8 @@ export interface TaskMenuModel {
 	readonly project: ProjectPage;
 	/** The Reminder page's kinds, the task's own checked. */
 	readonly reminders: readonly { readonly kind: ReminderKind; readonly checked: boolean }[];
+	/** The Repeat page as it opens: the task's rule, a new one drawn from the task's day (the core's `repeatOf`, F204). */
+	readonly repeat: RepeatPage;
 	/** The start of the task's description, over its copy (markdown); null without one. */
 	readonly peek: string | null;
 	/** A calendar's task: its open subtasks, standing between its copy and the panel (F107); none elsewhere. */
@@ -313,6 +339,11 @@ export type MenuAction =
 	/** A list tile of Pick a date's page: the task goes there as it is (the core's `sendTo`). */
 	| { readonly kind: "sendTo"; readonly list: ListPlaceId }
 	| { readonly kind: "reminder"; readonly reminder: ReminderKind }
+	/**
+	 * The Repeat page's rule as the menu closes (null: Remove repeat): written once, unless it is the task's own again (the
+	 * core's `RepeatPage`, F120).
+	 */
+	| { readonly kind: "repeat"; readonly rule: RepeatRule | null }
 	/** A project of the Project page: on beside the task's others, or off (the core's `toggleProject`); null: No project, all off. */
 	| { readonly kind: "project"; readonly name: string | null }
 	/** «New project…» named `name` (F220): made at the tree's top unless the tree has it, and the task gets it (the core's `newProject`). */
@@ -401,6 +432,8 @@ export interface ScreenPort {
 	 * (a name of nothing, a folder's).
 	 */
 	newProject(name: string): Promise<string | null>;
+	/** The Repeat page after a tap on it (the core's `editRepeat`); null when the tap changes nothing or would make a rule the file can't take. */
+	repeatEdit(page: RepeatPage, change: RepeatChange): RepeatPage | null;
 	/** What the menu of the task or event `id` offers, opened `from` there on the screen of the day `dayOffset` days from today. */
 	menu(id: string, from: MenuFrom, dayOffset: number): MenuModel;
 	/**

@@ -6,6 +6,7 @@ import { useHost } from "./host";
 import { Icon } from "./Icon";
 import { NewProjectRow, ProjectNameField, ProjectRows } from "./Projects";
 import { keepsTyping } from "./QuickAdd";
+import { RepeatPanel } from "./Repeat";
 
 /** The Date tile's word: the bar's own, as its icon is (the port names the lists only). */
 const DATE_WORD = "Date";
@@ -41,7 +42,7 @@ const BAR_BUTTONS: Readonly<Record<FieldActionId, (action: BarAction, steps: Bar
 	),
 	label: () => null,
 	project: (action, { toggle, hold }) => <BarButton key="project" action={action} cls="tc-bar-project" label="Project" title="Project" icon="project" hold={hold("project")} onPress={() => toggle("project")} />,
-	repeat: (action, { close }) => <BarButton key="repeat" action={action} cls="tc-bar-repeat" label="Repeat" title="Repeat" icon="repeat" onPress={close} />,
+	repeat: (action, { toggle, hold }) => <BarButton key="repeat" action={action} cls="tc-bar-repeat" label="Repeat" title="Repeat" icon="repeat" hold={hold("repeat")} onPress={() => toggle("repeat")} />,
 	description: (action, { api, close }) => <BarButton key="description" action={action} cls="tc-bar-description" label="Notes" title="Notes" icon="description" onPress={() => (close(), api.getState().openDescription())} />,
 	pickDate: (action, { bar, toggle, hold }) =>
 		bar.where ? (
@@ -72,6 +73,7 @@ export const QuickBar = memo(function QuickBar({ reach }: { readonly reach: read
 	const { desk, layerRoot } = useHost();
 	const entry = useScreen((s) => s.entry);
 	const bar = useScreen((s) => s.bar);
+	const repeat = useScreen((s) => s.entryRepeat);
 	const panel = useScreen((s) => s.entryPanel);
 	const setPanel = (next: PanelKind | null) => api.getState().showEntryPanel(next);
 	const [anchors, setAnchors] = useState<Partial<Record<PanelKind, HTMLElement | null>>>({});
@@ -111,6 +113,9 @@ export const QuickBar = memo(function QuickBar({ reach }: { readonly reach: read
 									<NewProjectRow label={bar.project.newLabel} onPick={() => setPanel("projectName")} />
 								</>
 							)}
+						</BarPanel>
+						<BarPanel open={panel === "repeat" && repeat !== null} onClose={close} reference={anchors.repeat ?? null} capsule={desk ? capsule : null} away={away} className="is-repeat">
+							{repeat ? <RepeatPanel page={repeat} onChange={(change) => api.getState().entryRepeatTap(change)} onRemove={() => api.getState().removeEntryRepeat()} /> : null}
 						</BarPanel>
 						<BarPanel open={panel === "where"} onClose={close} reference={anchors.where ?? null} capsule={desk ? capsule : null} away={away} className="is-place">
 							<TileGroup kind="is-place" rows={[bar.places.map((choice) => ({ label: choice.title ?? DATE_WORD, icon: PLACE_ICONS[choice.id], on: choice.on, onPick: () => (choice.id === "date" ? setPanel("date") : (api.getState().entryPlace(choice.id, null, reach), close())) }))]} />

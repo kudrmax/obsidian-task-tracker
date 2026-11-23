@@ -2,7 +2,7 @@ import { memo, type ReactNode, useEffect, useMemo, useRef, useState } from "reac
 import type { IconName } from "../../shared/icons";
 import { type BlockLook, MenuLayer, secondaryClick, useMenuFrom, useMenuOrigin } from "../layers/Layers";
 import { monthGrid, monthOf, monthTitle } from "../layout/month";
-import type { ListPlaceId, MenuAction, MenuActionGroup, MenuStatusId, ReminderKind, TaskMenuActionId, TaskMenuModel } from "../port";
+import type { ListPlaceId, MenuAction, MenuActionGroup, MenuStatusId, ReminderKind, RepeatChange, TaskMenuActionId, TaskMenuModel } from "../port";
 import { type Asking, type Layer, useScreen, useScreenApi } from "../store";
 import { CardFace } from "./Card";
 import { useHost } from "./host";
@@ -11,6 +11,7 @@ import { Row, RowGroup } from "./MenuRows";
 import { MovingRow, MovingRows } from "./MovingRow";
 import { NewProjectRow, ProjectNameField, ProjectRows } from "./Projects";
 import { EntryField } from "./QuickAdd";
+import { RepeatPanel } from "./Repeat";
 import { paintStyle } from "./Timeline";
 
 /** A status tile's words and icon, by the status it writes: the progress tile is In progress, or Stop progress on a task in progress. */
@@ -37,6 +38,7 @@ interface MenuSteps {
 	pick(action: MenuAction): void;
 	actHere(action: MenuAction): void;
 	nameMenuProject(name: string): void;
+	menuRepeat(change: RepeatChange): void;
 }
 
 interface ActionLook {
@@ -69,7 +71,7 @@ const MENU_ACTIONS: Readonly<Record<TaskMenuActionId, ActionLook | { readonly ti
 	today: { label: "Today", icon: "now", onPick: day },
 	tomorrow: { label: "Tomorrow", icon: "tomorrow", onPick: day },
 	pickDate: { label: "Pick a date", icon: "calendar", onPick: (_, steps) => steps.menuPage("picker") },
-	repeat: { label: "Repeat", icon: "repeat", onPick: leave },
+	repeat: { label: "Repeat", icon: "repeat", onPick: (_, steps) => steps.menuPage("repeat") },
 	reminder: { label: "Reminder", icon: "reminder", onPick: (_, steps) => steps.menuPage("reminders") },
 	rename: { label: "Rename", icon: "rename", onPick: (_, steps) => steps.startRename() },
 	description: { label: "Notes", icon: "description", onPick: (_, steps) => steps.startNotes() },
@@ -157,7 +159,7 @@ export const TaskMenu = memo(function TaskMenu() {
 				</>
 			}
 			groups={groups}
-			panelClass={model.kind === "event" ? "is-event" : shown.layer.page === "picker" ? "is-task is-picker" : "is-task"}
+			panelClass={model.kind === "event" ? "is-event" : shown.layer.page === "picker" ? "is-task is-picker" : shown.layer.page === "repeat" ? "is-task is-repeat" : "is-task"}
 			page={`${shown.layer.id}:${shown.layer.page}`}
 			shape={shown.layer.asking ?? ""}
 			keepWidth={model.kind === "event"}
@@ -186,6 +188,7 @@ function taskGroups(layer: Layer, typing: boolean, model: TaskMenuModel, steps: 
 		return [
 			<ProjectNameField key="name" onEnd={(name) => (name === null ? steps.menuPage("projects") : steps.nameMenuProject(name))} />,
 		];
+	if (layer.page === "repeat") return [<RepeatPanel key="repeat" page={layer.repeat?.page ?? model.repeat} onChange={steps.menuRepeat} onRemove={() => pick({ kind: "repeat", rule: null })} />];
 	if (layer.page === "reminders")
 		return [
 			<Row key="back" label="Reminder" icon="chevronLeft" className="tc-menu-back" lead onPick={() => steps.menuPage("menu")} />,

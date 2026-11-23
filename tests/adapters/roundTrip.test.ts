@@ -177,7 +177,7 @@ describe("each write the engine makes lands as the old screen's call of the same
 	it("a new task typed at Inbox's end and a rename: the quick entry's writes", async () => {
 		const { engine, old, oldItem, idOf } = await pair();
 		const field = { at: engine.port.listEnd("inbox", 0), renaming: null, stack: false };
-		await engine.port.commit(field, "Новая задача", { level: null, projects: [], descriptionLine: null, section: false }, false).write;
+		await engine.port.commit(field, "Новая задача", { level: null, projects: [], descriptionLine: null, section: false, repeat: null }, false).write;
 		const sections = (await old.core.tasks.screen(old.core.days.today())).sections.inbox;
 		await old.core.tasks.createInPlace("Новая задача", null, { kind: "list", list: "inbox", group: sections[sections.length - 1].name, before: null });
 		expect(engine.file.text).toBe(old.file.text);

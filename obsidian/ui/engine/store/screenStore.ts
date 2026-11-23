@@ -2,16 +2,16 @@ import { DESIGN } from "../../shared/design";
 import { createStore, type StoreApi } from "zustand/vanilla";
 import { EVERY_TASK } from "../port";
 import { type Stop, stopShowing } from "../layout/columns";
-import type { Destination, DividerStop, Edge, ScreenContext, UndoOutcome, EntryBar, EntryDraft, EntryField, FieldActionId, LevelRange, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, MenuStatusId, ScreenData, ScreenPort } from "../port";
+import type { Destination, DividerStop, Edge, ScreenContext, UndoOutcome, EntryBar, EntryDraft, EntryField, FieldActionId, LevelRange, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, MenuStatusId, RepeatChange, RepeatPage, ScreenData, ScreenPort } from "../port";
 import { share } from "./share";
 
 export type { Stop };
 
 /** Nothing came or went: one object, so a selector of it draws nothing again. */
 const NONE: ReadonlySet<string> = new Set();
-const NO_DRAFT: EntryDraft = { level: null, projects: [], descriptionLine: null, section: false };
+const NO_DRAFT: EntryDraft = { level: null, projects: [], descriptionLine: null, section: false, repeat: null };
 /** No field open: what closing one leaves. */
-const NO_ENTRY = { entry: null, draft: NO_DRAFT, entryText: "", entryPanel: null } as const;
+const NO_ENTRY = { entry: null, draft: NO_DRAFT, entryText: "", entryPanel: null, entryRepeat: null } as const;
 
 /** The one gesture that holds the pointer (spec, «Which gesture holds the pointer»). */
 type Gesture = "drag" | "ribbon" | "resize" | "zoom" | "divider";
@@ -19,14 +19,14 @@ type Gesture = "drag" | "ribbon" | "resize" | "zoom" | "divider";
 /** Where the calendar was zoomed to: an hour's height, or the whole day whatever the calendar's height. */
 export type Zoom = number | "wholeDay";
 
-/** A page of a task's menu: the menu itself, the month to pick a day in, the Reminder kinds. */
-type MenuPage = "menu" | "picker" | "reminders" | "projects" | "projectName";
+/** A page of a task's menu: the menu itself, the month to pick a day in, the Reminder kinds, the projects and a new one's name, the Repeat page. */
+type MenuPage = "menu" | "picker" | "reminders" | "projects" | "projectName" | "repeat";
 
 /** What a menu asks before it acts (Won't do, Stop, Delete), in place of what was pressed. */
 export type Asking = MenuStatusId | "delete";
 
 /** A panel of the field's bar: the flag's levels, the projects (and «New project…»'s name in their place), the places, the month of Date. */
-export type BarPanelKind = "priority" | "project" | "projectName" | "where" | "date";
+export type BarPanelKind = "priority" | "project" | "projectName" | "where" | "date" | "repeat";
 
 /**
  * An open layer (spec, «Layers and focus»): the menu of a task or an event, with what the port offers in it, opened from a
@@ -43,6 +43,8 @@ export interface Layer {
 	readonly stack: { readonly of: string; readonly ids: readonly string[] } | null;
 	/** The question last taken back by Cancel: what asked it takes the focus again. */
 	readonly asked: Asking | null;
+	/** The Repeat page as it stands (null: not opened yet), and whether a tap changed it: a changed rule is written as the menu closes (F120). */
+	readonly repeat: { readonly page: RepeatPage; readonly changed: boolean } | null;
 }
 
 interface ScreenState {
@@ -101,6 +103,8 @@ interface ScreenState {
 	readonly bar: EntryBar | null;
 	/** The bar's panel open over it: one at a time; every new field, or the field moved, opens with none. */
 	readonly entryPanel: BarPanelKind | null;
+	/** The bar's Repeat panel as it stands while open: each tap sets the field's rule at once (the design's «Повторы»). */
+	readonly entryRepeat: RepeatPage | null;
 	/** The open menu's block stands higher than its task (Decision 120): its copy is not over the task, so the task's dots go. */
 	readonly menuLifted: boolean;
 	/** Counts the fields opened: each new one (after Enter) is a fresh, empty field. */
@@ -177,6 +181,12 @@ interface ScreenActions {
 	layerGone(): void;
 	/** A tap in the menu that leaves it on its page (a project's check): written, the menu showing the task as it then stands. */
 	actHere(action: MenuAction): void;
+	/** A tap on the menu's Repeat page: the page shows it at once; the rule is written once, as the menu closes (F120, F202, F203). */
+	menuRepeat(change: RepeatChange): void;
+	/** A tap on the bar's Repeat panel: the panel shows it, and the field is written with that rule. */
+	entryRepeatTap(change: RepeatChange): void;
+	/** Remove repeat on the bar's panel: the field writes no rule, the panel closes. */
+	removeEntryRepeat(): void;
 	/** «New project…»'s name typed in the menu (F220): Enter makes it and gives it to the task, closing the menu; a name of nothing goes back to the projects. */
 	nameMenuProject(name: string): void;
 	/**
@@ -400,6 +410,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 			draft: NO_DRAFT,
 			entryText: "",
 			entryPanel: null,
+			entryRepeat: null,
 			bar: null,
 			menuLifted: false,
 			entrySeq: 0,
@@ -533,7 +544,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 				const over = get().layer;
 				const stack = from !== "stack" || !over ? null : (over.stack ?? (over.model.kind === "task" ? { of: over.id, ids: over.model.subtasks } : null));
 				const model = port.menu(id, from, get().dayOffset);
-				set({ layer: { kind: "menu", id, from, model, page: "menu", asking: null, asked: null, stack }, ...(from === "list" ? { selected: null } : {}) });
+				set({ layer: { kind: "menu", id, from, model, page: "menu", asking: null, asked: null, stack, repeat: null }, ...(from === "list" ? { selected: null } : {}) });
 			},
 			startRename() {
 				const layer = get().layer;
@@ -566,7 +577,10 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 				set({ layer: null });
 				let done: () => void = () => undefined;
 				write(new Promise<void>((resolve) => (done = resolve)));
-				picked = () => void port.act(layer.id, action, layer.from, get().dayOffset).finally(done);
+				/** A Repeat page changed is written as the menu closes, before what closed it (F120); Remove repeat is that write itself. */
+				const held = action.kind !== "repeat" && layer.repeat?.changed ? [{ kind: "repeat", rule: layer.repeat.page.draft.rule } as const] : [];
+				const acts: readonly MenuAction[] = [...held, action];
+				picked = () => void acts.reduce<Promise<unknown>>((before, next) => before.then(() => port.act(layer.id, next, layer.from, get().dayOffset)), Promise.resolve()).finally(done);
 			},
 			layerGone() {
 				const run = picked;
@@ -588,7 +602,23 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 				else get().pick({ kind: "newProject", name });
 			},
 			closeLayer() {
+				const repeat = get().layer?.repeat;
+				if (repeat?.changed) return get().pick({ kind: "repeat", rule: repeat.page.draft.rule });
 				if (get().layer) set(closed(get()));
+			},
+			menuRepeat(change) {
+				const layer = get().layer;
+				if (!layer || layer.model.kind !== "task") return;
+				const page = port.repeatEdit(layer.repeat?.page ?? layer.model.repeat, change);
+				if (page) set({ layer: { ...layer, repeat: { page, changed: true } } });
+			},
+			entryRepeatTap(change) {
+				const { entryRepeat, draft } = get();
+				const page = entryRepeat && port.repeatEdit(entryRepeat, change);
+				if (page) set({ entryRepeat: page, draft: { ...draft, repeat: page.draft.rule } });
+			},
+			removeEntryRepeat() {
+				set({ draft: { ...get().draft, repeat: null }, entryPanel: null, entryRepeat: null });
 			},
 			openEntry(at) {
 				const entry = at && { at, renaming: null, stack: false };
@@ -598,7 +628,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 				if (get().menuLifted !== menuLifted) set({ menuLifted });
 			},
 			showEntryPanel(entryPanel) {
-				if (get().entryPanel !== entryPanel) set({ entryPanel });
+				if (get().entryPanel !== entryPanel) set({ entryPanel, entryRepeat: entryPanel === "repeat" ? (get().bar?.repeat ?? null) : null });
 			},
 			escapeEntry() {
 				const { entryPanel, entry } = get();

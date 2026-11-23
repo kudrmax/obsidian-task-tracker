@@ -1,5 +1,21 @@
-import type { GroupedList, LocalDate, MenuProject, TaskItem, TaskMenuActionId, TaskMenuModel as CoreMenuModel } from "../../core/application/contracts";
-import type { ListPlaceId, ProjectPage, TaskMenuModel } from "../ui/engine/port";
+import { editRepeat, type GroupedList, type LocalDate, type MenuProject, onTheDay, REPEAT_WORDS, type RepeatChange, type RepeatDraft, repeatDraft, type RepeatRule, type TaskItem, type TaskMenuActionId, type TaskMenuModel as CoreMenuModel } from "../../core/application/contracts";
+import type { ListPlaceId, ProjectPage, RepeatPage, TaskMenuModel } from "../ui/engine/port";
+
+/** The Repeat page over the core's draft, worded as the core words it. */
+function repeatPageOf(draft: RepeatDraft): RepeatPage {
+	return { draft, monthDay: draft.detail === "monthDay" ? onTheDay(draft.rule) : "", words: REPEAT_WORDS };
+}
+
+/** The Repeat page as it opens: `rule`, a new one drawn from `day` (the core's `repeatDraft`). */
+export function repeatPageFor(day: LocalDate, rule: RepeatRule | null): RepeatPage {
+	return repeatPageOf(repeatDraft(day, rule));
+}
+
+/** The page after a tap (the core's `editRepeat`); null when the tap changes nothing. */
+export function repeatPageEdited(page: RepeatPage, change: RepeatChange): RepeatPage | null {
+	const next = editRepeat(page.draft, change);
+	return next && repeatPageOf(next);
+}
 
 /** A Project page in the engine's words, from the core's `MenuProject` as it is. */
 export function projectPageOf(page: MenuProject): ProjectPage {
@@ -24,6 +40,7 @@ export function menuModelOf(item: TaskItem, model: CoreMenuModel<TaskMenuActionI
 		date: { today, picked: model.dueDate, removable: model.removeDue },
 		places: model.places.flatMap((choice) => (choice.kind === "date" ? [] : [{ id: choice.kind as ListPlaceId, title: names(choice.kind), on: choice.on }])),
 		reminders: model.reminders.map((row) => ({ kind: row.kind, checked: row.checked })),
+		repeat: repeatPageFor(model.repeatOf.repeatDay, model.repeatOf.repeat),
 		project: projectPageOf(model.project),
 		peek: model.peek?.description ?? null,
 		subtasks,

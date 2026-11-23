@@ -1,9 +1,9 @@
-import { levelRange, sameSlot, type CalendarService, dividerAt, type DividerStop, LIST_WIDTHS, listShareOf, type ListWidths, listWidths, type Clock, type DayEvents, type DayService, type DropColumn, type DroppedTask, type DropTo, type LocalDate, listCardMenuFrom, type MenuFrom as CoreMenuFrom, originOf, type ScreenReader, type ShownChange, type TaskItem, type TaskService, type UndoOutcome, undoNotice, projectNodeOf, type ProjectsNodeId, type UndoService } from "../../core/application/contracts";
-import type { ScreenContext, Destination, Edge, EntryBar, EntryCommit, EntryDraft, EntryField, LevelRange, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, RenameStart, ScreenData, ScreenPort } from "../ui/engine/port";
+import { levelRange, sameSlot, type CalendarService, dividerAt, type DividerStop, LIST_WIDTHS, listShareOf, type ListWidths, listWidths, type Clock, type DayEvents, type DayService, type DropColumn, type DroppedTask, type DropTo, type LocalDate, listCardMenuFrom, type MenuFrom as CoreMenuFrom, originOf, type ScreenReader, type ShownChange, type TaskItem, type TaskService, type UndoOutcome, undoNotice, projectNodeOf, type ProjectsNodeId, RepeatPage as CoreRepeatPage, type RepeatRule, type UndoService } from "../../core/application/contracts";
+import type { RepeatChange, RepeatPage, ScreenContext, Destination, Edge, EntryBar, EntryCommit, EntryDraft, EntryField, LevelRange, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, RenameStart, ScreenData, ScreenPort } from "../ui/engine/port";
 import { CoreEntry } from "./CoreEntry";
 import { WriteQueue } from "./WriteQueue";
 import { ListCards } from "./ListCards";
-import { menuModelOf } from "./menuModel";
+import { menuModelOf, repeatPageEdited } from "./menuModel";
 import { ScreenDrawing, type ScreenSource } from "./ScreenDrawing";
 
 /** The core's services `CorePort` forwards to, as `composeCore` gives them. */
@@ -27,6 +27,16 @@ type CoreMove =
 	| { readonly kind: "drop"; readonly tasks: readonly DroppedTask[]; readonly to: DropTo; readonly day: LocalDate }
 	| { readonly kind: "slot"; readonly key: TaskItem["key"]; readonly slot: NonNullable<TaskItem["slot"]>; readonly day: LocalDate }
 	| { readonly kind: "home" };
+
+/** The Repeat page's rule written as the menu closes, as the core's `RepeatPage` says: once, never the task's own rule again. */
+async function repeatWrite(item: TaskItem, rule: RepeatRule | null, write: (rule: RepeatRule | null) => Promise<void>): Promise<void> {
+	let written: Promise<void> = Promise.resolve();
+	const page = new CoreRepeatPage(item, (end) => (written = write(end)));
+	if (rule === null) page.remove();
+	else page.change(rule);
+	page.close();
+	await written;
+}
 
 /** The context of every task: no project chosen. */
 const EVERY = "";
@@ -389,6 +399,10 @@ export class CorePort implements ScreenPort {
 		return this.entry.commit(field, text, draft, next);
 	}
 
+	repeatEdit(page: RepeatPage, change: RepeatChange): RepeatPage | null {
+		return repeatPageEdited(page, change);
+	}
+
 	menu(id: string, from: MenuFrom, dayOffset: number): MenuModel {
 		const event = this.shared.eventNamed(id);
 		if (event) return { kind: "event", title: event.title };
@@ -424,6 +438,9 @@ export class CorePort implements ScreenPort {
 				break;
 			case "reminder":
 				await tasks.setReminder(item.key, action.reminder);
+				break;
+			case "repeat":
+				await repeatWrite(item, action.rule, (rule) => tasks.setRepeat(item.key, rule));
 				break;
 			case "project":
 				await (action.name === null ? tasks.setProject(keys, null) : tasks.toggleProject(keys, action.name));

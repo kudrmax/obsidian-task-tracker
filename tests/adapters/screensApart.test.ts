@@ -4,7 +4,7 @@ import { standPort, settled } from "../ui/engine/standPort";
 
 const NOW = new Date(2026, 10, 18, 14, 20);
 const HOME = { project: "Дом" };
-const NO_DRAFT: EntryDraft = { level: null, projects: [], descriptionLine: null, section: false };
+const NO_DRAFT: EntryDraft = { level: null, projects: [], descriptionLine: null, section: false, repeat: null };
 
 /** A new task typed at the end of the leaf's Inbox, through `port` (another screen open beside it, or not), and the file as it is written. */
 async function typedInLeaf(withBlock: boolean): Promise<string> {

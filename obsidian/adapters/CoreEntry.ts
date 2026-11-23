@@ -1,11 +1,11 @@
-import { type DayService, type DropColumn, type EntryList, type EntryState, type LocalDate, type MenuProject, type ProjectsNodeId, type Placement, type QuickEntryView, QuickEntrySession, type ScreenReader, type TaskItem, type TaskService, type WriteLine } from "../../core/application/contracts";
+import { type DayService, type DropColumn, type EntryList, type EntryState, type LocalDate, type MenuProject, type ProjectsNodeId, type Placement, type QuickEntryView, QuickEntrySession, type ScreenReader, sameRule, type TaskItem, type TaskService, type WriteLine } from "../../core/application/contracts";
 import type { WriteQueue } from "./WriteQueue";
 import type { Destination, EntryBar, EntryCommit, EntryDraft, EntryField, ListId, MenuFrom, PlaceId, RenameStart } from "../ui/engine/port";
 import { ListCards } from "./ListCards";
-import { projectPageOf } from "./menuModel";
+import { projectPageOf, repeatPageFor } from "./menuModel";
 import type { ScreenDrawing } from "./ScreenDrawing";
 
-const NO_DRAFT: EntryDraft = { level: null, projects: [], descriptionLine: null, section: false };
+const NO_DRAFT: EntryDraft = { level: null, projects: [], descriptionLine: null, section: false, repeat: null };
 const ENTRY_LISTS: readonly ListId[] = ["day", "soon", "inbox"];
 /** A field with no Project button of its own (a subtask's, a section's name): an empty page, never drawn. */
 const NO_PROJECT_PAGE: MenuProject = { current: null, options: [], none: true, noneLabel: "", value: "", disabled: true, newLabel: "" };
@@ -110,6 +110,7 @@ export class CoreEntry {
 			where: state.place && { id: state.place.kind, title: this.core.tasks.placementTitle(state.place) },
 			places: state.places.map((choice) => ({ id: choice.kind, title: choice.kind === "date" ? null : this.core.tasks.listName(choice.kind), on: choice.on })),
 			date: { today: this.core.days.today(), picked: state.place && this.core.tasks.dayOfPlacement(state.place) },
+			repeat: repeatPageFor(state.repeatDay, state.repeat),
 		};
 	}
 
@@ -215,6 +216,7 @@ export class CoreEntry {
 			this.session.typeDescription(draft.descriptionLine);
 		}
 		if (draft.section !== (state().section === true) && state().section !== null) this.session.toggleSection();
+		if (!sameRule(draft.repeat, state().repeat)) this.session.setRepeat(draft.repeat);
 	}
 
 	private setProjects(names: readonly string[]): void {
@@ -229,7 +231,7 @@ export class CoreEntry {
 	}
 
 	private draftOf(state: EntryState): EntryDraft {
-		return { level: state.priority, projects: this.projectsOf(state), descriptionLine: state.description, section: state.section === true };
+		return { level: state.priority, projects: this.projectsOf(state), descriptionLine: state.description, section: state.section === true, repeat: state.repeat };
 	}
 
 	/** The engine's field for the core's: a list's gap as the card it goes before, a slot as its minute, a stack by its task. */
