@@ -8,6 +8,7 @@ import { Card } from "./Card";
 import { RowScreen } from "./MovingRow";
 import { MissingFile } from "./MissingFile";
 import { QuickBar } from "./QuickBar";
+import { FullScreen } from "./FullScreen";
 import { Icon } from "./Icon";
 import { HostContext, type ScreenHost, useHost } from "./host";
 
@@ -102,6 +103,7 @@ function Root({ place, store }: { readonly place: Place; readonly store: ScreenS
 	return (
 		<div className={`task-calendar is-engine is-${place}${entering ? " is-entering" : ""}`} onPointerDownCapture={pressed} onClickCapture={clicked} {...touches} onTouchStart={keepTouch} onTouchMove={keepTouch} onTouchEnd={keepTouch} onClick={(event) => letSelectionGo(event, store)}>
 			<Layout place={place} />
+			<FullScreen />
 			<QuickBar reach={reachOf(place)} />
 			<MissingFile />
 		</div>

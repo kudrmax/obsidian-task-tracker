@@ -99,6 +99,7 @@ body {
 	--tc-stroke-2-6: 2.6px;
 	--tc-stroke-2-8: 2.8px;
 	--tc-stroke-3-6: 3.6px;
+	--tc-stroke-3-4: 3.4px;
 	/* A capsule: the corners take half the card's height. */
 	--tc-radius-card: calc(var(--tc-card-h) / 2);
 	--tc-radius-event: 6px;
@@ -384,6 +385,22 @@ body {
 	--tc-repeat-remove-gap: var(--tc-space-6);
 	--tc-stroke-repeat-step: var(--tc-stroke-2-4);
 	--tc-weight-repeat-day: 500;
+	--tc-sheet-bar: 44px;
+	--tc-sheet-side: var(--tc-space-20);
+	--tc-rise: 12px;
+	--tc-font-sheet-btn: var(--tc-text-17);
+	--tc-full-w: 640px;
+	--tc-full-top: var(--tc-space-8);
+	--tc-full-title-gap: var(--tc-space-12);
+	--tc-full-parent-h: var(--tc-space-20);
+	--tc-full-parent-icon: var(--tc-icon-s);
+	--tc-full-parent-gap: var(--tc-space-6);
+	--tc-full-desc-gap: var(--tc-space-20);
+	--tc-full-foot: calc(var(--tc-chrome-room) + var(--tc-foot-gap) + var(--tc-wheel) + var(--tc-space-20));
+	--tc-font-full-parent: var(--tc-text-15);
+	--tc-font-full-title: var(--tc-text-22);
+	--tc-leading-full-title: 28px;
+	--tc-stroke-project-mark: var(--tc-stroke-2);
 	--tc-month-icon: var(--tc-icon-m);
 	--tc-day: 36px;
 	--tc-weekday-h: 20px;
@@ -475,6 +492,12 @@ body {
 	--tc-scrolled-below: 0px;
 	--tc-block-pad-top: calc((var(--tc-card-h) - var(--tc-leading-card)) / 2);
 	--tc-select-ring: 1.5px;
+	--tc-pick-size: var(--tc-icon-m);
+	--tc-pick-check: 12px;
+	--tc-pick-ring: var(--tc-select-ring);
+	--tc-stroke-pick: var(--tc-stroke-3-4);
+	--tc-pick-pad-start: 9px;
+	--tc-pick-gap: var(--tc-space-2);
 	--tc-ring-selected: inset 0 0 0 var(--tc-select-ring) var(--tc-accent);
 	--tc-meta-w: 14px;
 	--tc-meta-lift: 1px;
@@ -500,7 +523,9 @@ body {
 	--tc-text-13: 13px;
 	--tc-text-15: 15px;
 	--tc-text-16: 16px;
+	--tc-text-17: 17px;
 	--tc-text-20: 20px;
+	--tc-text-22: 22px;
 	--tc-font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, system-ui, sans-serif;
 	--tc-font-inherit: inherit;
 	--tc-font-title: var(--tc-text-20);
@@ -571,6 +596,7 @@ body {
 	--tc-layer-allday: 4;
 	--tc-layer-float: 1000;
 	--tc-layer-plus: 5;
+	--tc-layer-sheet: 20;
 	/* The projects' panel lies over the lists and their fade, under the bottom row and the projects button. */
 	--tc-layer-bar: 6;
 	/* Inside the quick bar: its panels' shadows lie under its ground, its buttons over it. */
@@ -1397,3 +1423,39 @@ body.theme-light .tc-menu-over .tc-event { --tc-event-bg: var(--tc-event-bg-ligh
 /* A part of the menu too tall for its room scrolls under the finger or the wheel without a scrollbar of its own: the question it asks is brought into sight as it opens. */
 .tc-level.tc-menu-layer .tc-panel { scrollbar-width: none; }
 .tc-level.tc-menu-layer .tc-panel::-webkit-scrollbar { display: none; }
+
+/* The full-screen task (the design's «Задача на весь экран»): a sheet over the whole screen, its content a centred column on the Mac. */
+.tc-sheet { position: absolute; inset: 0; z-index: var(--tc-layer-sheet); background: var(--tc-bg); opacity: 0; transform: translate3d(0, var(--tc-rise), 0); transition: opacity var(--tc-duration-menu) var(--tc-ease-out), transform var(--tc-duration-menu) var(--tc-ease-out); }
+.tc-sheet.is-shown { opacity: 1; transform: none; }
+.tc-sheet.is-closing { transition-duration: var(--tc-duration-collapse); }
+.tc-full-room { position: absolute; inset: 0; }
+/* The buttons' text, inside their own padding, starts and ends on the title's edges (--tc-sheet-side). */
+.tc-sheet-bar { position: absolute; left: 0; right: 0; top: 0; max-width: var(--tc-full-w); height: var(--tc-sheet-bar); margin: 0 auto; padding: 0 var(--tc-space-10); box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; }
+.tc-sheet-bar > button.tc-btn { height: var(--tc-sheet-bar); color: var(--tc-accent-ui); font-size: var(--tc-font-sheet-btn); }
+.tc-sheet-bar > button.tc-btn.is-hidden { visibility: hidden; }
+.tc-full-body { position: absolute; left: 0; right: 0; top: var(--tc-sheet-bar); bottom: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; }
+.tc-full-body::-webkit-scrollbar { display: none; }
+.tc-full-column { max-width: var(--tc-full-w); margin: 0 auto; padding: var(--tc-full-top) var(--tc-sheet-side) var(--tc-full-foot); display: flex; flex-direction: column; }
+.tc-full button.tc-full-parent, .tc-full button.tc-full-project { align-self: flex-start; max-width: 100%; height: var(--tc-full-parent-h); padding: 0; border: 0; background: none; box-shadow: none; display: flex; align-items: center; gap: var(--tc-full-parent-gap); font-size: var(--tc-font-full-parent); color: var(--tc-muted); cursor: pointer; }
+.tc-full button.tc-full-parent { margin-bottom: var(--tc-space-8); }
+.tc-full button.tc-full-project { margin-top: var(--tc-space-8); }
+.tc-full-parent svg, .tc-full-project svg { width: var(--tc-full-parent-icon); height: var(--tc-full-parent-icon); flex-shrink: 0; }
+.tc-full-parent svg { stroke-width: var(--tc-stroke-ring); }
+.tc-full-project svg { stroke-width: var(--tc-stroke-project-mark); }
+.tc-full-parent-text, .tc-full-project-text { min-width: 0; overflow: hidden; white-space: nowrap; }
+.tc-full-title { font-size: var(--tc-font-full-title); line-height: var(--tc-leading-full-title); font-weight: var(--tc-weight-bold); color: var(--tc-text); overflow-wrap: anywhere; }
+.tc-full-title .tc-entry .tc-quick-field { min-height: 0; padding: 0; border-radius: 0; background: none; box-shadow: none; font-size: var(--tc-font-full-title); font-weight: var(--tc-weight-bold); line-height: var(--tc-leading-full-title); }
+.tc-full-title .tc-quick-field.tc-title-field .markdown-source-view.mod-cm6 .cm-line { font-weight: var(--tc-weight-bold); }
+.tc-full-list { margin-top: var(--tc-full-title-gap); display: flex; flex-direction: column; gap: var(--tc-card-gap); }
+.tc-full-list > .tc-card { padding-left: var(--tc-pick-pad-start); }
+.tc-full-list > .tc-card > .tc-progress-dot { display: none; }
+.tc-full .tc-card > button.tc-pick { order: -1; display: flex; width: var(--tc-pick-size); height: var(--tc-pick-size); flex-shrink: 0; box-sizing: border-box; margin: 0 var(--tc-pick-gap) 0 0; padding: 0; border: var(--tc-pick-ring) solid var(--tc-muted); border-radius: var(--tc-radius-circle); background: none; box-shadow: none; color: var(--tc-on-accent); align-items: center; justify-content: center; cursor: pointer; }
+.tc-full .tc-card > button.tc-pick svg { width: var(--tc-pick-check); height: var(--tc-pick-check); stroke: currentColor; stroke-width: var(--tc-stroke-pick); visibility: hidden; }
+.tc-full .tc-card[data-mark="done"] > .tc-pick { border-color: transparent; background: var(--tc-accent); }
+.tc-full .tc-card[data-mark="done"] > .tc-pick svg { visibility: visible; }
+.tc-full .tc-card.is-closed > .tc-card-title { color: var(--tc-muted); text-decoration: line-through; }
+.tc-full-desc { margin-top: var(--tc-full-desc-gap); }
+.tc-full .tc-capsule, .tc-full button.tc-plus { position: absolute; bottom: calc(var(--tc-chrome-room) + var(--tc-foot-gap) + (var(--tc-wheel) - var(--tc-plus-size)) / 2); z-index: var(--tc-layer-plus); }
+.tc-full .tc-capsule { left: var(--tc-space-16); }
+.tc-full button.tc-plus { right: var(--tc-space-16); }
+.tc-full.is-typing :is(.tc-capsule, button.tc-plus) { display: none; }

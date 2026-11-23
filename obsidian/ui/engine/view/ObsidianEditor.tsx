@@ -39,6 +39,8 @@ export interface ObsidianEditorProps {
 	 * typed or pasted becomes a space.
 	 */
 	readonly lines?: boolean;
+	/** Takes the focus, the caret at the end, as it mounts (a field opened by a tap); false: an editor standing on the page (the full screen's notes). */
+	readonly focus?: boolean;
 	/** The focus left the field: the event, and the text as typed then. */
 	readonly onLeave?: (event: FocusEvent<HTMLDivElement>, text: () => string) => void;
 }
@@ -49,7 +51,7 @@ export interface ObsidianEditorProps {
  * scope stands over Obsidian's hotkeys (Decision 133). Made once as it mounts, given
  * the focus, destroyed as it goes.
  */
-export function ObsidianEditor({ text, className, placeholder, priority = null, lines = false, onEnter, onEscape, onTab, onNewSection, onChange, onLeave }: ObsidianEditorProps) {
+export function ObsidianEditor({ text, className, placeholder, priority = null, lines = false, focus = true, onEnter, onEscape, onTab, onNewSection, onChange, onLeave }: ObsidianEditorProps) {
 	const { app, sourcePath } = useHost();
 	const container = useRef<HTMLDivElement>(null);
 	const handlers = useRef({ onEnter, onEscape, onTab, onNewSection, onChange });
@@ -71,7 +73,7 @@ export function ObsidianEditor({ text, className, placeholder, priority = null, 
 		editorRef.current = editor;
 		/** The phone's keyboard offers «next»: Enter opens the next field (the plugin's `enterkeyhint`). */
 		editor.contentDOM.setAttribute("enterkeyhint", handlers.current.onEnter ? "next" : "enter");
-		editor.focusEnd();
+		if (focus) editor.focusEnd();
 		return () => {
 			editorRef.current = null;
 			editor.destroy();

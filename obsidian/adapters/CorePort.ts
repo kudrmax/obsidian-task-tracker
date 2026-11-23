@@ -1,6 +1,7 @@
 import { levelRange, sameSlot, type CalendarEvent, type CalendarService, dividerAt, type DividerStop, LIST_WIDTHS, listShareOf, type ListWidths, listWidths, type Clock, type DayEvents, type DayService, type DropColumn, type DroppedTask, type DropTo, type LocalDate, listCardMenuFrom, type MenuFrom as CoreMenuFrom, originOf, type ScreenReader, type ShownChange, type TaskItem, type TaskService, type UndoOutcome, undoNotice, projectNodeOf, type ProjectsNodeId, RepeatPage as CoreRepeatPage, type RepeatRule, type UndoService } from "../../core/application/contracts";
-import type { RepeatChange, RepeatPage, ScreenContext, Destination, Edge, EntryBar, EntryCommit, EntryDraft, EntryField, LevelRange, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, RenameStart, ScreenData, ScreenPort } from "../ui/engine/port";
+import type { FullEntryAt, FullTask, RepeatChange, RepeatPage, ScreenContext, Destination, Edge, EntryBar, EntryCommit, EntryDraft, EntryField, LevelRange, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, RenameStart, ScreenData, ScreenPort } from "../ui/engine/port";
 import { CoreEntry } from "./CoreEntry";
+import { FullScreens } from "./FullScreens";
 import { WriteQueue } from "./WriteQueue";
 import { ListCards } from "./ListCards";
 import { menuModelOf, repeatPageEdited } from "./menuModel";
@@ -169,6 +170,7 @@ export class CorePort implements ScreenPort {
 	private readonly listeners = new Set<() => void>();
 	private readonly cache = new Map<string, ScreenData>();
 	private readonly entry: CoreEntry;
+	private readonly fulls: FullScreens;
 
 	/** @internal Made by `CoreReads.view`. */
 	constructor(
@@ -177,6 +179,7 @@ export class CorePort implements ScreenPort {
 		private context: string,
 	) {
 		this.entry = new CoreEntry(shared.core, shared.drawing, () => this.reader, () => this.refresh(), shared.queue, () => this.filter());
+		this.fulls = new FullScreens(shared.core.tasks, shared.drawing, () => this.reader, () => this.refresh(), shared.core.onError);
 	}
 
 	/** The port over `core`, once the file is read, in every task's context. */
@@ -361,8 +364,8 @@ export class CorePort implements ScreenPort {
 		return this.entry.end(list, dayOffset);
 	}
 
-	subtaskPlace(id: string, dayOffset: number): EntryField {
-		return this.entry.subtask(id, dayOffset);
+	subtaskPlace(id: string, dayOffset: number, from: MenuFrom): EntryField {
+		return this.entry.subtask(id, dayOffset, from);
 	}
 
 	entryShift(field: EntryField, draft: EntryDraft, text: string, by: 1 | -1): EntryField | null {
@@ -405,6 +408,30 @@ export class CorePort implements ScreenPort {
 
 	commit(field: EntryField, text: string, draft: EntryDraft, next: boolean): EntryCommit {
 		return this.entry.commit(field, text, draft, next);
+	}
+
+	full(id: string): FullTask | null {
+		return this.fulls.task(id);
+	}
+
+	fullEntry(id: string): FullEntryAt | null {
+		return this.entry.fullEntry(id);
+	}
+
+	tick(id: string): Promise<void> {
+		return this.fulls.tick(id);
+	}
+
+	typeNotes(id: string, text: string): void {
+		this.fulls.typed(id, text);
+	}
+
+	focusNotes(id: string, focused: boolean): void {
+		this.fulls.focus(id, focused);
+	}
+
+	leaveNotes(id: string): Promise<void> {
+		return this.fulls.leave(id);
 	}
 
 	repeatEdit(page: RepeatPage, change: RepeatChange): RepeatPage | null {
@@ -493,7 +520,7 @@ export class CorePort implements ScreenPort {
 	}
 
 	private coreFrom(item: TaskItem, from: MenuFrom): CoreMenuFrom {
-		return from === "calendar" ? "timeline" : from === "stack" ? "stack" : listCardMenuFrom(item);
+		return from === "calendar" ? "timeline" : from === "list" ? listCardMenuFrom(item) : from;
 	}
 
 	/**

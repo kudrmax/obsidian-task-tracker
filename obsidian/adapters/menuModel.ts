@@ -44,6 +44,7 @@ export function menuModelOf(item: TaskItem, model: CoreMenuModel<TaskMenuActionI
 		repeat: repeatPageFor(model.repeatOf.repeatDay, model.repeatOf.repeat),
 		project: projectPageOf(model.project),
 		peek: model.peek?.description ?? null,
+		peekTask: model.peek?.id ?? null,
 		subtasks,
 	};
 }

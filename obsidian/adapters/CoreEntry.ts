@@ -1,6 +1,6 @@
 import { type DayService, type DropColumn, type EntryList, type EntryState, type LocalDate, type MenuProject, type ProjectsNodeId, type Placement, type QuickEntryView, QuickEntrySession, type ScreenReader, sameRule, type TaskItem, type TaskService, type WriteLine } from "../../core/application/contracts";
 import type { WriteQueue } from "./WriteQueue";
-import type { Destination, EntryBar, EntryCommit, EntryDraft, EntryField, ListId, MenuFrom, PlaceId, RenameStart } from "../ui/engine/port";
+import type { Destination, EntryBar, EntryCommit, EntryDraft, EntryField, FullEntryAt, ListId, MenuFrom, PlaceId, RenameStart } from "../ui/engine/port";
 import { ListCards } from "./ListCards";
 import { projectPageOf, repeatPageFor } from "./menuModel";
 import type { ScreenDrawing } from "./ScreenDrawing";
@@ -12,6 +12,12 @@ const NO_PROJECT_PAGE: MenuProject = { current: null, options: [], none: true, n
 
 /** The writes a session only asked where a field opens queues: none, it writes nothing. */
 const NO_WRITES: WriteLine = { push: () => undefined, idle: () => Promise.resolve() };
+
+/** A menu opened on the full screen: its fields stand there. */
+const onFull = (from: MenuFrom) => from === "full" || from === "fullSubtask";
+
+/** A field of the full screen: a new last subtask of `under`, or `renaming` renamed there. */
+const fullField = (under: string, renaming: string | null, dayOffset: number): EntryField => ({ at: { list: "day", before: null, dayOffset, under }, renaming, stack: false, full: true });
 
 /** A field the engine names, but for its depth: two such are the same field, shifted or not. */
 const placeOf = (field: EntryField) => JSON.stringify({ ...field, at: { ...field.at, depth: undefined } });
@@ -67,8 +73,9 @@ export class CoreEntry {
 		return this.fieldOf(asked.state, dayOffset).at;
 	}
 
-	/** A new last subtask of `id`: in the list that shows it, else in its menu's stack (a calendar's task): the core's `subtaskSpot`. */
-	subtask(id: string, dayOffset: number): EntryField {
+	/** A new last subtask of `id`: on the full screen there, else in the list that shows it, else in its menu's stack (a calendar's task): the core's `subtaskSpot`. */
+	subtask(id: string, dayOffset: number, from: MenuFrom): EntryField {
+		if (onFull(from)) return fullField(id, null, dayOffset);
 		const asked = this.asking(dayOffset);
 		asked.open(asked.subtaskSpot(this.item(id).key));
 		const field = this.fieldOf(asked.state, dayOffset);
@@ -86,6 +93,11 @@ export class CoreEntry {
 	}
 
 	rename(id: string, from: MenuFrom, dayOffset: number): RenameStart {
+		if (onFull(from)) {
+			const field = fullField(id, id, dayOffset);
+			const state = this.follow(field, null, null);
+			return { field, draft: this.draftOf(state), text: state.text };
+		}
 		const asked = this.asking(dayOffset);
 		const item = this.item(id);
 		const spot = asked.renameSpot(item, from === "stack");
@@ -93,6 +105,14 @@ export class CoreEntry {
 		asked.open(spot, item);
 		const state = asked.state!;
 		return { field: this.fieldOf(state, dayOffset), draft: this.draftOf(state), text: state.text };
+	}
+
+	/** Where the full screen of `id` draws the live field: its title, a card's place, or a new subtask's (the core's `stackEntry`). */
+	fullEntry(id: string): FullEntryAt | null {
+		const item = this.reader().item(id);
+		const at = item && this.field?.full ? this.session.stackEntry(item)?.at : null;
+		if (!at) return null;
+		return at.kind === "title" ? { kind: "title" } : { kind: at.kind, index: at.index, depth: at.level };
 	}
 
 	/** What a new field at `field` starts with: the session opened there, as the core sets it (a project's screen, a list's part). */
@@ -149,6 +169,7 @@ export class CoreEntry {
 	 * (Backlog, a list out of reach) stays so, as the next one types to the same place.
 	 */
 	private nextOf(field: EntryField, after: EntryState): EntryField {
+		if (field.full) return { ...this.fieldOf(after, field.at.dayOffset), stack: false, full: true };
 		return field.at.backlog || field.at.away ? { ...field, renaming: after.renaming?.id ?? null } : this.fieldOf(after, field.at.dayOffset);
 	}
 
@@ -183,7 +204,8 @@ export class CoreEntry {
 		this.look.date = this.dateOf(away?.dayOffset ?? at.dayOffset);
 		this.look.shown = ENTRY_LISTS;
 		const session = this.session;
-		if (field.renaming !== null) this.openRename(field);
+		if (field.full) this.openFull(field);
+		else if (field.renaming !== null) this.openRename(field);
 		else if (at.backlog) session.openAtEnd("backlog");
 		else if (away) session.openAtEnd(away.list);
 		else if (field.stack) session.open({ kind: "stack", parent: this.item(at.under!).key });
@@ -194,6 +216,12 @@ export class CoreEntry {
 			if (gap) session.open({ kind: "list", column: at.list, place: gap });
 			else session.openAtEnd(at.list);
 		}
+	}
+
+	/** A field on the full screen: the stack of the task renamed (its title or its card), or of the task a new subtask goes under. */
+	private openFull(field: EntryField): void {
+		const renamed = field.renaming === null ? null : this.item(field.renaming);
+		this.session.open({ kind: "stack", parent: (renamed ?? this.item(field.at.under!)).key }, renamed ?? undefined);
 	}
 
 	/** A rename's field at its own card, moved where the bar's place sends it. */

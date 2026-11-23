@@ -2,7 +2,7 @@ import { DESIGN } from "../../shared/design";
 import { createStore, type StoreApi } from "zustand/vanilla";
 import { EVERY_TASK } from "../port";
 import { type Stop, stopShowing } from "../layout/columns";
-import type { Destination, DividerStop, Edge, ScreenContext, UndoOutcome, EntryBar, EntryDraft, EntryField, FieldActionId, LevelRange, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, MenuStatusId, RepeatChange, RepeatPage, ScreenData, ScreenPort } from "../port";
+import type { Destination, DividerStop, Edge, ScreenContext, UndoOutcome, EntryBar, EntryDraft, EntryField, FieldActionId, LevelRange, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, MenuStatusId, RepeatChange, RepeatPage, ScreenData, ScreenPort, FullEntryAt, FullTask } from "../port";
 import { share } from "./share";
 
 export type { Stop };
@@ -12,6 +12,9 @@ const NONE: ReadonlySet<string> = new Set();
 const NO_DRAFT: EntryDraft = { level: null, projects: [], descriptionLine: null, section: false, repeat: null };
 /** No field open: what closing one leaves. */
 const NO_ENTRY = { entry: null, draft: NO_DRAFT, entryText: "", entryPanel: null, entryRepeat: null } as const;
+
+/** The task the full screen shows: the last one opened. */
+const topOf = (full: { readonly ids: readonly string[] }): string => full.ids[full.ids.length - 1];
 
 /** The one gesture that holds the pointer (spec, «Which gesture holds the pointer»). */
 type Gesture = "drag" | "ribbon" | "resize" | "zoom" | "divider";
@@ -130,6 +133,15 @@ interface ScreenState {
 	readonly canRedo: boolean;
 	/** A notice to show once per `seq` (the port's words): «Can’t undo: the tasks file changed». */
 	readonly notice: { readonly text: string; readonly seq: number } | null;
+	/**
+	 * The full screen (F239–F249): the tasks opened one inside another, the one shown last, as the port reads it now;
+	 * `notesFocus` counts the asks to put the caret in its notes (Notes, Add description). Null while closed.
+	 */
+	readonly full: { readonly ids: readonly string[]; readonly task: FullTask; readonly notesFocus: number } | null;
+	/** Where the full screen draws the open field (the port's answer for the field and the task shown), null for none. */
+	readonly fullAt: FullEntryAt | null;
+	/** Something on the full screen is typed in: Done shows, the bottom row hides. */
+	readonly fullTyping: boolean;
 	/** A card to take the keyboard's focus, once per `seq`: the one a rename ended on by a key (Decision 58). */
 	readonly focusCard: { readonly id: string; readonly seq: number } | null;
 	/** A task to bring into sight in its list, once per `seq`. */
@@ -268,6 +280,26 @@ interface ScreenActions {
 	commitEntry(text: string, next: boolean): void;
 	/** Another context (a project chosen, or none): the shown day and the days drawn beside it read again in it, drawn in place. */
 	setContext(context: ScreenContext): void;
+	/** The task `id` on the full screen, over the one shown (a level in), or the first; `notes`: the caret in its notes. */
+	openFull(id: string, notes?: boolean): void;
+	/** Open full screen in the menu: the menu closes and its task opens full screen (a subtask's goes a level in). */
+	openFullFromMenu(): void;
+	/** A level up: the task the one shown lies in. */
+	fullUp(): void;
+	/** Close: back to the main screen from any depth (F247). */
+	closeFull(): void;
+	/** A subtask's circle on the full screen: done, or open again (F241). */
+	tick(id: string): void;
+	/** The shown task's notes typed: the port writes them after a pause (F244). */
+	typeNotes(text: string): void;
+	focusNotes(focused: boolean): void;
+	setFullTyping(typing: boolean): void;
+	/** Done on the full screen, or Escape in its notes: what was typed in them is written now. */
+	saveNotes(): void;
+	/** The project under the full screen's title: the screen closes, that project chosen (F243). */
+	showProject(name: string): void;
+	/** The full screen's plus: a new last subtask of the task shown (F245). */
+	fullPlus(): void;
 	/** Undo, the button or ⌘Z (F267): the port takes its last step back, and the cards move as any change moves them. */
 	/** Creates the missing tasks file (F6); the screen reads it once written. */
 	createFile(): void;
@@ -321,15 +353,27 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 			const was = get();
 			const entry = "entry" in patch ? (patch.entry ?? null) : was.entry;
 			const stale = entry !== was.entry || ("draft" in patch && patch.draft !== was.draft) || ("entryText" in patch && patch.entryText !== was.entryText) || (entry !== null && "read" in patch && patch.read !== was.read);
-			setRaw(stale ? { ...patch, bar: entry && port.entryBar(entry, patch.draft ?? was.draft, patch.entryText ?? was.entryText) } : patch);
+			const full = "full" in patch ? (patch.full ?? null) : was.full;
+			const bar = stale ? { bar: entry && port.entryBar(entry, patch.draft ?? was.draft, patch.entryText ?? was.entryText) } : {};
+			/** The field on the full screen stands where the port says once the bar has followed it there. */
+			const at = stale || full !== was.full ? { fullAt: entry?.full && full ? port.fullEntry(topOf(full)) : null } : {};
+			setRaw({ ...patch, ...bar, ...at });
+		};
+		/** The full screen read again: each level as the file now has it, a level whose task left its place falling back (F248), none left closing it. */
+		const fullOver = (s: Screen): Partial<Screen> => {
+			if (!s.full) return {};
+			const ids = [...s.full.ids];
+			let task: FullTask | null = null;
+			while (ids.length > 0 && !(task = port.full(ids[ids.length - 1]))) void port.leaveNotes(ids.pop()!);
+			return { full: task ? { ...s.full, ids, task } : null, ...(task ? {} : { fullTyping: false }) };
 		};
 		/** A menu closed, with a field typed in its stack. */
 		const closed = (s: Screen): Partial<Screen> => ({ layer: null, ...(s.entry?.stack ? NO_ENTRY : {}) });
 		/** The open menu over `data`: it shows its task as it now stands (a subtask typed into its stack, F108); a menu whose task is no longer shown closes. */
-		const menuOver = (s: Screen, data: ScreenData): Partial<Screen> => {
+		const menuOver = (s: Screen, data: ScreenData, full: Screen["full"] = s.full): Partial<Screen> => {
 			const layer = s.layer;
 			if (!layer || layer.model.kind !== "task") return {};
-			return layer.id in data.cards ? { layer: { ...layer, model: port.menu(layer.id, layer.from, s.dayOffset) } } : closed(s);
+			return layer.id in data.cards || (full !== null && layer.id in full.task.faces) ? { layer: { ...layer, model: port.menu(layer.id, layer.from, s.dayOffset) } } : closed(s);
 		};
 		/** The port's data again; held while a drag or a drop's write keeps the screen still (spec, principle 5). */
 		const refresh = () => {
@@ -344,10 +388,11 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 			const same = next === s.read;
 			const came = Object.keys(next.cards).filter((id) => !(id in known));
 			const went = Object.keys(known).filter((id) => !(id in next.cards));
-			const menu = menuOver(s, next);
+			const full = fullOver(s);
+			const menu = menuOver(s, next, "full" in full ? (full.full ?? null) : s.full);
 			const undo = { canUndo: port.canUndo(), canRedo: port.canRedo() };
-			if (same) return set({ shown: share(s.shown, next), pending: false, ...menu, ...undo });
-			set({ read: next, shown: share(s.shown, next), pending: false, readSeq: s.readSeq + 1, fresh: came.length === 0 ? NONE : new Set(came), gone: went.length === 0 ? NONE : new Set(went), ...menu, ...undo });
+			if (same) return set({ shown: share(s.shown, next), pending: false, ...menu, ...undo, ...full });
+			set({ ...full, read: next, shown: share(s.shown, next), pending: false, readSeq: s.readSeq + 1, fresh: came.length === 0 ? NONE : new Set(came), gone: went.length === 0 ? NONE : new Set(went), ...menu, ...undo });
 		};
 
 		const write = (done: Promise<unknown>) => {
@@ -483,6 +528,9 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 			contextSeq: 0,
 			reveal: null,
 			focusCard: null,
+			full: null,
+			fullAt: null,
+			fullTyping: false,
 
 			setStop(stop) {
 				set({ stop });
@@ -553,8 +601,79 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 				set({ entry: field, draft, entryText: text, entrySeq: get().entrySeq + 1, entryPanel: null, layer: field.stack ? { ...layer, asking: null } : null });
 			},
 			startNotes() {
+				const layer = get().layer;
+				/** On the full screen the notes are its own editor: the task opens there, the caret in them (F119). */
+				if (layer && (layer.from === "full" || layer.from === "fullSubtask")) {
+					set(closed(get()));
+					return get().openFull(layer.id, true);
+				}
 				get().startRename();
 				get().openDescription();
+			},
+			openFull(id, notes = false) {
+				const s = get();
+				const shown = s.full && topOf(s.full);
+				const ids = shown === id ? s.full!.ids : [...(s.full?.ids ?? []), id];
+				const task = port.full(id);
+				if (!task) return;
+				if (shown && shown !== id) void port.leaveNotes(shown);
+				set({ full: { ids, task, notesFocus: (s.full?.notesFocus ?? 0) + (notes ? 1 : 0) }, ...(s.entry ? NO_ENTRY : {}), layer: null, selected: null });
+			},
+			openFullFromMenu() {
+				const layer = get().layer;
+				if (!layer) return;
+				set(closed(get()));
+				get().openFull(layer.id);
+			},
+			fullUp() {
+				const s = get();
+				if (!s.full) return;
+				const shown = topOf(s.full);
+				if (s.full.ids.length > 1) {
+					void port.leaveNotes(shown);
+					const ids = s.full.ids.slice(0, -1);
+					const task = port.full(ids[ids.length - 1]);
+					if (task) return set({ full: { ...s.full, ids, task }, ...(s.entry ? NO_ENTRY : {}) });
+				}
+				const parent = s.full.task.parent;
+				if (!parent) return;
+				const task = port.full(parent.id);
+				void port.leaveNotes(shown);
+				if (task) set({ full: { ...s.full, ids: [parent.id], task }, ...(s.entry ? NO_ENTRY : {}) });
+			},
+			closeFull() {
+				const s = get();
+				if (!s.full) return;
+				for (const id of s.full.ids) void port.leaveNotes(id);
+				set({ full: null, fullTyping: false, ...(s.entry?.full ? NO_ENTRY : {}) });
+			},
+			tick(id) {
+				write(port.tick(id));
+			},
+			typeNotes(text) {
+				const full = get().full;
+				if (full) port.typeNotes(topOf(full), text);
+			},
+			focusNotes(focused) {
+				const full = get().full;
+				if (full) port.focusNotes(topOf(full), focused);
+			},
+			saveNotes() {
+				const full = get().full;
+				if (full) write(port.leaveNotes(topOf(full)));
+			},
+			showProject(name) {
+				get().closeFull();
+				get().setContext({ project: name });
+			},
+			setFullTyping(fullTyping) {
+				if (get().fullTyping !== fullTyping) set({ fullTyping });
+			},
+			fullPlus() {
+				const full = get().full;
+				if (!full) return;
+				const entry = port.subtaskPlace(topOf(full), get().dayOffset, "full");
+				set({ entry, draft: port.entryDraft(entry), entryText: "", entrySeq: get().entrySeq + 1, entryPanel: null, layer: null });
 			},
 			startSubtask() {
 				const layer = get().layer;

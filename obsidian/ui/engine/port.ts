@@ -192,6 +192,39 @@ export interface EntryField {
 	readonly renaming: string | null;
 	/** The field stands in an open menu's stack (a calendar task's new subtask, or a card of the stack renamed), not on the screen. */
 	readonly stack: boolean;
+	/**
+	 * The field stands on the full screen (F245, F246): a new last subtask of the task `at.under`, or the task `renaming`
+	 * renamed in its title or its card there; the full screen draws it where the port says (`fullEntry`).
+	 */
+	readonly full?: boolean;
+}
+
+/** Where the full screen draws its field (the core's `StackEntry`): in the title (the task shown renamed), or among its rows at `index`, a card renamed in its place or a new subtask at its depth. */
+export type FullEntryAt = { readonly kind: "title" } | { readonly kind: "row" | "new"; readonly index: number; readonly depth: number };
+
+/** A subtask's row on the full screen, every one at every depth, done and given up too (the core's `FullTree.rows`). */
+export interface FullRow {
+	readonly id: string;
+	readonly depth: number;
+	/** Its status, drawn: done fills its circle. */
+	readonly status: "todo" | "inProgress" | "done" | "cancelled";
+	/** Still to do: a closed one's title is struck. */
+	readonly open: boolean;
+}
+
+/**
+ * A task on the full screen (F239–F249; the design's «Задача на весь экран»): its title, the task it lies in (a level up),
+ * its first project (a subtask's its parent's), every subtask unfolded, the faces of the task and of every row, and its
+ * notes as the editor holds them (`seq`: a change made elsewhere replaces what the editor shows, a new `seq`).
+ */
+export interface FullTask {
+	readonly id: string;
+	readonly title: string;
+	readonly parent: { readonly id: string; readonly title: string } | null;
+	readonly project: string | null;
+	readonly rows: readonly FullRow[];
+	readonly faces: Readonly<Record<string, CardFace>>;
+	readonly notes: { readonly text: string; readonly seq: number };
 }
 
 /** A rename's field as it opens: where it stands, what its bar starts with (the task's level and project), its text. */
@@ -271,8 +304,8 @@ export interface ProjectPage {
 	readonly newLabel: string;
 }
 
-/** Where a task's menu is opened from: a list's card, a calendar's block, a card of a block's stack in its menu (F107). */
-export type MenuFrom = "list" | "calendar" | "stack";
+/** Where a task's menu is opened from: a list's card, a calendar's block, a card of a block's stack in its menu (F107), the full screen's task («⋯») or a subtask's card there. */
+export type MenuFrom = "list" | "calendar" | "stack" | "full" | "fullSubtask";
 
 /** How a timed task reminds on the iPhone. */
 export type ReminderKind = "live" | "notification" | "alarm" | "none";
@@ -323,6 +356,8 @@ export interface TaskMenuModel {
 	readonly repeat: RepeatPage;
 	/** The start of the task's description, over its copy (markdown); null without one. */
 	readonly peek: string | null;
+	/** The task whose notes the copy shows (a folded card's shown step, else the task): a tap on them opens it full screen (F129). */
+	readonly peekTask: string | null;
 	/** A calendar's task: its open subtasks, standing between its copy and the panel (F107); none elsewhere. */
 	readonly subtasks: readonly string[];
 }
@@ -440,6 +475,18 @@ export interface ScreenPort {
 	 * (a name of nothing, a folder's).
 	 */
 	newProject(name: string): Promise<string | null>;
+	/** The task `id` on the full screen, as the file now has it; null once it is gone from its place (F248). */
+	full(id: string): FullTask | null;
+	/** Where the full screen of `id` draws the open field (`EntryField.full`); null where it draws none. */
+	fullEntry(id: string): FullEntryAt | null;
+	/** The circle of a subtask on the full screen: done, or open again (F241). Resolves once written and read back. */
+	tick(id: string): Promise<void>;
+	/** The full screen's notes of `id` typed: written by the port after a pause in typing (F244). */
+	typeNotes(id: string, text: string): void;
+	/** The notes' editor took or lost the focus: a change made elsewhere replaces its text only while it has none. */
+	focusNotes(id: string, focused: boolean): void;
+	/** The full screen leaves `id` (Done, another level, Close): what waits is written now. */
+	leaveNotes(id: string): Promise<void>;
 	/** The Repeat page after a tap on it (the core's `editRepeat`); null when the tap changes nothing or would make a rule the file can't take. */
 	repeatEdit(page: RepeatPage, change: RepeatChange): RepeatPage | null;
 	/** What the menu of the task or event `id` offers, opened `from` there on the screen of the day `dayOffset` days from today. */

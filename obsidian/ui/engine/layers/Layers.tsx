@@ -421,3 +421,26 @@ export function BarPanel({ open, onClose, reference, capsule, away, className, c
 		</div>
 	);
 }
+
+/**
+ * A sheet over the whole screen (the full-screen task, F239): one layer of the layer stack, a Floating UI element with
+ * the menu's transition status (`is-shown`, `is-closing`, mounted while it fades); Escape closes it while `escapes` (no
+ * menu over it, nothing typed in it: `useDismiss`, the key table takes no Escape then). It stands in the screen's own
+ * element, under the menus' layers.
+ */
+export function Sheet({ open, onClose, escapes, className, children }: { readonly open: boolean; readonly onClose: () => void; readonly escapes: boolean; readonly className: string; readonly children: ReactNode }) {
+	const { refs, context } = useFloating({
+		open,
+		onOpenChange: (next) => {
+			if (!next) onClose();
+		},
+	});
+	const { getFloatingProps } = useInteractions([useDismiss(context, { escapeKey: escapes, outsidePress: false })]);
+	const { isMounted, status } = useTransitionStatus(context, { duration: { open: LAYER_MS.open, close: LAYER_MS.close } });
+	if (!isMounted) return null;
+	return (
+		<div ref={refs.setFloating} className={`tc-sheet ${className}${motionClass(status, true)}`} {...getFloatingProps()}>
+			{children}
+		</div>
+	);
+}

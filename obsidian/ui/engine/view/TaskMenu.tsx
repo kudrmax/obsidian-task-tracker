@@ -39,6 +39,8 @@ interface MenuSteps {
 	actHere(action: MenuAction): void;
 	nameMenuProject(name: string): void;
 	menuRepeat(change: RepeatChange): void;
+	openFullFromMenu(): void;
+	openFull(id: string): void;
 }
 
 interface ActionLook {
@@ -79,7 +81,7 @@ const MENU_ACTIONS: Readonly<Record<TaskMenuActionId, ActionLook | { readonly ti
 	section: { label: "Section", icon: "section", onPick: (_, steps) => steps.menuPage("sections") },
 	subtask: { label: "Subtask", icon: "subtask", onPick: (_, steps) => steps.startSubtask(), tile: "steps" },
 	firstStep: { label: "First step", icon: "firstStep", onPick: leave, tile: "steps" },
-	openFull: { label: "Open full screen", icon: "fullScreen", onPick: leave, tile: "opens" },
+	openFull: { label: "Open full screen", icon: "fullScreen", onPick: (_, steps) => steps.openFullFromMenu(), tile: "opens" },
 	openInObsidian: { label: "Open in Obsidian", icon: "openFile", onPick: leave, tile: "opens" },
 	delete: { label: "Delete", icon: "delete", onPick: (action, steps) => (action.asks ? steps.ask("delete") : steps.pick({ kind: "delete" })) },
 };
@@ -150,7 +152,7 @@ export const TaskMenu = memo(function TaskMenu() {
 			label={model.kind === "event" ? "Event menu" : "Task menu"}
 			over={
 				<>
-					<MenuCopy id={shown.layer.stack?.of ?? shown.layer.id} look={shown.look} notes={model.kind === "task" && !shown.layer.stack && typing === null ? model.peek : null} />
+					<MenuCopy id={shown.layer.stack?.of ?? shown.layer.id} look={shown.look} notes={model.kind === "task" && !shown.layer.stack && typing === null ? model.peek : null} notesOf={model.kind === "task" ? model.peekTask : null} />
 					{shown.layer.stack ? (
 						<Stack ids={shown.layer.stack.ids} typing={false} renaming={typing === "rename" ? shown.layer.id : null} pressed={shown.layer.id} />
 					) : model.kind === "task" && (model.subtasks.length > 0 || typing === "subtask") ? (
@@ -373,8 +375,8 @@ export function MonthGrid({ today, picked, onPick }: { readonly today: string; r
  * list's card, a calendar's block in its look there, or an event (F90). A task's notes stand in it under the title, in
  * Obsidian's own markdown as on the full screen, the copy as wide as the menu (Decision 124, Max's variant 2).
  */
-function MenuCopy({ id, look, notes }: { readonly id: string; readonly look: BlockLook | null; readonly notes: string | null }) {
-	const face = useScreen((s) => s.shown.cards[id]);
+function MenuCopy({ id, look, notes, notesOf }: { readonly id: string; readonly look: BlockLook | null; readonly notes: string | null; readonly notesOf: string | null }) {
+	const face = useScreen((s) => s.shown.cards[id] ?? s.full?.task.faces[id]);
 	const block = useScreen((s) => s.shown.day.blocks.find((b) => b.id === id));
 	const event = useScreen((s) => s.shown.day.events.find((e) => e.id === id) ?? s.shown.day.allDay.find((e) => e.id === id));
 	const selected = useScreen((s) => s.selected === id);
@@ -394,13 +396,13 @@ function MenuCopy({ id, look, notes }: { readonly id: string; readonly look: Blo
 		return (
 			<div className={`tc-lifted is-block is-whole${notes ? " has-notes" : ""}`} data-lifted={id}>
 				<CardFace face={face} block={look ?? { corner: null, pill: null, clock: block.clock }} className={`tc-block-card${selected ? " is-selected" : ""}`}>
-					{notes ? <CopyNotes text={notes} /> : null}
+					{notes ? <CopyNotes text={notes} of={notesOf} /> : null}
 				</CardFace>
 			</div>
 		);
 	return (
 		<CardFace face={face} className={`tc-lifted is-whole${notes ? " has-notes" : ""}`} data-lifted={id}>
-			{notes ? <CopyNotes text={notes} /> : null}
+			{notes ? <CopyNotes text={notes} of={notesOf} /> : null}
 		</CardFace>
 	);
 }
@@ -410,13 +412,14 @@ function MenuCopy({ id, look, notes }: { readonly id: string; readonly look: Blo
  * look of notes, read here and typed in the field's notes line); a long one fades at its foot. They unfold as the menu
  * opens.
  */
-function CopyNotes({ text }: { readonly text: string }) {
+function CopyNotes({ text, of }: { readonly text: string; readonly of: string | null }) {
+	const api = useScreenApi();
 	const { markdown, sourcePath } = useHost();
 	const el = useRef<HTMLDivElement>(null);
 	useEffect(() => (el.current ? markdown(text, el.current, sourcePath) : undefined), [markdown, text, sourcePath]);
 	return (
 		<div className="tc-copy-notes">
-			<div ref={el} className="tc-desc-text tc-notes markdown-rendered" />
+			<div ref={el} className="tc-desc-text tc-notes markdown-rendered" onClick={(event) => of !== null && !(event.target as Element).closest("a") && api.getState().openFull(of)} />
 		</div>
 	);
 }

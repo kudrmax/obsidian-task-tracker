@@ -89,7 +89,7 @@ export const QuickBar = memo(function QuickBar({ reach }: { readonly reach: read
 	const shifts = bar.bar.find(({ group }) => group === "shifts");
 	const right = bar.bar.filter(({ group }) => group !== "mode" && group !== "shifts");
 	return (
-		<FieldBar desk={desk} over={entry.stack ? layerRoot : null} className="tc-quick-bar is-engine">
+		<FieldBar desk={desk} over={entry.stack || entry.full ? layerRoot : null} className="tc-quick-bar is-engine">
 			{(side, capsule) => {
 				const away = side === "under" ? "under" : "over";
 				return (
