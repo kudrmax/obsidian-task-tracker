@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { descendantsOf, finalOrder, levelAt, levelBetween, spotKey, SWIPE_REST_MS, SWIPE_STEP, shiftOf, slotOf, SwipeLevel } from "../../../obsidian/ui/engine/drag/tree";
+import { descendantsOf, finalOrder, levelAt, levelBetween, sectionBefore, sectionOrder, spotKey, SWIPE_REST_MS, SWIPE_STEP, shiftOf, slotOf, SwipeLevel } from "../../../obsidian/ui/engine/drag/tree";
 import type { Row } from "../../../obsidian/ui/engine/port";
 import { coreLevels } from "./coreRules";
 
@@ -17,7 +17,7 @@ describe("a carried card's level where it stands", () => {
 	});
 	it("at the top of a list, or right under a section's header, a task", () => {
 		expect(levelAt(coreLevels, rows, "c", "a", 3)).toBe(0);
-		expect(levelBetween(coreLevels, { kind: "section", id: "s", title: "Идеи" }, task("x"), 3)).toBe(0);
+		expect(levelBetween(coreLevels, { kind: "section", id: "s", title: "Идеи", tasks: 0, ungrouped: false, menu: null }, task("x"), 3)).toBe(0);
 	});
 	it("takes the level asked for where it now stands", () => {
 		expect(levelAt(coreLevels, rows, "a", "b2", 2)).toBe(2);
@@ -26,7 +26,7 @@ describe("a carried card's level where it stands", () => {
 });
 
 describe("where a card stands among a list's rows", () => {
-	const rows: Row[] = [task("a"), { kind: "section", id: "s1", title: "Идеи" }, task("x"), { kind: "section", id: "s2", title: "Пустая" }];
+	const rows: Row[] = [task("a"), { kind: "section", id: "s1", title: "Идеи", tasks: 0, ungrouped: false, menu: null }, task("x"), { kind: "section", id: "s2", title: "Пустая", tasks: 0, ungrouped: false, menu: null }];
 	it("right after an empty section's header: in that section, at its end", () => {
 		expect(slotOf(rows, ["a", "s1", "x", "s2", "c"], "c")).toEqual({ section: "s2", before: null });
 	});
@@ -45,7 +45,7 @@ describe("a carried card's subtasks", () => {
 });
 
 describe("the list's final order while a card is held (the sorting strategy)", () => {
-	const rows: Row[] = [task("a"), task("b"), { kind: "section", id: "s", title: "Пустая" }, { kind: "section", id: "t", title: "Дальше" }, task("x")];
+	const rows: Row[] = [task("a"), task("b"), { kind: "section", id: "s", title: "Пустая", tasks: 0, ungrouped: false, menu: null }, { kind: "section", id: "t", title: "Дальше", tasks: 0, ungrouped: false, menu: null }, task("x")];
 	const ids = rows.map((row) => row.id);
 	it("is dnd-kit's: the card moves to where it stands, an empty section's header like any row", () => {
 		expect(finalOrder(ids, 0, 2)).toEqual(["b", "s", "a", "t", "x"]);
@@ -130,5 +130,26 @@ describe("the carried card's level by swipes on its place (Max, 2026-11-18)", ()
 	it("a spot is named by its neighbours", () => {
 		expect(spotKey("inbox", ["a", "x", "b"], "x")).toBe("inbox|a|b");
 		expect(spotKey("inbox", ["x"], "x")).toBe("inbox||");
+	});
+});
+
+describe("a lifted section's place (F63)", () => {
+	const sections = new Set(["s1", "s2", "s3"]);
+	const ids = ["s1", "a", "s2", "b", "c", "s3", "d"];
+	it("carried up over a header: before it", () => {
+		expect(sectionOrder(ids, sections, 5, 2)).toEqual(["s1", "a", "s3", "s2", "b", "c", "d"]);
+		expect(sectionBefore(sectionOrder(ids, sections, 5, 2), sections, "s3")).toBe("s2");
+	});
+	it("carried down over a header: after that header's whole group", () => {
+		const order = sectionOrder(ids, sections, 0, 2);
+		expect(order).toEqual(["a", "s2", "b", "c", "s1", "s3", "d"]);
+		expect(sectionBefore(order, sections, "s1")).toBe("s3");
+	});
+	it("carried down over the last header: the list's end", () => {
+		expect(sectionBefore(sectionOrder(ids, sections, 0, 5), sections, "s1")).toBeNull();
+	});
+	it("over a task or over itself: where it was", () => {
+		expect(sectionOrder(ids, sections, 2, 3)).toBe(ids);
+		expect(sectionOrder(ids, sections, 2, 2)).toBe(ids);
 	});
 });

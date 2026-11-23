@@ -2,7 +2,7 @@ import { DESIGN } from "../../shared/design";
 import { createStore, type StoreApi } from "zustand/vanilla";
 import { EVERY_TASK } from "../port";
 import { type Stop, stopShowing } from "../layout/columns";
-import type { Destination, DividerStop, Edge, ScreenContext, UndoOutcome, EntryBar, EntryDraft, EntryField, FieldActionId, LevelRange, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, MenuStatusId, ScreenData, ScreenPort } from "../port";
+import type { Destination, SectionNameEnd, DividerStop, Edge, ScreenContext, UndoOutcome, EntryBar, EntryDraft, EntryField, FieldActionId, LevelRange, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, MenuStatusId, ScreenData, ScreenPort } from "../port";
 import { share } from "./share";
 
 export type { Stop };
@@ -130,6 +130,8 @@ interface ScreenState {
 	readonly focusCard: { readonly id: string; readonly seq: number } | null;
 	/** A task to bring into sight in its list, once per `seq`. */
 	readonly reveal: { readonly id: string; readonly seq: number } | null;
+	/** A section's header renamed in place (F62): its list and its id while its name is typed, and the two as one key (`sectionKey`). */
+	readonly sectionField: { readonly key: string; readonly list: ListId; readonly id: string } | null;
 }
 
 interface ScreenActions {
@@ -162,12 +164,25 @@ interface ScreenActions {
 	/** The carried task let go at `to` (null: cancelled, or let go where nothing takes it). */
 	drop(id: string, to: Destination | null): void;
 	/**
+	 * The lifted section `id` of `list` let go before the header `to.before` (null: the list's end; `to` null: cancelled or
+	 * let go where it was): drawn there at once by the port's preview and written (F63).
+	 */
+	dropSection(list: ListId, id: string, to: { readonly before: string | null } | null): void;
+	/**
 	 * Opens the menu of the task or event `id`, opened `from` there (a list's card unless said). `reveal`: a tap, not a finger
 	 * still held: a card partly out of its list's sight is scrolled into it first (the design's «Полная карточка»). It opens
 	 * at once: no double click is waited out (Max, 2026-11-20: the wait felt like lag; double click withdrawn).
 	 */
 	openMenu(id: string, from?: MenuFrom, reveal?: boolean): void;
 	closeLayer(): void;
+	/** A tap on a section's header (F62): its menu, Rename and Remove section as the port offers them; No section's offers none and opens nothing. */
+	openSectionMenu(list: ListId, id: string): void;
+	/** Rename in a section's menu: the menu closes and in the same tap the header becomes its name's field. */
+	startSectionRename(): void;
+	/** Remove section in a section's menu: the menu closes, and once it has faded out the heading goes, its tasks joining No section. */
+	removeSection(): void;
+	/** The section's name ended by Enter, Escape or a tap elsewhere: what the port says the end writes, written; the field closes. */
+	endSectionName(how: SectionNameEnd, text: string): void;
 	/** The open menu shows another page. */
 	menuPage(page: MenuPage): void;
 	/** The open menu asks before it acts (null: the question taken back, the menu as it was). */
@@ -292,6 +307,9 @@ const HOLDING: readonly (Gesture | null)[] = ["drag", "resize"];
 /** The share a device that kept none opens with: the divider in the middle, the day list and its calendar in halves. */
 const HALVES = 0.5;
 
+/** A section's header in a list, as one key: the same section may head a group in two lists (a later day's Soon). */
+export const sectionKey = (list: ListId, id: string): string => `${list}/${id}`;
+
 /** One store per mounted screen, over its port (spec, «Screen state»); `zoom`, the calendar's zoom the host kept. */
 export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, listShare = HALVES, opening: ScreenContext = EVERY_TASK): ScreenStore {
 	/** Writes of the screen's own not yet read back: their reads come together once the last is in. */
@@ -322,6 +340,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 		/** The open menu over `data`: it shows its task as it now stands (a subtask typed into its stack, F108); a menu whose task is no longer shown closes. */
 		const menuOver = (s: Screen, data: ScreenData): Partial<Screen> => {
 			const layer = s.layer;
+			if (layer?.model.kind === "section") return data.lists[layer.model.list].rows.some((row) => row.id === layer.id) ? {} : closed(s);
 			if (!layer || layer.model.kind !== "task") return {};
 			return layer.id in data.cards ? { layer: { ...layer, model: port.menu(layer.id, layer.from, s.dayOffset) } } : closed(s);
 		};
@@ -384,6 +403,14 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 					if (text) set({ notice: { text, seq: (get().notice?.seq ?? 0) + 1 } });
 				}),
 			);
+		};
+		/** The menu closes at once, and what was tapped in it is written once it has faded out (F132): the screen's reads wait for it. */
+		const afterClose = (act: () => Promise<unknown>) => {
+			get().layerGone();
+			set({ layer: null });
+			let done: () => void = () => undefined;
+			write(new Promise<void>((resolve) => (done = resolve)));
+			picked = () => void act().finally(done);
 		};
 		/** The card `id` takes the focus back, as a menu closing gives it back (Decision 58). */
 		const focusOn = (id: string) => set({ focusCard: { id, seq: (get().focusCard?.seq ?? 0) + 1 } });
@@ -476,6 +503,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 			contextSeq: 0,
 			reveal: null,
 			focusCard: null,
+			sectionField: null,
 
 			setStop(stop) {
 				set({ stop });
@@ -540,6 +568,16 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 				set({ lifted: null, liftedDepth: null });
 				get().release("drag");
 			},
+			dropSection(list, id, to) {
+				const { dayOffset, context } = get();
+				if (to && port.sectionMoves(list, dayOffset, id, to.before)) {
+					set({ shown: share(get().shown, port.previewSection(list, dayOffset, id, to.before, context)) });
+					write(port.moveSection(list, dayOffset, id, to.before));
+				} else get().carryHome();
+				home = null;
+				set({ lifted: null, liftedDepth: null });
+				get().release("drag");
+			},
 			openMenu(id, from = "list", reveal = false) {
 				if (reveal) set({ reveal: { id, seq: (get().reveal?.seq ?? 0) + 1 } });
 				const over = get().layer;
@@ -573,12 +611,29 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 			},
 			pick(action) {
 				const layer = get().layer;
-				if (!layer) return;
-				get().layerGone();
-				set({ layer: null });
-				let done: () => void = () => undefined;
-				write(new Promise<void>((resolve) => (done = resolve)));
-				picked = () => void port.act(layer.id, action, layer.from, get().dayOffset).finally(done);
+				if (layer) afterClose(() => port.act(layer.id, action, layer.from, get().dayOffset));
+			},
+			openSectionMenu(list, id) {
+				const row = get().shown.lists[list].rows.find((r) => r.id === id);
+				if (row?.kind !== "section" || !row.menu) return;
+				set({ layer: { kind: "menu", id, from: "list", model: { kind: "section", list, title: row.title, ...row.menu }, page: "menu", asking: null, asked: null, stack: null }, selected: null });
+			},
+			startSectionRename() {
+				const layer = get().layer;
+				if (layer?.model.kind !== "section") return;
+				set({ layer: null, sectionField: { key: sectionKey(layer.model.list, layer.id), list: layer.model.list, id: layer.id } });
+			},
+			removeSection() {
+				const layer = get().layer;
+				const model = layer?.model;
+				if (layer && model?.kind === "section") afterClose(() => port.removeSection(model.list, get().dayOffset, layer.id));
+			},
+			endSectionName(how, text) {
+				const field = get().sectionField;
+				if (!field) return;
+				set({ sectionField: null });
+				const name = port.sectionNameEnd(how, text);
+				if (name !== null) write(port.renameSection(field.list, get().dayOffset, field.id, name));
 			},
 			layerGone() {
 				const run = picked;

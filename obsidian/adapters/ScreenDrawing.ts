@@ -11,7 +11,7 @@ export interface ScreenSource {
 	readonly held?: { readonly id: string; readonly start: number; readonly end: number | null };
 }
 
-const LIST_COLUMNS: Readonly<Record<ListId, "inbox" | "soon" | "day">> = { inbox: "inbox", soon: "soon", day: "day" };
+const LIST_COLUMNS: Readonly<Record<ListId, DropColumn>> = { inbox: "inbox", backlog: "backlog", soon: "soon", day: "day" };
 
 /**
  * The core's answers in the engine's words (`engine/port.ts`): each list as `columnView` reads it, each card as its
@@ -32,7 +32,7 @@ export class ScreenDrawing {
 	}
 
 	listsOf(screen: ScreenView): Readonly<Record<ListId, ColumnList>> {
-		return { inbox: this.column(screen, LIST_COLUMNS.inbox), soon: this.column(screen, LIST_COLUMNS.soon), day: this.column(screen, LIST_COLUMNS.day) };
+		return { inbox: this.column(screen, LIST_COLUMNS.inbox), backlog: this.column(screen, LIST_COLUMNS.backlog), soon: this.column(screen, LIST_COLUMNS.soon), day: this.column(screen, LIST_COLUMNS.day) };
 	}
 
 	draw(source: ScreenSource): ScreenData {
@@ -42,6 +42,7 @@ export class ScreenDrawing {
 		return {
 			lists: {
 				inbox: this.list(this.tasks.listName("inbox"), lists.inbox, screen, cards, null),
+				backlog: this.list(this.tasks.listName("backlog"), lists.backlog, screen, cards, null),
 				soon: this.list(this.tasks.listName("soon"), lists.soon, screen, cards, null),
 				day: this.list(title, lists.day, screen, cards, date),
 			},
@@ -81,7 +82,7 @@ export class ScreenDrawing {
 	private list(title: string, column: ColumnList, screen: ScreenView, cards: Record<string, CardFace>, day: LocalDate | null): ListData {
 		const rows: Row[] = [];
 		for (const group of column.groups) {
-			if (group.header) rows.push({ kind: "section", id: group.id, title: group.name ?? screen.offer.ungrouped });
+			if (group.header) rows.push({ kind: "section", id: group.id, title: group.name ?? screen.offer.ungrouped, tasks: group.items.length, ungrouped: group.name === null, menu: group.menu && { rename: group.menu.rename, remove: group.menu.remove } });
 			for (const { item, level } of group.rows) {
 				cards[item.id] = this.face(item, day);
 				rows.push({ kind: "task", id: item.id, depth: level });

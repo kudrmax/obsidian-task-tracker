@@ -244,6 +244,8 @@ body {
 	--tc-foot-fade: 64px;
 	/* Its height, from over the switch. */
 	--tc-foot-fade-day: calc(var(--tc-switch-row) + var(--tc-chrome-room) + var(--tc-foot-fade));
+	/* Backlog's half of the first column is taller by the screen's foot lying over it, so both lists show as much (the design's «Inbox над Backlog»). */
+	--tc-backlog-extra: calc(var(--tc-space-8) + var(--tc-foot-fade-day));
 	/* The dragged card stands a little taller than the one it was lifted from. */
 	/* The stand's note block: the room the engine's screen takes in a note. */
 	/* Over the Projects screen's tree a carried card or project rides this far above the finger. */
@@ -1192,7 +1194,7 @@ body:not(.is-mobile) .tc-stage-col.is-timeline > .tc-stage-head { padding: 0 var
  * `listWidths` draws it; the calendar takes the rest of the window (`50%` of the strip is the window). A step of the
  * divider into the middle or out of it glides.
  */
-.tc-ribbon-track > .tc-stage-col:not(.is-timeline) :is(.tc-stage-head, .tc-stage-body) { padding: var(--tc-column-pad-ribbon); }
+.tc-ribbon-track > .tc-stage-col:not(.is-timeline) :is(.tc-stage-head, .tc-stage-body, .tc-backlog-head) { padding: var(--tc-column-pad-ribbon); }
 .tc-ribbon-track > .tc-stage-col:is(.is-day, .is-timeline) { --tc-ribbon-list-width: clamp(var(--tc-ribbon-list-least), calc(var(--tc-ribbon-list-share) * (50% - var(--tc-divider))), max(var(--tc-ribbon-list-most), calc(50% - var(--tc-divider) - var(--tc-ribbon-list-least)))); }
 .tc-ribbon-track > .tc-stage-col.is-timeline { width: calc(50% - var(--tc-ribbon-list-width) - var(--tc-divider) / 2); padding-left: calc(var(--tc-divider) / 2); box-sizing: border-box; }
 .tc-ribbon-track > .tc-stage-col:is(.is-day, .is-timeline) { transition: --tc-ribbon-list-share var(--tc-duration-snap) var(--tc-ease-out); }
@@ -1200,6 +1202,10 @@ body:not(.is-mobile) .tc-stage-col.is-timeline > .tc-stage-head { padding: 0 var
 .tc-rule { flex: none; width: 0; position: relative; z-index: var(--tc-layer-rule); }
 .tc-rule-strip { position: absolute; left: calc(-1 * var(--tc-divider) / 2); top: var(--tc-columns-head); bottom: 0; width: var(--tc-divider); display: flex; justify-content: center; pointer-events: none; }
 .tc-rule-strip.is-divider { pointer-events: auto; touch-action: none; cursor: col-resize; }
+/* The first column is Inbox over Backlog, half and half, each list scrolling by itself; Backlog's title stands in its half under a line, as a column's stands over it; Inbox's list ends over the line. */
+.tc-backlog { position: relative; flex: 1 1 var(--tc-backlog-extra); min-height: 0; display: flex; flex-direction: column; border-top: var(--tc-hairline) solid var(--tc-line); }
+.tc-backlog-head { flex: none; height: var(--tc-day-row); margin: var(--tc-space-8) 0 var(--tc-space-12); box-sizing: border-box; display: flex; align-items: center; }
+.task-calendar .tc-stage-body.is-inbox-half .tc-list::after { height: var(--tc-space-8); }
 /* A region that slides (the shown day's list and its calendar): one layer filling its column, the next sliding in beside it. */
 .tc-slide { position: absolute; inset: 0; display: flex; flex-direction: column; }
 .tc-slide > .tc-stage-body > .tc-timeline { top: 0; }
@@ -1226,7 +1232,16 @@ body:not(.is-mobile) .tc-stage-col.is-timeline > .tc-stage-head { padding: 0 var
 .tc-list-item { display: flow-root; padding-bottom: var(--tc-card-gap); }
 /* A row leaving (Decision 132): it fades where it stands and takes no press. */
 .task-calendar .is-leaving { pointer-events: none; }
-.tc-list-item > .tc-group-head, .tc-list-item > .tc-drag-source > .tc-group-head { margin-top: var(--tc-section-gap); }
+.tc-list-item > .tc-group-head, .tc-list-item > .tc-drag-source > .tc-group-head, .tc-list-item > .tc-group-slot { margin-top: var(--tc-section-gap); }
+/* A section renamed where its header stands (F62): the field takes the header's height and place, so nothing under it moves. */
+.tc-group-slot.is-rename { height: var(--tc-group-head-h); margin-bottom: calc(-1 * var(--tc-card-gap)); }
+.task-calendar .tc-group-slot.is-rename > .tc-quick-field { min-height: 0; height: 100%; padding-top: 0; padding-bottom: 0; display: flex; align-items: center; }
+.tc-group-slot.is-rename > .tc-quick-field > * { flex: 1; min-width: 0; }
+/* A lifted section (F63): its place between the groups is a dashed capsule of a card's height, the gaps of a group around it. */
+.tc-drag-source.is-lifted > .tc-group-head { height: var(--tc-card-h); margin-bottom: 0; border-radius: var(--tc-radius-card); outline: var(--tc-hairline) dashed var(--tc-dash); outline-offset: calc(-1 * var(--tc-hairline)); }
+.tc-drag-source.is-lifted > .tc-group-head > * { visibility: hidden; }
+/* The lifted section's plate: a carried card's, its name in the header's weight, how many tasks it holds on the right. */
+.tc-section-plate > .tc-card-title { font-weight: var(--tc-weight-semibold); }
 /* The calendar's tasks and events lie over each other in the stack's order (--tc-stack-z), inside the items: the now line stays over them all. */
 .task-calendar.is-engine .tc-items { isolation: isolate; }
 .task-calendar.is-engine .tc-items > :is(.tc-block, .tc-event) { z-index: var(--tc-stack-z); }

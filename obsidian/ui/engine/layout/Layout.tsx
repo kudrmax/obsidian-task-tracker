@@ -53,7 +53,7 @@ function RibbonColumns() {
 		<div className="tc-ribbon" ref={ribbon} {...bind()}>
 			<DayTurnContext.Provider value={turn}>
 				<RibbonTrack at={at} className="tc-ribbon-track" width={STRIP_WIDTH} share={COLUMN_SHARE}>
-					<ListColumn list="inbox" />
+					<InboxColumn />
 					<ColumnRule at={at} stop="inbox" />
 					<ListColumn list="soon" />
 					<ColumnRule at={at} stop="soon" />
@@ -213,6 +213,31 @@ const ListColumn = memo(function ListColumn({ list, share = COLUMN_SHARE }: { re
 			<ColumnHead title={title} />
 			<div className="tc-stage-body">
 				<TaskList list={list} />
+			</div>
+		</ColumnBox>
+	);
+});
+
+/**
+ * The ribbon's first column (the design's «Inbox над Backlog»): Inbox over Backlog, half and half, each list scrolling by
+ * itself; Backlog's title stands in its half under a line, as a column's stands over it.
+ */
+const InboxColumn = memo(function InboxColumn() {
+	const inbox = useData((d) => d.lists.inbox.title);
+	const backlog = useData((d) => d.lists.backlog.title);
+	return (
+		<ColumnBox className="is-inbox">
+			<ColumnHead title={inbox} />
+			<div className="tc-stage-body is-inbox-half">
+				<TaskList list="inbox" />
+			</div>
+			<div className="tc-backlog">
+				<header className="tc-backlog-head">
+					<div className="tc-head-title">{backlog}</div>
+				</header>
+				<div className="tc-stage-body">
+					<TaskList list="backlog" />
+				</div>
 			</div>
 		</ColumnBox>
 	);

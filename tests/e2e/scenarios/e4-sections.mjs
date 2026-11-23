@@ -36,14 +36,19 @@ export default {
 		const soon = await listOf(t, "Soon");
 		t.expect(soon.at(-1) === "Купить подарок" && soon.indexOf("### Поездка") < soon.indexOf("Купить подарок"), `under a section's last card: its end: ${JSON.stringify(soon)}`);
 
-		const toIdeas = await rowBy(t, "Купить молоко");
+		/** Inbox is the upper half of its column (F27): the section «Идеи» is scrolled to its middle, the card above it in sight. */
+		await t.cdp.eval(`(async () => { const l = document.querySelector('[data-list="inbox"]'); l.scrollTop = l.scrollHeight; await new Promise((r) => setTimeout(r, 300)); const head = [...l.querySelectorAll(".tc-group-head")].find((h) => h.textContent === "Идеи"); l.scrollTop += head.getBoundingClientRect().top - (l.getBoundingClientRect().top + l.clientHeight / 2); return 1; })()`);
+		await t.sleep(400);
+		const lines = await listOf(t, "Inbox");
+		const mover = lines[lines.indexOf("### Идеи") - 1];
+		const toIdeas = await rowBy(t, mover);
 		await carry(t, toIdeas, once(async () => {
 			const head = await rowBy(t, "Идеи");
 			return { x: head.x, y: head.y };
 		}));
 		await t.sleep(500);
 		let inbox = await listOf(t, "Inbox");
-		t.expect(inbox.indexOf("Купить молоко") > inbox.indexOf("### Идеи") && inbox.indexOf("Купить молоко") < inbox.indexOf("### Пустая секция"), `onto a section's header: into the section: ${JSON.stringify(inbox)}`);
+		t.expect(inbox.indexOf(mover) > inbox.indexOf("### Идеи") && inbox.indexOf(mover) < inbox.indexOf("### Пустая секция"), `onto a section's header: into the section: ${JSON.stringify(inbox)}`);
 
 		await t.cdp.eval(`(() => { const l = document.querySelector('[data-list="inbox"]'); l.scrollTop = l.scrollHeight; return 1; })()`);
 		await t.sleep(400);

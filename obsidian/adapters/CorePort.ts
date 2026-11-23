@@ -1,5 +1,5 @@
-import { levelRange, sameSlot, type CalendarService, dividerAt, type DividerStop, LIST_WIDTHS, listShareOf, type ListWidths, listWidths, type Clock, type DayEvents, type DayChange, type DayService, type DropColumn, type DroppedTask, type DropTo, type LocalDate, listCardMenuFrom, type MenuFrom as CoreMenuFrom, originOf, type ScreenReader, type ShownChange, type TaskItem, type TaskService, type UndoOutcome, undoNotice, projectNodeOf, type ProjectsNodeId, type UndoService } from "../../core/application/contracts";
-import type { ScreenContext, Destination, Edge, EntryBar, EntryCommit, EntryDraft, EntryField, LevelRange, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, RenameStart, ScreenData, ScreenPort } from "../ui/engine/port";
+import { type ColumnList, groupPlaceOf, SectionNameEntry, levelRange, sameSlot, type CalendarService, dividerAt, type DividerStop, LIST_WIDTHS, listShareOf, type ListWidths, listWidths, type Clock, type DayEvents, type DayChange, type DayService, type DropColumn, type DroppedTask, type DropTo, type LocalDate, listCardMenuFrom, type MenuFrom as CoreMenuFrom, originOf, type ScreenReader, type ShownChange, type TaskItem, type TaskService, type UndoOutcome, undoNotice, projectNodeOf, type ProjectsNodeId, type UndoService } from "../../core/application/contracts";
+import type { ScreenContext, SectionNameEnd, Destination, Edge, EntryBar, EntryCommit, EntryDraft, EntryField, LevelRange, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, RenameStart, ScreenData, ScreenPort } from "../ui/engine/port";
 import { CoreEntry } from "./CoreEntry";
 import { WriteQueue } from "./WriteQueue";
 import { ListCards } from "./ListCards";
@@ -31,7 +31,7 @@ type CoreMove =
 /** The context of every task: no project chosen. */
 const EVERY = "";
 
-const COLUMNS: Readonly<Record<ListId, DropColumn>> = { inbox: "inbox", soon: "soon", day: "day" };
+const COLUMNS: Readonly<Record<ListId, DropColumn>> = { inbox: "inbox", backlog: "backlog", soon: "soon", day: "day" };
 
 /**
  * What every screen's port over the core shares (Decision 145): the core's held read of the file, taken anew when the
@@ -301,6 +301,55 @@ export class CorePort implements ScreenPort {
 		await this.refresh();
 	}
 
+	sectionNameEnd(how: SectionNameEnd, text: string): string | null {
+		let name: string | null = null;
+		const entry = new SectionNameEntry((ended) => (name = ended));
+		if (how === "enter") entry.enter(text);
+		else if (how === "escape") entry.escape();
+		else entry.blur();
+		return name;
+	}
+
+	async renameSection(list: ListId, dayOffset: number, section: string, name: string): Promise<void> {
+		const found = this.sectionOf(list, dayOffset, section);
+		if (!found?.group.menu?.rename) return;
+		await this.core.tasks.renameGroup(found.list, found.group.menu.section, name);
+		await this.refresh();
+	}
+
+	async removeSection(list: ListId, dayOffset: number, section: string): Promise<void> {
+		const found = this.sectionOf(list, dayOffset, section);
+		if (!found?.group.menu?.remove) return;
+		await this.core.tasks.removeGroup(found.list, found.group.menu.section);
+		await this.refresh();
+	}
+
+	sectionMoves(list: ListId, dayOffset: number, section: string, before: string | null): boolean {
+		return this.groupMove(list, dayOffset, section, before) !== null;
+	}
+
+	async moveSection(list: ListId, dayOffset: number, section: string, before: string | null): Promise<void> {
+		const move = this.groupMove(list, dayOffset, section, before);
+		if (!move) return;
+		await this.core.tasks.moveGroup(move.list, move.name, move.place);
+		await this.refresh();
+	}
+
+	/** The screen read now with the section's header and its rows standing before the header `before` (the list's end for null), as `moveGroup` leaves them. */
+	previewSection(list: ListId, dayOffset: number, section: string, before: string | null, context?: ScreenContext): ScreenData {
+		const data = this.read(dayOffset, context);
+		const rows = data.lists[list].rows;
+		const from = rows.findIndex((row) => row.id === section);
+		if (from < 0 || !this.sectionMoves(list, dayOffset, section, before)) return data;
+		let to = from + 1;
+		while (to < rows.length && rows[to].kind !== "section") to++;
+		const moved = rows.slice(from, to);
+		const rest = [...rows.slice(0, from), ...rows.slice(to)];
+		const at = before === null ? rest.length : rest.findIndex((row) => row.id === before);
+		const next = [...rest.slice(0, at < 0 ? rest.length : at), ...moved, ...rest.slice(at < 0 ? rest.length : at)];
+		return { ...data, lists: { ...data.lists, [list]: { ...data.lists[list], rows: next } } };
+	}
+
 	readonly listBounds = LIST_WIDTHS;
 
 	listWidths(share: number, viewWidth: number, dividerWidth: number): ListWidths {
@@ -454,6 +503,31 @@ export class CorePort implements ScreenPort {
 		}
 		await this.refresh();
 		return this.reader.item(id) ? id : null;
+	}
+
+	/** The column `list` of the day `dayOffset` as it draws, and the grouped list whose sections it shows; null for one that shows none. */
+	private columnOf(list: ListId, dayOffset: number): { readonly column: ColumnList; readonly list: NonNullable<ColumnList["sections"]>["list"] } | null {
+		const column = this.drawing.column(this.reader.screen(this.dateOf(dayOffset)), COLUMNS[list]);
+		return column.sections ? { column, list: column.sections.list } : null;
+	}
+
+	/** The group of `list` whose header is `section`, and its grouped list. */
+	private sectionOf(list: ListId, dayOffset: number, section: string) {
+		const found = this.columnOf(list, dayOffset);
+		const group = found?.column.groups.find((g) => g.header && g.id === section);
+		return found && group ? { list: found.list, group } : null;
+	}
+
+	/** Where the section lifted goes let go before `before` (the core's `groupPlaceOf` over the headers the column draws); null at its own place. */
+	private groupMove(list: ListId, dayOffset: number, section: string, before: string | null) {
+		const found = this.columnOf(list, dayOffset);
+		if (!found) return null;
+		const groups = found.column.groups.filter((g) => g.header);
+		const lifted = groups.findIndex((g) => g.id === section);
+		const slot = before === null ? groups.length : groups.findIndex((g) => g.id === before);
+		if (lifted < 0 || slot < 0) return null;
+		const place = groupPlaceOf(groups.map((g) => g.name), lifted, slot);
+		return place && { list: found.list, name: groups[lifted].name, place };
 	}
 
 	/** The day `dayOffset` days from today, as the core steps days. */

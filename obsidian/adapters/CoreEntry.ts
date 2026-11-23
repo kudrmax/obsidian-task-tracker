@@ -6,7 +6,7 @@ import { projectPageOf } from "./menuModel";
 import type { ScreenDrawing } from "./ScreenDrawing";
 
 const NO_DRAFT: EntryDraft = { level: null, projects: [], descriptionLine: null, section: false };
-const ENTRY_LISTS: readonly ListId[] = ["day", "soon", "inbox"];
+const ENTRY_LISTS: readonly ListId[] = ["day", "soon", "inbox", "backlog"];
 /** A field with no Project button of its own (a subtask's, a section's name): an empty page, never drawn. */
 const NO_PROJECT_PAGE: MenuProject = { current: null, options: [], none: true, noneLabel: "", value: "", disabled: true, newLabel: "" };
 
@@ -117,10 +117,10 @@ export class CoreEntry {
 		this.follow(field, null, null);
 		const move = this.session.choosePlace(this.placementOf(choice, date));
 		if (!move) return field;
-		const home = { ...field.at, backlog: undefined, away: undefined };
+		const home = { ...field.at, away: undefined };
 		const dayOffset = move.day === null ? field.at.dayOffset : this.core.days.offset(this.core.days.today(), move.day);
 		this.look.date = this.dateOf(dayOffset);
-		const moved = move.column === "backlog" ? { ...field, at: { ...home, backlog: true } } : this.landed(field, home, dayOffset, reach);
+		const moved = this.landed(field, home, dayOffset, reach);
 		this.field = moved;
 		return moved;
 	}
@@ -145,10 +145,10 @@ export class CoreEntry {
 
 	/**
 	 * The field open after a commit: where the session stands; but a field kept where it stood while it writes elsewhere
-	 * (Backlog, a list out of reach) stays so, as the next one types to the same place.
+	 * (a list out of reach) stays so, as the next one types to the same place.
 	 */
 	private nextOf(field: EntryField, after: EntryState): EntryField {
-		return field.at.backlog || field.at.away ? { ...field, renaming: after.renaming?.id ?? null } : this.fieldOf(after, field.at.dayOffset);
+		return field.at.away ? { ...field, renaming: after.renaming?.id ?? null } : this.fieldOf(after, field.at.dayOffset);
 	}
 
 	/** The field a place moved to: where the session now stands, or kept where it stood when the screen can't bring that list into sight. */
@@ -183,7 +183,6 @@ export class CoreEntry {
 		this.look.shown = ENTRY_LISTS;
 		const session = this.session;
 		if (field.renaming !== null) this.openRename(field);
-		else if (at.backlog) session.openAtEnd("backlog");
 		else if (away) session.openAtEnd(away.list);
 		else if (field.stack) session.open({ kind: "stack", parent: this.item(at.under!).key });
 		else if (at.at !== undefined) session.openSlot(this.core.tasks.newSlot(this.look.date, at.at));
@@ -202,7 +201,7 @@ export class CoreEntry {
 		if (!spot) throw new Error(`no place to rename ${item.id}`);
 		this.session.open(spot, item);
 		const { at } = field;
-		const target = at.backlog ? ({ kind: "backlog" } as const) : at.away ? this.placementOfList(at.away.list, at.away.dayOffset) : null;
+		const target = at.away ? this.placementOfList(at.away.list, at.away.dayOffset) : null;
 		if (target) this.session.choosePlace(target);
 	}
 
