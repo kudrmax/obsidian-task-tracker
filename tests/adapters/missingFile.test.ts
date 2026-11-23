@@ -7,7 +7,7 @@ const NOW = new Date(2026, 10, 22, 12, 0);
 describe("no tasks file (F6)", () => {
 	it("the screen says where it was looked for and offers to create it; created, the five sections are there and the screen reads them", async () => {
 		const made = memoryCore(null, { now: () => NOW }, { tasksFile: "Задачи.md" });
-		const port = await CorePort.open({ ...made.core, clock: made.clock, tasksFile: () => made.settings.get().tasksFile, onError: (error) => {
+		const port = await CorePort.open({ ...made.core, clock: made.clock, tasksFile: () => made.settings.get().tasksFile, opens: { line: () => undefined, event: () => undefined }, onError: (error) => {
 			throw error;
 		} });
 		expect(port.read(0).missing).toEqual({ text: "No tasks file at Задачи.md", create: "Create file" });

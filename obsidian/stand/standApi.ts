@@ -6,6 +6,8 @@ import type { StandSource, WriteDelay } from "./standSource";
 /** What the checks and a person debugging reach on `window.__tcStand`: the made-up tasks' file and the stand's switches; never the screen's own state. */
 export interface StandApi {
 	fileText(): string;
+	/** What the screen opened elsewhere (`StandSource.opened`). */
+	opened(): readonly string[];
 	reset(): void;
 	setDelay(delay: WriteDelay): void;
 	addFromOutside(list: ListKey, title: string): void;
@@ -22,6 +24,7 @@ export interface StandApi {
 export function standApi(source: StandSource, screens: () => readonly MountedScreen[]): StandApi {
 	return {
 		fileText: () => source.fileText(),
+		opened: () => source.opened(),
 		reset: () => source.reset(),
 		setDelay: (delay) => source.setDelay(delay),
 		addFromOutside: (list, title) => source.addFromOutside(list, title),

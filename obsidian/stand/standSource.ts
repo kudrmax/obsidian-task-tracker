@@ -20,6 +20,8 @@ export interface StandSource {
 	/** The settings as the screen paints them. */
 	readonly paint: ScreenHostOptions["paint"];
 	fileText(): string;
+	/** What the screen opened elsewhere, in order: «line N» of the tasks file, «event <title>» in Calendar (the stand opens nothing). */
+	opened(): readonly string[];
 	/** New made-up tasks around now; `file` puts a given set instead. */
 	reset(file?: MockFile): void;
 	setDelay(delay: WriteDelay): void;
@@ -44,8 +46,11 @@ export async function standSource(device: DeviceViewKeys, onError: (error: unkno
 	const first = given ?? mockFile(now);
 	const made = memoryCore(coreText(first, now), { now: clock }, {}, standEvents(first, now));
 	const { core, file, events } = made;
-	const port = await CorePort.open({ ...core, clock: { now: clock }, onError, tasksFile: () => made.settings.get().tasksFile });
+	const opened: string[] = [];
+	const opens = { line: (line: number) => void opened.push(`line ${line}`), event: (event: { readonly title: string }) => void opened.push(`event ${event.title}`) };
+	const port = await CorePort.open({ ...core, clock: { now: clock }, onError, tasksFile: () => made.settings.get().tasksFile, opens });
 	return {
+		opened: () => opened,
 		port,
 		device: new DeviceSettings(device, core.tasks, () => made.settings.get().zoomLevels),
 		paint: made.screenSettings,

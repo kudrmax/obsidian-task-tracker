@@ -1,6 +1,7 @@
 import { Notice, Platform, Plugin, type EventRef, type Vault } from "obsidian";
 import { PROTOCOL_ACTION } from "./infrastructure/GoogleRedirectLogin";
 import { openOutside } from "./infrastructure/OutsideLink";
+import { TaskOpens } from "./infrastructure/TaskOpens";
 import { SYNC_ACTION } from "./infrastructure/SyncRoundTrip";
 import { trackpadSwitch } from "./infrastructure/trackpad";
 import { PluginCodeWatcher } from "./infrastructure/PluginCodeWatcher";
@@ -51,7 +52,7 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 		const host = new ScreenHost(this, {
 			look: { type: VIEW_TYPE, title: "Task Calendar", icon: "calendar-days" },
 			source: async () => {
-				const port = await CorePort.open({ ...services, clock: systemClock, onError: (error) => new Notice(failureText(error)), tasksFile: () => this.get().tasksFile });
+				const port = await CorePort.open({ ...services, clock: systemClock, onError: (error) => new Notice(failureText(error)), tasksFile: () => this.get().tasksFile, opens: new TaskOpens(this.app, () => this.get().tasksFile) });
 				return { port, device: new DeviceSettings({ get: () => this.get(), update: (patch) => this.update(patch) }, services.tasks, () => this.get().zoomLevels) };
 			},
 			paint: new ScreenSettingsImpl(this),

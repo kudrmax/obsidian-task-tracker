@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
-import { mockFile } from "../../../obsidian/stand/mockData";
+import { calendarFile, mockFile } from "../../../obsidian/stand/mockData";
 import type { TaskMenuModel } from "../../../obsidian/ui/engine/port";
 import { createScreenStore } from "../../../obsidian/ui/engine/store";
 import { standPort } from "./standPort";
@@ -59,5 +59,31 @@ describe("the menu's Section page (F121)", () => {
 		const { store, inboxTask } = await screen();
 		store.getState().openMenu(inboxTask().id, "calendar");
 		expect((store.getState().layer!.model as TaskMenuModel).sections).toBeNull();
+	});
+});
+
+describe("the rows that leave the screen (F126; the event menu)", () => {
+	it("Open in Obsidian opens the tasks file at the task's line, as the menu closes", async () => {
+		const { store, inboxTask, source } = await screen();
+		const task = inboxTask();
+		store.getState().openMenu(task.id);
+		store.getState().pick({ kind: "row", id: "openInObsidian" });
+		store.getState().layerGone();
+		await wait();
+		const line = source.fileText().split("\n").findIndex((l) => l.includes(task.title));
+		expect(source.opened()).toEqual([`line ${line}`]);
+	});
+
+	it("Open in Calendar opens Apple's Calendar at the event", async () => {
+		const source = await standPort(NOW, calendarFile(NOW));
+		source.port.read(0);
+		await wait();
+		const event = source.port.read(0).day.events.find((e) => e.title === "Встреча с дизайнером")!;
+		const store = createScreenStore(source.port);
+		store.getState().openMenu(event.id, "calendar");
+		store.getState().pick({ kind: "row", id: "calendar" });
+		store.getState().layerGone();
+		await wait();
+		expect(source.opened()).toEqual(["event Встреча с дизайнером"]);
 	});
 });

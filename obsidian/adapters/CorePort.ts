@@ -1,4 +1,4 @@
-import { levelRange, sameSlot, type CalendarService, dividerAt, type DividerStop, LIST_WIDTHS, listShareOf, type ListWidths, listWidths, type Clock, type DayEvents, type DayService, type DropColumn, type DroppedTask, type DropTo, type LocalDate, listCardMenuFrom, type MenuFrom as CoreMenuFrom, originOf, type ScreenReader, type ShownChange, type TaskItem, type TaskService, type UndoOutcome, undoNotice, projectNodeOf, type ProjectsNodeId, RepeatPage as CoreRepeatPage, type RepeatRule, type UndoService } from "../../core/application/contracts";
+import { levelRange, sameSlot, type CalendarEvent, type CalendarService, dividerAt, type DividerStop, LIST_WIDTHS, listShareOf, type ListWidths, listWidths, type Clock, type DayEvents, type DayService, type DropColumn, type DroppedTask, type DropTo, type LocalDate, listCardMenuFrom, type MenuFrom as CoreMenuFrom, originOf, type ScreenReader, type ShownChange, type TaskItem, type TaskService, type UndoOutcome, undoNotice, projectNodeOf, type ProjectsNodeId, RepeatPage as CoreRepeatPage, type RepeatRule, type UndoService } from "../../core/application/contracts";
 import type { RepeatChange, RepeatPage, ScreenContext, Destination, Edge, EntryBar, EntryCommit, EntryDraft, EntryField, LevelRange, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, RenameStart, ScreenData, ScreenPort } from "../ui/engine/port";
 import { CoreEntry } from "./CoreEntry";
 import { WriteQueue } from "./WriteQueue";
@@ -17,6 +17,14 @@ export interface CorePortServices {
 	readonly onError: (error: unknown) => void;
 	/** Where the tasks file is looked for, as the settings name it: what the screen says when it is missing. */
 	readonly tasksFile: () => string;
+	/** What leaves the screen for another tab or app: the host's. */
+	readonly opens: ScreenOpens;
+}
+
+/** The tasks file at a task's line (Open in Obsidian, F126), Apple's Calendar at an event (Open in Calendar). */
+export interface ScreenOpens {
+	line(line: number): void | Promise<void>;
+	event(event: CalendarEvent): void;
 }
 
 /**
@@ -415,7 +423,8 @@ export class CorePort implements ScreenPort {
 	/** The core's ids stay through every write it makes (`TaskItem.id`): the task's own id, null once it is gone. */
 	async act(id: string, action: MenuAction, from: MenuFrom, dayOffset: number): Promise<string | null> {
 		const item = this.reader.item(id);
-		if (action.kind === "row" || !item) return item ? id : null;
+		if (action.kind === "row") return this.open(id, item, action.id);
+		if (!item) return null;
 		const tasks = this.core.tasks;
 		const keys = [item.key];
 		switch (action.kind) {
@@ -456,6 +465,14 @@ export class CorePort implements ScreenPort {
 		}
 		await this.refresh();
 		return this.reader.item(id) ? id : null;
+	}
+
+	/** A row that leaves the screen: the tasks file at the task's line, Apple's Calendar at the event. */
+	private async open(id: string, item: TaskItem | null, row: string): Promise<string | null> {
+		const event = this.shared.eventNamed(id);
+		if (row === "calendar" && event) this.core.opens.event(event);
+		if (row === "openInObsidian" && item) await this.core.opens.line(await this.core.tasks.lineOf(item.key));
+		return item ? id : null;
 	}
 
 	/** The day `dayOffset` days from today, as the core steps days. */
