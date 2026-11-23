@@ -1956,6 +1956,12 @@ export interface DayService {
 	catchUp(): void;
 }
 
+/** An hour Day starts at offers: the hour, and how the clock writes it. */
+export interface DayStartChoice {
+	readonly hour: number;
+	readonly label: string;
+}
+
 /** What a step back or forward did: changed the file, found nothing to do, or found its lines edited since and left the file as it is. */
 export type UndoOutcome = "done" | "nothing" | "conflict";
 export { undoNotice } from "./undoNotice";
@@ -2236,6 +2242,8 @@ export interface SettingsForm {
 	readonly workCalendarFile: string;
 	/** The hours a day may start at, in order: Day starts at offers them. */
 	readonly dayStartHours: readonly number[];
+	/** The same hours with their words as Day starts at shows them (`05:00`): the label is the core's, never a frontend's. */
+	readonly dayStartChoices: readonly DayStartChoice[];
 	/** A client id is filled in, so Log in can open Google; without one the account asks for it first. */
 	readonly googleClientReady: boolean;
 	/** Google is logged in (in Obsidian: the settings keep its token), so the plugin fetches its calendars. */
