@@ -12,6 +12,7 @@ import { MovingRow, MovingRows } from "./MovingRow";
 import { ObsidianEditor } from "./ObsidianEditor";
 import { useHost } from "./host";
 import { EntryField } from "./QuickAdd";
+import { ScrollHold } from "./scrollHold";
 
 /** Rows drawn past each edge of the list's room. */
 const OVERSCAN = 6;
@@ -118,6 +119,8 @@ const ContextList = memo(function ContextList({ list, context }: { readonly list
 	}, [reveal?.seq]);
 
 	const items = virtualizer.getVirtualItems();
+	const [hold] = useState(() => new ScrollHold());
+	const height = hold.height(virtualizer.getTotalSize(), virtualizer.scrollOffset ?? 0);
 	/** Whether the pointer that pressed last was a mouse: the phone has no double click. */
 	const mouse = useRef(false);
 	return (
@@ -129,7 +132,7 @@ const ContextList = memo(function ContextList({ list, context }: { readonly list
 			/** A mouse's double click on the list's free room, between or under the cards, opens a new task at its end (F67); a card, a header or a field keeps its own. */
 			onDoubleClick={(event) => mouse.current && !(event.target as Element).closest(".tc-drag-source, .tc-group-head, .tc-quick-row") && api.getState().openAtEnd(list)}
 		>
-			<div className="tc-list-items" style={{ height: virtualizer.getTotalSize() }}>
+			<div className="tc-list-items" style={{ height }}>
 				<div className="tc-list-block" style={{ transform: `translateY(${items[0]?.start ?? 0}px)` }}>
 					<SortableList list={list} ids={ids} sections={sections}>
 						<MovingRows gone={gone}>

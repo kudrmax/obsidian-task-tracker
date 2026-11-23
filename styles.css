@@ -7,7 +7,7 @@
  * looks, change its token, or add one here with a name that says what it is for.
  *
  * Properties the code sets per element (--tc-list-width, --tc-grab-x, --tc-grab-y, --tc-landing-level, --tc-landing-w, --tc-landing-h, --tc-hour, --tc-allday-extra-rows, --tc-y, --tc-stack-z, --tc-lanes-after, --tc-block-top, --tc-label-room, --tc-anchor-offset, --tc-event-bg-dark, --tc-event-bar-dark, --tc-event-text-dark, --tc-event-bg-light, --tc-event-bar-light, --tc-event-text-light,
- * --tc-ribbon-list-share, --tc-ribbon-list-least, --tc-ribbon-list-most, --tc-len, --tc-x, --tc-level, --tc-pass, --tc-stack-end, --tc-room-top, --tc-room-bottom, --tc-scrolled, --tc-scrolled-below, --tc-event-bg, --tc-event-bar, --tc-event-text, and per priority colour --tc-priority-ink, --tc-priority-fill, --tc-priority-meta) carry a measure from the layout
+ * --tc-ribbon-list-share, --tc-ribbon-list-least, --tc-ribbon-list-most, --tc-len, --tc-x, --tc-level, --tc-pass, --tc-stack-end, --tc-room-top, --tc-room-bottom, --tc-scrolled, --tc-event-bg, --tc-event-bar, --tc-event-text, and per priority colour --tc-priority-ink, --tc-priority-fill, --tc-priority-meta) carry a measure from the layout
  * into these rules; the rules do the arithmetic.
  */
 body {
@@ -486,7 +486,6 @@ body {
 	--tc-room-top: 0px;
 	--tc-room-bottom: 0px;
 	--tc-scrolled: 0px;
-	--tc-scrolled-below: 0px;
 	--tc-block-pad-top: calc((var(--tc-card-h) - var(--tc-leading-card)) / 2);
 	--tc-select-ring: 1.5px;
 	--tc-ring-selected: inset 0 0 0 var(--tc-select-ring) var(--tc-accent);
@@ -779,8 +778,15 @@ body.is-mobile .task-calendar > .tc-seg { left: calc(var(--tc-foot-mid) + (var(-
 .task-calendar.is-entering .tc-list::after { height: max(var(--tc-foot-fade-day), var(--tc-entry-room)); }
 /* A scrolled list whose rows fold away keeps room under them for as long as its scroll needs it (obsidian/ui/motion/ScrollHold.ts). */
 .tc-list::-webkit-scrollbar { display: none; }
-/* Content scrolled under a list's or the calendar's edge fades out there instead of being cut by a line. Each fade is as deep as the content under its edge, up to its full height, so it grows in and out with the scroll and never appears in a step; a list at rest at an edge shows none there. */
-:is(.tc-list, .tc-timeline):is(.is-under-top, .is-under-bottom) { -webkit-mask-image: linear-gradient(to bottom, transparent, var(--tc-mask-ink) min(var(--tc-scrolled), var(--tc-scroll-fade)), var(--tc-mask-ink) calc(100% - min(var(--tc-scrolled-below), var(--tc-scroll-fade))), transparent); mask-image: linear-gradient(to bottom, transparent, var(--tc-mask-ink) min(var(--tc-scrolled), var(--tc-scroll-fade)), var(--tc-mask-ink) calc(100% - min(var(--tc-scrolled-below), var(--tc-scroll-fade))), transparent); }
+/*
+ * Content scrolled under a list's or the calendar's edge fades out there instead of being cut by a line (F65). Each fade
+ * is as deep as the content under its edge, up to half a card, so it grows in and out with the scroll and never appears in
+ * a step; a list at rest at an edge shows none there. The browser's own scroll timeline runs it: the first room of the
+ * scroll grows the top fade in, the last room takes the bottom fade away; a box that does not scroll fades nowhere.
+ */
+@keyframes tc-fade-top { from { --tc-fade-top: 0px; } to { --tc-fade-top: var(--tc-scroll-fade); } }
+@keyframes tc-fade-bottom { from { --tc-fade-bottom: var(--tc-scroll-fade); } to { --tc-fade-bottom: 0px; } }
+.task-calendar.is-engine :is(.tc-list, .tc-timeline) { -webkit-mask-image: linear-gradient(to bottom, transparent, var(--tc-mask-ink) var(--tc-fade-top), var(--tc-mask-ink) calc(100% - var(--tc-fade-bottom)), transparent); mask-image: linear-gradient(to bottom, transparent, var(--tc-mask-ink) var(--tc-fade-top), var(--tc-mask-ink) calc(100% - var(--tc-fade-bottom)), transparent); animation-name: tc-fade-top, tc-fade-bottom; animation-timing-function: linear; animation-fill-mode: both; animation-timeline: scroll(self), scroll(self); animation-range: 0px var(--tc-scroll-fade), calc(100% - var(--tc-scroll-fade)) 100%; }
 
 /* A card: the dot of a task in progress, the title fading out on the right, the due date. */
 .tc-card { position: relative; overflow: hidden; flex-shrink: 0; height: var(--tc-card-h); box-sizing: border-box; background: var(--tc-card-bg); border-radius: var(--tc-radius-card); padding: 0 var(--tc-card-pad-end) 0 var(--tc-card-pad-start); display: flex; align-items: center; gap: var(--tc-space-6); touch-action: pan-y; cursor: pointer; }
@@ -1409,6 +1415,8 @@ body.theme-light .tc-menu-over .tc-event { --tc-event-bg: var(--tc-event-bg-ligh
 @property --tc-ribbon-list-width { syntax: "<length-percentage>"; inherits: false; initial-value: 0px; }
 @property --tc-fit-whole { syntax: "<length>"; inherits: true; initial-value: 0px; }
 @property --tc-fit-left { syntax: "<length>"; inherits: true; initial-value: 0px; }
+@property --tc-fade-top { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@property --tc-fade-bottom { syntax: "<length>"; inherits: false; initial-value: 0px; }
 .tc-menu-tile > .tc-tile-fit { --tc-tile-font: var(--tc-font-menu-tile); align-self: stretch; box-sizing: border-box; padding: 0 var(--tc-tile-room); display: flex; container-type: inline-size; }
 .tc-menu-tiles.is-edit .tc-menu-tile > .tc-tile-fit { --tc-tile-font: var(--tc-font-menu-tile-small); padding: 0 var(--tc-tile-room-small); }
 .tc-tile-fit > .tc-tile-room { flex: 1 1 0; min-width: 0; container-type: inline-size; --tc-fit-whole: var(--tc-cq-whole); }
