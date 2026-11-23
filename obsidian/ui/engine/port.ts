@@ -58,6 +58,8 @@ export interface SectionRow {
 export interface ListData {
 	readonly title: string;
 	readonly rows: readonly Row[];
+	/** The No tasks plate drawn while the list draws nothing (F64): its words under a filter; null for none. A tap on it types a new task at the list's end. */
+	readonly plate: string | null;
 }
 
 /**

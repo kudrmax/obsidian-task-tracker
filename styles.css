@@ -1269,6 +1269,8 @@ body:not(.is-mobile) .tc-stage-col.is-timeline > .tc-stage-head { padding: 0 var
 /* A row leaving (Decision 132): it fades where it stands and takes no press. */
 .task-calendar .is-leaving { pointer-events: none; }
 .tc-list-item > .tc-group-head, .tc-list-item > .tc-drag-source > .tc-group-head, .tc-list-item > .tc-group-slot { margin-top: var(--tc-section-gap); }
+/* A filtered list with nothing in it (F64): a dashed plate where its first card would stand, saying so. */
+.tc-group-empty { flex-shrink: 0; height: var(--tc-card-h); box-sizing: border-box; overflow: hidden; border: var(--tc-hairline) dashed var(--tc-dash); border-radius: var(--tc-radius-card); background: var(--tc-bg); padding: 0 var(--tc-card-pad-end) 0 var(--tc-card-pad-start); display: flex; align-items: center; white-space: nowrap; font-size: var(--tc-font-body); color: var(--tc-muted); cursor: pointer; }
 /* A section renamed where its header stands (F62): the field takes the header's height and place, so nothing under it moves. */
 .tc-group-slot.is-rename { height: var(--tc-group-head-h); margin-bottom: calc(-1 * var(--tc-card-gap)); }
 .task-calendar .tc-group-slot.is-rename > .tc-quick-field { min-height: 0; height: 100%; padding-top: 0; padding-bottom: 0; display: flex; align-items: center; }

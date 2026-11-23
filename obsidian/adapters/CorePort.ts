@@ -47,6 +47,8 @@ class CoreReads {
 	private readonly offs: (() => void)[];
 	/** The same read within each project a screen is drawn in (`ScreenReader.within`), kept until the next read. */
 	private readonly readers = new Map<string, ScreenReader>();
+	/** The words of an empty list's plate under a filter (the core's `ViewChoice.emptyLabel`), once the core's view is read. */
+	plateWords: string | null = null;
 	/** The next held read asked for and not begun yet: every ask before it begins shares it. */
 	private queued: Promise<void> | null = null;
 	private reads: Promise<void> = Promise.resolve();
@@ -58,6 +60,10 @@ class CoreReads {
 	) {
 		this.drawing = new ScreenDrawing(core.tasks, core.days, core.calendars, core.tasksFile);
 		this.queue = new WriteQueue(core.onError);
+		void core.tasks.funnelView(true).then((view) => {
+			this.plateWords = view.view.emptyLabel;
+			this.changed();
+		});
 		this.offs = [core.tasks.onChange(() => void this.refresh()), core.tasks.onShownChange((change) => this.settingsChanged(change)), core.days.onDayChange(() => void this.refresh()), core.undo.onChange(() => this.changed()), core.calendars.onChange(() => this.forgetEvents())];
 	}
 
@@ -217,7 +223,7 @@ export class CorePort implements ScreenPort {
 			if (this.cache.size > 16) this.cache.clear();
 			const date = this.dateOf(dayOffset);
 			const screen = this.reader.screen(date);
-			data = this.drawing.draw({ date, screen, lists: this.drawing.listsOf(screen), events: this.eventsOf(date) });
+			data = this.drawing.draw({ date, screen, lists: this.drawing.listsOf(screen), events: this.eventsOf(date) }, this.plate());
 			this.cache.set(key, data);
 		}
 		return data;
@@ -240,7 +246,7 @@ export class CorePort implements ScreenPort {
 		if (!move || move.kind === "home") return this.read(to.dayOffset);
 		if (move.kind === "slot") return this.drawn(date, { id, ...this.core.days.boundary().spanOf(move.slot, date) });
 		const { screen } = this.reader.dropPreview(move.tasks, move.to, move.day);
-		return this.drawing.draw({ date, screen, lists: this.drawing.listsOf(screen), events: this.eventsOf(date) });
+		return this.drawing.draw({ date, screen, lists: this.drawing.listsOf(screen), events: this.eventsOf(date) }, this.plate());
 	}
 
 	/** Nothing changes where the core leaves the task as it is: a card let go where it was lifted (`placeOfDrop`), a time it has already (`sameSlot`). */
@@ -289,7 +295,7 @@ export class CorePort implements ScreenPort {
 		const date = this.dateOf(dayOffset);
 		if (!item) return this.read(dayOffset);
 		const screen = this.core.tasks.firstStepScreen(this.reader.screen(date), item.key);
-		return this.drawing.draw({ date, screen, lists: this.drawing.listsOf(screen), events: this.eventsOf(date) });
+		return this.drawing.draw({ date, screen, lists: this.drawing.listsOf(screen), events: this.eventsOf(date) }, this.plate());
 	}
 
 	async firstStep(id: string, text: string): Promise<void> {
@@ -543,7 +549,7 @@ export class CorePort implements ScreenPort {
 	/** The held read's screen of `date`, a task held by a dot drawn at `held`. */
 	private drawn(date: LocalDate, held: ScreenSource["held"] | null): ScreenData {
 		const screen = this.reader.screen(date);
-		return this.drawing.draw({ date, screen, lists: this.drawing.listsOf(screen), events: this.eventsOf(date), ...(held && { held }) });
+		return this.drawing.draw({ date, screen, lists: this.drawing.listsOf(screen), events: this.eventsOf(date), ...(held && { held }) }, this.plate());
 	}
 
 	private itemOf(id: string): TaskItem {
@@ -573,6 +579,11 @@ export class CorePort implements ScreenPort {
 		const place = new ListCards(this.drawing.column(this.reader.screen(day), column), id).dropOf(to);
 		if (place === null) return null;
 		return place === "home" ? { kind: "home" } : { kind: "drop", tasks, to: { kind: "place", column, place }, day };
+	}
+
+	/** An empty list's plate (F64): the core's words under a filter, as its view's plates are; none for every task. */
+	private plate(): string | null {
+		return this.context === EVERY ? null : this.shared.plateWords;
 	}
 
 	/** The screen drawn in `context` (every task when absent) from now on. */

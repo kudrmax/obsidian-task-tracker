@@ -33,6 +33,7 @@ export const TaskList = memo(function TaskList({ list }: { readonly list: ListId
 const ContextList = memo(function ContextList({ list, context }: { readonly list: ListId; readonly context: number }) {
 	const api = useScreenApi();
 	const allRows = useData((d) => d.lists[list].rows);
+	const plate = useData((d) => d.lists[list].plate);
 	const readRows = useData((d) => d.lists[list].rows, true);
 	const lifted = useScreen((s) => s.lifted);
 	const liftedDepth = useScreen((s) => s.liftedDepth);
@@ -132,6 +133,12 @@ const ContextList = memo(function ContextList({ list, context }: { readonly list
 			/** A mouse's double click on the list's free room, between or under the cards, opens a new task at its end (F67); a card, a header or a field keeps its own. */
 			onDoubleClick={(event) => mouse.current && !(event.target as Element).closest(".tc-drag-source, .tc-group-head, .tc-quick-row") && api.getState().openAtEnd(list)}
 		>
+			{plate !== null && drawn.length === 0 ? (
+				/** A filtered list with nothing in it says so (F64); a tap types a new task at its end. */
+				<div className="tc-group-empty" role="button" onClick={() => api.getState().openAtEnd(list)}>
+					{plate}
+				</div>
+			) : null}
 			<div className="tc-list-items" style={{ height }}>
 				<div className="tc-list-block" style={{ transform: `translateY(${items[0]?.start ?? 0}px)` }}>
 					<SortableList list={list} ids={ids} sections={sections}>
