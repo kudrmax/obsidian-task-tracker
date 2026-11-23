@@ -1453,6 +1453,7 @@ body.theme-light .tc-menu-over .tc-event { --tc-event-bg: var(--tc-event-bg-ligh
 .tc-full-title .tc-quick-field.tc-title-field .markdown-source-view.mod-cm6 .cm-line { font-weight: var(--tc-weight-bold); }
 .tc-full-list { margin-top: var(--tc-full-title-gap); display: flex; flex-direction: column; gap: var(--tc-card-gap); }
 .tc-full-list > .tc-card { padding-left: var(--tc-pick-pad-start); }
+.tc-full-list > :is(.tc-card, .tc-quick-row) { flex-shrink: 0; margin-left: calc(var(--tc-level) * var(--tc-subtask-indent)); }
 .tc-full-list > .tc-card > .tc-progress-dot { display: none; }
 .tc-full .tc-card > button.tc-pick { order: -1; display: flex; width: var(--tc-pick-size); height: var(--tc-pick-size); flex-shrink: 0; box-sizing: border-box; margin: 0 var(--tc-pick-gap) 0 0; padding: 0; border: var(--tc-pick-ring) solid var(--tc-muted); border-radius: var(--tc-radius-circle); background: none; box-shadow: none; color: var(--tc-on-accent); align-items: center; justify-content: center; cursor: pointer; }
 .tc-full .tc-card > button.tc-pick svg { width: var(--tc-pick-check); height: var(--tc-pick-check); stroke: currentColor; stroke-width: var(--tc-stroke-pick); visibility: hidden; }
