@@ -10,7 +10,7 @@ import { menuButton, menuNow } from "../lib/menu.mjs";
 export default {
 	name: "e28-full-screen",
 	features: ["Step 7 C: the full-screen task (F239–F249)"],
-	cases: ["tree and circles", "levels and close", "plus"],
+	cases: ["tree and circles", "levels and close", "plus", "notes in the copy"],
 	async run(t, item) {
 		const tap = (p) => (t.platform === "phone" ? t.input.tap(p.x, p.y) : t.input.click(p.x, p.y));
 		const key = async (k, code = k, vk = 0) => {
@@ -32,6 +32,17 @@ export default {
 		};
 		const sheet = () =>
 			t.cdp.eval(`(() => { const s = document.querySelector(".tc-full.is-shown"); if (!s) return null; return { title: s.querySelector(".tc-full-title")?.textContent ?? null, parent: s.querySelector(".tc-full-parent-text")?.textContent ?? null, rows: [...s.querySelectorAll(".tc-full-list > .tc-card")].map((c) => ({ title: c.querySelector(".tc-card-title")?.textContent, depth: Number(getComputedStyle(c).getPropertyValue("--tc-level") || 0), done: c.dataset.mark === "done", struck: getComputedStyle(c.querySelector(".tc-card-title")).textDecorationLine === "line-through", count: c.querySelector(".tc-count")?.textContent ?? null })), notes: !!s.querySelector(".tc-full-desc") }; })()`);
+		if (item === "notes in the copy") {
+			await t.setStop("soon");
+			const card = await cardBy(t, "Задача с описанием", "day");
+			if (!t.expect(card !== null, "the task with notes shows")) return;
+			await tap(card);
+			await t.sleep(500);
+			await pressAt(".tc-copy-notes .tc-notes");
+			const full = await sheet();
+			t.expect(full?.title === "Задача с описанием" && (await menuNow(t)) === null, `a tap on the notes in the menu's copy opens the task full screen (F129): ${JSON.stringify(full)}`);
+			return;
+		}
 		await t.stand(`step("step-subtasks")`);
 		await t.sleep(700);
 		await t.setStop("inbox");

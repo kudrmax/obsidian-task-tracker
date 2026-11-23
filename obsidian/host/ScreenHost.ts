@@ -109,7 +109,17 @@ export class ScreenHost {
 				const component = new Component();
 				component.load();
 				void MarkdownRenderer.render(app, text, el, sourcePath, component);
+				/** A note's link opens in a new tab, as a link in a note does; an address goes to the browser by itself. */
+				const openLink = (event: MouseEvent) => {
+					const link = (event.target as Element | null)?.closest?.("a.internal-link");
+					const target = link?.getAttribute("data-href") ?? link?.getAttribute("href");
+					if (!target) return;
+					event.preventDefault();
+					void app.workspace.openLinkText(target, sourcePath, "tab");
+				};
+				el.addEventListener("click", openLink);
 				return () => {
+					el.removeEventListener("click", openLink);
 					component.unload();
 					el.empty();
 				};

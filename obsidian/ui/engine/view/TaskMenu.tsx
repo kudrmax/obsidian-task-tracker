@@ -423,7 +423,7 @@ function CopyNotes({ text, of }: { readonly text: string; readonly of: string | 
 	useEffect(() => (el.current ? markdown(text, el.current, sourcePath) : undefined), [markdown, text, sourcePath]);
 	return (
 		<div className="tc-copy-notes">
-			<div ref={el} className="tc-desc-text tc-notes markdown-rendered" onClick={(event) => of !== null && !(event.target as Element).closest("a") && api.getState().openFull(of)} />
+			<div ref={el} className="tc-desc-text tc-notes markdown-rendered" onClick={(event) => ((event.target as Element).closest("a") ? api.getState().closeLayer() : of !== null && api.getState().openFull(of))} />
 		</div>
 	);
 }
