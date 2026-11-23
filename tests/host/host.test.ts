@@ -154,3 +154,47 @@ describe("the host's source", () => {
 		expect(dispose).toHaveBeenCalled();
 	});
 });
+
+describe("opening the view (F1, F2, F4)", () => {
+	/** The host over a workspace with `open` leaves of its type already: what `open` reveals and what it makes. */
+	function opener(open: number) {
+		const made: object[] = [];
+		const revealed: object[] = [];
+		const leaf = () => ({ setViewState: vi.fn(async () => undefined) });
+		const existing = Array.from({ length: open }, leaf);
+		const workspace = {
+			getLeavesOfType: () => existing,
+			getLeaf: () => {
+				const fresh = leaf();
+				made.push(fresh);
+				return fresh;
+			},
+			openPopoutLeaf: () => {
+				const fresh = leaf();
+				made.push(fresh);
+				return fresh;
+			},
+			revealLeaf: async (shown: object) => void revealed.push(shown),
+		};
+		const host = new Host({ app: { workspace } } as never, { look: LOOK, source: () => new Promise(() => undefined), paint: { get: () => ({}) as never, onChange: () => () => undefined } });
+		return { host, made, revealed, existing };
+	}
+
+	it("reveals the view already open rather than making a second one (F2)", async () => {
+		const { host, made, revealed, existing } = opener(1);
+		await host.open();
+		expect(made).toEqual([]);
+		expect(revealed).toEqual([existing[0]]);
+		expect(existing[0].setViewState).toHaveBeenCalledWith({ type: LOOK.type, active: true });
+	});
+
+	it("opens a new leaf when none is open, and a pop-out window when asked", async () => {
+		const none = opener(0);
+		await none.host.open();
+		expect(none.made).toHaveLength(1);
+		const shown = opener(1);
+		await shown.host.open(true);
+		expect(shown.made).toHaveLength(1);
+		expect(shown.revealed).toEqual(shown.made);
+	});
+});
