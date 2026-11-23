@@ -56,6 +56,7 @@ export class ScreenDrawing {
 				allDay: (source.events?.allDay ?? []).map((event) => this.allDay(event)),
 				hours: this.days.hourLabels(),
 				opensAt: this.days.openAt(this.days.step(this.days.today(), 1)).minute,
+				alert: source.events?.alert ?? "none",
 			},
 		};
 	}

@@ -27,6 +27,7 @@ body {
 	/* The chosen segment's ground, the due day, the confirm button's ground, the ring of the chosen place tile. */
 	--tc-ink-strong: #E5E5EA;
 	--tc-muted: #8E8E93;
+	--tc-stale: #FF9F0A;
 	/* An event that is over, whatever its calendar's colour: the ground barely lifted, the bar and the title faded into it. The core's `pastEventPaint` (core/application/paints.ts, PAST_SHARES) holds the same shares for the apps: change both together. */
 	--tc-event-past-lift: 1.5%;
 	--tc-event-past-ink: 12.5%;
@@ -137,9 +138,26 @@ body {
 	--tc-seg-pad: 2px;
 	--tc-seg-btn-h: 28px;
 	/* The switch is a wheel: a window two icons wide stands still in the middle of the screen, and the four icons roll under it; the track holds one neighbour on either side. */
+	--tc-seg-btn-w: 38px;
+	--tc-seg-icon: var(--tc-icon-m);
 	/* Away from the window the wheel turns from the eye: per icon's width out, an icon shrinks and fades by these. */
+	--tc-seg-shrink: 0.14;
+	--tc-seg-dim: 0.28;
 	/* The wheel is as tall as Undo's capsule and the plus beside it, so the foot reads as one bar in three parts. */
 	--tc-wheel: var(--tc-plus-size);
+	--tc-wheel-pad: var(--tc-space-4);
+	--tc-wheel-btn-h: calc(var(--tc-wheel) - 2 * var(--tc-wheel-pad));
+	--tc-radius-wheel: calc(var(--tc-wheel) / 2);
+	--tc-radius-wheel-btn: calc(var(--tc-wheel-btn-h) / 2);
+	/* The dot on the wheel's calendar icon: a calendar in use gone old (orange) or broken (red), at the icon's top right. */
+	--tc-dot: 7px;
+	--tc-dot-rise: 3px;
+	--tc-dot-top: calc((var(--tc-wheel-btn-h) - var(--tc-seg-icon)) / 2 - var(--tc-dot-rise));
+	--tc-dot-right: 6px;
+	/* The wheel stands in the middle of the strip on the desktop; on the phone, with the view button left of it, in the middle of the room between Undo's capsule and the plus. */
+	--tc-stage-mid: calc(var(--tc-stage-left) + (100% - var(--tc-stage-left)) / 2);
+	--tc-view-gap: var(--tc-space-8);
+	--tc-foot-mid: calc(50% + var(--tc-capsule-btn) - var(--tc-plus-size) / 2);
 	/* The switch's row at the bottom, this far over Obsidian's phone navigation or status bar. */
 	--tc-foot-gap: 6px;
 	--tc-switch-row: calc(var(--tc-wheel) + var(--tc-foot-gap));
@@ -567,6 +585,7 @@ body {
 	--tc-layer-allday: 4;
 	--tc-layer-float: 1000;
 	--tc-layer-plus: 5;
+	--tc-layer-switch: 5;
 	/* The projects' panel lies over the lists and their fade, under the bottom row and the projects button. */
 	--tc-layer-bar: 6;
 	/* Inside the quick bar: its panels' shadows lie under its ground, its buttons over it. */
@@ -591,6 +610,7 @@ body {
 
 	/* Motion: the cards of a list step aside for a dragged card and the dashed place eases along; a dropped card flies to its place; the drop target slides between grid steps. */
 	--tc-ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+	--tc-ease-in-out: cubic-bezier(0.42, 0, 0.58, 1);
 	/* The strip slides to the other pair of columns, the switch's pill with it; a column's padding and gap, which change with its side, slide along. */
 	--tc-duration-slide: 300ms;
 	--tc-duration-collapse: 150ms;
@@ -631,6 +651,7 @@ body.theme-light {
 	--tc-shadow-under: 0 3px 20px 0 rgba(0, 0, 0, 0.09);
 	--tc-shadow-control: 0 6px 16px rgba(0, 0, 0, 0.12), 0 0 0 0.5px rgba(0, 0, 0, 0.1);
 	--tc-danger: #FF3B30;
+	--tc-stale: #FF9500;
 	--tc-ink-dim: #C7C7CC;
 	--tc-separator: #D1D1D6;
 	--tc-backdrop: rgba(0, 0, 0, 0.22);
@@ -670,7 +691,7 @@ button.tc-btn:not(:disabled):active { opacity: var(--tc-pressed); }
 	body:not(.is-mobile) button.tc-btn:not(:disabled):hover { background-image: linear-gradient(var(--tc-hover), var(--tc-hover)); }
 }
 /* The keyboard's focus (desktop only, and in the settings): a ring outside the button; inside it in the windows that clip their content. */
-body:not(.is-mobile) button.tc-btn:focus-visible, button.tc-btn.is-swatch:focus-visible { outline: var(--tc-focus-ring); outline-offset: var(--tc-focus-offset); }
+body:not(.is-mobile) button.tc-btn:focus-visible, body:not(.is-mobile) .tc-seg:focus-visible, button.tc-btn.is-swatch:focus-visible { outline: var(--tc-focus-ring); outline-offset: var(--tc-focus-offset); }
 body:not(.is-mobile) :is(.tc-panel, .tc-picker, .tc-capsule) button.tc-btn:focus-visible { outline-offset: calc(-1 * var(--tc-focus-offset)); }
 /*
  * The button's kinds. Obsidian pads a button on the iPad and greys a tapped one on the phone at (0,2,1): a kind's padding,
@@ -703,6 +724,26 @@ button.tc-btn.is-swatch.tc-swatch-clear.is-on { box-shadow: inset 0 0 0 var(--tc
 .task-calendar > button.tc-plus, .task-calendar > .tc-plus-ring, .task-calendar > .tc-capsule { position: absolute; bottom: calc(var(--tc-chrome-room) + var(--tc-foot-gap) + (var(--tc-wheel) - var(--tc-plus-size)) / 2 - var(--tc-keyboard-room)); z-index: var(--tc-layer-plus); }
 .task-calendar > button.tc-plus, .task-calendar > .tc-plus-ring { right: var(--tc-space-16); touch-action: none; }
 /* The controls of the foot never vanish in a frame: one going (the plus while a card is carried, Undo + ⋯ while tasks are selected) fades and shrinks, one coming grows back, on the overlay's curve. */
+/*
+ * The wheel (the design's «Колёсико»): its place, --tc-wheel-at, set as the ribbon stands, from 0 (Inbox and Soon in the
+ * window) to 2 (the day and its calendar). The window, two icons wide, stands still in the middle; the track holds one
+ * neighbour on either side where there is one; an icon shrinks and fades by its distance from the window.
+ */
+.task-calendar > .tc-seg { --tc-seg-before: min(1, var(--tc-wheel-at)); --tc-seg-after: min(1, calc(2 - var(--tc-wheel-at))); --tc-seg-w: calc((2 + var(--tc-seg-before) + var(--tc-seg-after)) * var(--tc-seg-btn-w) + 2 * var(--tc-wheel-pad)); position: absolute; left: calc(var(--tc-stage-mid) - var(--tc-seg-btn-w) - var(--tc-wheel-pad) - var(--tc-seg-before) * var(--tc-seg-btn-w)); bottom: calc(var(--tc-chrome-room) + var(--tc-foot-gap) - var(--tc-keyboard-room)); z-index: var(--tc-layer-switch); }
+body.is-mobile .task-calendar > .tc-seg { left: calc(var(--tc-foot-mid) + (var(--tc-plus-size) + var(--tc-view-gap)) / 2 - var(--tc-seg-w) / 2); }
+.tc-seg { width: var(--tc-seg-w); height: var(--tc-wheel); box-sizing: border-box; border-radius: var(--tc-radius-wheel); background: var(--tc-track-bg); box-shadow: var(--tc-shadow-control); overflow: hidden; touch-action: none; cursor: pointer; outline: none; -webkit-user-select: none; user-select: none; }
+.tc-seg-view { position: absolute; top: var(--tc-wheel-pad); left: var(--tc-wheel-pad); right: var(--tc-wheel-pad); height: var(--tc-wheel-btn-h); overflow: hidden; }
+.tc-seg-pill { position: absolute; top: var(--tc-wheel-pad); left: calc(var(--tc-wheel-pad) + var(--tc-seg-before) * var(--tc-seg-btn-w)); width: calc(2 * var(--tc-seg-btn-w)); height: var(--tc-wheel-btn-h); border-radius: var(--tc-radius-wheel-btn); background: var(--tc-ink-strong); overflow: hidden; pointer-events: none; }
+.tc-seg-reel { position: absolute; top: 0; left: calc((var(--tc-seg-before) - var(--tc-wheel-at)) * var(--tc-seg-btn-w)); display: flex; }
+.tc-seg-pill > .tc-seg-reel { left: calc(-1 * var(--tc-wheel-at) * var(--tc-seg-btn-w)); }
+.tc-seg-icon { --tc-seg-off: calc(2 * var(--tc-seg-i) - 2 * var(--tc-wheel-at) - 1); --tc-seg-depth: max(0, (max(var(--tc-seg-off), -1 * var(--tc-seg-off)) - 1) / 2); position: relative; width: var(--tc-seg-btn-w); height: var(--tc-wheel-btn-h); flex-shrink: 0; color: var(--tc-muted); display: flex; align-items: center; justify-content: center; transform: scale(calc(1 - var(--tc-seg-depth) * var(--tc-seg-shrink))); opacity: calc(1 - var(--tc-seg-depth) * var(--tc-seg-dim)); }
+.tc-seg-pill .tc-seg-icon { color: var(--tc-on-strong); }
+.tc-seg-icon svg { width: var(--tc-seg-icon); height: var(--tc-seg-icon); stroke-width: var(--tc-stroke-seg); }
+/* Let go, the wheel rolls on to its place and the track's ends follow; the columns slide meanwhile. */
+.task-calendar > .tc-seg.is-settling, .tc-seg.is-settling :is(.tc-seg-pill, .tc-seg-reel) { transition: left var(--tc-duration-slide) var(--tc-ease-in-out), width var(--tc-duration-slide) var(--tc-ease-in-out); }
+.tc-seg.is-settling .tc-seg-icon { transition: transform var(--tc-duration-slide) var(--tc-ease-in-out), opacity var(--tc-duration-slide) var(--tc-ease-in-out); }
+.tc-dot { position: absolute; top: var(--tc-dot-top); right: var(--tc-dot-right); width: var(--tc-dot); height: var(--tc-dot); border-radius: var(--tc-radius-circle); background: var(--tc-stale); }
+.tc-dot.is-broken { background: var(--tc-danger); }
 .task-calendar > :is(button.tc-plus, .tc-capsule) { transition: opacity var(--tc-duration-collapse) var(--tc-ease-out), transform var(--tc-duration-collapse) var(--tc-ease-out), visibility 0s linear 0s; }
 .task-calendar > button.tc-plus.is-hidden, .task-calendar > button.tc-plus.is-hidden ~ .tc-capsule, .task-calendar > .tc-capsule.is-hidden { opacity: 0; transform: scale(var(--tc-menu-scale)); visibility: hidden; pointer-events: none; transition: opacity var(--tc-duration-collapse) var(--tc-ease-out), transform var(--tc-duration-collapse) var(--tc-ease-out), visibility 0s linear var(--tc-duration-collapse); }
 .task-calendar > .tc-capsule { left: var(--tc-space-16); }

@@ -12,6 +12,7 @@ import { DaySlide } from "../view/Slide";
 import { TaskList } from "../view/TaskList";
 import { TaskMenu } from "../view/TaskMenu";
 import { Timeline } from "../view/Timeline";
+import { Wheel } from "../view/Wheel";
 import { COLUMN_SHARE, columnsOf, dayColumnWidth, drawnWidths, type Place, ruleShift, type Stop, STRIP_WIDTH } from "./columns";
 
 export { type Place, reachOf } from "./columns";
@@ -49,6 +50,7 @@ function RibbonColumns() {
 	const { win, fingers } = useHost();
 	const { at, turn, bind } = useFollowRibbon(ribbon, calendar, win, fingers);
 	return (
+		<>
 		<div className="tc-ribbon" ref={ribbon} {...bind()}>
 			<DayTurnContext.Provider value={turn}>
 				<RibbonTrack at={at} className="tc-ribbon-track" width={STRIP_WIDTH} share={COLUMN_SHARE}>
@@ -62,6 +64,8 @@ function RibbonColumns() {
 				</RibbonTrack>
 			</DayTurnContext.Provider>
 		</div>
+		<Wheel at={at} />
+		</>
 	);
 }
 

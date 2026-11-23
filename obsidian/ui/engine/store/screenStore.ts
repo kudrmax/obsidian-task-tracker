@@ -14,7 +14,7 @@ const NO_DRAFT: EntryDraft = { level: null, projects: [], descriptionLine: null,
 const NO_ENTRY = { entry: null, draft: NO_DRAFT, entryText: "", entryPanel: null } as const;
 
 /** The one gesture that holds the pointer (spec, «Which gesture holds the pointer»). */
-type Gesture = "drag" | "ribbon" | "resize" | "zoom" | "divider";
+type Gesture = "drag" | "ribbon" | "resize" | "zoom" | "divider" | "wheel";
 
 /** Where the calendar was zoomed to: an hour's height, or the whole day whatever the calendar's height. */
 export type Zoom = number | "wholeDay";

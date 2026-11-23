@@ -124,6 +124,8 @@ export interface DayData {
 	readonly hours: readonly string[];
 	/** The hour another day opens at, in minutes from the day's start (the «Scroll to hour» setting). */
 	readonly opensAt: number;
+	/** The dot on the wheel's calendar icon (F33, the core's `CalendarAlert`): a calendar in use gone old, or broken too; none while all is fresh. */
+	readonly alert: "none" | "old" | "broken";
 }
 
 export interface Now {
