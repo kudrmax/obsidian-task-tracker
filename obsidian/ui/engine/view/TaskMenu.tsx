@@ -175,11 +175,14 @@ function taskGroups(layer: Layer, typing: boolean, model: TaskMenuModel, steps: 
 	const { pick } = steps;
 	/** Typing in the menu: the panel gives its room to the field (the plugin's `giveToField`). */
 	if (typing) return [];
+	/** One group: the panel's height is its groups', so the page's room around them is its own. */
 	if (layer.page === "picker")
 		return [
-			...(model.places.length > 0 ? [<TileGroup key="places" kind="is-place" rows={[model.places.map((list) => ({ label: list.title, icon: PLACE_ICONS[list.id], on: list.on, onPick: () => pick({ kind: "sendTo", list: list.id }) }))]} />] : []),
-			<MonthPage key={`month-${layer.id}`} model={model} pick={pick} />,
-			...(model.date.removable ? [<Row key="remove" label="Remove due date" icon="removeDue" className="tc-picker-remove" onPick={() => pick({ kind: "date", date: null })} />] : []),
+			<div key="picker" className="tc-picker-page">
+				{model.places.length > 0 ? <TileGroup kind="is-place" rows={[model.places.map((list) => ({ label: list.title, icon: PLACE_ICONS[list.id], on: list.on, onPick: () => pick({ kind: "sendTo", list: list.id }) }))]} /> : null}
+				<MonthPage key={`month-${layer.id}`} model={model} pick={pick} />
+				{model.date.removable ? <Row label="Remove due date" icon="removeDue" className="tc-picker-remove" onPick={() => pick({ kind: "date", date: null })} /> : null}
+			</div>,
 		];
 	if (layer.page === "projects")
 		return [

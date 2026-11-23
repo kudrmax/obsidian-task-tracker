@@ -985,7 +985,8 @@ body:has(> .tc-backdrop.is-shown) > .suggestion-container, body:has(> .tc-backdr
 .tc-panel.is-shown { opacity: 1; transform: none; }
 .tc-panel.is-scrolled { overflow-y: auto; overscroll-behavior: contain; }
 .tc-panel.is-closing { transition-duration: var(--tc-duration-collapse); }
-.tc-panel.is-picker { width: var(--tc-menu-w); padding: var(--tc-space-12) var(--tc-space-12) var(--tc-space-4); }
+.tc-panel.is-picker { width: var(--tc-menu-w); }
+.tc-panel.is-picker > :is(.tc-picker-page, .tc-picker) { padding: var(--tc-space-12) var(--tc-space-12) var(--tc-space-4); }
 .tc-menu-group + .tc-menu-group { border-top: var(--tc-band); }
 .tc-panel .tc-project-name { padding: var(--tc-space-12); }
 .tc-panel button.tc-menu-row { width: 100%; height: var(--tc-row); box-sizing: border-box; padding: 0 var(--tc-space-16); display: flex; align-items: center; gap: var(--tc-space-10); font-size: var(--tc-font-menu); text-align: left; }
@@ -1060,9 +1061,9 @@ body:has(> .tc-backdrop.is-shown) > .suggestion-container, body:has(> .tc-backdr
 .tc-picker .tc-day.is-today { color: var(--tc-accent-ui); font-weight: var(--tc-weight-bold); }
 .tc-picker .tc-day.is-selected { background: var(--tc-accent-ui); color: var(--tc-text); font-weight: var(--tc-weight-bold); }
 .tc-panel button.tc-picker-remove { margin-top: var(--tc-picker-remove-gap); padding: 0 var(--tc-space-4); border-top: var(--tc-rule); }
-.tc-panel.is-repeat { width: var(--tc-menu-w); padding: var(--tc-space-8); }
-.tc-panel.is-repeat:has(.tc-repeat-remove) { padding-bottom: 0; }
-.tc-repeat { display: flex; flex-direction: column; gap: var(--tc-space-8); }
+.tc-panel.is-repeat { width: var(--tc-menu-w); }
+.tc-repeat { padding: var(--tc-space-8); display: flex; flex-direction: column; gap: var(--tc-space-8); }
+.tc-repeat:has(> .tc-repeat-remove) { padding-bottom: 0; }
 .tc-repeat-seg { height: var(--tc-seg); flex-shrink: 0; box-sizing: border-box; padding: var(--tc-seg-pad); border-radius: var(--tc-radius-seg); background: var(--tc-menu-tile-bg); display: flex; }
 .tc-panel button.tc-repeat-seg-btn { flex: 1; min-width: 0; height: var(--tc-seg-btn-h); padding: 0; border-radius: var(--tc-radius-seg-btn); display: flex; align-items: center; justify-content: center; color: var(--tc-text); font-size: var(--tc-font-caption); font-weight: var(--tc-weight-semibold); white-space: nowrap; }
 .tc-panel button.tc-repeat-seg-btn.is-on { background: var(--tc-ink-strong); color: var(--tc-on-strong); }
