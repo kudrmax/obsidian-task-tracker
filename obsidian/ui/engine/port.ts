@@ -313,6 +313,12 @@ export interface TaskMenuModel {
 	readonly project: ProjectPage;
 	/** The Reminder page's kinds, the task's own checked. */
 	readonly reminders: readonly { readonly kind: ReminderKind; readonly checked: boolean }[];
+	/**
+	 * The Section page (F121; the core's `MenuSections`), where the task's column shows its list's sections: each section
+	 * the list offers (empty ones and the presets too) with its name, `name` null for the tasks outside any (named
+	 * `label`), a check on the one the task stands in; `create`, whether New section ends it. Null where it isn't offered.
+	 */
+	readonly sections: { readonly options: readonly { readonly name: string | null; readonly label: string; readonly checked: boolean }[]; readonly create: boolean } | null;
 	/** The Repeat page as it opens: the task's rule, a new one drawn from the task's day (the core's `repeatOf`, F204). */
 	readonly repeat: RepeatPage;
 	/** The start of the task's description, over its copy (markdown); null without one. */
@@ -339,6 +345,8 @@ export type MenuAction =
 	/** A list tile of Pick a date's page: the task goes there as it is (the core's `sendTo`). */
 	| { readonly kind: "sendTo"; readonly list: ListPlaceId }
 	| { readonly kind: "reminder"; readonly reminder: ReminderKind }
+	/** A section of the Section page, or a new one's name as typed (the core's `toSection`: null outside any section, a blank name writing nothing). */
+	| { readonly kind: "section"; readonly name: string | null }
 	/**
 	 * The Repeat page's rule as the menu closes (null: Remove repeat): written once, unless it is the task's own again (the
 	 * core's `RepeatPage`, F120).

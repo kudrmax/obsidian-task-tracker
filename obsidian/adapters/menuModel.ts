@@ -40,6 +40,7 @@ export function menuModelOf(item: TaskItem, model: CoreMenuModel<TaskMenuActionI
 		date: { today, picked: model.dueDate, removable: model.removeDue },
 		places: model.places.flatMap((choice) => (choice.kind === "date" ? [] : [{ id: choice.kind as ListPlaceId, title: names(choice.kind), on: choice.on }])),
 		reminders: model.reminders.map((row) => ({ kind: row.kind, checked: row.checked })),
+		sections: model.sections && { options: model.sections.options.map((option) => ({ name: option.name, label: option.name ?? model.sections!.choice.ungrouped, checked: option.checked })), create: model.sections.create },
 		repeat: repeatPageFor(model.repeatOf.repeatDay, model.repeatOf.repeat),
 		project: projectPageOf(model.project),
 		peek: model.peek?.description ?? null,

@@ -20,7 +20,7 @@ type Gesture = "drag" | "ribbon" | "resize" | "zoom" | "divider";
 export type Zoom = number | "wholeDay";
 
 /** A page of a task's menu: the menu itself, the month to pick a day in, the Reminder kinds, the projects and a new one's name, the Repeat page. */
-type MenuPage = "menu" | "picker" | "reminders" | "projects" | "projectName" | "repeat";
+type MenuPage = "menu" | "picker" | "reminders" | "projects" | "projectName" | "repeat" | "sections" | "sectionName";
 
 /** What a menu asks before it acts (Won't do, Stop, Delete), in place of what was pressed. */
 export type Asking = MenuStatusId | "delete";

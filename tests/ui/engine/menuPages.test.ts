@@ -1,0 +1,63 @@
+// @vitest-environment happy-dom
+import { describe, expect, it } from "vitest";
+import { mockFile } from "../../../obsidian/stand/mockData";
+import type { TaskMenuModel } from "../../../obsidian/ui/engine/port";
+import { createScreenStore } from "../../../obsidian/ui/engine/store";
+import { standPort } from "./standPort";
+
+const NOW = new Date(2026, 10, 18, 14, 20);
+const wait = (ms = 5) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function screen() {
+	const source = await standPort(NOW, mockFile(NOW));
+	const store = createScreenStore(source.port);
+	const lineOf = (title: string) => source.fileText().split("\n").find((l) => l.includes(title)) ?? "";
+	const inboxTask = () => {
+		const row = source.port.read(0).lists.inbox.rows.find((r) => r.kind === "task")!;
+		return source.port.read(0).cards[row.id];
+	};
+	return { source, store, lineOf, inboxTask };
+}
+
+describe("the menu's Section page (F121)", () => {
+	it("offers the list's sections and the presets, the task's own checked, the tasks outside any by their name, New section last", async () => {
+		const { store, inboxTask } = await screen();
+		store.getState().openMenu(inboxTask().id);
+		const sections = (store.getState().layer!.model as TaskMenuModel).sections!;
+		expect(sections.create).toBe(true);
+		expect(sections.options.filter((o) => o.checked)).toHaveLength(1);
+		expect(sections.options.map((o) => o.label)).toContain("Morning");
+		expect(sections.options.some((o) => o.name === null)).toBe(true);
+	});
+
+	it("a section picked moves the task into it as the menu closes", async () => {
+		const { store, inboxTask, source } = await screen();
+		const task = inboxTask();
+		store.getState().openMenu(task.id);
+		store.getState().menuPage("sections");
+		store.getState().pick({ kind: "section", name: "Morning" });
+		expect(store.getState().layer).toBeNull();
+		store.getState().layerGone();
+		await wait();
+		expect(source.fileText()).toMatch(new RegExp(`## Inbox[\\s\\S]*### Morning\\n- \\[ \\] (?:p\\d )?${task.title}`));
+	});
+
+	it("New section's name: the way back returns to the sections; a name makes the section with the task in it", async () => {
+		const { store, inboxTask, source } = await screen();
+		const task = inboxTask();
+		store.getState().openMenu(task.id);
+		store.getState().menuPage("sectionName");
+		store.getState().menuPage("sections");
+		expect(store.getState().layer?.page).toBe("sections");
+		store.getState().pick({ kind: "section", name: "Дача" });
+		store.getState().layerGone();
+		await wait();
+		expect(source.fileText()).toMatch(new RegExp(`### Дача\\n- \\[ \\] (?:p\\d )?${task.title}`));
+	});
+
+	it("is not offered where the column shows no sections (the calendar)", async () => {
+		const { store, inboxTask } = await screen();
+		store.getState().openMenu(inboxTask().id, "calendar");
+		expect((store.getState().layer!.model as TaskMenuModel).sections).toBeNull();
+	});
+});

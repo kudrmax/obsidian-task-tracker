@@ -439,6 +439,9 @@ export class CorePort implements ScreenPort {
 			case "reminder":
 				await tasks.setReminder(item.key, action.reminder);
 				break;
+			case "section":
+				await tasks.toSection(keys, action.name);
+				break;
 			case "repeat":
 				await repeatWrite(item, action.rule, (rule) => tasks.setRepeat(item.key, rule));
 				break;
