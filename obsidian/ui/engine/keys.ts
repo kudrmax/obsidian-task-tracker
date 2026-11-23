@@ -1,4 +1,4 @@
-import { placeOf, standAt } from "./layout/columns";
+import { stepped } from "./layout/columns";
 import type { Screen } from "./store";
 
 /**
@@ -16,7 +16,11 @@ export interface ScreenKey {
 }
 
 /** The ribbon one place on or back, as a swipe lets it go one: a stop, and past the calendar a day; the ribbon lands there as from any place set from outside. */
-const turn = (s: Screen, shift: -1 | 1) => standAt(s, placeOf(s.stop, s.dayOffset) + shift);
+const turn = (s: Screen, shift: -1 | 1) => {
+	const to = stepped(s.stop, s.dayOffset, shift);
+	s.setStop(to.stop);
+	s.showDay(to.day);
+};
 
 export const KEYS: readonly ScreenKey[] = [
 	{ id: "step-on", name: "Ribbon: one stop on", modifiers: [], key: "ArrowRight", run: (s) => turn(s, 1) },

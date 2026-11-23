@@ -4,9 +4,10 @@ import { useDivider } from "../gestures/Divider";
 import { DayTurnContext, type FollowGestures, useFollowRibbon } from "../gestures/FollowRibbon";
 import { RibbonTrack, StripColumn, StripRule } from "../gestures/RibbonTrack";
 import type { ListId } from "../port";
-import { DayContext, useData, useScreen } from "../store";
+import { DayContext, useData, useScreen, useScreenApi } from "../store";
 import { Capsule } from "../view/Capsule";
 import { useHost } from "../view/host";
+import { Icon } from "../view/Icon";
 import { PlusButton } from "../view/QuickAdd";
 import { DaySlide } from "../view/Slide";
 import { TaskList } from "../view/TaskList";
@@ -73,9 +74,9 @@ function TurningDayColumn({ at }: { readonly at: RibbonAt }) {
 		<DayColumnBox at={at}>
 			<div className="tc-day-lane">
 				{turn.days.map((day) => (
-					<DaySlide key={day} day={day} at={turn.at} window="lane" className="tc-slide">
+					<DaySlide key={day} day={day} at={turn.at} line={turn.line} window="lane" className="tc-slide">
 						<DayContext.Provider value={day}>
-							<ColumnHead title={<DayListTitle />} />
+							<ColumnHead title={<DayTitle />} />
 							<div className="tc-stage-body">
 								<TaskList list="day" />
 							</div>
@@ -83,6 +84,7 @@ function TurningDayColumn({ at }: { readonly at: RibbonAt }) {
 					</DaySlide>
 				))}
 			</div>
+			<DayNav />
 		</DayColumnBox>
 	);
 }
@@ -160,9 +162,37 @@ function ListDivider({ at, ribbon, calendar }: { readonly at: RibbonAt; readonly
 	);
 }
 
-function DayListTitle() {
+/** A day's title on its page (F41): a tap goes back to today (F42). */
+function DayTitle() {
 	const title = useData((d) => d.lists.day.title);
-	return <span className="tc-day-title">{title}</span>;
+	const api = useScreenApi();
+	return (
+		<button type="button" className="tc-btn tc-day-title" aria-label="Back to today" onClick={() => api.getState().backToToday()}>
+			{title}
+		</button>
+	);
+}
+
+/**
+ * The day's arrows (F41, the design's «Колонка дня»): a day back and on, standing still over the turning pages so a quick
+ * second tap finds the same arrow (F46); the shown day's title, unseen, keeps the next arrow right after it.
+ */
+function DayNav() {
+	const api = useScreenApi();
+	const title = useScreen((s) => s.shown.lists.day.title);
+	return (
+		<div className="tc-day-nav">
+			<button type="button" className="tc-btn is-icon is-quiet tc-arrow" aria-label="Previous day" onClick={() => api.getState().turnDay(-1)}>
+				<Icon name="chevronLeft" />
+			</button>
+			<span className="tc-day-nav-title" aria-hidden="true">
+				{title}
+			</span>
+			<button type="button" className="tc-btn is-icon is-quiet tc-arrow" aria-label="Next day" onClick={() => api.getState().turnDay(1)}>
+				<Icon name="chevronRight" />
+			</button>
+		</div>
+	);
 }
 
 function NoteColumn({ list }: { readonly list: ListId }) {

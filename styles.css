@@ -161,6 +161,9 @@ body {
 	--tc-divider: 16px;
 	/* Soon and Now share the window evenly on both sides of the fixed divider. */
 	--tc-half-column: calc((100% - var(--tc-stage-left) - var(--tc-divider)) / 2);
+	/* The day's arrows either side of its title (the design's «Колонка дня»): narrow beside the day's list, the chevron in them. */
+	--tc-arrow-narrow: 28px;
+	--tc-chevron: 20px;
 	--tc-column-pad-near: 0 var(--tc-space-2) 0 var(--tc-space-10);
 	--tc-column-pad-far: 0 var(--tc-space-10) 0 var(--tc-space-2);
 	/* A column of the engine's ribbon holds half of the divider beside it: its near side's room, its far side's and that half. */
@@ -1201,6 +1204,16 @@ body:not(.is-mobile) .tc-stage-col.is-timeline > .tc-stage-head { padding: 0 var
 .tc-slide { position: absolute; inset: 0; display: flex; flex-direction: column; }
 .tc-slide > .tc-stage-body > .tc-timeline { top: 0; }
 .tc-day-lane { position: relative; flex: 1 1 0; min-height: 0; overflow: clip; }
+/*
+ * The day's arrows stand still over its turning pages (F41, F46): the previous day's at the title's start, the next day's right
+ * after the shown day's title (drawn unseen between them for its width); each page's title starts past the first arrow.
+ */
+.tc-day-nav { position: absolute; top: 0; left: 0; right: 0; height: var(--tc-day-row); box-sizing: border-box; padding: var(--tc-column-pad-ribbon); display: flex; align-items: center; gap: var(--tc-space-2); pointer-events: none; }
+.tc-day-nav > button.tc-arrow { width: var(--tc-arrow-narrow); height: var(--tc-day-row); flex: none; pointer-events: auto; }
+.tc-day-nav > .tc-arrow svg { width: var(--tc-chevron); height: var(--tc-chevron); stroke-width: var(--tc-stroke-chevron); }
+.tc-day-nav-title { min-width: 0; padding: 0 var(--tc-space-4); font-size: var(--tc-font-title); font-weight: var(--tc-weight-bold); white-space: nowrap; overflow: hidden; visibility: hidden; }
+.tc-slide > .tc-stage-head > .tc-head-title { margin-left: calc(var(--tc-arrow-narrow) + var(--tc-space-2)); padding: 0; }
+.tc-head-title > button.tc-day-title { max-width: 100%; height: 100%; padding: 0 var(--tc-space-4); border-radius: var(--tc-radius-text-btn); color: var(--tc-text); font-weight: var(--tc-weight-bold); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .task-calendar.is-engine .tc-timeline { overflow-x: hidden; }
 .tc-now-lane { position: absolute; top: 0; bottom: 0; left: var(--tc-items-left); right: var(--tc-items-right); z-index: var(--tc-layer-now); pointer-events: none; }
 .tc-now-lane > .tc-now { left: calc(-1 * var(--tc-items-left)); right: calc(-1 * var(--tc-items-right)); }

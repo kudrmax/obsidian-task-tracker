@@ -1,7 +1,7 @@
 import { useGesture, useWheel } from "@use-gesture/react";
 import { animate, type AnimationPlaybackControls, type MotionValue, useMotionValue, useTransform } from "motion/react";
 import { createContext, type RefObject, useEffect, useRef, useState } from "react";
-import { CALENDAR, drawnWidths, landingWidth, type PlaceWidths, placeOf, placesAfter, standAt } from "../layout/columns";
+import { CALENDAR, DayLine, drawnWidths, landingWidth, type PlaceWidths, placesAfter, type Stop } from "../layout/columns";
 import { useScreen, useScreenApi } from "../store";
 import { type ChangeTiming, changeLook, changeTiming, type DayChange } from "./dayChange";
 import { FollowPager, LANDING, landingAt, landingVelocity } from "./followPager";
@@ -17,8 +17,10 @@ const REST = 0.001;
  * full strength, and switches to the new day quickly as the list lands (`dayChange.ts`), at rest on the same frame.
  */
 export interface DayTurn {
-	/** Where the days' lists stand, in days from today: 1.3 is a third of the way from tomorrow's to the next day's. */
+	/** Where the days' lists stand, in pages past the calendar: 1.3 is a third of the way from the first page past it to the next. */
 	readonly at: MotionValue<number>;
+	/** Which page each day's list stands on (`DayLine.pos`): today's the calendar's own, unless an arrow went back before it or a far day is turned to. */
+	readonly line: MotionValue<DayLine>;
 	/** The days whose lists are drawn, in days from today: the shown one, and while a finger may draw them in, its neighbours. */
 	readonly days: readonly number[];
 	/** The day the calendar stands on while no change is under way. */
@@ -72,11 +74,13 @@ export function useFollowRibbon(ribbon: RefObject<HTMLElement | null>, calendar:
 	const stop = useScreen((s) => s.stop);
 	const dayOffset = useScreen((s) => s.dayOffset);
 	const dragging = useScreen((s) => s.gesture === "drag");
+	/** Which page each day stands on past the calendar: set in the same tick as `along` whenever it changes, so both draw the same frame. */
+	const line = useMotionValue(DayLine.plain(dayOffset));
 	/** Where the ribbon stands, in places: the strip's stops, then the days past the calendar. */
-	const along = useMotionValue(placeOf(stop, dayOffset));
+	const along = useMotionValue(line.get().placeOf(stop, dayOffset));
 	const at = useTransform(along, (p) => Math.min(p, CALENDAR));
 	const dayAt = useTransform(along, (p) => Math.max(0, p - CALENDAR));
-	const [days, setDays] = useState<readonly number[]>(() => [Math.max(0, dayOffset)]);
+	const [days, setDays] = useState<readonly number[]>(() => [dayOffset]);
 	const [change, setChange] = useState<DayChange | null>(null);
 	const changing = useRef<DayChange | null>(null);
 	/** The landing the calendar's change rides: where the list began it and lands, and the switch's times for it. */
@@ -101,11 +105,13 @@ export function useFollowRibbon(ribbon: RefObject<HTMLElement | null>, calendar:
 	const inX = useTransform(() => lookAt(along.get())?.in.x ?? 0);
 	const inOpacity = useTransform(() => lookAt(along.get())?.in.opacity ?? 1);
 	/** The day the calendar stands on when no change is under way. */
-	const shown = useRef(Math.max(0, dayOffset));
+	const shown = useRef(dayOffset);
 	const [shownDay, setShownDay] = useState(shown.current);
 	const drawnDays = useRef(days);
 	const glide = useRef<AnimationPlaybackControls | null>(null);
-	const pager = useRef(new FollowPager(placeOf(stop, dayOffset), Infinity));
+	const pager = useRef(new FollowPager(line.get().placeOf(stop, dayOffset), Infinity));
+	/** Where taps sent the ribbon while it landed (an arrow, the day's title, a key): each taken in turn once it rests (F46); fingers drop them (F47). */
+	const queued = useRef<{ readonly stop: Stop; readonly day: number }[]>([]);
 	const wheelFingers = useRef(new WheelFollow());
 	/** Without macOS's signals: the wheel gesture has begun a stroke of the ribbon, so it scrolls nothing else until it ends. */
 	const wheelLocked = useRef(false);
@@ -137,11 +143,13 @@ export function useFollowRibbon(ribbon: RefObject<HTMLElement | null>, calendar:
 	 * stay until it stands.
 	 */
 	const draw = (moving: boolean) => {
+		const l = line.get();
 		const p = along.get() - CALENDAR;
 		const stop = pager.current.stop - CALENDAR;
 		const near = stop < 0 ? [] : [stop - 1, stop, stop + 1];
-		const next = [...new Set([...near, Math.floor(p), Math.ceil(p), ...(moving ? drawnDays.current : [])])].filter((day) => day >= 0).sort((a, b) => a - b);
-		const shown = next.length > 0 ? next : [0];
+		const pages = [...near, Math.floor(p), Math.ceil(p)].filter((page) => page >= 0).map((page) => l.dayAt(CALENDAR + page));
+		const next = [...new Set([...pages, ...(moving ? drawnDays.current : [])])].sort((a, b) => a - b);
+		const shown = next.length > 0 ? next : [l.dayAt(CALENDAR)];
 		api.getState().peekDays(shown);
 		if (sameDays(drawnDays.current, shown)) return;
 		drawnDays.current = shown;
@@ -153,7 +161,7 @@ export function useFollowRibbon(ribbon: RefObject<HTMLElement | null>, calendar:
 		glide.current?.stop();
 		settle();
 		const from = along.get();
-		const day = Math.max(0, to - CALENDAR);
+		const day = line.get().dayAt(to);
 		const velocity = landingVelocity(from, to, speed, landingWidth(from, to, widths()));
 		const turn = day === shown.current ? null : { from: shown.current, to: day, way: Math.sign(day - shown.current) };
 		const spring = animate(along, to, { type: "spring", ...LANDING, velocity, restDelta: REST, restSpeed: REST });
@@ -166,8 +174,38 @@ export function useFollowRibbon(ribbon: RefObject<HTMLElement | null>, calendar:
 			if (glide.current !== spring) return;
 			landing.current = false;
 			settle();
-			if (!pager.current.following) draw(false);
+			if (pager.current.following) return;
+			rest();
+			draw(false);
+			const next = queued.current.shift();
+			if (next) go(next.stop, next.day);
 		});
+	};
+
+	/** `next` the line from now on, the ribbon standing where it stood on it: the same frame draws both. */
+	const reline = (next: DayLine) => {
+		const was = line.get();
+		const standing = was.moved(along.get(), next);
+		pager.current.stop = was.moved(pager.current.stop, next);
+		line.set(next);
+		along.jump(standing);
+	};
+
+	/** At rest, the line as it rests: a far day drawn beside for the turn goes back to its own page, today back at the calendar. */
+	const rest = () => {
+		const day = shown.current;
+		if (!line.get().isPlain(day)) reline(DayLine.plain(day));
+	};
+
+	/** The ribbon to `stop` and `day`, set from outside (a key, an arrow, the day's title, a place picked): one landing on the line that turn runs on. */
+	const go = (stop: Stop, day: number) => {
+		const next = line.get().toward(along.get(), stop, day);
+		reline(next);
+		const to = next.placeOf(stop, day);
+		if (pager.current.stop === to && Math.abs(along.get() - to) < REST) return;
+		pager.current.stop = to;
+		draw(true);
+		land(to);
 	};
 
 	/** The calendar's change done at once: it stands on the day it was changing to (its landing over, or caught by fingers). */
@@ -181,14 +219,17 @@ export function useFollowRibbon(ribbon: RefObject<HTMLElement | null>, calendar:
 		setChange(null);
 	};
 
-	/** A stop or day set from outside (a key, a place picked for a new task, a scenario's setup): the ribbon goes there by the same landing. Read as the store stands once the render is in: a finger's lift sets the stop and the day one after the other. */
+	/**
+	 * A stop or day set from outside (a key, an arrow, the day's title, a place picked for a new task, a scenario's setup): the
+	 * ribbon goes there by the same landing; while it lands, the tap waits its turn (F46). Read as the store stands once the
+	 * render is in: a finger's lift sets the stop and the day one after the other.
+	 */
 	useEffect(() => {
 		const now = api.getState();
-		const to = placeOf(now.stop, now.dayOffset);
-		if (pager.current.following || pager.current.stop === to) return;
-		pager.current.stop = to;
-		draw(true);
-		land(to);
+		const to = { stop: now.stop, day: now.dayOffset };
+		if (pager.current.following || pager.current.stop === line.get().placeOf(to.stop, to.day)) return;
+		if (landing.current) return void queued.current.push(to);
+		go(to.stop, to.day);
 	}, [stop, dayOffset]);
 	useEffect(() => {
 		draw(false);
@@ -200,9 +241,10 @@ export function useFollowRibbon(ribbon: RefObject<HTMLElement | null>, calendar:
 		if (!pager.current.following && !screen.claim("ribbon")) return false;
 		glide.current?.stop();
 		landing.current = false;
+		queued.current = [];
 		settle();
 		pager.current.begin(along.get(), fresh);
-		standAt(screen, pager.current.stop);
+		line.get().standAt(screen, pager.current.stop);
 		draw(true);
 		return true;
 	};
@@ -216,7 +258,7 @@ export function useFollowRibbon(ribbon: RefObject<HTMLElement | null>, calendar:
 		if (!pager.current.following) return;
 		const to = pager.current.release(along.get(), speed, scale());
 		const screen = api.getState();
-		standAt(screen, to);
+		line.get().standAt(screen, to);
 		screen.release("ribbon");
 		draw(true);
 		land(to, speed);
@@ -296,7 +338,7 @@ export function useFollowRibbon(ribbon: RefObject<HTMLElement | null>, calendar:
 		{ target: ribbon, enabled: !dragging, eventOptions: { passive: false } },
 	);
 	/** A card carried: only the shown day is drawn, so a day out of sight never lies under it as a place to drop on. */
-	const drawnNow = dragging ? [Math.max(0, dayOffset)] : days;
+	const drawnNow = dragging ? [dayOffset] : days;
 	const bind = () => gestures();
-	return { at, turn: { at: dayAt, days: drawnNow, shown: shownDay, change, out: { x: outX, opacity: outOpacity }, in: { x: inX, opacity: inOpacity } }, bind };
+	return { at, turn: { at: dayAt, line, days: drawnNow, shown: shownDay, change, out: { x: outX, opacity: outOpacity }, in: { x: inX, opacity: inOpacity } }, bind };
 }

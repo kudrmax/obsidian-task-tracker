@@ -139,6 +139,10 @@ interface ScreenActions {
 	 * day turned away from kept for its page still in sight.
 	 */
 	showDay(offset: number): void;
+	/** A day arrow (F41): the day before or after the shown one, past the calendar where the days turn; the ribbon turns there as a swipe does, a tap while it turns waiting its turn (F46). */
+	turnDay(shift: -1 | 1): void;
+	/** The day's title tapped (F42): back to today, in one turn from however far (F45); today's title does nothing. */
+	backToToday(): void;
 	/** Reads the days `offsets` (other than the shown one) for the pages a finger draws into sight, kept as the days turned away from are. */
 	peekDays(offsets: readonly number[]): void;
 	/** Takes the pointer for `gesture` unless another holds it; whether it got it. A drag takes it from the ribbon (its long press already proved the ribbon still, dnd-kit's activation constraint), never from a pinch or a resize. */
@@ -477,6 +481,14 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 				set({ stop });
 			},
 			showDay,
+			turnDay(shift) {
+				const day = get().dayOffset + shift;
+				set({ stop: "calendar" });
+				showDay(day);
+			},
+			backToToday() {
+				if (get().dayOffset !== 0) showDay(0);
+			},
 			peekDays(offsets) {
 				const { dayOffset, left } = get();
 				const read = offsets
