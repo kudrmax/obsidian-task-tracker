@@ -1219,7 +1219,16 @@ body:not(.is-mobile) .tc-stage-col.is-timeline > .tc-stage-head { padding: 0 var
 .tc-list-item { display: flow-root; padding-bottom: var(--tc-card-gap); }
 /* A row leaving (Decision 132): it fades where it stands and takes no press. */
 .task-calendar .is-leaving { pointer-events: none; }
-.tc-list-item > .tc-group-head, .tc-list-item > .tc-drag-source > .tc-group-head { margin-top: var(--tc-section-gap); }
+.tc-list-item > .tc-group-head, .tc-list-item > .tc-drag-source > .tc-group-head, .tc-list-item > .tc-group-slot { margin-top: var(--tc-section-gap); }
+/* A section renamed where its header stands (F62): the field takes the header's height and place, so nothing under it moves. */
+.tc-group-slot.is-rename { height: var(--tc-group-head-h); margin-bottom: calc(-1 * var(--tc-card-gap)); }
+.task-calendar .tc-group-slot.is-rename > .tc-quick-field { min-height: 0; height: 100%; padding-top: 0; padding-bottom: 0; display: flex; align-items: center; }
+.tc-group-slot.is-rename > .tc-quick-field > * { flex: 1; min-width: 0; }
+/* A lifted section (F63): its place between the groups is a dashed capsule of a card's height, the gaps of a group around it. */
+.tc-drag-source.is-lifted > .tc-group-head { height: var(--tc-card-h); margin-bottom: 0; border-radius: var(--tc-radius-card); outline: var(--tc-hairline) dashed var(--tc-dash); outline-offset: calc(-1 * var(--tc-hairline)); }
+.tc-drag-source.is-lifted > .tc-group-head > * { visibility: hidden; }
+/* The lifted section's plate: a carried card's, its name in the header's weight, how many tasks it holds on the right. */
+.tc-section-plate > .tc-card-title { font-weight: var(--tc-weight-semibold); }
 /* The calendar's tasks and events lie over each other in the stack's order (--tc-stack-z), inside the items: the now line stays over them all. */
 .task-calendar.is-engine .tc-items { isolation: isolate; }
 .task-calendar.is-engine .tc-items > :is(.tc-block, .tc-event) { z-index: var(--tc-stack-z); }

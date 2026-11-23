@@ -1,7 +1,7 @@
 import { autoUpdate, flip, FloatingFocusManager, FloatingOverlay, FloatingPortal, hide, type Middleware, type MiddlewareState, offset, type Placement, useDismiss, useFloating, useInteractions, useRole, useTransitionStatus } from "@floating-ui/react";
 import { type CSSProperties, createContext, type MouseEvent as ReactMouseEvent, type MutableRefObject, type ReactNode, type RefObject, useContext, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { DESIGN, PROPERTY } from "../../shared/design";
-import type { MenuFrom } from "../port";
+import type { ListId, MenuFrom } from "../port";
 import { useScreenApi } from "../store";
 import { blockTop } from "./block";
 import { LAYER_MS } from "./motion";
@@ -86,6 +86,19 @@ export function useMenuFrom(): (id: string, from: MenuFrom, element: Element, lo
 		(id, from, element, look = null, reveal = false) => {
 			origin.current = { element, look };
 			api.getState().openMenu(id, from, reveal);
+		},
+		[origin, api],
+	);
+}
+
+/** A section header's menu opens the same way (F62), standing over the header pressed. */
+export function useSectionMenuFrom(): (list: ListId, id: string, element: Element) => void {
+	const origin = useOrigin();
+	const api = useScreenApi();
+	return useCallback(
+		(list, id, element) => {
+			origin.current = { element, look: null };
+			api.getState().openSectionMenu(list, id);
 		},
 		[origin, api],
 	);

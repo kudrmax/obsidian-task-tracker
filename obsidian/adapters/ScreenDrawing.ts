@@ -82,7 +82,7 @@ export class ScreenDrawing {
 	private list(title: string, column: ColumnList, screen: ScreenView, cards: Record<string, CardFace>, day: LocalDate | null): ListData {
 		const rows: Row[] = [];
 		for (const group of column.groups) {
-			if (group.header) rows.push({ kind: "section", id: group.id, title: group.name ?? screen.offer.ungrouped });
+			if (group.header) rows.push({ kind: "section", id: group.id, title: group.name ?? screen.offer.ungrouped, tasks: group.items.length, ungrouped: group.name === null, menu: group.menu && { rename: group.menu.rename, remove: group.menu.remove } });
 			for (const { item, level } of group.rows) {
 				cards[item.id] = this.face(item, day);
 				rows.push({ kind: "task", id: item.id, depth: level });
