@@ -31,7 +31,7 @@ type CoreMove =
 /** The context of every task: no project chosen. */
 const EVERY = "";
 
-const COLUMNS: Readonly<Record<ListId, DropColumn>> = { inbox: "inbox", soon: "soon", day: "day" };
+const COLUMNS: Readonly<Record<ListId, DropColumn>> = { inbox: "inbox", backlog: "backlog", soon: "soon", day: "day" };
 
 /**
  * What every screen's port over the core shares (Decision 145): the core's held read of the file, taken anew when the

@@ -241,6 +241,8 @@ body {
 	--tc-foot-fade: 64px;
 	/* Its height, from over the switch. */
 	--tc-foot-fade-day: calc(var(--tc-switch-row) + var(--tc-chrome-room) + var(--tc-foot-fade));
+	/* Backlog's half of the first column is taller by the screen's foot lying over it, so both lists show as much (the design's «Inbox над Backlog»). */
+	--tc-backlog-extra: calc(var(--tc-space-8) + var(--tc-foot-fade-day));
 	/* The dragged card stands a little taller than the one it was lifted from. */
 	/* The stand's note block: the room the engine's screen takes in a note. */
 	/* Over the Projects screen's tree a carried card or project rides this far above the finger. */
@@ -1189,7 +1191,7 @@ body:not(.is-mobile) .tc-stage-col.is-timeline > .tc-stage-head { padding: 0 var
  * `listWidths` draws it; the calendar takes the rest of the window (`50%` of the strip is the window). A step of the
  * divider into the middle or out of it glides.
  */
-.tc-ribbon-track > .tc-stage-col:not(.is-timeline) :is(.tc-stage-head, .tc-stage-body) { padding: var(--tc-column-pad-ribbon); }
+.tc-ribbon-track > .tc-stage-col:not(.is-timeline) :is(.tc-stage-head, .tc-stage-body, .tc-backlog-head) { padding: var(--tc-column-pad-ribbon); }
 .tc-ribbon-track > .tc-stage-col:is(.is-day, .is-timeline) { --tc-ribbon-list-width: clamp(var(--tc-ribbon-list-least), calc(var(--tc-ribbon-list-share) * (50% - var(--tc-divider))), max(var(--tc-ribbon-list-most), calc(50% - var(--tc-divider) - var(--tc-ribbon-list-least)))); }
 .tc-ribbon-track > .tc-stage-col.is-timeline { width: calc(50% - var(--tc-ribbon-list-width) - var(--tc-divider) / 2); padding-left: calc(var(--tc-divider) / 2); box-sizing: border-box; }
 .tc-ribbon-track > .tc-stage-col:is(.is-day, .is-timeline) { transition: --tc-ribbon-list-share var(--tc-duration-snap) var(--tc-ease-out); }
@@ -1197,6 +1199,10 @@ body:not(.is-mobile) .tc-stage-col.is-timeline > .tc-stage-head { padding: 0 var
 .tc-rule { flex: none; width: 0; position: relative; z-index: var(--tc-layer-rule); }
 .tc-rule-strip { position: absolute; left: calc(-1 * var(--tc-divider) / 2); top: var(--tc-columns-head); bottom: 0; width: var(--tc-divider); display: flex; justify-content: center; pointer-events: none; }
 .tc-rule-strip.is-divider { pointer-events: auto; touch-action: none; cursor: col-resize; }
+/* The first column is Inbox over Backlog, half and half, each list scrolling by itself; Backlog's title stands in its half under a line, as a column's stands over it; Inbox's list ends over the line. */
+.tc-backlog { position: relative; flex: 1 1 var(--tc-backlog-extra); min-height: 0; display: flex; flex-direction: column; border-top: var(--tc-hairline) solid var(--tc-line); }
+.tc-backlog-head { flex: none; height: var(--tc-day-row); margin: var(--tc-space-8) 0 var(--tc-space-12); box-sizing: border-box; display: flex; align-items: center; }
+.task-calendar .tc-stage-body.is-inbox-half .tc-list::after { height: var(--tc-space-8); }
 /* A region that slides (the shown day's list and its calendar): one layer filling its column, the next sliding in beside it. */
 .tc-slide { position: absolute; inset: 0; display: flex; flex-direction: column; }
 .tc-slide > .tc-stage-body > .tc-timeline { top: 0; }

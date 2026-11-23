@@ -12,9 +12,12 @@ export type Place = "leaf" | "note";
 /** A row counts as this tall until it is drawn and measured, by the virtualizer and the drag alike: a card and its gap at the default size. */
 export const ROW_PX = DESIGN.cardHeight + DESIGN.cardGap;
 
-/** The strip of columns the ribbon slides, left to right. */
-export type Column = ListId | "timeline";
+/** The strip of columns the ribbon slides, left to right: the first is Inbox over Backlog. */
+export type Column = Exclude<ListId, "backlog"> | "timeline";
 const STRIP: readonly Column[] = ["inbox", "soon", "day", "timeline"];
+
+/** The lists a column of the strip shows: Inbox over Backlog in the first, one list in the others, none on the calendar. */
+const LISTS_OF: Readonly<Record<Column, readonly ListId[]>> = { inbox: ["inbox", "backlog"], soon: ["soon"], day: ["day"], timeline: [] };
 
 /** The ribbon's window shows two columns side by side. */
 const SHOWN = 2;
@@ -31,7 +34,7 @@ export function shownAt(stop: Stop): readonly [Column, Column] {
 
 /** What each stop shows (the one place it is said): the lists a screen mounted at `place` shows at `stop`; a note's block shows its Inbox alone. */
 export function columnsOf(place: Place, stop: Stop): readonly ListId[] {
-	return place === "note" ? ["inbox"] : shownAt(stop).filter((column): column is ListId => column !== "timeline");
+	return place === "note" ? ["inbox"] : shownAt(stop).flatMap((column) => LISTS_OF[column]);
 }
 
 /** The lists a screen mounted at `place` can bring into sight: the ribbon turns to any; a note's block shows its Inbox. */

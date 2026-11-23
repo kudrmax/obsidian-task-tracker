@@ -14,8 +14,8 @@ export type { DividerStop, EntryBarGroup, FieldActionId, FieldGroup, ListWidths,
  * made-up tasks (`MockPort`); part 2 serves it over the core. It grows step by step with the engine.
  */
 
-/** A list the screen shows: Inbox, Soon, the shown day's. */
-export type ListId = "inbox" | "soon" | "day";
+/** A list the screen shows: Inbox, Backlog under it, Soon, the shown day's. */
+export type ListId = "inbox" | "backlog" | "soon" | "day";
 
 /** A card as it is drawn. */
 export interface CardFace {
@@ -158,8 +158,6 @@ export interface Destination {
 	readonly end?: number | null;
 	/** When given, a new task goes as the last subtask of this task, wherever it stands (Add subtask on a calendar's task). */
 	readonly under?: string;
-	/** A new task written to Backlog, which the screen doesn't show: its field stays where it stands. */
-	readonly backlog?: boolean;
 	/** A new task written at the end of this list (the day's of `dayOffset`), which the screen as laid out can't show: its field stays where it stands. */
 	readonly away?: { readonly list: ListId; readonly dayOffset: number };
 }
