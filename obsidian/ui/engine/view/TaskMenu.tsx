@@ -9,7 +9,7 @@ import { useHost } from "./host";
 import { Icon } from "./Icon";
 import { Row, RowGroup } from "./MenuRows";
 import { MovingRow, MovingRows } from "./MovingRow";
-import { NewProjectRow, ProjectNameField, ProjectRows, SectionNameField } from "./Projects";
+import { NewProjectRow, ProjectNameField, ProjectRows } from "./Projects";
 import { EntryField } from "./QuickAdd";
 import { RepeatPanel } from "./Repeat";
 import { paintStyle } from "./Timeline";
@@ -42,6 +42,7 @@ interface MenuSteps {
 	openFullFromMenu(): void;
 	openFull(id: string): void;
 	startFirstStep(): void;
+	startNewSection(): void;
 }
 
 interface ActionLook {
@@ -198,9 +199,8 @@ function taskGroups(layer: Layer, typing: boolean, model: TaskMenuModel, steps: 
 		return [
 			<Row key="back" label="Section" icon="chevronLeft" className="tc-menu-back" lead onPick={() => steps.menuPage("menu")} />,
 			<RowGroup key="sections" rows={model.sections.options.map((option) => ({ label: option.label, icon: option.checked ? "check" : undefined, choice: true, quiet: option.name === null, onPick: () => pick({ kind: "section", name: option.name }) }))} />,
-			...(model.sections.create ? [<Row key="new" label="New section" icon="plus" className="is-apart is-add" onPick={() => steps.menuPage("sectionName")} />] : []),
+			...(model.sections.create ? [<Row key="new" label="New section" icon="plus" className="is-apart is-add" onPick={() => steps.startNewSection()} />] : []),
 		];
-	if (layer.page === "sectionName") return [<SectionNameField key="name" onEnd={(name) => (name === null ? steps.menuPage("sections") : pick({ kind: "section", name }))} />];
 	if (layer.page === "repeat") return [<RepeatPanel key="repeat" page={layer.repeat?.page ?? model.repeat} onChange={steps.menuRepeat} onRemove={() => pick({ kind: "repeat", rule: null })} />];
 	if (layer.page === "reminders")
 		return [

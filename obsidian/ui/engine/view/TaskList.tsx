@@ -9,6 +9,7 @@ import type { EntryField as Field, ListId, Row } from "../port";
 import { DayContext, useData, useScreen, useScreenApi } from "../store";
 import { Card } from "./Card";
 import { MovingRow, MovingRows } from "./MovingRow";
+import { ObsidianEditor } from "./ObsidianEditor";
 import { EntryField } from "./QuickAdd";
 
 /** Rows drawn past each edge of the list's room. */
@@ -51,10 +52,11 @@ const ContextList = memo(function ContextList({ list, context }: { readonly list
 	}, [rows, plusAt, list]);
 	/** A day's list draws the field only for its own day: the day sliding out keeps none. */
 	const day = useContext(DayContext);
-	const entry = useScreen((s) => (s.entry && !s.entry.stack && (list !== "day" || day === null || day === s.entry.at.dayOffset) ? s.entry : null));
+	const entry = useScreen((s) => (s.entry && !s.entry.stack && !s.entry.full && (list !== "day" || day === null || day === s.entry.at.dayOffset) ? s.entry : null));
 	const entrySeq = useScreen((s) => s.entrySeq);
 	/** The rows drawn: the list's, with the new task's field standing in its slot when it is in this list. */
-	const drawn = useMemo(() => withEntry(withPlus, list, entry), [withPlus, list, entry]);
+	const naming = useScreen((s) => s.namingSection);
+	const drawn = useMemo(() => withEntry(withNaming(withPlus, naming), list, entry), [withPlus, naming, list, entry]);
 	const fresh = useScreen((s) => s.fresh);
 	const gone = useScreen((s) => s.gone);
 	const reveal = useScreen((s) => s.reveal);
@@ -105,6 +107,14 @@ const ContextList = memo(function ContextList({ list, context }: { readonly list
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [entrySeq]);
 
+	/** A task sent to New section is brought into sight at the list's end with the name's field over it. */
+	useEffect(() => {
+		const at = drawn.findIndex((row) => row.kind === "naming");
+		if (at >= 0) virtualizer.scrollToIndex(Math.min(at + 1, drawn.length - 1), { align: "auto" });
+		// Once per task sent: the rows it looks in are those drawn then.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [naming]);
+
 	/** Before the screen is painted, so a menu opening over the card finds it where it is shown. */
 	useLayoutEffect(() => {
 		if (!reveal) return;
@@ -138,6 +148,12 @@ const ContextList = memo(function ContextList({ list, context }: { readonly list
 											<SortableRow id={row.id} gap>
 												<div className="tc-card" style={{ [PROPERTY.level]: String(liftedDepth ?? 0) } as CSSProperties} />
 											</SortableRow>
+										</MovingRow>
+									);
+								if (row.kind === "naming")
+									return (
+										<MovingRow key={row.id} id={row.id} context={context} index={item.index} measure={virtualizer.measureElement} order={order} carried={false} fresh={false} className="tc-list-item">
+											<NewSectionName />
 										</MovingRow>
 									);
 								if (row.kind === "entry")
@@ -181,8 +197,41 @@ const RowFace = memo(function RowFace({ row }: { readonly row: Row }) {
 	);
 });
 
-/** A row of the list as drawn: the list's own, or the new task's field. */
-type Drawn = Row | { readonly kind: "entry"; readonly id: string; readonly depth: number } | { readonly kind: "plus"; readonly id: string };
+/** A row of the list as drawn: the list's own, the new task's field, the carried plus, or a new section's name over the task sent to it. */
+type Drawn = Row | { readonly kind: "entry"; readonly id: string; readonly depth: number } | { readonly kind: "plus"; readonly id: string } | { readonly kind: "naming"; readonly id: string };
+
+/**
+ * The task sent to New section from its menu (`naming`), with its subtasks, waiting at the list's end under the new
+ * section's name field (the design's «Поле имени»); the rows as they are in a list that doesn't hold it.
+ */
+function withNaming(all: readonly Drawn[], naming: string | null): readonly Drawn[] {
+	if (naming === null || !all.some((row) => row.id === naming)) return all;
+	const under = descendantsOf(all.filter((row): row is Row => row.kind === "task" || row.kind === "section"), naming);
+	const goes = (row: Drawn) => row.id === naming || under.has(row.id);
+	return [...all.filter((row) => !goes(row)), { kind: "naming", id: NAMING }, ...all.filter(goes)];
+}
+
+/** The row of a new section's name. */
+const NAMING = "naming";
+
+/**
+ * A new section's name typed where its header will stand (the design's «Поле имени»): a capsule ringed in the accent,
+ * «Section name» while empty, the caret in it. Enter or a tap elsewhere ends it with the name, Escape with none; once.
+ */
+function NewSectionName() {
+	const api = useScreenApi();
+	const ended = useRef(false);
+	const end = (name: string | null) => {
+		if (ended.current) return;
+		ended.current = true;
+		api.getState().endNewSection(name);
+	};
+	return (
+		<div className="tc-new-section">
+			<ObsidianEditor text="" className="tc-quick-field tc-title-field is-section" placeholder="Section name" onEnter={end} onEscape={() => end(null)} onLeave={(_, text) => end(text())} />
+		</div>
+	);
+}
 
 /**
  * The list's rows with the field put in its slot: before the task it goes before, else at the end of its section; a

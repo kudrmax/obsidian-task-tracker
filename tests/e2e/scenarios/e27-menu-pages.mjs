@@ -3,8 +3,8 @@ import { menuButton, menuNow } from "../lib/menu.mjs";
 
 /**
  * Step 7, batch C: the task menu's part 2 pages (F120, F121, F125, F126, F199–F204): Repeat shows each tap at once and
- * writes its rule once, as the menu closes; Section moves the task into a section, New section names one in the menu's
- * place; First step folds the task in the tap and its step line is the field, Enter writing the first subtask; Open in
+ * writes its rule once, as the menu closes; Section moves the task into a section, New section names one in a field
+ * over the task waiting at its list's end; First step folds the task in the tap and its step line is the field, Enter writing the first subtask; Open in
  * Obsidian leaves for the tasks file at the task's line. What is written is read from the tasks file.
  */
 export default {
@@ -63,7 +63,9 @@ export default {
 			t.expect(words.includes("Section") && words.includes("Morning") && words.includes("New section"), `the Section page: the way back, the presets, New section: ${JSON.stringify(words)}`);
 			await t.shot("section-page");
 			await press("New section");
-			t.expect(await t.cdp.eval(`!!document.querySelector(".tc-menu-layer .tc-section-name [contenteditable]") && document.activeElement?.isContentEditable === true`), "New section's name is typed in the menu's place, the caret in it");
+			const waiting = await t.cdp.eval(`(() => { const rows = [...document.querySelectorAll("[data-list=inbox] .tc-list-item")]; const at = rows.findIndex((r) => r.querySelector(".tc-new-section")); return { field: at >= 0 && document.activeElement?.closest(".tc-new-section") !== null, next: rows[at + 1]?.querySelector(".tc-card-title")?.textContent ?? null, menu: !!document.querySelector(".tc-menu-layer .tc-panel:not(.is-closing)") }; })()`);
+			t.expect(waiting.field && waiting.next === title && !waiting.menu, `the menu closes, the task waits under the new section's name field, the caret in it (the design's «Поле имени»): ${JSON.stringify(waiting)}`);
+			await t.shot("section-name");
 			await t.cdp.send("Input.insertText", { text: "Дача" });
 			await key("Enter", "Enter", 13);
 			await t.sleep(600);

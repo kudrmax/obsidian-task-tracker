@@ -42,16 +42,23 @@ describe("the menu's Section page (F121)", () => {
 		expect(source.fileText()).toMatch(new RegExp(`## Inbox[\\s\\S]*### Morning\\n- \\[ \\] (?:p\\d )?${task.title}`));
 	});
 
-	it("New section's name: the way back returns to the sections; a name makes the section with the task in it", async () => {
+	it("New section: the menu closes, the task waits for the name; Escape puts it back, a name makes the section with the task in it", async () => {
 		const { store, inboxTask, source } = await screen();
 		const task = inboxTask();
+		const before = source.fileText();
 		store.getState().openMenu(task.id);
-		store.getState().menuPage("sectionName");
 		store.getState().menuPage("sections");
-		expect(store.getState().layer?.page).toBe("sections");
-		store.getState().pick({ kind: "section", name: "Дача" });
-		store.getState().layerGone();
+		store.getState().startNewSection();
+		expect(store.getState().layer).toBeNull();
+		expect(store.getState().namingSection).toBe(task.id);
+		store.getState().endNewSection(null);
 		await wait();
+		expect(source.fileText()).toBe(before);
+		store.getState().openMenu(task.id);
+		store.getState().startNewSection();
+		store.getState().endNewSection("Дача");
+		await wait();
+		expect(store.getState().namingSection).toBeNull();
 		expect(source.fileText()).toMatch(new RegExp(`### Дача\\n- \\[ \\] (?:p\\d )?${task.title}`));
 	});
 

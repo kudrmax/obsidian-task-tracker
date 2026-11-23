@@ -31,16 +31,6 @@ export function NewProjectRow({ label, onPick }: { readonly label: string; reado
  * `onLeave`: the focus went elsewhere before it ended.
  */
 export function ProjectNameField({ onEnd, onLeave }: { readonly onEnd: (name: string | null) => void; readonly onLeave?: (event: FocusEvent<HTMLDivElement>) => void }) {
-	return <NameField back="New project" placeholder="Project name" className="tc-project-name" onEnd={onEnd} onLeave={onLeave} />;
-}
-
-/** New section's name, in place of the sections (F121), as «New project…»'s is: the way back «New section», «Section name» while empty. */
-export function SectionNameField({ onEnd }: { readonly onEnd: (name: string | null) => void }) {
-	return <NameField back="New section" placeholder="Section name" className="tc-project-name tc-section-name" onEnd={onEnd} />;
-}
-
-/** A name typed in a menu's page (a new project's, a new section's): the way back, then the one line ringed in the accent. */
-function NameField({ back, placeholder, className, onEnd, onLeave }: { readonly back: string; readonly placeholder: string; readonly className: string; readonly onEnd: (name: string | null) => void; readonly onLeave?: (event: FocusEvent<HTMLDivElement>) => void }) {
 	const ended = useRef(false);
 	const end = (name: string | null) => {
 		if (ended.current) return;
@@ -49,9 +39,9 @@ function NameField({ back, placeholder, className, onEnd, onLeave }: { readonly 
 	};
 	return (
 		<div>
-			<Row label={back} icon="chevronLeft" className="tc-menu-back" lead onPick={() => end(null)} />
-			<div className={`tc-menu-group ${className}`}>
-				<ObsidianEditor text="" className="tc-quick-field tc-title-field tc-project-name-field" placeholder={placeholder} onEnter={end} onEscape={() => end(null)} onLeave={onLeave ? (event) => (ended.current ? undefined : onLeave(event)) : undefined} />
+			<Row label="New project" icon="chevronLeft" className="tc-menu-back" lead onPick={() => end(null)} />
+			<div className="tc-menu-group tc-project-name">
+				<ObsidianEditor text="" className="tc-quick-field tc-title-field tc-project-name-field" placeholder="Project name" onEnter={end} onEscape={() => end(null)} onLeave={onLeave ? (event) => (ended.current ? undefined : onLeave(event)) : undefined} />
 			</div>
 		</div>
 	);

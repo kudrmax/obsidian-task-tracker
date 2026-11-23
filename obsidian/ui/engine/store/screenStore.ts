@@ -23,7 +23,7 @@ type Gesture = "drag" | "ribbon" | "resize" | "zoom" | "divider";
 export type Zoom = number | "wholeDay";
 
 /** A page of a task's menu: the menu itself, the month to pick a day in, the Reminder kinds, the projects and a new one's name, the Repeat page. */
-type MenuPage = "menu" | "picker" | "reminders" | "projects" | "projectName" | "repeat" | "sections" | "sectionName";
+type MenuPage = "menu" | "picker" | "reminders" | "projects" | "projectName" | "repeat" | "sections";
 
 /** What a menu asks before it acts (Won't do, Stop, Delete), in place of what was pressed. */
 export type Asking = MenuStatusId | "delete";
@@ -140,6 +140,11 @@ interface ScreenState {
 	readonly full: { readonly ids: readonly string[]; readonly task: FullTask; readonly notesFocus: number } | null;
 	/** Where the full screen draws the open field (the port's answer for the field and the task shown), null for none. */
 	readonly fullAt: FullEntryAt | null;
+	/**
+	 * The task sent to New section from its menu (F121; the design's «Поле имени»): it waits at the end of its list under
+	 * the new section's name field; null while none does.
+	 */
+	readonly namingSection: string | null;
 	/** The task First step's field is open on (F199): its card's step line is the field; null while none is. */
 	readonly firstStep: string | null;
 	/** Something on the full screen is typed in: Done shows, the bottom row hides. */
@@ -300,6 +305,10 @@ interface ScreenActions {
 	saveNotes(): void;
 	/** The project under the full screen's title: the screen closes, that project chosen (F243). */
 	showProject(name: string): void;
+	/** New section on the Section page: the menu closes and the task waits at its list's end under the section's name field. */
+	startNewSection(): void;
+	/** The section's name ended: Enter (or a tap elsewhere) with `name` makes the section with the task in it (the core's `toSection`, a blank name writing nothing); null (Escape) puts the card back. */
+	endNewSection(name: string | null): void;
 	/** First step from the menu (F199): the menu closes and in the same tap the task folds, its card's step line the field. */
 	startFirstStep(): void;
 	/** First step's field ended: Enter or a tap elsewhere with `text` writes it as the first subtask (F200); null (Escape) writes nothing, the card as it was. */
@@ -534,6 +543,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 			contextSeq: 0,
 			reveal: null,
 			focusCard: null,
+			namingSection: null,
 			firstStep: null,
 			full: null,
 			fullAt: null,
@@ -675,6 +685,17 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 			},
 			setFullTyping(fullTyping) {
 				if (get().fullTyping !== fullTyping) set({ fullTyping });
+			},
+			startNewSection() {
+				const layer = get().layer;
+				if (!layer) return;
+				set({ ...closed(get()), namingSection: layer.id });
+			},
+			endNewSection(name) {
+				const id = get().namingSection;
+				if (id === null) return;
+				set({ namingSection: null });
+				if (name !== null) write(port.act(id, { kind: "section", name }, "list", get().dayOffset));
 			},
 			startFirstStep() {
 				const layer = get().layer;
