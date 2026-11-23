@@ -160,7 +160,7 @@ const ContextList = memo(function ContextList({ list, context }: { readonly list
 										</MovingRow>
 									);
 								return (
-									<MovingRow key={row.id} id={row.id} context={context} index={item.index} measure={virtualizer.measureElement} order={order} carried={lifted === row.id} fresh={fresh.has(row.id)} className="tc-list-item">
+									<MovingRow key={row.id} id={row.kind === "section" ? sectionKey(list, row.id) : row.id} context={context} index={item.index} measure={virtualizer.measureElement} order={order} carried={lifted === row.id} fresh={fresh.has(row.id)} className="tc-list-item">
 										<RowFace list={list} row={row.kind === "task" && row.id === lifted && liftedDepth !== null ? { ...row, depth: liftedDepth } : row} />
 									</MovingRow>
 								);
