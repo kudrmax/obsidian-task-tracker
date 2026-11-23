@@ -68,6 +68,8 @@ interface ScreenState {
 	readonly gesture: Gesture | null;
 	/** The task carried now. */
 	readonly lifted: string | null;
+	/** The other picked tasks carried with it as a stack (F149): they wait in their places and go where it lands, in one write. */
+	readonly along: readonly string[];
 	/** The level the carried task would take where it stands now (its swipes there, `SwipeLevel`); null: its own. */
 	readonly liftedDepth: number | null;
 	/** Data came while a drag or its write held the screen still: read once they end. */
@@ -450,6 +452,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 			stop: "calendar",
 			gesture: null,
 			lifted: null,
+			along: [],
 			liftedDepth: null,
 			pending: false,
 			now: port.now(),
@@ -570,13 +573,17 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 			},
 			lift(id) {
 				home = get().shown;
-				set({ lifted: id, liftedDepth: null, layer: null, selected: null });
+				const along = get().carriedWith(id);
+				/** A card not picked carried alone lets the ⌘-picks go; Select tasks keeps its picks (F145). */
+				if (along.length === 0 && !get().picked.includes(id) && !get().picking) get().clearPicks();
+				set({ lifted: id, along, liftedDepth: null, layer: null, selected: null });
 			},
 			setLiftedDepth(liftedDepth) {
 				if (get().liftedDepth !== liftedDepth) set({ liftedDepth });
 			},
 			takes(id, to) {
-				return port.takes(id, to);
+				const along = get().along;
+				return port.takes(id, along.length > 0 ? { ...to, along } : to);
 			},
 			changes(id, to) {
 				return port.changes(id, to);
@@ -589,8 +596,11 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 				set({ shown: share(get().shown, port.preview(id, to, get().context)) });
 			},
 			drop(id, to) {
-				letGo(id, to);
-				set({ lifted: null, liftedDepth: null });
+				const along = get().along;
+				letGo(id, to && along.length > 0 ? { ...to, along } : to);
+				set({ lifted: null, along: [], liftedDepth: null });
+				/** A stack that landed ends Select tasks (the core's `endsSelection`: one that landed does). */
+				if (to && along.length > 0) get().clearPicks();
 				get().release("drag");
 			},
 			openMenu(id, from = "list", reveal = false) {

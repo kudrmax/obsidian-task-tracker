@@ -31,9 +31,15 @@ const carried = (id: string, grab: Grab, landing: Landing) => (
 		className={`tc-carried${landing.block ? " is-block" : ""}`}
 		style={{ [PROPERTY.grabX]: `${grab.x}px`, [PROPERTY.grabY]: `${grab.y}px`, [PROPERTY.landingLevel]: String(landing.level), ...(landing.width === null ? {} : { [PROPERTY.landingWidth]: `${landing.width}px` }), ...(landing.height === null ? {} : { [PROPERTY.landingHeight]: `${landing.height}px` }) } as CSSProperties}
 	>
-		<Card id={id} copy />
+		<Card id={id} copy badge={<StackCount />} />
 	</div>
 );
+
+/** How many tasks a carried stack holds, on its top card's corner (F149); none for one task. */
+function StackCount() {
+	const count = useScreen((s) => s.along.length);
+	return count === 0 ? null : <span className="tc-float-count">{count + 1}</span>;
+}
 
 /** A tap anywhere on the screen but on a calendar's task or its dots lets the selected task go (F102); one on a layer (the menu, its backdrop) leaves it. */
 const letSelectionGo = (event: MouseEvent, store: ScreenStore) => {

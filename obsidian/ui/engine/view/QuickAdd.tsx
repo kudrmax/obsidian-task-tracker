@@ -1,6 +1,6 @@
 import { memo, type FocusEvent, type CSSProperties, useState } from "react";
 import { PROPERTY } from "../../shared/design";
-import { CarriedPlus } from "../drag/Drag";
+import { CarriedPlus, useCancelTarget } from "../drag/Drag";
 import { useScreen, useScreenApi } from "../store";
 import { Icon } from "./Icon";
 import { ObsidianEditor } from "./ObsidianEditor";
@@ -17,6 +17,8 @@ export const PlusButton = memo(function PlusButton({ shown }: { readonly shown: 
 	/** A field open, or Select tasks on: the circle for the picked tasks stands in its place (F136). */
 	const open = useScreen((s) => s.entry !== null || s.picking);
 	const inList = useScreen((s) => s.plusAt !== null);
+	const stack = useScreen((s) => s.along.length > 0);
+	if (stack) return <CancelRing />;
 	if (inList) return RING;
 	return (
 		<CarriedPlus onTap={() => api.getState().plusTap(shown)} ring={RING} hidden={open}>
@@ -24,6 +26,16 @@ export const PlusButton = memo(function PlusButton({ shown }: { readonly shown: 
 		</CarriedPlus>
 	);
 });
+
+/** The plus's place while a stack is carried (F169, the design's «Массовые действия»): a ring with a cross, lit with the stack over it, which goes back let go there. */
+function CancelRing() {
+	const { ref, hot } = useCancelTarget();
+	return (
+		<div ref={ref} className={`tc-btn is-round tc-plus-ring is-cross${hot ? " is-hot" : ""}`}>
+			<Icon name="cross" />
+		</div>
+	);
+}
 
 /** The plus's place while it is carried: a dashed ring. */
 const RING = (

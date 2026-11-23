@@ -14,6 +14,8 @@ export interface CardProps {
 	readonly copy?: boolean;
 	/** On the calendar: the card's look there; absent, the card of a list. */
 	readonly block?: BlockLook;
+	/** On the carried copy's corner: how many tasks the stack holds (F149). */
+	readonly badge?: ReactNode;
 }
 
 /**
@@ -22,7 +24,7 @@ export interface CardProps {
  * right, the counter and the description's mark, the date in a list; on the calendar, its look there (`BlockLook`). A card
  * whose task has left the screen keeps its last face while its row fades (`MovingRows`).
  */
-export const Card = memo(function Card({ id, depth = 0, copy = false, block }: CardProps) {
+export const Card = memo(function Card({ id, depth = 0, copy = false, block, badge = null }: CardProps) {
 	const read = useData((d) => d.cards[id]);
 	const leaving = useLeaving();
 	const last = useRef(read);
@@ -31,13 +33,16 @@ export const Card = memo(function Card({ id, depth = 0, copy = false, block }: C
 	const picked = useScreen((s) => !block && s.picked.includes(id));
 	/** The task the search led to: the ring until the screen is touched (F256). */
 	const ringed = useScreen((s) => !copy && s.ringed === id);
+	/** Carried along in a stack, it waits in its place, dashed, until the stack lands (F149, the design's «Массовые действия»). */
+	const waiting = useScreen((s) => !copy && s.along.includes(id));
 	const face = read ?? (leaving ? last.current : undefined);
 	if (!face) return null;
 	const marked = copy ? { "data-copy": id } : block ? { "data-block": id, "data-own-press": "" } : { "data-id": id };
-	const marks = `${picked ? " is-selected" : ""}${ringed ? " is-found" : ""}`;
+	const marks = `${picked ? " is-selected" : ""}${ringed ? " is-found" : ""}${waiting ? " is-waiting" : ""}`;
 	return (
 		<CardFace face={face} block={block} className={`${block ? "tc-block-card" : "tc-card"}${marks}`} {...marked} data-collapsed={!block && face.folded ? "true" : undefined} style={block ? undefined : ({ [PROPERTY.level]: String(depth) } as CSSProperties)}>
 			{block ? null : PICK_CIRCLE}
+			{badge}
 		</CardFace>
 	);
 });

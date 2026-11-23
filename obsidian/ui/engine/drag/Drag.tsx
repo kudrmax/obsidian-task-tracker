@@ -152,6 +152,11 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 		pointer.current = args.pointerCoordinates;
 		rects.current = args.droppableRects;
 		const underPointer = pointerWithin(args);
+		/** A stack over the plus's place, its ring with a cross: let go there, every task goes back (F169). */
+		if (underPointer.some((hit) => hit.id === CANCEL)) {
+			lastOver.current = CANCEL;
+			return [{ id: CANCEL }];
+		}
 		/** Over the calendar the target is the calendar itself: the card's place there is at the minute under its top, among no rows. */
 		const onCalendar = underPointer.some((hit) => hit.id === CALENDAR_TARGET || hit.id === CALENDAR_ROOM);
 		if (onCalendar) {
@@ -335,6 +340,7 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 	};
 	const move = (event: DragMoveEvent) => {
 		const { active: lifted, over } = event;
+		if (over?.id === CANCEL) return refused();
 		if (Math.hypot(event.delta.x, event.delta.y) > LONG_PRESS_TOLERANCE_PX) moved.current = true;
 		followEdge(over);
 		if (isPlus(lifted.id)) {
@@ -392,6 +398,7 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 	const overList = (event: DragOverEvent) => {
 		const { active: lifted, over } = event;
 		followEdge(over);
+		if (over?.id === CANCEL) return refused();
 		if (isPlus(lifted.id)) return plusOver(event, over);
 		if (over?.id === CALENDAR_TARGET) return overCalendar(event, over);
 		const into = crossing(lifted, over);
@@ -565,6 +572,14 @@ const STAND_STILL: SortingStrategy = () => null;
 
 /** A list's own drop target, for when no row of it is under the pointer: an empty list, or past its last row. */
 const LIST_TARGET = "list:";
+/** The plus's place while a stack is carried: its ring with a cross, where the stack is let go to go back (F169). */
+const CANCEL = "cancel";
+
+/** The ring with a cross in the plus's place while a stack is carried (F169): a target that takes nothing, and whether the stack is over it. */
+export function useCancelTarget(): { readonly ref: (element: HTMLElement | null) => void; readonly hot: boolean } {
+	const { setNodeRef, isOver } = useDroppable({ id: CANCEL });
+	return { ref: setNodeRef, hot: isOver };
+}
 
 /**
  * The carried card is over another list: where it goes there, as dnd-kit's «multiple containers» example puts it — at the

@@ -632,6 +632,12 @@ body {
 	--tc-answer-field-pad-y: calc((var(--tc-row) - var(--tc-leading-card)) / 2);
 	--tc-answer-field-pad-x: var(--tc-card-pad-start);
 	--tc-answer-foot-gap: var(--tc-space-8);
+	/* A carried stack's count on its top card's corner: its size, how far it stands out, its ring of the ground; the stack over the ring that sends it back. */
+	--tc-float-count-size: 22px;
+	--tc-float-count-out: 9px;
+	--tc-float-count-ring: 2px;
+	--tc-radius-float-count: calc(var(--tc-float-count-size) / 2);
+	--tc-float-cancel-opacity: 0.35;
 }
 
 /* The light theme follows Obsidian's: the same roles, the values of the board «Палитра» (docs/design/README.md, «Светлая тема»). */
@@ -1479,3 +1485,10 @@ mark.tc-hit { background: var(--tc-selection); color: inherit; font-weight: var(
 .tc-hit-desc { display: flex; align-items: center; gap: var(--tc-space-4); white-space: nowrap; overflow: hidden; font-size: var(--tc-font-block); line-height: var(--tc-leading-block); color: var(--tc-muted); -webkit-mask-image: var(--tc-fade-card-end); mask-image: var(--tc-fade-card-end); }
 .tc-hit-desc > svg { width: var(--tc-pick-check); height: var(--tc-pick-check); flex-shrink: 0; stroke: currentColor; }
 .tc-hit-card.is-picked { box-shadow: var(--tc-ring-selected); }
+
+/* A stack carried (F149, F169): its count on the top card's corner, the cards waiting dashed in their places, the stack see-through over the ring that sends it back. */
+.tc-card > .tc-float-count { position: absolute; top: calc(-1 * var(--tc-float-count-out)); right: calc(-1 * var(--tc-float-count-out)); min-width: var(--tc-float-count-size); height: var(--tc-float-count-size); box-sizing: border-box; padding: 0 var(--tc-space-6); border-radius: var(--tc-radius-float-count); background: var(--tc-accent); color: var(--tc-on-accent); box-shadow: 0 0 0 var(--tc-float-count-ring) var(--tc-bg); font-family: var(--tc-font-ui); font-size: var(--tc-font-count); font-weight: var(--tc-weight-bold); display: flex; align-items: center; justify-content: center; font-variant-numeric: tabular-nums; }
+.tc-carried > .tc-card:has(> .tc-float-count) { overflow: visible; }
+.tc-card.is-waiting { background: none; box-shadow: none; outline: var(--tc-hairline) dashed var(--tc-dash); outline-offset: calc(-1 * var(--tc-hairline)); }
+.tc-card.is-waiting > * { visibility: hidden; }
+body:has(.tc-plus-ring.is-cross.is-hot) .tc-carried { opacity: var(--tc-float-cancel-opacity); }
