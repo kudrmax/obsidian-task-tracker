@@ -283,6 +283,29 @@ export class CorePort implements ScreenPort {
 		await this.refresh();
 	}
 
+	firstStepView(id: string, dayOffset: number, context?: ScreenContext): ScreenData {
+		this.use(context);
+		const item = this.reader.item(id);
+		const date = this.dateOf(dayOffset);
+		if (!item) return this.read(dayOffset);
+		const screen = this.core.tasks.firstStepScreen(this.reader.screen(date), item.key);
+		return this.drawing.draw({ date, screen, lists: this.drawing.listsOf(screen), events: this.eventsOf(date) });
+	}
+
+	async firstStep(id: string, text: string): Promise<void> {
+		const item = this.reader.item(id);
+		if (!item) return;
+		await this.core.tasks.firstStep(item.key, text);
+		await this.refresh();
+	}
+
+	async fold(id: string): Promise<void> {
+		const item = this.reader.item(id);
+		if (!item) return;
+		await this.core.tasks.toggleCollapsed(item.key);
+		await this.refresh();
+	}
+
 	sectionNameEnd(how: SectionNameEnd, text: string): string | null {
 		let name: string | null = null;
 		const entry = new SectionNameEntry((ended) => (name = ended));

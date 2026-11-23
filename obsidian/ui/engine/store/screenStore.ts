@@ -130,6 +130,8 @@ interface ScreenState {
 	readonly focusCard: { readonly id: string; readonly seq: number } | null;
 	/** A task to bring into sight in its list, once per `seq`. */
 	readonly reveal: { readonly id: string; readonly seq: number } | null;
+	/** The task whose First step is typed on its own card (F199–F201): the screen drawn as the port folds it meanwhile. */
+	readonly firstStep: string | null;
 	/** A section's header renamed in place (F62): its list and its id while its name is typed, and the two as one key (`sectionKey`). */
 	readonly sectionField: { readonly key: string; readonly list: ListId; readonly id: string } | null;
 }
@@ -171,6 +173,15 @@ interface ScreenActions {
 	 */
 	openMenu(id: string, from?: MenuFrom, reveal?: boolean): void;
 	closeLayer(): void;
+	/**
+	 * First step from the menu (F199): the menu closes and in the same tap the task folds, its card's second line the field,
+	 * the screen drawn as the port draws it while the field is open.
+	 */
+	startFirstStep(): void;
+	/** First step's field ended (F200): Enter or a tap elsewhere write its text as the first subtask (a blank one writes nothing); Escape writes nothing; the card returns as the file has it. */
+	endFirstStep(how: "enter" | "blur" | "escape", text: string): void;
+	/** A tap on a list card's counter (F196): the task's subtasks fold away or show again, written through the port. */
+	fold(id: string): void;
 	/** A tap on a section's header (F62): its menu, Rename and Remove section as the port offers them; No section's offers none and opens nothing. */
 	openSectionMenu(list: ListId, id: string): void;
 	/** Rename in a section's menu: the menu closes and in the same tap the header becomes its name's field. */
@@ -347,7 +358,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 				if (!s.pending) set({ pending: true });
 				return;
 			}
-			const next = share(s.read, port.read(s.dayOffset, s.context));
+			const next = share(s.read, s.firstStep === null ? port.read(s.dayOffset, s.context) : port.firstStepView(s.firstStep, s.dayOffset, s.context));
 			const known = s.read.cards;
 			/** A read that changed nothing (a write's read-back after its own change came) keeps what came and went in the last one. */
 			const same = next === s.read;
@@ -500,6 +511,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 			reveal: null,
 			focusCard: null,
 			sectionField: null,
+			firstStep: null,
 
 			setStop(stop) {
 				set({ stop });
@@ -600,6 +612,23 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 			pick(action) {
 				const layer = get().layer;
 				if (layer) afterClose(() => port.act(layer.id, action, layer.from, get().dayOffset));
+			},
+			startFirstStep() {
+				const layer = get().layer;
+				if (layer?.model.kind !== "task") return;
+				const { dayOffset, context } = get();
+				const view = share(get().read, port.firstStepView(layer.id, dayOffset, context));
+				set({ layer: null, firstStep: layer.id, read: view, shown: share(get().shown, view), selected: null });
+			},
+			endFirstStep(how, text) {
+				const id = get().firstStep;
+				if (id === null) return;
+				set({ firstStep: null });
+				if (how === "escape") refresh();
+				else write(port.firstStep(id, text));
+			},
+			fold(id) {
+				write(port.fold(id));
 			},
 			openSectionMenu(list, id) {
 				const row = get().shown.lists[list].rows.find((r) => r.id === id);

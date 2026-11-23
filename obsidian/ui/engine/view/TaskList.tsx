@@ -10,6 +10,7 @@ import { DayContext, sectionKey, useData, useScreen, useScreenApi } from "../sto
 import { Card } from "./Card";
 import { MovingRow, MovingRows } from "./MovingRow";
 import { ObsidianEditor } from "./ObsidianEditor";
+import { useHost } from "./host";
 import { EntryField } from "./QuickAdd";
 
 /** Rows drawn past each edge of the list's room. */
@@ -165,13 +166,19 @@ const ContextList = memo(function ContextList({ list, context }: { readonly list
 /** A row's face: a section's header, or a task's card as a drag source that opens its menu when tapped. */
 const RowFace = memo(function RowFace({ list, row }: { readonly list: ListId; readonly row: Row }) {
 	const openMenuFrom = useMenuFrom();
+	const api = useScreenApi();
+	const { haptics } = useHost();
+	const fold = useCallback(() => {
+		haptics.tap();
+		api.getState().fold(row.id);
+	}, [api, haptics, row.id]);
 	if (row.kind === "section") return <SectionHead list={list} row={row} />;
 	return (
 		<SortableRow
 			id={row.id}
 			onTap={(target, held) => openMenuFrom(row.id, "list", pressedIn(target, "[data-id]"), null, !held)}
 		>
-			<Card id={row.id} depth={row.depth} />
+			<Card id={row.id} depth={row.depth} onFold={fold} />
 		</SortableRow>
 	);
 });

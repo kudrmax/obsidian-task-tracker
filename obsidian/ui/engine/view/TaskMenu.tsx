@@ -34,6 +34,7 @@ interface MenuSteps {
 	startRename(): void;
 	startSubtask(): void;
 	startNotes(): void;
+	startFirstStep(): void;
 	pick(action: MenuAction): void;
 	actHere(action: MenuAction): void;
 	nameMenuProject(name: string): void;
@@ -76,7 +77,7 @@ const MENU_ACTIONS: Readonly<Record<TaskMenuActionId, ActionLook | { readonly ti
 	project: { label: "Project", icon: "project", onPick: (_, steps) => steps.menuPage("projects") },
 	section: { label: "Section", icon: "section", onPick: leave },
 	subtask: { label: "Subtask", icon: "subtask", onPick: (_, steps) => steps.startSubtask(), tile: "steps" },
-	firstStep: { label: "First step", icon: "firstStep", onPick: leave, tile: "steps" },
+	firstStep: { label: "First step", icon: "firstStep", onPick: (_, steps) => steps.startFirstStep(), tile: "steps" },
 	openFull: { label: "Open full screen", icon: "fullScreen", onPick: leave, tile: "opens" },
 	openInObsidian: { label: "Open in Obsidian", icon: "openFile", onPick: leave, tile: "opens" },
 	delete: { label: "Delete", icon: "delete", onPick: (action, steps) => (action.asks ? steps.ask("delete") : steps.pick({ kind: "delete" })) },

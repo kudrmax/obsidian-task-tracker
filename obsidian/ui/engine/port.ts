@@ -443,6 +443,15 @@ export interface ScreenPort {
 	 * write, so a menu left open on its page goes on with it), null once it is gone.
 	 */
 	act(id: string, action: MenuAction, from: MenuFrom, dayOffset: number): Promise<string | null>;
+	/**
+	 * The screen while First step's field is open on the task `id` (F199, the core's `firstStepScreen`): the task folded,
+	 * its subtasks gone under its card, its card two lines, its own title small over an empty step.
+	 */
+	firstStepView(id: string, dayOffset: number, context?: ScreenContext): ScreenData;
+	/** First step's text written as the task's first subtask, the task folded on it (the core's `firstStep`; a blank text writes nothing). */
+	firstStep(id: string, text: string): Promise<void>;
+	/** A tap on a list card's counter (F196): the task's subtasks fold away under its card, or show again (the core's `toggleCollapsed`). */
+	fold(id: string): Promise<void>;
 	/** What a section's name typed in place ends with (the core's `sectionNameEnd`): the name to write, null for none (the old name stays). */
 	sectionNameEnd(how: SectionNameEnd, text: string): string | null;
 	/** Renames the section `section` of `list` (the day's of `dayOffset`) as typed (the core's `renameGroup`); resolves once written and read back. */
