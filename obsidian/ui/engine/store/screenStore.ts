@@ -1,8 +1,8 @@
-import { DESIGN } from "../../design";
+import { DESIGN } from "../../shared/design";
 import { createStore, type StoreApi } from "zustand/vanilla";
 import { EVERY_TASK } from "../port";
 import { type Stop, stopShowing } from "../layout/columns";
-import type { Destination, DividerStop, Edge, ScreenContext, UndoOutcome, EntryBar, EntryDraft, EntryField, FieldActionId, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, MenuStatusId, ScreenData, ScreenPort } from "../port";
+import type { Destination, DividerStop, Edge, ScreenContext, UndoOutcome, EntryBar, EntryDraft, EntryField, FieldActionId, LevelRange, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, MenuStatusId, ScreenData, ScreenPort } from "../port";
 import { share } from "./share";
 
 export type { Stop };
@@ -259,6 +259,12 @@ interface ScreenActions {
 	/** Another context (a project chosen, or none): the shown day and the days drawn beside it read again in it, drawn in place. */
 	setContext(context: ScreenContext): void;
 	/** Undo, the button or ⌘Z (F267): the port takes its last step back, and the cards move as any change moves them. */
+	/** Creates the missing tasks file (F6); the screen reads it once written. */
+	createFile(): void;
+	/** The core's snap, through the port (E3): the time scale lands every gesture by it. */
+	snap(minute: number, hourPx: number, tolerancePx: number): number;
+	/** The core's nesting, through the port (E7): the levels a carried card may take between two rows. */
+	levels(above: number | null, below: number | null): LevelRange;
 	undo(): void;
 	/** ⌘⇧Z (F268): the step last taken back, done again. */
 	redo(): void;
@@ -283,7 +289,7 @@ const HOLDING: readonly (Gesture | null)[] = ["drag", "resize"];
 const HALVES = 0.5;
 
 /** One store per mounted screen, over its port (spec, «Screen state»); `zoom`, the calendar's zoom the host kept. */
-export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, listShare = HALVES): ScreenStore {
+export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, listShare = HALVES, opening: ScreenContext = EVERY_TASK): ScreenStore {
 	/** Writes of the screen's own not yet read back: their reads come together once the last is in. */
 	let writing = 0;
 	/** The screen as it stood when the carried task was lifted: its place's home, a drop's in-flight write drawn in it. */
@@ -295,7 +301,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 	let picked: (() => void) | null = null;
 	/** A context chosen while a drag or a resize held the screen still: set as it ends. */
 	let waitingContext: ScreenContext | null = null;
-	const first = port.read(0);
+	const first = port.read(0, opening);
 	return createStore<Screen>()((setRaw, get) => {
 		/**
 		 * The store's one way to change: the field's bar is worked out again in the same change whenever the field, what the
@@ -462,7 +468,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 			canUndo: port.canUndo(),
 			canRedo: port.canRedo(),
 			notice: null,
-			context: EVERY_TASK,
+			context: opening,
 			contextSeq: 0,
 			reveal: null,
 			focusCard: null,
@@ -543,7 +549,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 				const layer = get().layer;
 				if (!layer) return;
 				const entry = port.subtaskPlace(layer.id, get().dayOffset, layer.from);
-				set({ entry, draft: NO_DRAFT, entryText: "", entrySeq: get().entrySeq + 1, entryPanel: null, layer: entry.stack ? { ...layer, asking: null } : null });
+				set({ entry, draft: port.entryDraft(entry), entryText: "", entrySeq: get().entrySeq + 1, entryPanel: null, layer: entry.stack ? { ...layer, asking: null } : null });
 			},
 			menuPage(page) {
 				const layer = get().layer;
@@ -585,7 +591,8 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 				if (get().layer) set(closed(get()));
 			},
 			openEntry(at) {
-				set({ entry: at && { at, renaming: null, stack: false }, entrySeq: get().entrySeq + 1, entryPanel: null, layer: null, entryText: "", draft: NO_DRAFT });
+				const entry = at && { at, renaming: null, stack: false };
+				set({ entry, entrySeq: get().entrySeq + 1, entryPanel: null, layer: null, entryText: "", draft: entry ? port.entryDraft(entry) : NO_DRAFT });
 			},
 			liftMenu(menuLifted) {
 				if (get().menuLifted !== menuLifted) set({ menuLifted });
@@ -697,6 +704,11 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 				const left = Object.fromEntries(Object.keys(s.left).map((day) => [day, ((data) => ({ shown: data, read: data }))(port.read(Number(day), context))]));
 				set({ context, contextSeq: s.contextSeq + 1, read: next, shown: next, left, pending: false, readSeq: s.readSeq + 1, fresh: NONE, gone: NONE, selected: null, ...menuOver(s, next) });
 			},
+			createFile() {
+				void port.createFile();
+			},
+			snap: (minute, hourPx, tolerancePx) => port.snap(minute, hourPx, tolerancePx),
+			levels: (above, below) => port.levels(above, below),
 			undo() {
 				retrace("undo");
 			},

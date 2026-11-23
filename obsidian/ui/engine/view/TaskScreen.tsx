@@ -1,11 +1,12 @@
 import { type CSSProperties, type MouseEvent, type PointerEvent, type TouchEvent, useEffect, useId, useRef } from "react";
-import { PROPERTY } from "../../design";
+import { PROPERTY } from "../../shared/design";
 import { Drag, type Grab, type Landing, useTouchPresses } from "../drag/Drag";
 import { Layers } from "../layers/Layers";
 import { Layout, type Place, reachOf } from "../layout/Layout";
 import { StoreContext, type ScreenStore, useScreen } from "../store";
 import { Card } from "./Card";
 import { RowScreen } from "./MovingRow";
+import { MissingFile } from "./MissingFile";
 import { QuickBar } from "./QuickBar";
 import { Icon } from "./Icon";
 import { HostContext, type ScreenHost, useHost } from "./host";
@@ -102,6 +103,7 @@ function Root({ place, store }: { readonly place: Place; readonly store: ScreenS
 		<div className={`task-calendar is-engine is-${place}${entering ? " is-entering" : ""}`} onPointerDownCapture={pressed} onClickCapture={clicked} {...touches} onTouchStart={keepTouch} onTouchMove={keepTouch} onTouchEnd={keepTouch} onClick={(event) => letSelectionGo(event, store)}>
 			<Layout place={place} />
 			<QuickBar reach={reachOf(place)} />
+			<MissingFile />
 		</div>
 	);
 }

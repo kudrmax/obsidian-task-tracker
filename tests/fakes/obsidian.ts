@@ -330,3 +330,92 @@ export class Scope {
 		this.keys.push({ modifiers, key, run });
 	}
 }
+
+/** Obsidian's lifecycle: what it registers ends with it, its children load and unload with it. */
+export class Component {
+	_loaded = false;
+	private readonly ends: (() => void)[] = [];
+	private readonly children: Component[] = [];
+
+	load(): void {
+		if (this._loaded) return;
+		this._loaded = true;
+		this.onload();
+		for (const child of this.children) child.load();
+	}
+
+	unload(): void {
+		if (!this._loaded) return;
+		this._loaded = false;
+		for (const child of this.children.splice(0)) child.unload();
+		for (const end of this.ends.splice(0)) end();
+		this.onunload();
+	}
+
+	onload(): void {}
+
+	onunload(): void {}
+
+	addChild<T extends Component>(child: T): T {
+		this.children.push(child);
+		if (this._loaded) child.load();
+		return child;
+	}
+
+	removeChild<T extends Component>(child: T): T {
+		const at = this.children.indexOf(child);
+		if (at >= 0) this.children.splice(at, 1);
+		child.unload();
+		return child;
+	}
+
+	register(end: () => void): void {
+		this.ends.push(end);
+	}
+
+	registerEvent(ref: { readonly off?: () => void } | (() => void)): void {
+		this.ends.push(typeof ref === "function" ? ref : () => ref.off?.());
+	}
+
+	registerDomEvent(target: EventTarget, type: string, listener: (event: Event) => void): void {
+		target.addEventListener(type, listener);
+		this.ends.push(() => target.removeEventListener(type, listener));
+	}
+}
+
+export class MarkdownRenderChild extends Component {
+	constructor(readonly containerEl: HTMLElement) {
+		super();
+	}
+}
+
+/** A view of a leaf: Obsidian asks its type while constructing it, as the real one does. */
+export class ItemView extends Component {
+	readonly containerEl = document.createElement("div");
+	readonly contentEl = this.containerEl.appendChild(document.createElement("div"));
+	readonly app: unknown;
+	scope: Scope | null = null;
+	readonly constructedAs: string;
+
+	constructor(readonly leaf: { readonly app?: unknown }) {
+		super();
+		this.app = leaf.app ?? {};
+		this.constructedAs = this.getViewType();
+	}
+
+	getViewType(): string {
+		return "";
+	}
+
+	async onOpen(): Promise<void> {}
+
+	async onClose(): Promise<void> {}
+}
+
+export class MarkdownView extends ItemView {}
+
+export const Platform = { isMobile: false, isDesktopApp: false, isMacOS: false, isIosApp: false };
+
+export const MarkdownRenderer = { render: async () => undefined };
+
+export class FileSystemAdapter {}

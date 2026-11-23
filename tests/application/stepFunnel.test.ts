@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { stepFunnel } from "../../core/application/screenPlaces";
-import { placeIndex } from "../../obsidian/ui/screens";
 
 const TODAY = "2026-11-01";
 const DAYS = TODAY;
@@ -35,7 +34,6 @@ describe("stepFunnel", () => {
 	});
 
 	it("goes from Done, left of Inbox, on to Inbox and nowhere back; nothing leads back to Done", () => {
-		expect(placeIndex("done")).toBeLessThan(placeIndex("inbox"));
 		expect(stepFunnel({ mode: "done", date: TODAY }, 1, DAYS)).toEqual({ mode: "inbox", date: TODAY });
 		expect(stepFunnel({ mode: "done", date: TODAY }, -1, DAYS)).toBeNull();
 	});

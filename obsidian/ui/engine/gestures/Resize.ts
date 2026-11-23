@@ -1,6 +1,6 @@
 import { useDrag } from "@use-gesture/react";
 import { useEffect, useRef } from "react";
-import { DESIGN } from "../../design";
+import { DESIGN } from "../../shared/design";
 import type { TimeScale } from "../layout/timeScale";
 import type { Block, Edge } from "../port";
 import { useScreenApi } from "../store";

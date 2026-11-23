@@ -6,7 +6,7 @@ import { doorMethods } from "../core/application/PhoneCalls";
 
 const ROOT = resolve(__dirname, "..");
 
-type Layer = "domain" | "application" | "infrastructure" | "ui" | "phone" | "settings" | "root" | "stand" | "adapters" | "agentReads" | "agentMain";
+type Layer = "domain" | "application" | "infrastructure" | "ui" | "phone" | "settings" | "root" | "stand" | "host" | "adapters" | "agentReads" | "agentMain";
 
 /** Obsidian's own packages: the app provides them at run time (`external` in esbuild.config.mjs). */
 const OBSIDIAN_PACKAGES = ["obsidian", "@codemirror/state", "@codemirror/view"];
@@ -26,18 +26,22 @@ const ADAPTERS = "obsidian/adapters/";
 const MEMORY_CORE = "obsidian/memoryCore.ts";
 /** The engine's port, the one file of the engine the adapters see. */
 const ENGINE_PORT = "obsidian/ui/engine/port.ts";
-/** The plugin's one write queue (`WriteQueue`), which the quick entry's writes go through on every screen: no second queue. */
-const WRITE_QUEUE = "obsidian/ui/quick/WriteQueue.ts";
+/**
+ * The host (Decision 142): what the screen needs from Obsidian, assembled once for the plugin and the stand; it may reach
+ * the engine, the adapters and the trackpad's module, and of the core the contract alone.
+ */
+const HOST = "obsidian/host/";
 
 /** The agents' program (`agent/`): its composition over Node's files, as `obsidian/compose.ts` is the plugin's. */
 const AGENT_ROOT = ["agent/compose.ts", "agent/nodePorts.ts"];
 
 function layerOf(file: string): Layer | null {
-	if (["obsidian/main.ts", "obsidian/demo.ts", "obsidian/compose.ts", "obsidian/settingsFile.ts", MEMORY_CORE, ...AGENT_ROOT].includes(file)) return "root";
+	if (["obsidian/main.ts", "obsidian/compose.ts", "obsidian/settingsFile.ts", MEMORY_CORE, ...AGENT_ROOT].includes(file)) return "root";
 	if (file === "agent/main.ts") return "agentMain";
 	if (file.startsWith("core/application/agent/")) return "agentReads";
 	if (file === "core/settings.ts") return "settings";
 	if (file.startsWith("obsidian/stand/")) return "stand";
+	if (file.startsWith(HOST)) return "host";
 	if (file.startsWith(ADAPTERS)) return "adapters";
 	const m = /^(?:core|obsidian)\/(domain|application|infrastructure|ui|phone)\//.exec(file);
 	return m ? (m[1] as Layer) : null;
@@ -67,14 +71,16 @@ const MAY_IMPORT: Readonly<Record<Layer, (target: string) => boolean>> = {
 	agentMain: (t) => t === "core/application/contracts.ts",
 	settings: (t) => under(t, "domain"),
 	root: (t) => !under(t, "stand"),
-	/** `CorePort`: the contract, the engine's port and the plugin's write queue; nothing else of the core, the engine or the old screen. */
-	adapters: (t) => t.startsWith(ADAPTERS) || t === "core/application/contracts.ts" || t === ENGINE_PORT || t === WRITE_QUEUE,
+	/** `CorePort`: the contract and the engine's port; nothing else of the core or the engine. */
+	adapters: (t) => t.startsWith(ADAPTERS) || t === "core/application/contracts.ts" || t === ENGINE_PORT,
+	/** The host: the engine and the rest of the plugin's UI, the adapters, the trackpad's module, the contract; nothing of the stand. */
+	host: (t) => t.startsWith(HOST) || under(t, "ui") || t.startsWith(ADAPTERS) || t.startsWith(STAND_TRACKPAD) || t === "core/application/contracts.ts" || OBSIDIAN_PACKAGES.includes(t),
 	/**
-	 * The stand (`obsidian/stand`, docs/superpowers/specs/2026-11-18-ui-engine.md): the engine over `MockPort`, never the core;
-	 * nothing imports it. Of the infrastructure only the trackpad's native module, as the plugin gets it (Decision 126).
-	 * The core only through `CorePort` over the core in memory (Decision 135), never a module of the core itself.
+	 * The stand (`obsidian/stand`, docs/superpowers/specs/2026-11-18-ui-engine.md): the engine mounted by the plugin's host
+	 * (Decision 142) over `CorePort` and the core over its made-up file in memory (Decision 143), never a module of the core
+	 * itself; nothing imports it. Of the infrastructure only the trackpad's native module, as the plugin gets it (Decision 126).
 	 */
-	stand: (t) => under(t, "stand") || under(t, "ui") || t.startsWith(STAND_TRACKPAD) || t.startsWith(ADAPTERS) || t === MEMORY_CORE || OBSIDIAN_PACKAGES.includes(t) || UI_PACKAGES.includes(t),
+	stand: (t) => under(t, "stand") || under(t, "ui") || t.startsWith(HOST) || t.startsWith(STAND_TRACKPAD) || t.startsWith(ADAPTERS) || t === MEMORY_CORE || OBSIDIAN_PACKAGES.includes(t) || UI_PACKAGES.includes(t),
 };
 
 const SOURCE = /\.(?:[cm]?[jt]sx?)$/;
@@ -137,7 +143,7 @@ describe("the layers", () => {
 
 	it("reads every form of import it guards", () => {
 		expect(importsOf("core/application/contracts.ts")).toContain("core/domain/Repeat.ts");
-		expect(importsOf("obsidian/main.ts")).toEqual(expect.arrayContaining(["obsidian", "child_process", "obsidian/ui/SettingsTab.ts"]));
+		expect(importsOf("obsidian/main.ts")).toEqual(expect.arrayContaining(["obsidian", "obsidian/ui/settings/SettingsTab.ts", "obsidian/host/ScreenHost.ts"]));
 		expect(importsOf("obsidian/infrastructure/WorkCalendarExportScript.ts")).toContain("scriptable/work-calendar-export.js");
 	});
 
@@ -178,7 +184,11 @@ describe("the guard itself", () => {
 		expect(MAY_IMPORT.adapters("core/application/TaskServiceImpl.ts")).toBe(false);
 		expect(MAY_IMPORT.adapters("core/application/composeCore.ts")).toBe(false);
 		expect(MAY_IMPORT.adapters("obsidian/ui/engine/store/index.ts")).toBe(false);
-		expect(MAY_IMPORT.adapters("obsidian/ui/design.ts")).toBe(false);
+		expect(MAY_IMPORT.adapters("obsidian/ui/shared/design.ts")).toBe(false);
+		expect(MAY_IMPORT.host("obsidian/adapters/CorePort.ts")).toBe(true);
+		expect(MAY_IMPORT.host("core/application/TaskServiceImpl.ts")).toBe(false);
+		expect(MAY_IMPORT.host("obsidian/stand/main.ts")).toBe(false);
+		expect(MAY_IMPORT.ui("obsidian/host/ScreenHost.ts")).toBe(false);
 		expect(MAY_IMPORT.adapters("obsidian/infrastructure/VaultTaskFileStore.ts")).toBe(false);
 		expect(MAY_IMPORT.ui("obsidian/adapters/CorePort.ts")).toBe(false);
 		expect(MAY_IMPORT.stand("obsidian/adapters/CorePort.ts")).toBe(true);
@@ -192,8 +202,8 @@ describe("the guard itself", () => {
 		expect(MAY_IMPORT.phone("core/application/composeCore.ts")).toBe(false);
 		expect(MAY_IMPORT.infrastructure("core/phone/main.ts")).toBe(false);
 		expect(MAY_IMPORT.infrastructure("obsidian/compose.ts")).toBe(false);
-		expect(MAY_IMPORT.infrastructure("obsidian/ui/TaskCard.ts")).toBe(false);
-		expect(target("obsidian/ui/x.ts", "./TaskCard")).toBe("obsidian/ui/TaskCard.ts");
+		expect(MAY_IMPORT.infrastructure("obsidian/ui/engine/view/Card.tsx")).toBe(false);
+		expect(target("obsidian/ui/engine/x.ts", "./mount")).toBe("obsidian/ui/engine/mount.tsx");
 	});
 });
 
@@ -521,7 +531,7 @@ const OWNERS: readonly Owner[] = [
 	/** Motion: the rows that move and the regions that slide; of the gestures, only the ribbon's own files: its landing spring, its strip and the calendar's day change (the table's gestures row). */
 	{ concern: "Rows that move, regions that slide: Motion", imports: (t) => t === "motion" || t.startsWith("motion/") || t === "framer-motion", owners: [`${ENGINE}view/MovingRow.tsx`, `${ENGINE}view/Slide.tsx`, ...RIBBON_MOTION] },
 	{ concern: "Long lists: TanStack Virtual", imports: (t) => t.startsWith("@tanstack/"), owners: [`${ENGINE}view/TaskList.tsx`] },
-	{ concern: "Text fields: Obsidian's editor and its CodeMirror", imports: (t) => t === "obsidian/ui/markdown/EmbeddedEditor.ts" || t.startsWith("@codemirror/"), owners: [`${ENGINE}view/ObsidianEditor.tsx`] },
+	{ concern: "Text fields: Obsidian's editor and its CodeMirror", imports: (t) => t === "obsidian/ui/shared/markdown/EmbeddedEditor.ts" || t.startsWith("@codemirror/"), owners: [`${ENGINE}view/ObsidianEditor.tsx`] },
 	/** The overlay of a carried card goes in a portal (stage 0, «Integration findings» 1); the root is made by the mount. */
 	{ concern: "Portals and roots: react-dom", imports: (t) => t === "react-dom" || t === "react-dom/client", owners: [`${ENGINE}drag/`, `${ENGINE}mount.tsx`] },
 ];
@@ -533,7 +543,8 @@ const OWNERS: readonly Owner[] = [
 const CONTRACT_TYPES = { file: `${ENGINE}port.ts`, target: "core/application/contracts.ts" } as const;
 
 /** What the engine may import besides itself, React's stack and Obsidian's packages: the design's icons and measures (`DESIGN`, which agrees with the CSS) and Obsidian's editor. */
-const ENGINE_MAY_ALSO = ["obsidian/ui/kit/icons.ts", "obsidian/ui/design.ts", "obsidian/ui/markdown/EmbeddedEditor.ts"];
+/** What the engine takes from outside itself (Decision 141): one shared folder, `DESIGN`, the icons and the one editor with its `FieldScope`. */
+const ENGINE_MAY_ALSO = "obsidian/ui/shared/";
 
 /**
  * Touching the page by hand, each with where the standard puts it instead: a library measures and listens, Motion animates,
@@ -615,8 +626,8 @@ describe("the engine's owners", () => {
 		expect(engineFiles().flatMap((file) => byHandIn(file, source(file)))).toEqual([]);
 	});
 
-	it("imports nothing from the core, and of the rest of the plugin only the icons and Obsidian's editor", () => {
-		const outside = engineFiles().flatMap((file) => importsOf(file).filter((t) => (t.startsWith("core/") || t.startsWith("obsidian/") || t.startsWith("tests/")) && !t.startsWith(ENGINE) && !ENGINE_MAY_ALSO.includes(t) && !(file === CONTRACT_TYPES.file && t === CONTRACT_TYPES.target)).map((t) => `${file} → ${t}`));
+	it("imports nothing from the core, and of the rest of the plugin only the shared folder (the design, the icons, the editor)", () => {
+		const outside = engineFiles().flatMap((file) => importsOf(file).filter((t) => (t.startsWith("core/") || t.startsWith("obsidian/") || t.startsWith("tests/")) && !t.startsWith(ENGINE) && !t.startsWith(ENGINE_MAY_ALSO) && !(file === CONTRACT_TYPES.file && t === CONTRACT_TYPES.target)).map((t) => `${file} → ${t}`));
 		expect(outside).toEqual([]);
 	});
 
@@ -632,10 +643,9 @@ describe("the engine's owners", () => {
 		expect(engineFiles().filter((file) => !ownedBy(file, PLACE_READERS) && readsPlace(source(file)))).toEqual([]);
 	});
 
-	it("leaves the key table to the host: the stand registers it once", () => {
-		const registering = engineAndStand().filter((file) => /\bKEYS\b/.test(withoutComments(source(file))) && !file.startsWith(`${ENGINE}keys.ts`));
-		expect(registering.every((file) => file.startsWith(STAND))).toBe(true);
-		expect(registering.length).toBeLessThanOrEqual(1);
+	it("leaves the key table to the host: registered once, as commands and on the leaf's scope, for the plugin and the stand alike", () => {
+		const registering = FILES.filter((file) => /\bKEYS\b/.test(withoutComments(source(file))) && !file.startsWith(`${ENGINE}keys.ts`));
+		expect(registering).toEqual([`${HOST}ScreenHost.ts`, `${HOST}ScreenLeaf.ts`]);
 	});
 });
 

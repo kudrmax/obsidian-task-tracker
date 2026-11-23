@@ -1,5 +1,5 @@
 import { type DayService, type DropColumn, type EntryList, type EntryState, type LocalDate, type MenuProject, type ProjectsNodeId, type Placement, type QuickEntryView, QuickEntrySession, type ScreenReader, type TaskItem, type TaskService, type WriteLine } from "../../core/application/contracts";
-import { WriteQueue } from "../ui/quick/WriteQueue";
+import type { WriteQueue } from "./WriteQueue";
 import type { Destination, EntryBar, EntryCommit, EntryDraft, EntryField, ListId, MenuFrom, PlaceId, RenameStart } from "../ui/engine/port";
 import { ListCards } from "./ListCards";
 import { projectPageOf } from "./menuModel";
@@ -24,12 +24,11 @@ interface Look {
 
 /**
  * The new task's field over the core's quick entry (`QuickEntrySession`, which holds every rule of it). One session lives
- * as long as the port, with one write queue, as the old screen's: the engine's field is followed on it (its depth by the
+ * as long as its screen's port, every screen's fields writing through the one write queue: the engine's field is followed on it (its depth by the
  * session's own shifts, its text and bar by the session's setters), so what Enter queued is still known to the next field
  * and every write lands in the order typed. Where a new field would open is asked of a session that writes nothing.
  */
 export class CoreEntry {
-	private readonly queue: WriteQueue;
 	private readonly look: Look;
 	private readonly session: QuickEntrySession;
 	/** The engine's field the live session stands at; null while none is open. */
@@ -41,10 +40,10 @@ export class CoreEntry {
 		private readonly drawing: ScreenDrawing,
 		private readonly reader: () => ScreenReader,
 		private readonly refresh: () => Promise<void>,
-		onError: (error: unknown) => void,
+		/** The one write queue every screen's field writes through, in the order typed. */
+		private readonly queue: WriteQueue,
 		private readonly filter: () => { readonly node: ProjectsNodeId; readonly project: string | null } | null = () => null,
 	) {
-		this.queue = new WriteQueue(onError);
 		this.look = { date: core.days.today(), shown: ENTRY_LISTS };
 		const counted: WriteLine = {
 			push: (job) => {
@@ -94,6 +93,11 @@ export class CoreEntry {
 		asked.open(spot, item);
 		const state = asked.state!;
 		return { field: this.fieldOf(state, dayOffset), draft: this.draftOf(state), text: state.text };
+	}
+
+	/** What a new field at `field` starts with: the session opened there, as the core sets it (a project's screen, a list's part). */
+	draft(field: EntryField): EntryDraft {
+		return this.draftOf(this.follow(field, null, null));
 	}
 
 	bar(field: EntryField, draft: EntryDraft, text: string): EntryBar {

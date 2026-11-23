@@ -1,37 +1,31 @@
-import { Component, MarkdownRenderer, Notice, Platform, Plugin, type EventRef, type Vault, type WorkspaceLeaf } from "obsidian";
-import { AssistantAnswers, type MarkdownHost } from "./ui/assistant/AssistantAnswers";
-import { scopedModEnter } from "./ui/assistant/scopedModEnter";
-import { AppleCalendar } from "./infrastructure/AppleCalendar";
+import { Notice, Platform, Plugin, type EventRef, type Vault } from "obsidian";
 import { PROTOCOL_ACTION } from "./infrastructure/GoogleRedirectLogin";
 import { openOutside } from "./infrastructure/OutsideLink";
 import { SYNC_ACTION } from "./infrastructure/SyncRoundTrip";
-
+import { trackpadSwitch } from "./infrastructure/trackpad";
 import { PluginCodeWatcher } from "./infrastructure/PluginCodeWatcher";
 import { DEVICE_STATE_KEY, PluginSettings } from "./infrastructure/PluginSettings";
-import { systemClock, type Clock, type SettingsStore } from "../core/application/ports";
+import { systemClock, type SettingsStore } from "../core/application/ports";
 import { SettingsServiceImpl } from "../core/application/SettingsServiceImpl";
 import { ScreenSettingsImpl } from "../core/application/ScreenSettingsImpl";
+import { CorePort } from "./adapters/CorePort";
+import { DeviceSettings } from "./adapters/DeviceSettings";
 import { createServices, type Services, type ServicesHost } from "./compose";
+import { failureText } from "./host/failureText";
+import { NoteBlocks } from "./host/NoteBlocks";
+import { ScreenHost } from "./host/ScreenHost";
 import { SETTINGS_FILE, type StoredSettings } from "./settingsFile";
-import { clearCardSize, showCardSize } from "./ui/cardSize";
-import { clearPriorityColors, showLabelPaint, showPriorityColors } from "./ui/priorityColors";
-import { addWindowDocument } from "./ui/windowDocuments";
-import { ProjectBlocks } from "./ui/ProjectBlocks";
-import { TaskCalendarSettingsTab } from "./ui/SettingsTab";
-import { TaskCalendarView, VIEW_TYPE, type ViewDeps } from "./ui/TaskCalendarView";
-import { ShownSettingsStore, ViewSettingsStore } from "./ui/viewSettings";
+import { TaskCalendarSettingsTab } from "./ui/settings/SettingsTab";
 
 /** obsidian://task-calendar-open: a tap on a reminder on the phone opens the calendar. */
 const OPEN_ACTION = "task-calendar-open";
+/** The plugin's leaf: the view type it has always had, so a leaf Obsidian kept opens again. */
+const VIEW_TYPE = "task-calendar";
 
 /** The plugin is the settings store the services and the view see; PluginSettings keeps them. */
 export default class TaskCalendarPlugin extends Plugin implements SettingsStore {
 	private pluginSettings!: PluginSettings<StoredSettings>;
-	/** The view's own settings, kept in the same file. */
-	protected readonly viewSettings = new ViewSettingsStore(this);
-	/** The shared settings as a screen reads them: the levels and labels it paints. */
-	private readonly screenSettings = new ScreenSettingsImpl(this);
-	/** The real services, once built (the demo build has none): open for a look from the console. */
+	/** The real services, once built: open for a look from the console. */
 	services: Services | null = null;
 
 	override async onload(): Promise<void> {
@@ -45,16 +39,7 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 			`${this.pluginDir}/data.json`,
 			SETTINGS_FILE,
 		);
-		this.pluginSettings.onChange(() => {
-			const screen = this.screenSettings.get();
-			showCardSize({ height: screen.cardHeight, gap: screen.cardGap });
-			showPriorityColors(screen.priorities, screen.labels);
-			showLabelPaint(screen.labelPaint);
-		});
 		await this.pluginSettings.load();
-		this.register(clearCardSize);
-		this.register(clearPriorityColors);
-		this.followPopoutWindows();
 		const code = this.watchOwnCode();
 		this.registerEvent(this.watchSettingsFile(code));
 		this.registerDomEvent(document, "visibilitychange", () => {
@@ -62,16 +47,25 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 			void this.pluginSettings.reload();
 			void code.check();
 		});
-		const deps = this.createDeps();
-		this.registerView(VIEW_TYPE, (leaf) => new TaskCalendarView(leaf, deps));
-		this.addChild(new ProjectBlocks(this.app, deps));
-		this.addRibbonIcon("calendar-days", "Task Calendar", () => void this.openView());
-		this.addCommand({ id: "open", name: "Open Task Calendar", callback: () => void this.openView() });
+		const services = this.startServices();
+		const host = new ScreenHost(this, {
+			look: { type: VIEW_TYPE, title: "Task Calendar", icon: "calendar-days" },
+			source: async () => {
+				const port = await CorePort.open({ ...services, clock: systemClock, onError: (error) => new Notice(failureText(error)), tasksFile: () => this.get().tasksFile });
+				return { port, device: new DeviceSettings({ get: () => this.get(), update: (patch) => this.update(patch) }, services.tasks, () => this.get().zoomLevels) };
+			},
+			paint: new ScreenSettingsImpl(this),
+		});
+		host.load();
+		this.addChild(new NoteBlocks(this.app, services.tasks, host));
+		this.addRibbonIcon("calendar-days", "Task Calendar", () => void host.open());
+		this.addCommand({ id: "open", name: "Open Task Calendar", callback: () => void host.open() });
+		this.registerObsidianProtocolHandler(OPEN_ACTION, () => void host.open());
 	}
 
-	/** The real services over the vault and the network; the demo build replaces them with fakes. */
-	protected createDeps(clock: Clock = systemClock): ViewDeps {
-		const services = createServices(this.app, this.servicesHost(), this, clock);
+	/** The services over the vault and the network, with what they hand to Obsidian: Google's login, the iPhone app's Sync, the settings tab. */
+	private startServices(): Services {
+		const services = createServices(this.app, this.servicesHost(), this);
 		this.services = services;
 		this.app.workspace.onLayoutReady(() => this.register(services.keepWorkExportInstalled()));
 		this.registerObsidianProtocolHandler(PROTOCOL_ACTION, (params) => {
@@ -80,35 +74,14 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 				(e: unknown) => new Notice(`Google Calendar: ${e instanceof Error ? e.message : String(e)}`),
 			);
 		});
-		this.registerObsidianProtocolHandler(OPEN_ACTION, () => void this.openView());
 		this.registerObsidianProtocolHandler(SYNC_ACTION, () => services.syncForApp());
 		this.register(() => services.stopSyncForApp());
 		this.register(() => services.assistant.stopAll());
 		this.handOverPlace(services);
-		const settingsTab = new TaskCalendarSettingsTab(this.app, this, { settings: new SettingsServiceImpl(this), google: services.google, work: services.work, calendars: services.calendars, assistant: services.assistant });
+		const settingsTab = new TaskCalendarSettingsTab(this.app, this, { settings: new SettingsServiceImpl(this), google: services.google, work: services.work, calendars: services.calendars, assistant: services.assistant, trackpad: Platform.isDesktopApp && Platform.isMacOS ? trackpadSwitch(this.app) : null });
 		this.addSettingTab(settingsTab);
 		this.register(() => settingsTab.closePage());
-		const calendarApp = new AppleCalendar({ isPhone: Platform.isIosApp, open: (url) => openOutside(url, { isPhone: Platform.isIosApp, window }), runScript: runAppleScript });
-		return {
-			tasks: services.tasks,
-			days: services.days,
-			undo: services.undo,
-			calendars: services.calendars,
-			settings: this.shownSettings(),
-			clock,
-			assistant: new AssistantAnswers(services.assistant, this.markdown(), undefined, scopedModEnter(this.app)),
-			openInCalendar: (event) => calendarApp.open(event),
-		};
-	}
-
-	/** Obsidian's markdown in a popup of the plugin's: drawn in a component of its own, let go when the popup closes. */
-	private markdown(): MarkdownHost {
-		return (el, text) => {
-			const component = new Component();
-			component.load();
-			el.empty();
-			return { done: MarkdownRenderer.render(this.app, text, el, "", component), release: () => component.unload() };
-		};
+		return services;
 	}
 
 	/**
@@ -120,11 +93,6 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 		if (!device || !("rightMode" in device)) return;
 		const { rightMode, ...rest } = device;
 		void services.tasks.setFunnelPlace(rightMode).then(() => this.app.saveLocalStorage(DEVICE_STATE_KEY, rest));
-	}
-
-	/** What the screen reads: the shared settings it draws and the view's own. */
-	protected shownSettings(): ShownSettingsStore {
-		return new ShownSettingsStore(this.screenSettings, this.viewSettings);
 	}
 
 	private get pluginDir(): string {
@@ -151,23 +119,6 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 	}
 
 	/** The plugin runs the code in its folder: a release Sync brought loads at once, not at Obsidian's next start. */
-	/** A popout window gets the card size and the colours the main window has: a note's block or the screen moved there draws as here. */
-	private followPopoutWindows(): void {
-		const closings = new Map<Document, () => void>();
-		const open = (doc: Document) => {
-			if (doc !== document && !closings.has(doc)) closings.set(doc, addWindowDocument(doc));
-		};
-		this.app.workspace.iterateAllLeaves((leaf) => open(leaf.view.containerEl.ownerDocument));
-		this.registerEvent(this.app.workspace.on("window-open", (win) => open(win.doc)));
-		this.registerEvent(
-			this.app.workspace.on("window-close", (win) => {
-				closings.get(win.doc)?.();
-				closings.delete(win.doc);
-			}),
-		);
-		this.register(() => closings.forEach((close) => close()));
-	}
-
 	private watchOwnCode(): PluginCodeWatcher {
 		const adapter = this.app.vault.adapter;
 		const plugins = (this.app as unknown as { plugins: { disablePlugin(id: string): Promise<void>; enablePlugin(id: string): Promise<boolean> } }).plugins;
@@ -200,18 +151,4 @@ export default class TaskCalendarPlugin extends Plugin implements SettingsStore 
 	onChange(listener: () => void): () => void {
 		return this.pluginSettings.onChange(listener);
 	}
-
-	private async openView(): Promise<void> {
-		const workspace = this.app.workspace;
-		const leaf: WorkspaceLeaf = workspace.getLeavesOfType(VIEW_TYPE)[0] ?? workspace.getLeaf(true);
-		await leaf.setViewState({ type: VIEW_TYPE, active: true });
-		await workspace.revealLeaf(leaf);
-	}
-}
-
-/** The Mac runs it through osascript; Node's modules exist only in the desktop app, so they are reached for only here. */
-function runAppleScript(script: string, args: readonly string[]): void {
-	if (!Platform.isMacOS || !Platform.isDesktopApp) return;
-	const { execFile } = (window as unknown as { require: (id: string) => typeof import("child_process") }).require("child_process");
-	execFile("osascript", ["-e", script, ...args], () => undefined);
 }

@@ -1,5 +1,5 @@
 import { memo, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
-import type { IconName } from "../../kit/icons";
+import type { IconName } from "../../shared/icons";
 import { type BlockLook, MenuLayer, secondaryClick, useMenuFrom, useMenuOrigin } from "../layers/Layers";
 import { monthGrid, monthOf, monthTitle } from "../layout/month";
 import type { ListPlaceId, MenuAction, MenuActionGroup, MenuStatusId, ReminderKind, TaskMenuActionId, TaskMenuModel } from "../port";

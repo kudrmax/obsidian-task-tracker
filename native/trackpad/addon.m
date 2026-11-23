@@ -4,7 +4,15 @@
 #include <node_api.h>
 #include <stdlib.h>
 
+#ifndef TRACKPAD_BUILD
+#define TRACKPAD_BUILD "unnamed"
+#endif
+
 enum { SIGNAL_DOWN = 1, SIGNAL_UP = 2, SIGNAL_MOMENTUM_BEGAN = 3, SIGNAL_MOMENTUM_ENDED = 4 };
+
+typedef enum { HOOK_REFUSED = 0, HOOK_FRESH = 1, HOOK_TOOK_OVER = 2 } Hook;
+
+static const char *HOOK_NAMES[] = {"refused", "fresh", "tookOver"};
 
 typedef struct {
 	int kind;
@@ -15,7 +23,6 @@ typedef struct {
 } Signal;
 
 static napi_threadsafe_function listener = NULL;
-static BOOL installed = NO;
 static IMP originalDeltaY = NULL;
 static IMP originalSendEvent = NULL;
 
@@ -89,17 +96,37 @@ static void sendEventReporting(id self, SEL command, NSEvent *event) {
 	((void (*)(id, SEL, NSEvent *))originalSendEvent)(self, command, event);
 }
 
-static void mark(id self, SEL command) {}
-
-static BOOL install(void) {
-	Class meta = object_getClass([NSEvent class]);
-	if (!class_addMethod(meta, sel_registerName("taskCalendarTrackpadInstalled"), (IMP)mark, "v@:")) return NO;
-	Method deltaY = class_getInstanceMethod([NSEvent class], @selector(deltaY));
-	Method sendEvent = class_getInstanceMethod([NSWindow class], @selector(sendEvent:));
-	if (deltaY == NULL || sendEvent == NULL) return NO;
-	originalDeltaY = method_setImplementation(deltaY, (IMP)deltaYReporting);
-	originalSendEvent = method_setImplementation(sendEvent, (IMP)sendEventReporting);
-	return YES;
+static Hook install(void) {
+	Class event = [NSEvent class];
+	Class window = [NSWindow class];
+	if (class_respondsToSelector(object_getClass(event), sel_registerName("taskCalendarTrackpadInstalled"))) return HOOK_REFUSED;
+	Method deltaY = class_getInstanceMethod(event, @selector(deltaY));
+	Method sendEvent = class_getInstanceMethod(window, @selector(sendEvent:));
+	if (deltaY == NULL || sendEvent == NULL) return HOOK_REFUSED;
+	SEL keptDeltaY = sel_registerName("taskCalendarTrackpadOriginalDeltaY");
+	SEL keptSendEvent = sel_registerName("taskCalendarTrackpadOriginalSendEvent:");
+	SEL ownDeltaY = sel_registerName("taskCalendarTrackpadHookDeltaY");
+	SEL ownSendEvent = sel_registerName("taskCalendarTrackpadHookSendEvent:");
+	BOOL fresh = class_addMethod(event, keptDeltaY, method_getImplementation(deltaY), method_getTypeEncoding(deltaY));
+	if (fresh) {
+		class_addMethod(event, ownDeltaY, method_getImplementation(deltaY), method_getTypeEncoding(deltaY));
+		class_addMethod(window, keptSendEvent, method_getImplementation(sendEvent), method_getTypeEncoding(sendEvent));
+		class_addMethod(window, ownSendEvent, method_getImplementation(sendEvent), method_getTypeEncoding(sendEvent));
+	}
+	Method hookedDeltaY = class_getInstanceMethod(event, ownDeltaY);
+	Method hookedSendEvent = class_getInstanceMethod(window, ownSendEvent);
+	Method originalDeltaYMethod = class_getInstanceMethod(event, keptDeltaY);
+	Method originalSendEventMethod = class_getInstanceMethod(window, keptSendEvent);
+	if (hookedDeltaY == NULL || hookedSendEvent == NULL || originalDeltaYMethod == NULL || originalSendEventMethod == NULL) return HOOK_REFUSED;
+	if (method_getImplementation(deltaY) != method_getImplementation(hookedDeltaY)) return HOOK_REFUSED;
+	if (method_getImplementation(sendEvent) != method_getImplementation(hookedSendEvent)) return HOOK_REFUSED;
+	originalDeltaY = method_getImplementation(originalDeltaYMethod);
+	originalSendEvent = method_getImplementation(originalSendEventMethod);
+	method_setImplementation(hookedDeltaY, (IMP)deltaYReporting);
+	method_setImplementation(hookedSendEvent, (IMP)sendEventReporting);
+	method_setImplementation(deltaY, (IMP)deltaYReporting);
+	method_setImplementation(sendEvent, (IMP)sendEventReporting);
+	return fresh ? HOOK_FRESH : HOOK_TOOK_OVER;
 }
 
 static void stopListening(void) {
@@ -135,17 +162,24 @@ static napi_value uptime(napi_env env, napi_callback_info info) {
 	return result;
 }
 
+static napi_value take(napi_env env, napi_callback_info info) {
+	napi_value result;
+	napi_create_string_utf8(env, HOOK_NAMES[install()], NAPI_AUTO_LENGTH, &result);
+	return result;
+}
+
 static napi_value init(napi_env env, napi_value exports) {
-	if (!installed) installed = install();
 	napi_value value;
+	napi_create_function(env, "take", NAPI_AUTO_LENGTH, take, NULL, &value);
+	napi_set_named_property(env, exports, "take", value);
 	napi_create_function(env, "listen", NAPI_AUTO_LENGTH, startListening, NULL, &value);
 	napi_set_named_property(env, exports, "listen", value);
 	napi_create_function(env, "stop", NAPI_AUTO_LENGTH, stopCall, NULL, &value);
 	napi_set_named_property(env, exports, "stop", value);
 	napi_create_function(env, "uptime", NAPI_AUTO_LENGTH, uptime, NULL, &value);
 	napi_set_named_property(env, exports, "uptime", value);
-	napi_get_boolean(env, installed, &value);
-	napi_set_named_property(env, exports, "installed", value);
+	napi_create_string_utf8(env, TRACKPAD_BUILD, NAPI_AUTO_LENGTH, &value);
+	napi_set_named_property(env, exports, "build", value);
 	return exports;
 }
 

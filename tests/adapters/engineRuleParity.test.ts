@@ -1,16 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { levelRange, SWIPE_FLICK_SPEED, swipeLanding } from "../../core/application/contracts";
-import { snapMinute } from "../../core/application/snapGrid";
-import { LAYOUT } from "../../obsidian/ui/design";
-import { levelBetween } from "../../obsidian/ui/engine/drag/tree";
+import { SWIPE_FLICK_SPEED, swipeLanding } from "../../core/application/contracts";
 import { FLICK_SPEED, FollowPager } from "../../obsidian/ui/engine/gestures/followPager";
-import { TimeScale } from "../../obsidian/ui/engine/layout/timeScale";
-import type { Row } from "../../obsidian/ui/engine/port";
 
 /**
- * The engine's own copies of a rule in the core (the audit's pairs, Decision 136) fed the same inputs as the core's: one
- * rule, two places, until the engine asks the port for it. The frozen pager (Decisions 64, 126, 129) keeps its code; this
- * holds it to the core's guarded `swipeLanding`.
+ * The engine's one copy left of a rule in the core (the audit's pair E1, Decision 136): the frozen pager (Decisions 64,
+ * 126, 129) keeps its code, held here to the core's guarded `swipeLanding`. The snap (E3) and the levels (E7) are the
+ * core's own, asked through the port (Decision 145).
  */
 describe("the engine's copies answer as the core's rules", () => {
 	it("E1: a swipe lands where the core's swipeLanding says, never two places (Max's «one swipe, one place»)", () => {
@@ -26,19 +21,4 @@ describe("the engine's copies answer as the core's rules", () => {
 			}
 	});
 
-	it("E3: the calendar's snap is the core's (`TaskService.snap`, `snapMinute`) at every zoom", () => {
-		for (const hourPx of [28, 46, 56, 80, 112, 160, 224])
-			for (let minute = 0; minute <= 24 * 60; minute += 7) expect({ hourPx, minute, at: new TimeScale(hourPx).snap(minute) }).toEqual({ hourPx, minute, at: snapMinute(minute, hourPx, LAYOUT.snapTolerance) });
-	});
-
-	it("E7: a level between two cards keeps the core's bounds (levelRange)", () => {
-		const row = (depth: number): Row => ({ kind: "task", id: `t${depth}`, depth });
-		for (const above of [undefined, 0, 1, 2])
-			for (const below of [undefined, 0, 1, 2, 3]) {
-				if (above !== undefined && below !== undefined && below > above + 1) continue;
-				const cards = [...(above === undefined ? [] : [{ level: above, group: null }]), ...(below === undefined ? [] : [{ level: below, group: null }])];
-				const { min, max } = levelRange(cards, above === undefined ? 0 : 1, null);
-				for (const wanted of [-1, 0, 1, 2, 3, 4]) expect({ above, below, wanted, level: levelBetween(above === undefined ? undefined : row(above), below === undefined ? undefined : row(below), wanted) }).toEqual({ above, below, wanted, level: Math.max(min, Math.min(max, Math.max(0, wanted))) });
-			}
-	});
 });

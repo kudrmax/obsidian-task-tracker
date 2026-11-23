@@ -1,5 +1,5 @@
 import { type CSSProperties, memo, type MouseEvent, useCallback, useContext, useMemo, useRef, useState } from "react";
-import { DESIGN, PROPERTY } from "../../design";
+import { DESIGN, PROPERTY } from "../../shared/design";
 import { CalendarBlocks, SortableRow, useCalendarDrop, useNewSlot } from "../drag/Drag";
 import { type Edge, useResize } from "../gestures/Resize";
 import { hourOf, type RoomMeasure, useCalendarZoom } from "../gestures/Zoom";
@@ -51,7 +51,8 @@ export const Timeline = memo(function Timeline() {
 	const turn = useContext(DayTurnContext);
 	const { zoomMost } = useHost();
 	const [measured, setMeasured] = useState<RoomMeasure | null>(null);
-	const scale = useMemo(() => new TimeScale(hourOf(zoom, measured?.fit ?? null, zoomMost)), [zoom, measured, zoomMost]);
+	const snap = useScreen((s) => s.snap);
+	const scale = useMemo(() => new TimeScale(hourOf(zoom, measured?.fit ?? null, zoomMost), snap), [zoom, measured, zoomMost, snap]);
 	/** A new task's place or field on the calendar stands in the stack as a card without a length. */
 	const extra = plusMinute !== null ? plusMinute : entry?.at !== undefined && entry.dayOffset === dayOffset ? entry.at : null;
 	const { boxes, drawn } = useDayLayout(day, extra, scale);

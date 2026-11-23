@@ -1,9 +1,12 @@
 import { composeCore, type Core } from "../core/application/composeCore";
-import { type CalendarEvent, TasksFileMissingError } from "../core/application/contracts";
+import { type CalendarEvent, type ScreenSettingsStore, TasksFileMissingError } from "../core/application/contracts";
+import { ScreenSettingsImpl } from "../core/application/ScreenSettingsImpl";
 import type { CalendarFile } from "../core/application/calendarFile";
 import type { EventFile } from "../core/application/EventSource";
 import type { Clock, ProjectsScreenStore, SettingsStore, TaskFileStore } from "../core/application/ports";
 import { DEFAULT_SETTINGS, type TaskCalendarSettings } from "../core/settings";
+import type { DeviceViewKeys } from "./adapters/DeviceSettings";
+import { type ViewSettings, viewSettingsFrom } from "./settingsFile";
 
 /**
  * The core over a tasks file kept in memory (the plan, steps 5–6: the stand runs on `CorePort` over an in-memory copy of
@@ -105,6 +108,8 @@ export interface MemoryCore {
 	readonly file: MemoryTasksFile;
 	readonly events: MemoryEvents;
 	readonly settings: SettingsStore;
+	/** The settings as a screen reads them: the levels, labels and card size the host paints. */
+	readonly screenSettings: ScreenSettingsStore;
 	readonly clock: Clock;
 }
 
@@ -112,7 +117,7 @@ export interface MemoryCore {
  * The core over `text` as its tasks file, `events` as the Google calendar's, the settings' defaults over `settings`; the
  * device's Projects screen in `projectsScreen` (kept in memory when left out).
  */
-export function memoryCore(text: string, clock: Clock, settings: Partial<TaskCalendarSettings> = {}, events: readonly CalendarEvent[] = [], projectsScreen?: ProjectsScreenStore): MemoryCore {
+export function memoryCore(text: string | null, clock: Clock, settings: Partial<TaskCalendarSettings> = {}, events: readonly CalendarEvent[] = [], projectsScreen?: ProjectsScreenStore): MemoryCore {
 	const file = new MemoryTasksFile(text);
 	const calendar = new MemoryEvents(events, clock);
 	const store = new MemorySettings({ ...DEFAULT_SETTINGS, ...settings });
@@ -131,5 +136,16 @@ export function memoryCore(text: string, clock: Clock, settings: Partial<TaskCal
 		isPhone: () => false,
 		...(projectsScreen && { projectsScreen }),
 	});
-	return { core, file, events: calendar, settings: store, clock };
+	return { core, file, events: calendar, settings: store, screenSettings: new ScreenSettingsImpl(store), clock };
+}
+
+/**
+ * The device's keys of the screen (the divider's share, the zoom, the tree's width) kept by `load` and `save` under one
+ * key, the defaults for what was never kept: what `DeviceSettings` reads where there is no plugin's settings file.
+ */
+export function keptDevice(load: () => unknown, save: (value: ViewSettings) => void): DeviceViewKeys {
+	return {
+		get: () => viewSettingsFrom(load()),
+		update: async (patch) => save({ ...viewSettingsFrom(load()), ...patch }),
+	};
 }

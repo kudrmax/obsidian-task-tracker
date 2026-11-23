@@ -60,7 +60,7 @@ export default {
 		await check(t, cal, "whole day");
 		await t.shot("events-whole-day");
 
-		await t.cdp.eval(`(() => { localStorage.setItem("task-calendar-stand-zoom", "46"); return 1; })()`);
+		await t.cdp.eval(`(() => { localStorage.setItem("task-calendar-stand:device", JSON.stringify({ zoom: 46 })); return 1; })()`);
 		await t.open();
 		await t.cdp.eval(`(async () => { window.__tcStand.step("step-calendar"); await new Promise((r) => setTimeout(r, 700)); return 1; })()`);
 		const at46 = Number(await t.cdp.eval(`document.querySelector(".tc-timeline").dataset.hourPx`));

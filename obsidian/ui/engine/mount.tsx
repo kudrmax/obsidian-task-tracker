@@ -1,9 +1,9 @@
 import type { App } from "obsidian";
 import { createRoot } from "react-dom/client";
-import { DESIGN } from "../design";
+import { DESIGN } from "../shared/design";
 import type { Place } from "./layout/Layout";
 import type { TrackpadFingers } from "./gestures/trackpadFollow";
-import type { ScreenPort } from "./port";
+import type { ScreenContext, ScreenPort } from "./port";
 import { createScreenStore, type ScreenStore, type Zoom } from "./store";
 import { TaskScreen } from "./view/TaskScreen";
 
@@ -26,6 +26,8 @@ export interface MountOptions {
 	readonly notice: (text: string) => void;
 	/** macOS's touch and lift on the trackpad, where the host hears them (Decision 126). */
 	readonly fingers?: TrackpadFingers | null;
+	/** The context the screen opens in: a project note's block shows its project's tasks; every task when absent. */
+	readonly context?: ScreenContext;
 }
 
 export interface MountedScreen {
@@ -34,9 +36,9 @@ export interface MountedScreen {
 }
 
 /** The engine's screen in `el`: its own store over the port, in the element's own document and window. */
-export function mountScreen(el: HTMLElement, { port, place, app, sourcePath, haptics, zoom, listShare, markdown, desk, notice, fingers = null }: MountOptions): MountedScreen {
+export function mountScreen(el: HTMLElement, { port, place, app, sourcePath, haptics, zoom, listShare, markdown, desk, notice, fingers = null, context }: MountOptions): MountedScreen {
 	const doc = el.ownerDocument;
-	const store = createScreenStore(port, zoom.kept ?? DESIGN.hourPx, listShare.kept ?? undefined);
+	const store = createScreenStore(port, zoom.kept ?? DESIGN.hourPx, listShare.kept ?? undefined, context);
 	const keep = store.subscribe((s, was) => {
 		if (s.zoom !== was.zoom && s.gesture !== "zoom") zoom.keep(s.zoom);
 		else if (was.gesture === "zoom" && s.gesture !== "zoom") zoom.keep(s.zoom);

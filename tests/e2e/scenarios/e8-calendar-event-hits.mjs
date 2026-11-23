@@ -37,7 +37,7 @@ export default {
 	cases: Object.keys(ZOOMS),
 	async run(t, zoom) {
 		await t.setClock("12:00");
-		await t.cdp.eval(`(() => { localStorage.clear(); localStorage.setItem("task-calendar-stand-zoom", ${JSON.stringify(JSON.stringify(ZOOMS[zoom]))}); return 1; })()`);
+		await t.cdp.eval(`(() => { localStorage.clear(); localStorage.setItem("task-calendar-stand:device", ${JSON.stringify(JSON.stringify({ zoom: ZOOMS[zoom] }))}); return 1; })()`);
 		await t.open();
 		await t.cdp.eval(`(async () => { window.__tcStand.step("step-calendar"); await new Promise((r) => setTimeout(r, 700)); return 1; })()`);
 		const hour = Number(await t.cdp.eval(`document.querySelector(".tc-timeline").dataset.hourPx`));

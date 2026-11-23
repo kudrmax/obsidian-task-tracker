@@ -1,21 +1,24 @@
 import { CorePort } from "../adapters/CorePort";
+import { DeviceSettings, type DeviceViewKeys } from "../adapters/DeviceSettings";
+import type { ScreenHostOptions } from "../host/ScreenHost";
 import { memoryCore, type MemoryTasksFile } from "../memoryCore";
-import type { ScreenPort } from "../ui/engine/port";
 import { dateOf, dayOf, fileText, LIST_NAMES, type ListKey, type MockFile, mockFile } from "./mockData";
-import { MockPort, type WriteDelay } from "./MockPort";
 import { standEvents } from "./standEvents";
 
-/** Which port the stand runs the screen on: its made-up rules (`MockPort`), or the core's over its tasks file in memory. */
-export type StandPortKind = "mock" | "core";
+/** The delays a write may take before it lands, as a real write and its read-back do: the stand's switch. */
+export const WRITE_DELAYS = [0, 30, 300] as const;
+export type WriteDelay = (typeof WRITE_DELAYS)[number];
 
 /**
- * The stand's tasks behind the screen (the plan's step 5, the stand's switch): the port the screen draws from, and the
- * stand's own reach the checks use, the same whichever port it is: the file's text, new made-up tasks, the write delay, an
- * edit from outside.
+ * The stand's tasks behind the screen (Decision 143): the core over the made-up tasks file in memory, the screen on
+ * `CorePort`; and the stand's own reach the checks use: the file's text, new made-up tasks, the write delay, an edit
+ * from outside.
  */
 export interface StandSource {
-	readonly kind: StandPortKind;
-	readonly port: ScreenPort;
+	readonly port: CorePort;
+	readonly device: DeviceSettings;
+	/** The settings as the screen paints them. */
+	readonly paint: ScreenHostOptions["paint"];
 	fileText(): string;
 	/** New made-up tasks around now; `file` puts a given set instead. */
 	reset(file?: MockFile): void;
@@ -24,21 +27,6 @@ export interface StandSource {
 	addFromOutside(list: ListKey, title: string): void;
 	/** A task moved from outside: the one titled `title` before the one titled `before` (null: its list's first section's end). */
 	moveFromOutside(title: string, list: ListKey, before: string | null): void;
-	/** Lets go of what the port holds: the stand switched ports, or unloads. */
-	dispose(): void;
-}
-
-export function mockSource(port: MockPort = new MockPort()): StandSource {
-	return {
-		kind: "mock",
-		port,
-		fileText: () => port.fileText(),
-		reset: (file) => port.reset(file),
-		setDelay: (delay) => (port.delay = delay),
-		addFromOutside: (list, title) => port.addFromOutside(list, title),
-		moveFromOutside: (title, list, before) => port.moveFromOutside(title, list, before),
-		dispose: () => undefined,
-	};
 }
 
 /** The made-up file as the core reads it: its lists, then the made-up projects' tree (`## Projects`, a folder marked 🗃️). */
@@ -47,27 +35,31 @@ function coreText(file: MockFile, now: Date): string {
 	return `${fileText(file, now)}\n## Projects\n\n${tree.join("\n")}\n`;
 }
 
-/** The core over the stand's made-up file as a tasks file in memory, its calendar the stand's events; the screen on `CorePort`. */
-export async function coreSource(onError: (error: unknown) => void, clock: () => Date = () => new Date()): Promise<StandSource> {
+/**
+ * The core over the stand's made-up file (`given`, or the whole made-up file around now) as a tasks file in memory, its
+ * calendar the stand's events; the screen on `CorePort`, the device's keys in `device`.
+ */
+export async function standSource(device: DeviceViewKeys, onError: (error: unknown) => void, clock: () => Date = () => new Date(), given?: MockFile): Promise<StandSource> {
 	const now = clock();
-	const { core, file, events } = memoryCore(coreText(mockFile(now), now), { now: clock }, {}, standEvents(mockFile(now), now));
-	const port = await CorePort.open({ ...core, clock: { now: clock }, onError });
+	const first = given ?? mockFile(now);
+	const made = memoryCore(coreText(first, now), { now: clock }, {}, standEvents(first, now));
+	const { core, file, events } = made;
+	const port = await CorePort.open({ ...core, clock: { now: clock }, onError, tasksFile: () => made.settings.get().tasksFile });
 	return {
-		kind: "core",
 		port,
+		device: new DeviceSettings(device, core.tasks, () => made.settings.get().zoomLevels),
+		paint: made.screenSettings,
 		fileText: () => file.text ?? "",
 		reset: (given) => {
-			const made = given ?? mockFile(clock());
-			events.replace(standEvents(made, clock()));
-			file.replace(coreText(made, clock()));
+			const fresh = given ?? mockFile(clock());
+			events.replace(standEvents(fresh, clock()));
+			file.replace(coreText(fresh, clock()));
 		},
 		setDelay: (delay) => (file.delay = delay),
 		addFromOutside: (list, title) => file.replace(withLine(file, list, `- [ ] ${title}${list === "now" ? ` 📅 ${dateOf(dayOf(clock()))}` : ""}`)),
 		moveFromOutside: (title, list, before) => file.replace(movedLine(file, title, list, before)),
-		dispose: () => port.dispose(),
 	};
 }
-
 const isTaskOf = (line: string, title: string) => new RegExp(`^\\s*- \\[.\\] (?:p\\d )?${title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?: |$)`).test(line);
 
 /** The line of the list's heading, and where the list's first section ends (its first `###` or the next list). */

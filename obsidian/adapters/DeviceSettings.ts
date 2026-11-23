@@ -1,9 +1,8 @@
 import { levelsFor, type TaskService, type ViewChoice, type ViewMode, type Zoom, type ZoomLevel } from "../../core/application/contracts";
 
 /**
- * The device's own part of the plugin's settings, under the keys the old screen keeps (`obsidian/ui/viewSettings.ts`,
- * `DEVICE_KEYS`, which `PluginSettings` keeps in Obsidian's local storage under `task-calendar:device`): the divider's
- * share, the zoom, the projects tree's width.
+ * The device's own part of the plugin's settings (`ViewSettings` in `obsidian/settingsFile.ts`, which `PluginSettings`
+ * keeps in Obsidian's local storage under `task-calendar:device`): the divider's share, the zoom, the projects tree's width.
  */
 export interface DeviceViewKeys {
 	get(): { readonly listShare: number; readonly zoom: Zoom; readonly treeWidth: number | null };
@@ -11,7 +10,7 @@ export interface DeviceViewKeys {
 }
 
 /**
- * What this device keeps of the screen, read where the old screen reads it (the plan's step 5): the divider, the zoom and
+ * What this device keeps of the screen, read where the plugin has always kept it (the plan's step 5): the divider, the zoom and
  * the tree's width from the plugin's device keys; the view mode, a note block's mode and Subprojects from the core's
  * Projects screen (`ProjectsScreenStore`, kept under `task-calendar:projects-screen`), through `TaskService`. Nothing is
  * kept twice and no key is new.

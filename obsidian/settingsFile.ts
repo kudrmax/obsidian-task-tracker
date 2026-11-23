@@ -1,6 +1,27 @@
 import type { SettingsSchema } from "./infrastructure/PluginSettings";
+import { DEFAULT_ZOOM_HOUR, type Zoom } from "../core/application/contracts";
 import { settingsFrom, type TaskCalendarSettings } from "../core/settings";
-import { DEVICE_KEYS, type ViewSettings, viewSettingsFrom } from "./ui/viewSettings";
+
+/**
+ * The settings of this frontend alone, each set by hand on each screen: the day list's share beside the calendar, the
+ * zoom a pinch last settled on, the projects tree's width (null for the design's). They live in the device's own storage,
+ * never in data.json, so Sync never carries them (`DEVICE_KEYS`); `DeviceSettings` reads them.
+ */
+export interface ViewSettings {
+	readonly listShare: number;
+	readonly zoom: Zoom;
+	readonly treeWidth: number | null;
+}
+
+const VIEW_DEFAULTS: ViewSettings = { listShare: 0.5, zoom: DEFAULT_ZOOM_HOUR, treeWidth: null };
+
+const DEVICE_KEYS = ["listShare", "zoom", "treeWidth"] as const satisfies readonly (keyof ViewSettings)[];
+
+/** The view's settings of what was saved, the defaults for any it lacks. */
+export function viewSettingsFrom(saved: unknown): ViewSettings {
+	const s = (saved ?? {}) as Partial<Record<keyof ViewSettings, unknown>>;
+	return Object.fromEntries(DEVICE_KEYS.map((key) => [key, s[key] ?? VIEW_DEFAULTS[key]])) as unknown as ViewSettings;
+}
 
 /** data.json and the device's part of it: the settings every frontend shares and this view's own, one object. */
 export type StoredSettings = TaskCalendarSettings & ViewSettings;

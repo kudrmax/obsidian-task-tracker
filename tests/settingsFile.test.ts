@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DEVICE_STATE_KEY, PluginSettings, type SettingsPersistence } from "../obsidian/infrastructure/PluginSettings";
-import { SETTINGS_FILE } from "../obsidian/settingsFile";
+import { SETTINGS_FILE, viewSettingsFrom } from "../obsidian/settingsFile";
 
 /** data.json as 0.4.155 wrote it for the defaults, the device's part left out. */
 const OLD_FILE = `{
@@ -132,5 +132,21 @@ describe("data.json", () => {
 		await settings.update({ treeWidth: 300, cardGap: 3 });
 		expect(disk.text).toBe(OLD_FILE.replace('"cardGap": 2\n}', `"cardGap": 3,\n  "projectTag": "#project",\n  "resultMark": "🎯",\n${ASSISTANT},\n  "future": 1\n}`));
 		expect(disk.local.get(DEVICE_STATE_KEY)).toEqual({ treeWidth: 300 });
+	});
+});
+
+describe("the screen's device keys", () => {
+	it("read what was saved, the defaults for the rest, and nothing else", () => {
+		expect(viewSettingsFrom(null)).toEqual({ listShare: 0.5, zoom: 56, treeWidth: null });
+		expect(viewSettingsFrom({ zoom: 80, zoomLevels: [{ hourPx: 40 }], cardGap: 4, tasksFile: "x.md" })).toEqual({ listShare: 0.5, zoom: 80, treeWidth: null });
+	});
+
+	it("stay on the device: data.json is not touched", async () => {
+		const disk = new Disk(FILE);
+		const settings = await opened(disk);
+		await settings.update({ listShare: 0.3, treeWidth: 300, zoom: "wholeDay" });
+		expect(disk.local.get(DEVICE_STATE_KEY)).toEqual({ listShare: 0.3, treeWidth: 300, zoom: "wholeDay" });
+		expect(disk.text).toBe(FILE);
+		expect(settings.get()).toMatchObject({ listShare: 0.3, treeWidth: 300, zoom: "wholeDay" });
 	});
 });

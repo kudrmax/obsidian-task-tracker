@@ -1,7 +1,7 @@
 import { carry } from "../lib/carry.mjs";
 
 /** The block a person sees: in the note's reading view, as the test page lays the note out. */
-const BLOCK = ".markdown-reading-view .tc-stand-block";
+const BLOCK = ".markdown-reading-view .tc-note-block";
 
 /**
  * E0, the note's block (spec, principle 1): the same TaskScreen mounted in a note shows its list as the leaf does, and the

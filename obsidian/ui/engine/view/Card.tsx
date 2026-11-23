@@ -1,5 +1,5 @@
 import { type CSSProperties, type HTMLAttributes, memo, type ReactNode, useRef } from "react";
-import { PROPERTY } from "../../design";
+import { PROPERTY } from "../../shared/design";
 import type { BlockLook } from "../layers/Layers";
 import type { CardFace as Face } from "../port";
 import { useData } from "../store";

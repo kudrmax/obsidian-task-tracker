@@ -1,49 +1,26 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { dividerAt as coreDividerAt, LIST_WIDTHS, listShareOf as coreShareOf, listWidths as coreListWidths } from "../../../core/application/listWidth";
-import { MockPort } from "../../../obsidian/stand/MockPort";
-import { dividerAt, LIST_BOUNDS, listShareOf, listWidths } from "../../../obsidian/stand/listWidths";
+import { LIST_WIDTHS, listWidths as coreListWidths } from "../../../core/application/listWidth";
 import { SNAP_MS } from "../../../obsidian/ui/engine/gestures/Divider";
 import { CALENDAR, dayColumnWidth, landingWidth, placesAfter, ruleShift } from "../../../obsidian/ui/engine/layout/columns";
 import { createScreenStore } from "../../../obsidian/ui/engine/store";
+import { standPort } from "./standPort";
 
 const NOW = new Date(2026, 10, 21, 14, 20);
 
-function screen(share?: number) {
-	const port = new MockPort(() => NOW);
-	port.delay = 0;
-	return createScreenStore(port, undefined, share);
+async function screen(share?: number) {
+	return createScreenStore((await standPort(NOW)).port, undefined, share);
 }
 
-/** The stand serves the core's divider rule by the same values until `CorePort` serves the core's own (core audit pair E8). */
-describe("the stand's divider rule is the core's", () => {
-	it("has the core's bounds and draws every share as the core does", () => {
-		expect(LIST_BOUNDS).toEqual(LIST_WIDTHS);
-		for (const view of [320, 390, 700, 1280, 1728])
-			for (const share of [0, 0.1, 0.3, 0.5, 0.77, 1]) {
-				expect(listWidths(share, view, 16)).toEqual(coreListWidths(share, view, 16));
-				expect(listShareOf(share * view, view, 16)).toBe(coreShareOf(share * view, view, 16));
-			}
-	});
-
-	it("stands a dragged divider where the core does, held to the middle only slowly", () => {
-		for (const view of [390, 1280]) {
-			const widths = coreListWidths(0.5, view, 16);
-			for (const wanted of [0, 100, widths.center - 9, widths.center - 3, widths.center + 8, 300, 5000])
-				for (const speed of [0, 0.05, 0.08, 0.5]) expect(dividerAt(wanted, widths, speed)).toEqual(coreDividerAt(wanted, widths, speed));
-		}
-	});
-});
-
 describe("the divider's share on the screen", () => {
-	it("opens with the halves, or the share the device kept", () => {
-		expect(screen().getState().listShare).toBe(0.5);
-		expect(screen(0.3).getState().listShare).toBe(0.3);
+	it("opens with the halves, or the share the device kept", async () => {
+		expect((await screen()).getState().listShare).toBe(0.5);
+		expect((await screen(0.3)).getState().listShare).toBe(0.3);
 	});
 
-	it("is set where the port's rule stands the divider", () => {
-		const store = screen();
+	it("is set where the port's rule stands the divider", async () => {
+		const store = await screen();
 		const fast = store.getState().dragDivider(120, 390, 1);
 		expect(fast).toEqual({ width: 120, snapped: false });
 		expect(store.getState().listShare).toBe(120 / 374);
@@ -52,8 +29,8 @@ describe("the divider's share on the screen", () => {
 		expect(store.getState().listShare).toBe(110 / 374);
 	});
 
-	it("holds the pointer while dragged: a long press can't lift a card under it, nor the ribbon swipe", () => {
-		const store = screen();
+	it("holds the pointer while dragged: a long press can't lift a card under it, nor the ribbon swipe", async () => {
+		const store = await screen();
 		expect(store.getState().claim("divider")).toBe(true);
 		expect(store.getState().claim("drag")).toBe(false);
 		expect(store.getState().claim("ribbon")).toBe(false);
@@ -62,8 +39,8 @@ describe("the divider's share on the screen", () => {
 		expect(store.getState().claim("divider")).toBe(false);
 	});
 
-	it("knows where the middle is, as the port's rule puts it", () => {
-		expect(screen(0.3).getState().dividerMiddle(390)).toBe(187);
+	it("knows where the middle is, as the port's rule puts it", async () => {
+		expect((await screen(0.3)).getState().dividerMiddle(390)).toBe(187);
 	});
 
 	it("glides a step into the middle as long as the design's snap", () => {
@@ -106,7 +83,7 @@ describe("the ribbon's widths", () => {
 
 	it("at the halves the divider gave, a day is as wide as a stop: the pager's own count, the ribbon as it was", () => {
 		for (const view of [390, 1280]) {
-			const w = { stop: view / 2, day: listWidths(0.5, view, 16).width + 8 };
+			const w = { stop: view / 2, day: coreListWidths(0.5, view, 16).width + 8 };
 			expect(w.day).toBe(w.stop);
 			for (const base of [0, 1, CALENDAR, CALENDAR + 2]) for (const px of [-300, -10, 10, 300]) expect(placesAfter(base, px, w)).toBe(base + px / (view / 2));
 		}

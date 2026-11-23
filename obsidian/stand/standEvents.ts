@@ -16,7 +16,7 @@ export interface StandEvent {
 
 const DAYS_AROUND = 7;
 
-/** The stand's events, each day a week either way of today, as the calendars' files would list them (the work calendar's from the work file, as `MockPort` paints it): what `CorePort` reads on the stand. */
+/** The stand's events, each day a week either way of today, as the calendars' files would list them (the work calendar's from the work file): what `CorePort` reads on the stand. */
 export function standEvents(file: MockFile, clock: Date): StandEvent[] {
 	const today = dayOf(clock);
 	const at = (day: Date, minute: number) => new Date(day.getFullYear(), day.getMonth(), day.getDate(), DAY_START_HOUR, minute);

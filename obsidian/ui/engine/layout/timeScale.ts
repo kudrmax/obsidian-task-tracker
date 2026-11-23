@@ -1,4 +1,4 @@
-import { DESIGN, LAYOUT } from "../../design";
+import { DESIGN, LAYOUT } from "../../shared/design";
 
 /** A grid line between the hours: its minute from the day's start, and its label (`:30`) when it is a labelled one. */
 export interface GridMark {
@@ -11,8 +11,14 @@ export interface GridMark {
  * finer marks, every block and event, the now line, the drop, resize and zoom place themselves through it and nothing
  * else. The snap and the grid follow the hour's height (the design's «Шаг привязки» and «Деления между часами»).
  */
+/** The core's snap, asked through the port (E3): `minute` snapped at the hour's height `hourPx` for a finger moving `tolerancePx`. */
+export type SnapRule = (minute: number, hourPx: number, tolerancePx: number) => number;
+
 export class TimeScale {
-	constructor(readonly hourPx: number) {}
+	constructor(
+		readonly hourPx: number,
+		private readonly rule: SnapRule,
+	) {}
 
 	static readonly DAY = 24 * 60;
 	/** The steps a carried task, a resize and a long tap snap to, finest first (the design's «Шаг привязки»: 10 is left out). */
@@ -35,10 +41,9 @@ export class TimeScale {
 		return TimeScale.STEPS.find((minutes) => this.y(minutes) >= LAYOUT.snapTolerance) ?? TimeScale.STEPS[TimeScale.STEPS.length - 1];
 	}
 
-	/** The nearest step to `minute`, within the day. */
+	/** The minute a gesture at `minute` lands on: the core's snap at this zoom. */
 	snap(minute: number): number {
-		const step = this.step;
-		return Math.max(0, Math.min(TimeScale.DAY, Math.round(minute / step) * step));
+		return this.rule(minute, this.hourPx, LAYOUT.snapTolerance);
 	}
 
 	/** The start a carried task's top at `y` pixels takes: the nearest step, a step before the day's end at the latest. */
@@ -57,12 +62,5 @@ export class TimeScale {
 		}
 		return marks;
 	}
-
-	/** The scale whose hour is `hourPx`, held between the whole day (`least`) and the largest hour (`most`). */
-	static within(hourPx: number, least: number, most: number): TimeScale {
-		return new TimeScale(Math.max(least, Math.min(most, hourPx)));
-	}
 }
 
-/** The scale at the base zoom. */
-export const BASE_SCALE = new TimeScale(DESIGN.hourPx);

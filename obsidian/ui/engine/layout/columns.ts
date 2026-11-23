@@ -1,4 +1,4 @@
-import { DESIGN } from "../../design";
+import { DESIGN } from "../../shared/design";
 import type { ListId } from "../port";
 import type { Screen } from "../store";
 
