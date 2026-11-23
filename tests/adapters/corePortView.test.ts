@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { projectNodeOf } from "../../core/application/contracts";
 import { corePortOver, NOW, standText } from "./standCore";
 
 /** The view the main screen draws and its button's menu, as the core keeps it on the device (F10–F13; Decision 149). */
@@ -27,5 +28,17 @@ describe("CorePort's view", () => {
 		await port.setViewMode("byProject");
 		expect(port.view(true)).toMatchObject({ mode: "twoColumns", ribbon: true });
 		expect(port.view(true).modes.find((m) => m.checked)?.mode).toBe("twoColumns");
+	});
+
+	it("offers the Subprojects row while a project with subprojects is chosen, and turns its check over (F13)", async () => {
+		const { port, core } = await corePortOver(`${standText(NOW)}\n## Projects\n\n- Дом\n\t- Ремонт\n`, NOW);
+		expect(port.view(true).subprojects).toBeNull();
+		await core.tasks.pickProjectNode(projectNodeOf("Дом"), true);
+		await port.toggleSubprojects();
+		await port.toggleSubprojects();
+		expect(port.view(true).subprojects).toEqual({ label: "Subprojects", checked: true });
+		await port.toggleSubprojects();
+		expect(port.view(true).subprojects).toEqual({ label: "Subprojects", checked: false });
+		expect(port.view(true).mode).toBe("twoColumns");
 	});
 });
