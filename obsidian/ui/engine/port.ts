@@ -297,6 +297,8 @@ export interface TaskMenuModel {
 	readonly peek: string | null;
 	/** A calendar's task: its open subtasks, standing between its copy and the panel (F107); none elsewhere. */
 	readonly subtasks: readonly string[];
+	/** The menu for several picked tasks: Delete's words, «Delete N tasks» (F140); absent, Delete. */
+	readonly deleteLabel?: string;
 }
 
 /** An event's menu: its one row, Open in Calendar. */

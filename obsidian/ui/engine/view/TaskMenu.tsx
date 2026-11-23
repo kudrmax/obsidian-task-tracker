@@ -235,7 +235,7 @@ export function taskGroups(layer: Layer, typing: boolean, model: TaskMenuModel, 
 					if (look)
 						groups.push(
 							<div key={group} className="tc-menu-tiles is-remove">
-								<Row label={look.label} icon={look.icon} className="is-danger" focus={layer.asked === "delete"} onPick={() => look.onPick(action, steps)} />
+								<Row label={model.deleteLabel ?? look.label} icon={look.icon} className="is-danger" focus={layer.asked === "delete"} onPick={() => look.onPick(action, steps)} />
 							</div>,
 						);
 				}

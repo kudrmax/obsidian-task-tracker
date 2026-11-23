@@ -48,5 +48,6 @@ export function bulkMenuModelOf(count: number, model: CoreMenuModel<BulkActionId
 		project: projectPageOf(model.project),
 		peek: null,
 		subtasks: [],
+		deleteLabel: `Delete ${count} tasks`,
 	};
 }

@@ -19,6 +19,8 @@ export interface StandApi {
 	answerAssistant(title: string | null, reason?: string): void;
 	/** Whether the assistant's question waits for its answer. */
 	assistantAsked(): boolean;
+	/** The titles the assistant's waiting question offers. */
+	assistantCandidates(): readonly string[];
 	/** Each open screen's stop, gesture slot, carried task, layer and the task its menu is open over (a check reads `menuOf` alone: whose menu a tap opened). */
 	debug(): readonly object[];
 }
@@ -28,6 +30,7 @@ export function standApi(source: StandSource, screens: () => readonly MountedScr
 	return {
 		answerAssistant: (title, reason = "It changes the most.") => (title === null ? model?.fail() : model?.answer(title, reason)),
 		assistantAsked: () => model?.asked ?? false,
+		assistantCandidates: () => model?.candidates() ?? [],
 		fileText: () => source.fileText(),
 		reset: () => source.reset(),
 		setDelay: (delay) => source.setDelay(delay),

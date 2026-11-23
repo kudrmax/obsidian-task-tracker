@@ -13,15 +13,12 @@ import { ObsidianEditor } from "./ObsidianEditor";
  * or a press beside it close it writing nothing. A failure takes the same popup, its words in the reason's place.
  */
 export function AnswerPopup({ answer, onGone }: { readonly answer: Answer; readonly onGone: () => void }) {
-	const { layerRoot, markdown, sourcePath } = useHost();
+	const { layerRoot } = useHost();
 	const [open, setOpen] = useState(true);
 	const [text, setText] = useState("");
 	const [failed, setFailed] = useState<string | null>(null);
 	/** One write at a time; once one took, the popup is closing and nothing more is saved. */
 	const writing = useRef(false);
-	const note = useRef<HTMLDivElement>(null);
-	const words = answer.kind === "task" ? answer.note : answer.words;
-	useEffect(() => (note.current ? markdown(words, note.current, sourcePath) : undefined), [markdown, words, sourcePath]);
 	const field = answer.kind === "task" ? answer.field : null;
 	const save = async (again: boolean) => {
 		if (!field || writing.current || !open || text === "") return;
@@ -41,7 +38,7 @@ export function AnswerPopup({ answer, onGone }: { readonly answer: Answer; reado
 					{answer.notice !== null ? <div className="tc-answer-notice">{answer.notice}</div> : null}
 				</>
 			) : null}
-			<div ref={note} className="tc-desc-text tc-answer-note markdown-rendered" />
+			<AnswerNote words={answer.kind === "task" ? answer.note : answer.words} />
 			{field ? (
 				<>
 					<ObsidianEditor
@@ -77,4 +74,12 @@ export function AnswerPopup({ answer, onGone }: { readonly answer: Answer; reado
 			</div>
 		</CenterLayer>
 	);
+}
+
+/** The model's reason, or a failure's words, drawn by Obsidian's markdown for as long as the popup shows it. */
+function AnswerNote({ words }: { readonly words: string }) {
+	const { markdown, sourcePath } = useHost();
+	const note = useRef<HTMLDivElement>(null);
+	useEffect(() => (note.current ? markdown(words, note.current, sourcePath) : undefined), [markdown, words, sourcePath]);
+	return <div ref={note} className="tc-desc-text tc-answer-note markdown-rendered" />;
 }

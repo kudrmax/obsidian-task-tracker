@@ -140,6 +140,8 @@ export function memoryCore(text: string | null, clock: Clock, settings: Partial<
 	return { core, file, events: calendar, settings: store, screenSettings: new ScreenSettingsImpl(store), clock };
 }
 
+const candidatesOf = (question: ModelQuestion): readonly { readonly ref: string; readonly title: string }[] => (JSON.parse(question.input) as { candidates: { ref: string; title: string }[] }).candidates;
+
 /**
  * A model in memory, the stand's (the plan: the assistant calls an LLM, never run against Max's data in tests — faked): «claude» served
  * on the desktop, each question waiting until the stand answers it by hand, naming one of its candidates by title or
@@ -166,10 +168,15 @@ export class MemoryModel implements ModelTransport {
 		return this.waiting !== null;
 	}
 
+	/** The titles the waiting question offers to choose from. */
+	candidates(): readonly string[] {
+		return this.waiting ? candidatesOf(this.waiting.question).map((c) => c.title) : [];
+	}
+
 	/** The waiting question answered: the candidate titled `title`, with `reason`. */
 	answer(title: string, reason: string): void {
 		const waiting = this.take();
-		const candidates = (JSON.parse(waiting.question.input) as { candidates: { ref: string; title: string }[] }).candidates;
+		const candidates = candidatesOf(waiting.question);
 		const chosen = candidates.find((candidate) => candidate.title === title);
 		if (!chosen) throw new Error(`no candidate «${title}» among ${candidates.map((c) => c.title).join(", ")}`);
 		waiting.reply({ ok: true, answer: { taskRef: chosen.ref, reason } });
