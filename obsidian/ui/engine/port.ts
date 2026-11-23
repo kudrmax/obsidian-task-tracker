@@ -337,6 +337,8 @@ export interface ScreenPort {
 	read(dayOffset: number, context?: ScreenContext): ScreenData;
 	/** Fires after the data changed: a write, an edit from outside. Returns the unsubscribe. The screen reads again each minute too: what rides the now line and what is past changes with the clock. */
 	subscribe(listener: () => void): () => void;
+	/** Fires when the day starts at another hour (the settings' Day starts at): the screen opens today afresh (F50). Returns the unsubscribe. */
+	onDayStartMoved(listener: () => void): () => void;
 	/** The present minute from today's start and the clock's time as the now line writes it: «14:20». */
 	now(): Now;
 	/**

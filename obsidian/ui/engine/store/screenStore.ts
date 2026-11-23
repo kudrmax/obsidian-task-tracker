@@ -733,6 +733,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 			},
 			start() {
 				const off = port.subscribe(refresh);
+				const offToday = port.onDayStartMoved(() => get().backToToday());
 				let timer = 0;
 				/** Each minute the clock moves and the screen reads again: what rides the now line moves with it, what is over fades. */
 				const tick = () => {
@@ -743,6 +744,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 				tick();
 				return () => {
 					off();
+					offToday();
 					window.clearTimeout(timer);
 					window.clearTimeout(scrollWait);
 					scrollEdge = null;

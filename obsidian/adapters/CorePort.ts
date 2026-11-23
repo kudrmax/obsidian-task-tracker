@@ -1,4 +1,4 @@
-import { levelRange, sameSlot, type CalendarService, dividerAt, type DividerStop, LIST_WIDTHS, listShareOf, type ListWidths, listWidths, type Clock, type DayEvents, type DayService, type DropColumn, type DroppedTask, type DropTo, type LocalDate, listCardMenuFrom, type MenuFrom as CoreMenuFrom, originOf, type ScreenReader, type ShownChange, type TaskItem, type TaskService, type UndoOutcome, undoNotice, projectNodeOf, type ProjectsNodeId, type UndoService } from "../../core/application/contracts";
+import { levelRange, sameSlot, type CalendarService, dividerAt, type DividerStop, LIST_WIDTHS, listShareOf, type ListWidths, listWidths, type Clock, type DayEvents, type DayChange, type DayService, type DropColumn, type DroppedTask, type DropTo, type LocalDate, listCardMenuFrom, type MenuFrom as CoreMenuFrom, originOf, type ScreenReader, type ShownChange, type TaskItem, type TaskService, type UndoOutcome, undoNotice, projectNodeOf, type ProjectsNodeId, type UndoService } from "../../core/application/contracts";
 import type { ScreenContext, Destination, Edge, EntryBar, EntryCommit, EntryDraft, EntryField, LevelRange, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, RenameStart, ScreenData, ScreenPort } from "../ui/engine/port";
 import { CoreEntry } from "./CoreEntry";
 import { WriteQueue } from "./WriteQueue";
@@ -58,7 +58,7 @@ class CoreReads {
 	) {
 		this.drawing = new ScreenDrawing(core.tasks, core.days, core.calendars, core.tasksFile);
 		this.queue = new WriteQueue(core.onError);
-		this.offs = [core.tasks.onChange(() => void this.refresh()), core.tasks.onShownChange((change) => this.settingsChanged(change)), core.days.onDayChange(() => void this.refresh()), core.undo.onChange(() => this.changed()), core.calendars.onChange(() => this.forgetEvents())];
+		this.offs = [core.tasks.onChange(() => void this.refresh()), core.tasks.onShownChange((change) => this.settingsChanged(change)), core.days.onDayChange((change) => this.dayChanged(change)), core.undo.onChange(() => this.changed()), core.calendars.onChange(() => this.forgetEvents())];
 	}
 
 	/** A screen's port in `context`, told of every change from now on. */
@@ -129,6 +129,12 @@ class CoreReads {
 		if (change.drawn || change.cards || change.timeline || change.gestures) void this.refresh();
 	}
 
+	/** A day ended: the lists read anew. Another hour for the day's start: every screen opens today afresh, its lists read in the new day. */
+	private dayChanged(change: DayChange): void {
+		void this.refresh();
+		if (change === "moved") for (const view of this.views) view.dayMoved();
+	}
+
 	private forgetEvents(): void {
 		this.events.clear();
 		this.asked.clear();
@@ -149,6 +155,7 @@ class CoreReads {
  */
 export class CorePort implements ScreenPort {
 	private readonly listeners = new Set<() => void>();
+	private readonly todayListeners = new Set<() => void>();
 	private readonly cache = new Map<string, ScreenData>();
 	private readonly entry: CoreEntry;
 
@@ -174,6 +181,7 @@ export class CorePort implements ScreenPort {
 	/** This screen's port is let go: its screen is gone. */
 	release(): void {
 		this.listeners.clear();
+		this.todayListeners.clear();
 		this.shared.release(this);
 	}
 
@@ -221,6 +229,16 @@ export class CorePort implements ScreenPort {
 			this.cache.set(key, data);
 		}
 		return data;
+	}
+
+	onDayStartMoved(listener: () => void): () => void {
+		this.todayListeners.add(listener);
+		return () => this.todayListeners.delete(listener);
+	}
+
+	/** @internal The day starts at another hour now. */
+	dayMoved(): void {
+		for (const listener of this.todayListeners) listener();
 	}
 
 	subscribe(listener: () => void): () => void {
