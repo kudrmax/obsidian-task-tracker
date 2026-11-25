@@ -3,13 +3,16 @@ import { type CSSProperties, memo, useCallback, useContext, useEffect, useLayout
 import { PROPERTY } from "../../shared/design";
 import { PLUS, SortableList, SortableRow, useListTarget } from "../drag/Drag";
 import { descendantsOf } from "../drag/tree";
-import { pressedIn, useMenuFrom } from "../layers/Layers";
+import { pressedIn, useMenuFrom, useSectionMenuFrom } from "../layers/Layers";
 import { ROW_PX } from "../layout/columns";
-import type { EntryField as Field, ListId, Row } from "../port";
-import { DayContext, useData, useScreen, useScreenApi } from "../store";
+import type { EntryField as Field, ListId, Row, SectionRow } from "../port";
+import { DayContext, sectionKey, useData, useScreen, useScreenApi } from "../store";
 import { Card } from "./Card";
 import { MovingRow, MovingRows } from "./MovingRow";
+import { ObsidianEditor } from "./ObsidianEditor";
+import { useHost } from "./host";
 import { EntryField } from "./QuickAdd";
+import { ScrollHold } from "./scrollHold";
 
 /** Rows drawn past each edge of the list's room. */
 const OVERSCAN = 6;
@@ -30,6 +33,7 @@ export const TaskList = memo(function TaskList({ list }: { readonly list: ListId
 const ContextList = memo(function ContextList({ list, context }: { readonly list: ListId; readonly context: number }) {
 	const api = useScreenApi();
 	const allRows = useData((d) => d.lists[list].rows);
+	const plate = useData((d) => d.lists[list].plate);
 	const readRows = useData((d) => d.lists[list].rows, true);
 	const lifted = useScreen((s) => s.lifted);
 	const liftedDepth = useScreen((s) => s.liftedDepth);
@@ -61,6 +65,7 @@ const ContextList = memo(function ContextList({ list, context }: { readonly list
 	const order = useMemo(() => readRows.map((row) => row.id).join(" "), [readRows]);
 	/** Every row is in the sortable list: headers move aside like cards; a card goes after a header into its section. */
 	const ids = useMemo(() => withPlus.map((row) => row.id), [withPlus]);
+	const sections = useMemo(() => new Set(withPlus.flatMap((row) => (row.kind === "section" ? [row.id] : []))), [withPlus]);
 	const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
 	/** A day's page beside the shown one (the day turn draws them ahead) is no place to drop on: its target stands apart. */
 	const away = useScreen((s) => (day !== null && day !== s.dayOffset ? day : null));
@@ -115,6 +120,8 @@ const ContextList = memo(function ContextList({ list, context }: { readonly list
 	}, [reveal?.seq]);
 
 	const items = virtualizer.getVirtualItems();
+	const [hold] = useState(() => new ScrollHold());
+	const height = hold.height(virtualizer.getTotalSize(), virtualizer.scrollOffset ?? 0);
 	/** Whether the pointer that pressed last was a mouse: the phone has no double click. */
 	const mouse = useRef(false);
 	return (
@@ -126,9 +133,15 @@ const ContextList = memo(function ContextList({ list, context }: { readonly list
 			/** A mouse's double click on the list's free room, between or under the cards, opens a new task at its end (F67); a card, a header or a field keeps its own. */
 			onDoubleClick={(event) => mouse.current && !(event.target as Element).closest(".tc-drag-source, .tc-group-head, .tc-quick-row") && api.getState().openAtEnd(list)}
 		>
-			<div className="tc-list-items" style={{ height: virtualizer.getTotalSize() }}>
+			{plate !== null && drawn.length === 0 ? (
+				/** A filtered list with nothing in it says so (F64); a tap types a new task at its end. */
+				<div className="tc-group-empty" role="button" onClick={() => api.getState().openAtEnd(list)}>
+					{plate}
+				</div>
+			) : null}
+			<div className="tc-list-items" style={{ height }}>
 				<div className="tc-list-block" style={{ transform: `translateY(${items[0]?.start ?? 0}px)` }}>
-					<SortableList list={list} ids={ids}>
+					<SortableList list={list} ids={ids} sections={sections}>
 						<MovingRows gone={gone}>
 							{items.map((item) => {
 								const row = drawn[item.index];
@@ -147,8 +160,8 @@ const ContextList = memo(function ContextList({ list, context }: { readonly list
 										</MovingRow>
 									);
 								return (
-									<MovingRow key={row.id} id={row.id} context={context} index={item.index} measure={virtualizer.measureElement} order={order} carried={lifted === row.id} fresh={fresh.has(row.id)} className="tc-list-item">
-										<RowFace row={row.kind === "task" && row.id === lifted && liftedDepth !== null ? { ...row, depth: liftedDepth } : row} />
+									<MovingRow key={row.id} id={row.kind === "section" ? sectionKey(list, row.id) : row.id} context={context} index={item.index} measure={virtualizer.measureElement} order={order} carried={lifted === row.id} fresh={fresh.has(row.id)} className="tc-list-item">
+										<RowFace list={list} row={row.kind === "task" && row.id === lifted && liftedDepth !== null ? { ...row, depth: liftedDepth } : row} />
 									</MovingRow>
 								);
 							})}
@@ -161,25 +174,47 @@ const ContextList = memo(function ContextList({ list, context }: { readonly list
 });
 
 /** A row's face: a section's header, or a task's card as a drag source that opens its menu when tapped. */
-const RowFace = memo(function RowFace({ row }: { readonly row: Row }) {
+const RowFace = memo(function RowFace({ list, row }: { readonly list: ListId; readonly row: Row }) {
 	const openMenuFrom = useMenuFrom();
-	if (row.kind === "section")
-		return (
-			<SortableRow id={row.id}>
-				<div className="tc-group-head">
-					<span className="tc-group-name">{row.title}</span>
-				</div>
-			</SortableRow>
-		);
+	const api = useScreenApi();
+	const { haptics } = useHost();
+	const fold = useCallback(() => {
+		haptics.tap();
+		api.getState().fold(row.id);
+	}, [api, haptics, row.id]);
+	if (row.kind === "section") return <SectionHead list={list} row={row} />;
 	return (
 		<SortableRow
 			id={row.id}
 			onTap={(target, held) => openMenuFrom(row.id, "list", pressedIn(target, "[data-id]"), null, !held)}
 		>
-			<Card id={row.id} depth={row.depth} />
+			<Card id={row.id} depth={row.depth} onFold={fold} />
 		</SortableRow>
 	);
 });
+
+/**
+ * A section's header (F58, F62): a tap opens its menu (No section's opens none); while renamed, its name's field stands in
+ * its place at its height, so nothing under it moves (the design's «Меню заголовка», `view="rename"`).
+ */
+function SectionHead({ list, row }: { readonly list: ListId; readonly row: SectionRow }) {
+	const api = useScreenApi();
+	const openSectionMenu = useSectionMenuFrom();
+	const renaming = useScreen((s) => s.sectionField?.key === sectionKey(list, row.id));
+	if (renaming)
+		return (
+			<div className="tc-group-slot is-rename">
+				<ObsidianEditor text={row.title} className="tc-quick-field tc-title-field is-section tc-section-name" placeholder="Section name" onEnter={(text) => api.getState().endSectionName("enter", text)} onEscape={() => api.getState().endSectionName("escape", "")} onLeave={(_, text) => api.getState().endSectionName("blur", text())} />
+			</div>
+		);
+	return (
+		<SortableRow id={row.id} lifts onTap={row.menu ? (target) => openSectionMenu(list, row.id, pressedIn(target, ".tc-group-head")) : undefined}>
+			<div className={`tc-group-head${row.ungrouped ? " is-ungrouped" : ""}`}>
+				<span className="tc-group-name">{row.title}</span>
+			</div>
+		</SortableRow>
+	);
+}
 
 /** A row of the list as drawn: the list's own, or the new task's field. */
 type Drawn = Row | { readonly kind: "entry"; readonly id: string; readonly depth: number } | { readonly kind: "plus"; readonly id: string };

@@ -30,9 +30,24 @@ const carried = (id: string, grab: Grab, landing: Landing) => (
 		className={`tc-carried${landing.block ? " is-block" : ""}`}
 		style={{ [PROPERTY.grabX]: `${grab.x}px`, [PROPERTY.grabY]: `${grab.y}px`, [PROPERTY.landingLevel]: String(landing.level), ...(landing.width === null ? {} : { [PROPERTY.landingWidth]: `${landing.width}px` }), ...(landing.height === null ? {} : { [PROPERTY.landingHeight]: `${landing.height}px` }) } as CSSProperties}
 	>
-		<Card id={id} copy />
+		<CarriedFace id={id} />
 	</div>
 );
+
+/**
+ * What is carried, as the card it lifted: a task's card, or a section's header drawn as a plate of a card's look, its
+ * name and how many tasks it holds (the design's «Поднятая секция», F63).
+ */
+function CarriedFace({ id }: { readonly id: string }) {
+	const section = useScreen((s) => Object.values(s.shown.lists).flatMap((list) => list.rows).find((row) => row.kind === "section" && row.id === id));
+	if (section?.kind !== "section") return <Card id={id} copy />;
+	return (
+		<div className="tc-card tc-section-plate" data-copy={id}>
+			<div className="tc-card-title">{section.title}</div>
+			<span className="tc-count">{section.tasks}</span>
+		</div>
+	);
+}
 
 /** A tap anywhere on the screen but on a calendar's task or its dots lets the selected task go (F102); one on a layer (the menu, its backdrop) leaves it. */
 const letSelectionGo = (event: MouseEvent, store: ScreenStore) => {

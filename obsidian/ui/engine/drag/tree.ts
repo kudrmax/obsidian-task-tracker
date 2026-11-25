@@ -153,3 +153,21 @@ function topIn(order: readonly string[], id: string, heightOf: (id: string) => n
 export function shiftOf(id: string, ids: readonly string[], final: readonly string[], heightOf: (id: string) => number): number {
 	return topIn(final, id, heightOf) - topIn(ids, id, heightOf);
 }
+
+/**
+ * The list's order once the lifted section (its header at `activeIndex` of `ids`, its rows folded away) is let go over the
+ * header at `overIndex` (the design's «Поднятая секция»: it goes only between groups): carried up, before that header;
+ * carried down, after that header's whole group, before the next header or at the list's end.
+ */
+export function sectionOrder(ids: readonly string[], sections: ReadonlySet<string>, activeIndex: number, overIndex: number): readonly string[] {
+	if (overIndex < 0 || overIndex === activeIndex || !sections.has(ids[overIndex])) return ids;
+	if (overIndex < activeIndex) return arrayMove([...ids], activeIndex, overIndex);
+	let next = overIndex + 1;
+	while (next < ids.length && !sections.has(ids[next])) next++;
+	return arrayMove([...ids], activeIndex, next - 1);
+}
+
+/** The header the lifted section `id` stands before in `order`; null for the list's end. */
+export function sectionBefore(order: readonly string[], sections: ReadonlySet<string>, id: string): string | null {
+	return order.slice(order.indexOf(id) + 1).find((other) => sections.has(other)) ?? null;
+}

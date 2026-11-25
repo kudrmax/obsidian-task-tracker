@@ -34,6 +34,7 @@ interface MenuSteps {
 	startRename(): void;
 	startSubtask(): void;
 	startNotes(): void;
+	startFirstStep(): void;
 	pick(action: MenuAction): void;
 	actHere(action: MenuAction): void;
 	nameMenuProject(name: string): void;
@@ -76,7 +77,7 @@ const MENU_ACTIONS: Readonly<Record<TaskMenuActionId, ActionLook | { readonly ti
 	project: { label: "Project", icon: "project", onPick: (_, steps) => steps.menuPage("projects") },
 	section: { label: "Section", icon: "section", onPick: leave },
 	subtask: { label: "Subtask", icon: "subtask", onPick: (_, steps) => steps.startSubtask(), tile: "steps" },
-	firstStep: { label: "First step", icon: "firstStep", onPick: leave, tile: "steps" },
+	firstStep: { label: "First step", icon: "firstStep", onPick: (_, steps) => steps.startFirstStep(), tile: "steps" },
 	openFull: { label: "Open full screen", icon: "fullScreen", onPick: leave, tile: "opens" },
 	openInObsidian: { label: "Open in Obsidian", icon: "openFile", onPick: leave, tile: "opens" },
 	delete: { label: "Delete", icon: "delete", onPick: (action, steps) => (action.asks ? steps.ask("delete") : steps.pick({ kind: "delete" })) },
@@ -134,7 +135,12 @@ export const TaskMenu = memo(function TaskMenu() {
 	if (!shown) return null;
 	const { model } = shown.layer;
 	const pick = (action: MenuAction) => api.getState().pick(action);
-	const groups = model.kind === "event" ? [<RowGroup key="open" rows={[{ label: "Open in Calendar", icon: "calendar", onPick: () => pick({ kind: "row", id: "calendar" }) }]} />] : taskGroups(shown.layer, typing !== null, model, { ...api.getState(), pick });
+	const groups =
+		model.kind === "event"
+			? [<RowGroup key="open" rows={[{ label: "Open in Calendar", icon: "calendar", onPick: () => pick({ kind: "row", id: "calendar" }) }]} />]
+			: model.kind === "section"
+				? [<RowGroup key="section" rows={[...(model.rename ? [{ label: "Rename", icon: "rename" as const, onPick: () => api.getState().startSectionRename() }] : []), ...(model.remove ? [{ label: "Remove section", icon: "removeSection" as const, onPick: () => api.getState().removeSection() }] : [])]} />]
+				: taskGroups(shown.layer, typing !== null, model, { ...api.getState(), pick });
 	return (
 		<MenuLayer
 			key={shown.seq}
@@ -145,10 +151,16 @@ export const TaskMenu = memo(function TaskMenu() {
 			escapes={typing === null}
 			root={layerRoot}
 			reference={shown.reference}
-			label={model.kind === "event" ? "Event menu" : "Task menu"}
+			label={model.kind === "event" ? "Event menu" : model.kind === "section" ? "Section menu" : "Task menu"}
 			over={
 				<>
-					<MenuCopy id={shown.layer.stack?.of ?? shown.layer.id} look={shown.look} notes={model.kind === "task" && !shown.layer.stack && typing === null ? model.peek : null} />
+					{model.kind === "section" ? (
+						<div className="tc-lifted is-head" data-lifted={shown.layer.id}>
+							<span className="tc-group-name">{model.title}</span>
+						</div>
+					) : (
+						<MenuCopy id={shown.layer.stack?.of ?? shown.layer.id} look={shown.look} notes={model.kind === "task" && !shown.layer.stack && typing === null ? model.peek : null} />
+					)}
 					{shown.layer.stack ? (
 						<Stack ids={shown.layer.stack.ids} typing={false} renaming={typing === "rename" ? shown.layer.id : null} pressed={shown.layer.id} />
 					) : model.kind === "task" && (model.subtasks.length > 0 || typing === "subtask") ? (
@@ -157,7 +169,7 @@ export const TaskMenu = memo(function TaskMenu() {
 				</>
 			}
 			groups={groups}
-			panelClass={model.kind === "event" ? "is-event" : shown.layer.page === "picker" ? "is-task is-picker" : "is-task"}
+			panelClass={model.kind === "event" ? "is-event" : model.kind === "section" ? "is-section" : shown.layer.page === "picker" ? "is-task is-picker" : "is-task"}
 			page={`${shown.layer.id}:${shown.layer.page}`}
 			shape={shown.layer.asking ?? ""}
 			keepWidth={model.kind === "event"}
