@@ -55,8 +55,6 @@ function RibbonColumns() {
 		<div className="tc-ribbon" ref={ribbon} {...bind()}>
 			<DayTurnContext.Provider value={turn}>
 				<RibbonTrack at={at} className="tc-ribbon-track" width={STRIP_WIDTH} share={COLUMN_SHARE}>
-					<ListColumn list="done" />
-					<ColumnRule at={at} stop="done" />
 					<ListColumn list="inbox" />
 					<ColumnRule at={at} stop="inbox" />
 					<ListColumn list="soon" />
@@ -64,6 +62,11 @@ function RibbonColumns() {
 					<TurningDayColumn at={at} />
 					<ListDivider at={at} ribbon={ribbon} calendar={calendar} />
 					<CalendarColumn ref={calendar} />
+					{/* Done stands left of the strip (F257): out of the strip's flow, so the columns and their rules keep their order. */}
+					<ListColumn list="done" />
+					<div className="tc-done-edge">
+						<ColumnRule at={at} stop="done" />
+					</div>
 				</RibbonTrack>
 			</DayTurnContext.Provider>
 		</div>

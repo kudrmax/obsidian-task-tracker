@@ -1418,6 +1418,7 @@ body.theme-light .tc-menu-over .tc-event { --tc-event-bg: var(--tc-event-bg-ligh
 /* Done, left of Inbox (F257, the design's «Колонка Done»): a column of the strip standing left of its first, in sight while the ribbon stands one place before Inbox. */
 .tc-ribbon-track { position: relative; }
 .tc-ribbon-track > .tc-stage-col.is-done { position: absolute; right: 100%; top: 0; bottom: 0; }
+.tc-ribbon-track > .tc-done-edge { position: absolute; left: 0; top: 0; bottom: 0; width: 0; display: flex; }
 
 /* Select tasks (the design's «Выбор задач»): the capsule with the cross and the count, the accent circle with «⋯» in the plus's place; the control a layer opens from stands over its backdrop. */
 .task-calendar > button.tc-select-menu { position: absolute; right: var(--tc-space-16); bottom: calc(var(--tc-chrome-room) + var(--tc-foot-gap) + (var(--tc-wheel) - var(--tc-plus-size)) / 2 - var(--tc-keyboard-room)); z-index: var(--tc-layer-plus); transition: opacity var(--tc-duration-collapse) var(--tc-ease-out), transform var(--tc-duration-collapse) var(--tc-ease-out), visibility 0s linear 0s; }
