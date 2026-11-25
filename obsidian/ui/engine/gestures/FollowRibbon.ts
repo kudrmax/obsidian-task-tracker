@@ -80,7 +80,7 @@ export function useFollowRibbon(ribbon: RefObject<HTMLElement | null>, calendar:
 	/** Where the ribbon stands, in places: the strip's stops, then the days past the calendar. */
 	const along = useMotionValue(line.get().placeOf(stop, dayOffset));
 	const at = useTransform(along, (p) => Math.min(p, CALENDAR));
-	const dayAt = useTransform(along, (p) => Math.max(0, p - CALENDAR));
+	const dayAt = useTransform(() => line.get().laneAt(along.get()));
 	const [days, setDays] = useState<readonly number[]>(() => [dayOffset]);
 	const [change, setChange] = useState<DayChange | null>(null);
 	const changing = useRef<DayChange | null>(null);
@@ -145,9 +145,9 @@ export function useFollowRibbon(ribbon: RefObject<HTMLElement | null>, calendar:
 	 */
 	const draw = (moving: boolean) => {
 		const l = line.get();
-		const p = along.get() - CALENDAR;
-		const stop = pager.current.stop - CALENDAR;
-		const near = stop < 0 ? [] : [stop - 1, stop, stop + 1];
+		const p = l.laneAt(along.get());
+		const stop = l.laneAt(pager.current.stop);
+		const near = pager.current.stop < CALENDAR ? [stop] : [stop - 1, stop, stop + 1];
 		const pages = [...near, Math.floor(p), Math.ceil(p)].filter((page) => page >= 0).map((page) => l.dayAt(CALENDAR + page));
 		const next = [...new Set([...pages, ...(moving ? drawnDays.current : [])])].sort((a, b) => a - b);
 		const shown = next.length > 0 ? next : [l.dayAt(CALENDAR)];
@@ -198,6 +198,13 @@ export function useFollowRibbon(ribbon: RefObject<HTMLElement | null>, calendar:
 		if (!line.get().isPlain(day)) reline(DayLine.plain(day));
 	};
 
+	/** Whether the ribbon lands (or stands) at `stop` and `day` already, read on the line a turn there would run on: a day before the line's start is not its stop. */
+	const standsAt = (stop: Stop, day: number) => {
+		const was = line.get();
+		const next = was.toward(along.get(), stop, day);
+		return was.moved(pager.current.stop, next) === next.placeOf(stop, day);
+	};
+
 	/** The ribbon to `stop` and `day`, set from outside (a key, an arrow, the day's title, a place picked): one landing on the line that turn runs on. */
 	const go = (stop: Stop, day: number) => {
 		const next = line.get().toward(along.get(), stop, day);
@@ -228,7 +235,7 @@ export function useFollowRibbon(ribbon: RefObject<HTMLElement | null>, calendar:
 	useEffect(() => {
 		const now = api.getState();
 		const to = { stop: now.stop, day: now.dayOffset };
-		if (pager.current.following || pager.current.stop === line.get().placeOf(to.stop, to.day)) return;
+		if (pager.current.following || standsAt(to.stop, to.day)) return;
 		if (landing.current) return void queued.current.push(to);
 		go(to.stop, to.day);
 	}, [stop, dayOffset]);
@@ -318,7 +325,8 @@ export function useFollowRibbon(ribbon: RefObject<HTMLElement | null>, calendar:
 			enabled: !dragging && swipes,
 			drag: {
 				/** The pointer is followed on the view's window, not captured by the card under the finger: a long press there can hand it to the drag mid-swipe, and the ribbon's gesture still ends. */
-				pointer: { capture: false },
+				/** The arrow keys are the screen's key table's (← and →, the same landing), never @use-gesture's keyboard drag of a focused button in the ribbon (`pointer.keys`; found with the day's arrows, Decision 146). */
+				pointer: { capture: false, keys: false },
 				axis: "x",
 				threshold: DRAG_THRESHOLD_PX,
 			},

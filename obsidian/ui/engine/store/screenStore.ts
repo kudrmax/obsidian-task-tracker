@@ -2,7 +2,7 @@ import { DESIGN } from "../../shared/design";
 import { createStore, type StoreApi } from "zustand/vanilla";
 import { EVERY_TASK } from "../port";
 import { type Stop, stopShowing } from "../layout/columns";
-import type { ScreenView, ViewMode, Destination, SectionNameEnd, DividerStop, Edge, ScreenContext, UndoOutcome, EntryBar, EntryDraft, EntryField, FieldActionId, LevelRange, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, MenuStatusId, ScreenData, ScreenPort } from "../port";
+import type { LayoutWidths, ViewChoice, ViewMode, Destination, SectionNameEnd, DividerStop, Edge, ScreenContext, UndoOutcome, EntryBar, EntryDraft, EntryField, FieldActionId, LevelRange, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, MenuStatusId, ScreenData, ScreenPort } from "../port";
 import { share } from "./share";
 
 export type { Stop };
@@ -69,7 +69,7 @@ interface ScreenState {
 	readonly now: Now;
 	readonly layer: Layer | null;
 	/** The view the screen draws (the port's, F10–F14). */
-	readonly view: ScreenView;
+	readonly view: ViewChoice;
 	/** The view button's menu is open (F11): one layer at a time, a task's menu closed while it is. */
 	readonly viewMenu: boolean;
 	/**
@@ -237,7 +237,12 @@ interface ScreenActions {
 	setZoom(zoom: Zoom): void;
 	/** The list's width that puts the divider in the middle of a ribbon `viewWidth` wide (the port's rule). */
 	dividerMiddle(viewWidth: number): number;
-	/** The divider dragged to make the list `wanted` wide at `speed` px/ms: where the port's rule stands it, the share set to it. */
+	/** A still layout's columns' widths at the divider's `share`, in a view `viewWidth` wide (the core's, through the port); null for the ribbon. */
+	stillWidths(viewWidth: number, share: number): LayoutWidths | null;
+	/**
+	 * The divider dragged to stand `wanted` px from the view's left (on the ribbon, the list that wide) at `speed` px/ms:
+	 * where the layout's rule (the port's) stands it, the share set to it.
+	 */
 	dragDivider(wanted: number, viewWidth: number, speed: number): DividerStop;
 	followList(follow: boolean): void;
 	/** The edge the carried card heads into (`room:edge`; null: none): a new one waits a quarter second before it may scroll. */
@@ -333,7 +338,7 @@ const HALVES = 0.5;
 export const sectionKey = (list: ListId, id: string): string => `${list}/${id}`;
 
 /** One store per mounted screen, over its port (spec, «Screen state»); `zoom`, the calendar's zoom the host kept. */
-export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, listShare = HALVES, opening: ScreenContext = EVERY_TASK, wide = false): ScreenStore {
+export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, listShare = HALVES, opening: ScreenContext = EVERY_TASK): ScreenStore {
 	/** Writes of the screen's own not yet read back: their reads come together once the last is in. */
 	let writing = 0;
 	/** The screen as it stood when the carried task was lifted: its place's home, a drop's in-flight write drawn in it. */
@@ -367,13 +372,23 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 			return layer.id in data.cards ? { layer: { ...layer, model: port.menu(layer.id, layer.from, s.dayOffset) } } : closed(s);
 		};
 		/**
-		 * The view as the port now gives it: another mode is another context, drawn in place (principle 3); a mode that is no
-		 * ribbon stands at the day and its calendar, where the day's list and the calendar turn.
+		 * The view as the port now gives it: another context of the core's (another mode, Subprojects turned) is drawn in place
+		 * (principle 3, F23); a layout that doesn't swipe stands at the day and its calendar, where the days turn.
 		 */
 		const viewed = (s: Screen): Partial<Screen> => {
-			const view = port.view(wide);
+			const view = port.view();
 			if (JSON.stringify(view) === JSON.stringify(s.view)) return {};
-			return view.mode === s.view.mode ? { view } : { view, contextSeq: s.contextSeq + 1, ...(view.ribbon ? {} : { stop: "calendar" as const }) };
+			if (view.context === s.view.context) return { view };
+			return { view, contextSeq: s.contextSeq + 1, ...(view.layout.swipe === "pages" ? {} : { stop: "calendar" as const }) };
+		};
+		/** The divider's rule in the layout drawn: the ribbon's own list beside the calendar, or a still layout's, the core's `layoutWidths`. */
+		const dividerWidths = (viewWidth: number) => {
+			const { layout } = get().view;
+			return layout.swipe === "pages" ? port.listWidths(get().listShare, viewWidth, DESIGN.dividerWidth) : (port.layoutWidths(layout, get().listShare, viewWidth, DESIGN.dividerWidth)?.divider ?? port.listWidths(get().listShare, viewWidth, DESIGN.dividerWidth));
+		};
+		const shareAt = (at: number, viewWidth: number): number => {
+			const { layout } = get().view;
+			return (layout.swipe === "pages" ? null : port.layoutShareAt(layout, at, viewWidth, DESIGN.dividerWidth)) ?? port.listShareOf(at, viewWidth, DESIGN.dividerWidth);
 		};
 		/** The port's data again; held while a drag or a drop's write keeps the screen still (spec, principle 5). */
 		const refresh = () => {
@@ -452,7 +467,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 			left: {},
 			dayOffset: 0,
 			stop: "calendar",
-			view: port.view(wide),
+			view: port.view(),
 			viewMenu: false,
 			openViewMenu() {
 				set({ viewMenu: true, layer: null, selected: null });
@@ -462,7 +477,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 			},
 			pickViewMode(mode) {
 				set({ viewMenu: false });
-				if (mode !== get().view.mode) write(port.setViewMode(mode));
+				if (mode !== get().view.chosen) write(port.setViewMode(mode));
 			},
 			toggleSubprojects() {
 				set({ viewMenu: false });
@@ -488,11 +503,14 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 			listFollow: false,
 			listBounds: port.listBounds,
 			dividerMiddle(viewWidth) {
-				return port.listWidths(get().listShare, viewWidth, DESIGN.dividerWidth).center;
+				return dividerWidths(viewWidth).center;
+			},
+			stillWidths(viewWidth, share) {
+				return port.layoutWidths(get().view.layout, share, viewWidth, DESIGN.dividerWidth);
 			},
 			dragDivider(wanted, viewWidth, speed) {
-				const stop = port.dividerAt(wanted, port.listWidths(get().listShare, viewWidth, DESIGN.dividerWidth), speed);
-				const next = port.listShareOf(stop.width, viewWidth, DESIGN.dividerWidth);
+				const stop = port.dividerAt(wanted, dividerWidths(viewWidth), speed);
+				const next = shareAt(stop.width, viewWidth);
 				if (next !== get().listShare) set({ listShare: next });
 				return stop;
 			},
@@ -786,7 +804,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 				if (to.at.dayOffset !== get().dayOffset) get().showDay(to.at.dayOffset);
 				const where = to.at.list;
 				/** Another day than today stands past the calendar, where the ribbon turns the days (Decision 127); a list out of sight, the stop that shows it. */
-				const next = to.at.dayOffset !== 0 || !get().view.ribbon ? "calendar" : stopShowing(stop, where);
+				const next = to.at.dayOffset !== 0 || get().view.layout.swipe !== "pages" ? "calendar" : stopShowing(stop, where);
 				/** The field opens again at its new place, with what was typed (a new field brought into sight, F193). */
 				set({ entry: to, entrySeq: get().entrySeq + 1, entryPanel: null, ...(next === stop ? {} : { stop: next }) });
 			},

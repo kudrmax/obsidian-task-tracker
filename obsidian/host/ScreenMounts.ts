@@ -34,7 +34,7 @@ export class ScreenMounts {
 	/** `TaskScreen` at `place` in `el`, in `context` (every task when absent), counted among the open screens. */
 	mount(el: HTMLElement, place: Place, sourcePath: string, context?: ScreenContext): MountedScreen {
 		const { device, app, haptics, markdown, notice, desk, fingers } = this.parts;
-		const port = this.parts.port.within(context);
+		const port = this.parts.port.within(context, { wide: desk, note: place === "note" ? sourcePath : null });
 		const screen = mountScreen(el, { port, place, app, sourcePath, haptics, zoom: device.zoom(), listShare: { kept: device.listShare(), keep: (share) => void device.keepListShare(share) }, markdown, notice, desk, fingers, context });
 		this.screens.set(screen, port);
 		return screen;

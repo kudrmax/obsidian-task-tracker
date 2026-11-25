@@ -35,17 +35,17 @@ export class ScreenDrawing {
 		return { inbox: this.column(screen, LIST_COLUMNS.inbox), backlog: this.column(screen, LIST_COLUMNS.backlog), soon: this.column(screen, LIST_COLUMNS.soon), day: this.column(screen, LIST_COLUMNS.day) };
 	}
 
-	/** The words of an empty list's plate: the core's, under a filter (`ViewChoice.plates`, `ProjectFilter.emptyLabel`); none without one. */
-	draw(source: ScreenSource, plate: string | null = null): ScreenData {
+	/** Each list's No tasks plate as the screen's view has it (`ViewChoice.plates`): its words, or null for none. */
+	draw(source: ScreenSource, plates: Readonly<Record<DropColumn, string | null>>): ScreenData {
 		const { date, screen, lists } = source;
 		const cards: Record<string, CardFace> = {};
 		const title = this.dayTitle(date);
 		return {
 			lists: {
-				inbox: this.list(this.tasks.listName("inbox"), lists.inbox, screen, cards, null, plate),
-				backlog: this.list(this.tasks.listName("backlog"), lists.backlog, screen, cards, null, plate),
-				soon: this.list(this.tasks.listName("soon"), lists.soon, screen, cards, null, plate),
-				day: this.list(title, lists.day, screen, cards, date, plate),
+				inbox: this.list(this.tasks.listName("inbox"), lists.inbox, screen, cards, null, plates.inbox),
+				backlog: this.list(this.tasks.listName("backlog"), lists.backlog, screen, cards, null, plates.backlog),
+				soon: this.list(this.tasks.listName("soon"), lists.soon, screen, cards, null, plates.soon),
+				day: this.list(title, lists.day, screen, cards, date, plates.day),
 			},
 			cards,
 			missing: screen.missing ? { text: `No tasks file at ${this.tasksFile()}`, create: "Create file" } : null,

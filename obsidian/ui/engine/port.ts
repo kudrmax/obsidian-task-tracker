@@ -1,11 +1,11 @@
-import type { DividerStop, EntryBarGroup, FieldActionId, FieldGroup, ListWidths, MenuActionGroup, MenuStatusId, SubprojectsOption, TaskActionId, TaskMenuActionId, TaskMenuGroup, UndoOutcome, ViewMode, ViewModeOption } from "../../../core/application/contracts";
+import type { DividerStop, EntryBarGroup, FieldActionId, FieldGroup, ListWidths, MenuActionGroup, DropColumn, LayoutColumnId, LayoutStack, LayoutWidths, MenuStatusId, TaskActionId, TaskMenuActionId, TaskMenuGroup, UndoOutcome, ViewChoice, ViewLayout, ViewMode } from "../../../core/application/contracts";
 
 /**
  * The task actions are the core's (`core/application/taskActions.ts`, task actions spec): the ids, the groups and the
  * offered actions a surface lays out. The port answers with them; the engine keeps only each action's look and handler,
  * an exhaustive `Record` over the surface's ids. Types only: the engine runs no code of the core.
  */
-export type { DividerStop, EntryBarGroup, FieldActionId, FieldGroup, ListWidths, MenuActionGroup, MenuStatusId, SubprojectsOption, TaskActionId, TaskMenuActionId, TaskMenuGroup, UndoOutcome, ViewMode, ViewModeOption };
+export type { DividerStop, EntryBarGroup, FieldActionId, FieldGroup, ListWidths, MenuActionGroup, DropColumn, LayoutColumnId, LayoutStack, LayoutWidths, MenuStatusId, TaskActionId, TaskMenuActionId, TaskMenuGroup, UndoOutcome, ViewChoice, ViewLayout, ViewMode };
 
 /**
  * The screen's one port (docs/superpowers/specs/2026-11-18-ui-engine.md, «The owners», «Data and writes»): what the screen
@@ -358,24 +358,19 @@ export interface ScreenContext {
 /** Every task: no project chosen. */
 export const EVERY_TASK: ScreenContext = { project: null };
 
-/**
- * The view the main screen draws and its button (the core's `ViewChoice`, F10–F14): the mode drawn, the modes the button's
- * menu offers with the chosen one checked, the button's icon, whether the screen is the ribbon a swipe turns, and the
- * menu's Subprojects row (null: none).
- */
-export interface ScreenView {
-	readonly mode: ViewMode;
-	readonly modes: readonly ViewModeOption[];
-	readonly icon: string;
-	readonly ribbon: boolean;
-	readonly subprojects: SubprojectsOption | null;
-}
-
 export interface ScreenPort {
-	/** The main screen's view on a `wide` screen (the desktop offers All columns), as this device keeps it; a change fires `subscribe`. */
-	view(wide: boolean): ScreenView;
-	/** A mode picked in the view button's menu: kept on the device, every filter alike (F10, F15). */
+	/**
+	 * The view this screen draws, as the core gives it (`ViewChoice`, F10–F14): the mode drawn and its layout (columns,
+	 * swipe, divider, rows' stack), the button's modes and icon, the wheel, the plates, the context. In the screen's own
+	 * context: the main screen's, or a note's block's. A change fires `subscribe`.
+	 */
+	view(): ViewChoice;
+	/** A mode picked in the view button's menu: kept on the device, every filter alike (F10, F15); a note's block keeps its own. */
 	setViewMode(mode: ViewMode): Promise<void>;
+	/** A still layout's columns' widths at the divider's `share` in a view `viewWidth` wide (the core's `layoutWidths`); null for the ribbon. */
+	layoutWidths(layout: ViewLayout, share: number, viewWidth: number, dividerWidth: number): LayoutWidths | null;
+	/** The share a still layout's divider let go at `at` saves (the core's `layoutShareAt`). */
+	layoutShareAt(layout: ViewLayout, at: number, viewWidth: number, dividerWidth: number): number | null;
 	/** The menu's Subprojects row tapped: the chosen project's subprojects shown or not (F13, F14). */
 	toggleSubprojects(): Promise<void>;
 	/** The screen for the day `dayOffset` days from today, in `context` (every task when absent). */

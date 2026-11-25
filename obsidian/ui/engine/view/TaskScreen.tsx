@@ -97,7 +97,7 @@ const TYPING = ".tc-quick-row, .tc-quick-bar, .tc-quick-panel";
 function Root({ place, store }: { readonly place: Place; readonly store: ScreenStore }) {
 	/** A task typed: a new one, or one renamed in place (both the plugin's quick entry). */
 	const entering = useScreen((s) => s.entry !== null);
-	const ribbon = useScreen((s) => s.view.ribbon);
+	const layout = useScreen((s) => s.view.layout);
 	const touches = useTouchPresses();
 	useDrawn(store);
 	/**
@@ -118,7 +118,7 @@ function Root({ place, store }: { readonly place: Place; readonly store: ScreenS
 	return (
 		<div className={`task-calendar is-engine is-${place}${entering ? " is-entering" : ""}`} onPointerDownCapture={pressed} onClickCapture={clicked} {...touches} onTouchStart={keepTouch} onTouchMove={keepTouch} onTouchEnd={keepTouch} onClick={(event) => letSelectionGo(event, store)}>
 			<Layout place={place} />
-			<QuickBar reach={reachOf(place, ribbon)} />
+			<QuickBar reach={reachOf(place, layout)} />
 			<MissingFile />
 		</div>
 	);

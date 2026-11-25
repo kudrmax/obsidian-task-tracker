@@ -1,5 +1,6 @@
+import { type RefObject, useEffect, useState } from "react";
 import { DESIGN } from "../../shared/design";
-import type { ListId } from "../port";
+import type { ListId, ViewLayout } from "../port";
 import type { Screen } from "../store";
 
 /** Where the ribbon stands: Inbox–Soon, Soon–the day, the day–its calendar. */
@@ -32,27 +33,28 @@ export function shownAt(stop: Stop): readonly [Column, Column] {
 	return [STRIP[at], STRIP[at + 1]];
 }
 
-/** Every list, as the modes without the ribbon show them side by side or stacked (All columns, Rows; F16, F17). */
-const ALL_LISTS: readonly ListId[] = ["inbox", "backlog", "soon", "day"];
+/** The engine's lists a still layout's columns draw, left to right and top to bottom (the core's `ViewLayout`). */
+const listsOf = (layout: ViewLayout): readonly ListId[] => layout.columns.flatMap((column) => column.lists.map((one) => one.list)).filter((list): list is ListId => list !== "projects");
 
 /**
  * What each stop shows (the one place it is said): the lists a screen mounted at `place` shows at `stop`; a note's block
- * shows its Inbox alone; a mode that is no ribbon (`ribbon` false) every list at once.
+ * shows its Inbox alone; a layout that doesn't swipe, every list its columns draw at once.
  */
-export function columnsOf(place: Place, stop: Stop, ribbon = true): readonly ListId[] {
+export function columnsOf(place: Place, stop: Stop, layout: ViewLayout): readonly ListId[] {
 	if (place === "note") return ["inbox"];
-	return ribbon ? shownAt(stop).flatMap((column) => LISTS_OF[column]) : ALL_LISTS;
+	return layout.swipe === "pages" ? shownAt(stop).flatMap((column) => LISTS_OF[column]) : listsOf(layout);
 }
 
 /** The lists a screen mounted at `place` can bring into sight: the ribbon turns to any; a note's block shows its Inbox. */
-export function reachOf(place: Place, ribbon = true): readonly ListId[] {
-	return [...new Set(STOPS.flatMap((stop) => columnsOf(place, stop, ribbon)))];
+export function reachOf(place: Place, layout: ViewLayout): readonly ListId[] {
+	return [...new Set(STOPS.flatMap((stop) => columnsOf(place, stop, layout)))];
 }
 
 /** The stop that brings `list` into sight from `stop`: the same while it shows it, else the last of the lists' own stops (Inbox–Soon, Soon–day) that does. */
 export function stopShowing(stop: Stop, list: ListId): Stop {
-	if (columnsOf("leaf", stop).includes(list)) return stop;
-	return [...STOPS].reverse().find((other) => other !== "calendar" && columnsOf("leaf", other).includes(list)) ?? stop;
+	const shows = (at: Stop) => shownAt(at).flatMap((column) => LISTS_OF[column]).includes(list);
+	if (shows(stop)) return stop;
+	return [...STOPS].reverse().find((other) => other !== "calendar" && shows(other)) ?? stop;
 }
 
 /** How far the strip stands from its start at a stop, in columns: where the ribbon's gestures take it. */
@@ -60,9 +62,6 @@ export const offsetOf = (stop: Stop): number => STRIP.indexOf(shownAt(stop)[0]);
 
 /** The ribbon's last stop, the day and its calendar, in places: past it the places are the days, one a day. */
 export const CALENDAR = offsetOf("calendar");
-
-/** A day other than today stands past the calendar, where the days turn; at Inbox and Soon the day's list is today's (Decision 129). */
-const dayAtStop = (stop: Stop, day: number): number => (stop === "calendar" ? day : 0);
 
 /**
  * Where each day stands on the ribbon past the calendar (Decision 146): the stops, then one place a day from `origin`, the
@@ -96,6 +95,16 @@ export class DayLine {
 		return stop === "calendar" ? CALENDAR + this.pos(day) : offsetOf(stop);
 	}
 
+	/**
+	 * Where the day's pages stand at the ribbon's `place`, in pages from the calendar's own: past the calendar one a place;
+	 * at Inbox and Soon today's page, whose day list they show; between Soon and the calendar from today's page to the
+	 * calendar's own with the strip, so a line that starts before today turns the visible page as the strip moves, never in
+	 * a frame (on the plain line today's page is the calendar's own, and nothing turns).
+	 */
+	laneAt(place: number): number {
+		return place >= CALENDAR ? place - CALENDAR : Math.min(1, CALENDAR - place) * this.pos(0);
+	}
+
 	/** The day a place shows: past the calendar its page's, at Inbox and Soon today. */
 	dayAt(place: number): number {
 		if (place < CALENDAR) return 0;
@@ -112,10 +121,11 @@ export class DayLine {
 
 	/**
 	 * The line a turn from the ribbon's place `from` to `stop` and `day` runs on: an earlier day than the calendar's own
-	 * becomes it; a day further than the next from where the ribbon stands is drawn beside it, the one way it lies.
+	 * becomes it; a day further than the next from where the ribbon stands is drawn beside it, the one way it lies. To
+	 * Inbox or Soon the line stays as it is until the ribbon rests, so no page changes its day under the eye.
 	 */
 	toward(from: number, stop: Stop, day: number): DayLine {
-		if (stop !== "calendar") return DayLine.plain(0);
+		if (stop !== "calendar") return this;
 		const base = new DayLine(Math.min(this.origin, day), null);
 		const shown = from >= CALENDAR ? this.dayAt(from) : null;
 		if (shown === null) return base.pos(day) > 1 ? new DayLine(base.origin, { day, at: 1 }) : base;
@@ -133,9 +143,6 @@ export class DayLine {
 
 /** The ribbon stood at a stop's place (the wheel's tap and turn): that stop, today's list beside it, on the line it rests on. */
 export const standAt = (screen: Pick<Screen, "setStop" | "showDay">, place: number): void => DayLine.plain(0).standAt(screen, place);
-
-/** Where the ribbon stands at a stop and day on the line it rests on: the stops' offsets, past the calendar one place a day. */
-export const placeOf = (stop: Stop, dayOffset: number): number => DayLine.plain(dayOffset).placeOf(stop, dayAtStop(stop, dayOffset));
 
 /** A step on or back as a swipe takes it (the keys ← and →): Inbox, Soon, the day's calendar, then a day a step; back from today's calendar or an earlier day to Soon. */
 export function stepped(stop: Stop, day: number, shift: -1 | 1): { readonly stop: Stop; readonly day: number } {
@@ -175,6 +182,23 @@ export const ruleShift =
 export function drawnWidths(ribbon: HTMLElement | null, calendar: HTMLElement | null): { readonly view: number; readonly calendar: number } {
 	const view = ribbon?.clientWidth ?? 0;
 	return { view, calendar: calendar?.clientWidth ?? view / 2 };
+}
+
+/**
+ * The width the browser draws `el` at, as it changes (a `ResizeObserver` of its own window, named in the owners' guard):
+ * a still layout's columns are the core's widths for it. Null before it is drawn.
+ */
+export function useDrawnWidth(el: RefObject<HTMLElement | null>): number | null {
+	const [width, setWidth] = useState<number | null>(null);
+	useEffect(() => {
+		const node = el.current;
+		const view = node?.ownerDocument.defaultView;
+		if (!node || !view) return;
+		const observer = new view.ResizeObserver(([entry]) => setWidth(entry.contentRect.width));
+		observer.observe(node);
+		return () => observer.disconnect();
+	}, [el]);
+	return width;
 }
 
 /** How wide a place is drawn, px: a stop's step is half the ribbon; past the calendar a day is the day list's column. */

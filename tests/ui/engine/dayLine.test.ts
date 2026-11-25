@@ -45,3 +45,35 @@ describe("a step as a swipe takes it (the keys ← and →)", () => {
 		expect(stepped("inbox", 0, -1)).toEqual({ stop: "inbox", day: 0 });
 	});
 });
+
+/** The reviewer's three on the day line: moving to another line never changes the day of the visible page. */
+describe("the visible page keeps its day as the line changes (Decision 146)", () => {
+	const soon = offsetOf("soon");
+	it("at Soon shows today's page on a line that starts before today, and turns to the calendar's own as the strip reaches it", () => {
+		const back = DayLine.plain(0).toward(soon, "calendar", -1);
+		expect(back.dayAt(CALENDAR + back.laneAt(soon))).toBe(0);
+		expect(back.dayAt(CALENDAR + back.laneAt(CALENDAR))).toBe(-1);
+		expect(back.laneAt(soon + 0.5)).toBeCloseTo(0.5);
+	});
+
+	it("keeps the line going from yesterday's calendar to Soon, so the page under the eye stays yesterday's until the strip moves", () => {
+		const yesterday = DayLine.plain(-1);
+		const toSoon = yesterday.toward(CALENDAR, "soon", 0);
+		expect(toSoon).toBe(yesterday);
+		expect(yesterday.moved(CALENDAR, toSoon)).toBe(CALENDAR);
+		expect(toSoon.dayAt(CALENDAR + toSoon.laneAt(CALENDAR))).toBe(-1);
+		expect(toSoon.dayAt(CALENDAR + toSoon.laneAt(soon))).toBe(0);
+	});
+
+	it("rests at Soon on the plain line with today's page where it stood", () => {
+		const yesterday = DayLine.plain(-1);
+		const plain = DayLine.plain(0);
+		expect(yesterday.moved(soon, plain)).toBe(soon);
+		expect(plain.dayAt(CALENDAR + plain.laneAt(soon))).toBe(yesterday.dayAt(CALENDAR + yesterday.laneAt(soon)));
+	});
+
+	it("on the plain line the strip moves no page (the feel of Decision 127 untouched)", () => {
+		const plain = DayLine.plain(0);
+		for (const place of [0, 0.5, soon, soon + 0.3, CALENDAR]) expect(plain.laneAt(place)).toBe(Math.max(0, place - CALENDAR));
+	});
+});

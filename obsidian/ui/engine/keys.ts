@@ -17,7 +17,7 @@ export interface ScreenKey {
 
 /** The ribbon one place on or back, as a swipe lets it go one: a stop, and past the calendar a day; the ribbon lands there as from any place set from outside. In a mode with no ribbon, a day, as the arrows. */
 const turn = (s: Screen, shift: -1 | 1) => {
-	if (!s.view.ribbon) return s.turnDay(shift);
+	if (s.view.layout.swipe !== "pages") return s.turnDay(shift);
 	const to = stepped(s.stop, s.dayOffset, shift);
 	s.setStop(to.stop);
 	s.showDay(to.day);

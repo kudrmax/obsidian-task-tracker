@@ -8760,6 +8760,18 @@ var TaskReads = class {
       place: funnelPlaceOf(state.place)
     };
   }
+  /**
+   * The main screen's view under `node` (null: no filter), whatever node the device chose, or with `note` a project
+   * note's block's: a screen drawn in its own context reads its view in it. Without a file, the unfiltered view.
+   */
+  viewInRead(node, wide, note = false) {
+    const view = (s, at) => {
+      const tree = s ? projectTreeOf(s.doc) : ProjectTree.EMPTY;
+      const closed = at !== null && nodeHeader(at, tree, s?.doc ?? null).closed;
+      return viewChoice(this.source.screen(), { node: at, closed, wide, note, title: this.columnTitle, branches: hasSubprojects(at, tree, s?.doc ?? null) });
+    };
+    return { reads: true, tidies: true, missing: () => view(null, null), answer: (s) => view(s, node) };
+  }
   /** The block at the end of the note at `path`: null for a note no project has, and without a file. */
   projectNoteViewRead(path, wide) {
     return { reads: true, tidies: true, missing: () => null, answer: (s) => this.projectNoteView(s, path, wide) };
@@ -9818,6 +9830,10 @@ var SnapshotReader = class _SnapshotReader {
     const screen = this.answer(this.reads.screenRead(date, this.filter));
     this.screens.set(date, screen);
     return screen;
+  }
+  view(wide, notePath) {
+    if (notePath === null) return this.answer(this.reads.viewInRead(this.filter, wide));
+    return this.answer(this.reads.projectNoteViewRead(notePath, wide))?.view ?? this.answer(this.reads.viewInRead(this.filter, wide, true));
   }
   columnView(column, date) {
     return this.reads.columnView(this.screen(date), column);

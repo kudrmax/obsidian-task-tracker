@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { FLICK_SPEED, FollowPager } from "../../../obsidian/ui/engine/gestures/followPager";
 import { WheelFollow } from "../../../obsidian/ui/engine/gestures/wheelFollow";
-import { COLUMN_SHARE, DayLine, offsetOf, placeOf, shownAt, STRIP_WIDTH } from "../../../obsidian/ui/engine/layout/columns";
+import { COLUMN_SHARE, DayLine, offsetOf, shownAt, STRIP_WIDTH } from "../../../obsidian/ui/engine/layout/columns";
 import { createScreenStore, type ScreenStore } from "../../../obsidian/ui/engine/store";
 import { standPort } from "./standPort";
 
@@ -21,8 +21,8 @@ function swipeStep(moved: number, width: number, flick: number): number {
 function ribbon(store: ScreenStore) {
 	const width = 195;
 	const { stop, dayOffset } = store.getState();
-	const pager = new FollowPager(placeOf(stop, dayOffset), Infinity);
 	const line = DayLine.plain(dayOffset);
+	const pager = new FollowPager(line.placeOf(stop, dayOffset), Infinity);
 	return {
 		step(shift: -1 | 1) {
 			pager.begin(pager.stop, true);
@@ -78,7 +78,7 @@ describe("one swipe, one place (Max)", () => {
 /**
  * Max asked twice: at Inbox and at Soon the two columns split the screen in half. The ribbon's strip (`RibbonTrack` in
  * `Layout.tsx`) is `STRIP_WIDTH` of the window, each column `COLUMN_SHARE` of it, and it stands at `offsetOf` its stop
- * (through `placeOf`, where the pager lands).
+ * (through `DayLine.placeOf`, where the pager lands).
  */
 describe("halves at Inbox and Soon (Max)", () => {
 	it("each shown column is half the window", () => {
@@ -93,7 +93,7 @@ describe("halves at Inbox and Soon (Max)", () => {
 	});
 
 	it("is where the ribbon stands at each stop", () => {
-		for (const stop of ["inbox", "soon", "calendar"] as const) expect(placeOf(stop, 0)).toBe(offsetOf(stop));
+		for (const stop of ["inbox", "soon", "calendar"] as const) expect(DayLine.plain(0).placeOf(stop, 0)).toBe(offsetOf(stop));
 	});
 });
 

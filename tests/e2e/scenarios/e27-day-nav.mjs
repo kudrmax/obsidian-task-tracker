@@ -19,13 +19,21 @@ const RECORD = `(() => {
 		const titles = seen.map((p) => p.title);
 		const most = seen.sort((a, b) => b.width - a.width)[0]?.title ?? null;
 		const arrows = [...document.querySelectorAll(".tc-day-nav .tc-arrow")].map((el) => Math.round(el.getBoundingClientRect().left));
-		window.__tcNav.push({ titles, most, arrows });
+		const pages = box ? [...col.querySelectorAll(".tc-slide")].map((page) => ({ title: page.querySelector(".tc-day-title")?.textContent.trim() ?? "", left: Math.round(page.getBoundingClientRect().left) })) : [];
+		window.__tcNav.push({ titles, most, arrows, pages });
 		requestAnimationFrame(tick);
 	};
 	requestAnimationFrame(tick);
 	window.__tcNavStop = () => { run = false; return window.__tcNav; };
 	return 1;
 })()`;
+
+/**
+ * Frames where a page changed its day without moving (review of batch A, finding 4: a line changed under the eye): a page
+ * standing where a page stood the frame before, showing another day.
+ */
+export const swapped = (frames) =>
+	frames.flatMap((frame, i) => (i === 0 ? [] : frame.pages.filter((page) => frames[i - 1].pages.some((was) => Math.abs(was.left - page.left) <= 1 && was.title !== page.title)).map((page) => ({ i, ...page }))));
 
 /** The days in order a run of frames showed, each once: a day seen again after another is listed again. */
 const passed = (frames) => frames.map((f) => f.most).filter((title, i, all) => title !== null && (i === 0 || all[i - 1] !== title));
@@ -113,6 +121,52 @@ export default {
 		t.expect(!(await nowLine()), "yesterday's calendar has no now line");
 		await backToToday();
 		await isDay(0, "back from yesterday");
+
+		const key = async (code) => {
+			await t.cdp.send("Input.dispatchKeyEvent", { type: "keyDown", key: code, code, windowsVirtualKeyCode: code === "ArrowLeft" ? 37 : 39 });
+			await t.cdp.send("Input.dispatchKeyEvent", { type: "keyUp", key: code, code, windowsVirtualKeyCode: code === "ArrowLeft" ? 37 : 39 });
+		};
+		const stopOf = async () => (await t.stand("debug()"))[0].stop;
+		const ribbon = await t.oracle.rect(".tc-ribbon");
+		const swipeBack = async () => {
+			if (t.platform === "phone") {
+				const y = ribbon.top + ribbon.height * 0.6;
+				await t.input.swipe({ x: ribbon.left + ribbon.width * 0.3, y }, { x: ribbon.left + ribbon.width * 0.7, y: y + 2 }, { steps: 6, stepMs: 12 });
+				return;
+			}
+			const at = { x: ribbon.left + ribbon.width * 0.5, y: ribbon.top + ribbon.height * 0.5 };
+			for (let i = 0; i < 14; i++) {
+				await t.cdp.send("Input.dispatchMouseEvent", { type: "mouseWheel", x: at.x, y: at.y, deltaX: -24, deltaY: 0 });
+				await t.sleep(8);
+			}
+		};
+		const noSwap = (frames, what) => {
+			const faults = swapped(frames);
+			t.expect(faults.length === 0, `${what}: no page changes its day without moving (finding 4): ${JSON.stringify(faults.slice(0, 3))}`);
+		};
+
+		await press("Previous day");
+		await isDay(-1, "to yesterday again");
+		await t.sleep(400);
+		const keyed = await record(() => key("ArrowLeft"));
+		await t.sleep(300);
+		t.expect((await stopOf()) === "soon", `← on yesterday's calendar: Soon and the day (finding 4a): ${await stopOf()}`);
+		t.expect(await nowLine(), "← on yesterday's calendar: the calendar switched to today on the way (finding 4a)");
+		noSwap(keyed, "← on yesterday's calendar");
+		t.expect(passed(keyed).at(-1) === "Today", `at Soon the day's list is today's: ${JSON.stringify(passed(keyed))}`);
+
+		await t.setStop("soon");
+		const fromSoon = await record(() => press("Previous day"));
+		await isDay(-1, "Previous day from Soon");
+		noSwap(fromSoon, "the back arrow at Soon (finding 4c)");
+		t.expect(fromSoon[0]?.most === "Today" || passed(fromSoon)[0] === "Today", `the back arrow at Soon starts from today's page in sight: ${JSON.stringify(passed(fromSoon))}`);
+
+		await t.sleep(400);
+		const swiped = await record(swipeBack);
+		await t.sleep(400);
+		t.expect((await stopOf()) === "soon", `a swipe back from yesterday's calendar: Soon (finding 4b): ${await stopOf()}`);
+		noSwap(swiped, "a swipe back from yesterday (finding 4b)");
+		await t.setStop("calendar");
 
 		if (t.platform === "phone") {
 			const lane = await t.oracle.rect(".tc-day-lane");

@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
+import { viewLayout } from "../../../core/application/contracts";
 import { mockFile } from "../../../obsidian/stand/mockData";
 import { columnsOf, reachOf, stopShowing } from "../../../obsidian/ui/engine/layout/columns";
 import { LAYER_MS } from "../../../obsidian/ui/engine/layers/motion";
@@ -134,12 +135,15 @@ describe("the field's bar, ready in the store (review of part 1, finding 10)", (
 
 describe("what each stop shows, said once by the layout (review of part 1, finding 3)", () => {
 	it("gives the lists of each stop and place, what a place can reach, and the stop that brings a list into sight", () => {
-		expect(columnsOf("leaf", "inbox")).toEqual(["inbox", "backlog", "soon"]);
-		expect(columnsOf("leaf", "soon")).toEqual(["soon", "day"]);
-		expect(columnsOf("leaf", "calendar")).toEqual(["day"]);
-		expect(columnsOf("note", "calendar")).toEqual(["inbox"]);
-		expect(reachOf("leaf")).toEqual(["inbox", "backlog", "soon", "day"]);
-		expect(reachOf("note")).toEqual(["inbox"]);
+		const two = viewLayout("twoColumns", false, () => null);
+		const rows = viewLayout("rows", false, () => null);
+		expect(columnsOf("leaf", "inbox", two)).toEqual(["inbox", "backlog", "soon"]);
+		expect(columnsOf("leaf", "soon", two)).toEqual(["soon", "day"]);
+		expect(columnsOf("leaf", "calendar", two)).toEqual(["day"]);
+		expect(columnsOf("note", "calendar", two)).toEqual(["inbox"]);
+		expect(columnsOf("leaf", "calendar", rows)).toEqual(["inbox", "backlog", "soon", "day"]);
+		expect(reachOf("leaf", two)).toEqual(["inbox", "backlog", "soon", "day"]);
+		expect(reachOf("note", two)).toEqual(["inbox"]);
 		expect(stopShowing("calendar", "day")).toBe("calendar");
 		expect(stopShowing("calendar", "inbox")).toBe("inbox");
 		expect(stopShowing("calendar", "soon")).toBe("soon");

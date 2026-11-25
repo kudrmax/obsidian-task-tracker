@@ -577,6 +577,7 @@ const BY_HAND_EXCEPTIONS: readonly { readonly file: string; readonly rule: strin
 	{ file: `${ENGINE}gestures/Zoom.ts`, rule: "an observer", call: /\.ResizeObserver\s*\(/g, most: 1, why: "the whole day refitted to the calendar's height as it changes (Max, F98)" },
 	{ file: `${ENGINE}gestures/Zoom.ts`, rule: "a size read from the page", call: /\.clientHeight\b/g, most: 2, why: "the room's height and its foot's, for the whole day's fit, read by the observer above" },
 	{ file: `${ENGINE}gestures/Zoom.ts`, rule: "a size read from the page", call: /\.scrollTop\b(?!\s*=(?!=))/g, most: 1, why: "the calendar's scroll as a pinch begins, for the minute under the pointer" },
+	{ file: `${ENGINE}layout/columns.ts`, rule: "an observer", call: /\.ResizeObserver\s*\(/g, most: 1, why: "a still layout's drawn width as it changes, for the core's widths of its columns (`useDrawnWidth`, Decision 148)" },
 	{ file: `${ENGINE}layout/columns.ts`, rule: "a size read from the page", call: /\.clientWidth\b/g, most: 2, why: "the ribbon's and its calendar's drawn widths as a gesture needs them, read in this one place (@use-gesture's pager example reads the window's)" },
 	{ file: `${ENGINE}store/screenStore.ts`, rule: "a timer", call: /\bsetTimeout\s*\(\s*tick\b/g, most: 1, why: "the store's one minute tick (spec, «Time»)" },
 	{ file: `${ENGINE}store/screenStore.ts`, rule: "a timer", call: /\bsetTimeout\s*\(\s*\(\)\s*=>\s*set\(\{\s*scrollArmed:/g, most: 1, why: "a carried card's quarter second at a room's edge before it scrolls (F162): dnd-kit's auto-scroll has no delay" },

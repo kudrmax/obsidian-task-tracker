@@ -1,9 +1,9 @@
-import { type CSSProperties, memo, type PointerEvent, type ReactNode, type RefObject, useContext, useRef } from "react";
+import { type CSSProperties, Fragment, memo, type PointerEvent, type ReactNode, type RefObject, useContext, useRef } from "react";
 import { DESIGN } from "../../shared/design";
 import { useDivider } from "../gestures/Divider";
 import { DayTurnContext, type FollowGestures, useFollowRibbon } from "../gestures/FollowRibbon";
 import { RibbonTrack, StripColumn, StripRule } from "../gestures/RibbonTrack";
-import type { ListId, ViewMode } from "../port";
+import type { DropColumn, LayoutColumnId, LayoutStack, ListId, ViewLayout } from "../port";
 import { DayContext, useData, useScreen, useScreenApi } from "../store";
 import { Capsule } from "../view/Capsule";
 import { useHost } from "../view/host";
@@ -15,7 +15,7 @@ import { TaskMenu } from "../view/TaskMenu";
 import { ViewButton } from "../view/ViewButton";
 import { Timeline } from "../view/Timeline";
 import { Wheel } from "../view/Wheel";
-import { COLUMN_SHARE, columnsOf, dayColumnWidth, drawnWidths, type Place, ruleShift, type Stop, STRIP_WIDTH } from "./columns";
+import { COLUMN_SHARE, columnsOf, dayColumnWidth, drawnWidths, useDrawnWidth, type Place, ruleShift, type Stop, STRIP_WIDTH } from "./columns";
 
 export { type Place, reachOf } from "./columns";
 
@@ -30,12 +30,11 @@ type RibbonAt = FollowGestures["at"];
  */
 export const Layout = memo(function Layout({ place }: { readonly place: Place }) {
 	const stop = useScreen((s) => s.stop);
-	const mode = useScreen((s) => s.view.mode);
-	const ribbon = useScreen((s) => s.view.ribbon);
-	const shown = columnsOf(place, stop, ribbon);
+	const layout = useScreen((s) => s.view.layout);
+	const shown = columnsOf(place, stop, layout);
 	return (
 		<>
-			{place === "leaf" ? <ModeColumns key={mode} mode={mode} /> : <NoteColumn list={shown[0]} />}
+			{place === "leaf" ? <ViewColumns key={layout.mode} layout={layout} /> : <NoteColumn list={shown[0]} />}
 			<PlusButton shown={shown} />
 			<Capsule />
 			{place === "leaf" ? <ViewButton /> : null}
@@ -50,17 +49,18 @@ export const Layout = memo(function Layout({ place }: { readonly place: Place })
  * one place a day: the strip stands, the day's list turns under the fingers as a page with its header, and the calendar,
  * standing on its day while they hold it, changes to the new day on the list's own landing.
  */
-function ModeColumns({ mode }: { readonly mode: ViewMode }) {
+function ViewColumns({ layout }: { readonly layout: ViewLayout }) {
 	const ribbon = useRef<HTMLDivElement>(null);
 	const calendar = useRef<HTMLElement>(null);
 	const { win, fingers } = useHost();
-	const { at, turn, bind } = useFollowRibbon(ribbon, calendar, win, fingers, mode === "twoColumns");
+	const wheel = useScreen((s) => s.view.wheel);
+	const { at, turn, bind } = useFollowRibbon(ribbon, calendar, win, fingers, layout.swipe === "pages");
 	return (
 		<>
-			<div className={`tc-ribbon is-${mode}`} ref={ribbon} {...bind()}>
-				<DayTurnContext.Provider value={turn}>{mode === "allColumns" ? <AllColumns ribbon={ribbon} calendar={calendar} /> : <RibbonStrip at={at} rows={mode === "rows"} ribbon={ribbon} calendar={calendar} />}</DayTurnContext.Provider>
+			<div className={`tc-ribbon is-${layout.mode}`} ref={ribbon} {...bind()}>
+				<DayTurnContext.Provider value={turn}>{layout.swipe === "pages" || layout.stack ? <RibbonStrip at={at} stack={layout.stack} ribbon={ribbon} calendar={calendar} /> : <StillColumns layout={layout} ribbon={ribbon} calendar={calendar} />}</DayTurnContext.Provider>
 			</div>
-			{mode === "twoColumns" ? <Wheel at={at} /> : null}
+			{wheel ? <Wheel at={at} /> : null}
 		</>
 	);
 }
@@ -70,14 +70,15 @@ function ModeColumns({ mode }: { readonly mode: ViewMode }) {
  * the lists stacked and the day's title with its arrows over the calendar; the strip's own Inbox and Soon stand empty there,
  * never in sight.
  */
-function RibbonStrip({ at, rows, ribbon, calendar }: { readonly at: RibbonAt; readonly rows: boolean; readonly ribbon: RefObject<HTMLDivElement | null>; readonly calendar: RefObject<HTMLElement | null> }) {
+function RibbonStrip({ at, stack, ribbon, calendar }: { readonly at: RibbonAt; readonly stack: LayoutStack | null; readonly ribbon: RefObject<HTMLDivElement | null>; readonly calendar: RefObject<HTMLElement | null> }) {
+	const rows = stack !== null;
 	return (
 		<RibbonTrack at={at} className="tc-ribbon-track" width={STRIP_WIDTH} share={COLUMN_SHARE}>
 			{rows ? <ColumnBox className="is-inbox" /> : <InboxColumn />}
 			<ColumnRule at={at} stop="inbox" />
 			{rows ? <ColumnBox className="is-soon" /> : <ListColumn list="soon" />}
 			<ColumnRule at={at} stop="soon" />
-			<DayColumnBox at={at}>{rows ? <StackedRows /> : <TurningDay />}</DayColumnBox>
+			<DayColumnBox at={at}>{stack ? <StackedRows lists={stack.lists} /> : <TurningDay />}</DayColumnBox>
 			<ListDivider at={at} ribbon={ribbon} calendar={calendar} />
 			<CalendarColumn ref={calendar} nav={rows} />
 		</RibbonTrack>
@@ -85,24 +86,36 @@ function RibbonStrip({ at, rows, ribbon, calendar }: { readonly at: RibbonAt; re
 }
 
 /**
- * All columns (F16, desktop): Inbox over Backlog, Soon and the day's list side by side, each as wide, then the calendar
- * behind the divider; nothing slides. The divider sets the three lists against the calendar, all four equal at its
- * middle: the same share as Two columns' list, read over half the window (the stylesheet's `--tc-all-list-width`).
+ * A still layout's columns side by side (All columns, F16; the core's `ViewLayout`): each column the core's list, nothing
+ * slides; the divider before the calendar sets the lists against it, each column as wide as the core's `layoutWidths`
+ * gives for the share in the width the browser draws (all four equal at its middle in All columns).
  */
-function AllColumns({ ribbon, calendar }: { readonly ribbon: RefObject<HTMLDivElement | null>; readonly calendar: RefObject<HTMLElement | null> }) {
-	const { style, follow } = useListWidth();
+function StillColumns({ layout, ribbon, calendar }: { readonly layout: ViewLayout; readonly ribbon: RefObject<HTMLDivElement | null>; readonly calendar: RefObject<HTMLElement | null> }) {
+	const api = useScreenApi();
+	const { follow } = useListWidth();
+	const share = useScreen((s) => s.listShare);
+	const view = useDrawnWidth(ribbon);
+	const widths = view === null ? null : (api.getState().stillWidths(view, share)?.widths ?? null);
+	const width = (i: number): CSSProperties | undefined => (widths ? { width: `${widths[i]}px` } : undefined);
 	return (
-		<div className={`tc-all-columns${follow}`} style={style}>
-			<InboxColumn share={null} />
-			<StillRule />
-			<ListColumn list="soon" share={null} />
-			<StillRule />
-			<section className="tc-stage-col is-day">
-				<TurningDay />
-			</section>
-			<AllDivider ribbon={ribbon} calendar={calendar} />
-			<CalendarColumn ref={calendar} nav={false} />
+		<div className={`tc-all-columns${follow}`}>
+			{layout.columns.map((column, i) => (
+				<Fragment key={column.id}>
+					{i === 0 ? null : column.id === "timeline" ? layout.divider ? <StillDivider ribbon={ribbon} calendar={calendar} /> : null : <StillRule />}
+					<StillColumn id={column.id} calendar={calendar} style={width(i)} />
+				</Fragment>
+			))}
 		</div>
+	);
+}
+
+/** One column of a still layout, by the core's id: a list (Inbox over Backlog, Soon, the day's turning), the calendar, or By project's list, drawn empty until the engine draws it (Decision 149). */
+function StillColumn({ id, calendar, style }: { readonly id: LayoutColumnId; readonly calendar: RefObject<HTMLElement | null>; readonly style: CSSProperties | undefined }) {
+	if (id === "timeline") return <CalendarColumn ref={calendar} nav={false} />;
+	return (
+		<section className={`tc-stage-col is-${id}`} style={style}>
+			{id === "inbox" ? <InboxLists /> : id === "soon" ? <ListLists list="soon" /> : id === "day" ? <TurningDay /> : null}
+		</section>
 	);
 }
 
@@ -135,7 +148,7 @@ function TurningDay() {
 					</DaySlide>
 				))}
 			</div>
-			<DayNav />
+			<DayNav standing={false} />
 		</>
 	);
 }
@@ -145,24 +158,28 @@ function TurningDay() {
  * tall as its cards, long ones share the rest and scroll each by itself (CSS flex). The day's list turns with the days as
  * its pages, its label the day's name; the day changes only by the arrows over the calendar (F22).
  */
-function StackedRows() {
-	const turn = useContext(DayTurnContext);
+function StackedRows({ lists }: { readonly lists: readonly DropColumn[] }) {
 	return (
 		<div className="tc-rows-stack">
-			{(["inbox", "backlog", "soon"] as const).map((list) => (
-				<StackedRow key={list} list={list} />
-			))}
-			<div className="tc-row is-day">
-				<div className="tc-day-lane">
-					{turn?.days.map((day) => (
-						<DaySlide key={day} day={day} at={turn.at} line={turn.line} window="lane" className="tc-slide">
-							<DayContext.Provider value={day}>
-								<RowLabel list="day" />
-								<TaskList list="day" />
-							</DayContext.Provider>
-						</DaySlide>
-					))}
-				</div>
+			{lists.map((list) => (list === "day" ? <TurningRow key={list} /> : <StackedRow key={list} list={list} />))}
+		</div>
+	);
+}
+
+/** The day's row: its pages turning with the days, each under the day's name. */
+function TurningRow() {
+	const turn = useContext(DayTurnContext);
+	return (
+		<div className="tc-row is-day">
+			<div className="tc-day-lane">
+				{turn?.days.map((day) => (
+					<DaySlide key={day} day={day} at={turn.at} line={turn.line} window="lane" className="tc-slide">
+						<DayContext.Provider value={day}>
+							<RowLabel list="day" />
+							<TaskList list="day" />
+						</DayContext.Provider>
+					</DaySlide>
+				))}
 			</div>
 		</div>
 	);
@@ -209,7 +226,13 @@ function CalendarColumn({ ref, nav }: { readonly ref: RefObject<HTMLElement | nu
 	const { style, follow } = useListWidth();
 	return (
 		<section ref={ref} className={`tc-stage-col is-timeline${follow}`} style={style}>
-			{nav ? <CalendarNav /> : <ColumnHead title={null} />}
+			{nav ? (
+				<header className="tc-stage-head">
+					<DayNav standing />
+				</header>
+			) : (
+				<ColumnHead title={null} />
+			)}
 			<div className="tc-stage-body">
 				<Timeline />
 			</div>
@@ -255,18 +278,18 @@ function ListDivider({ at, ribbon, calendar }: { readonly at: RibbonAt; readonly
 	);
 }
 
-/** All columns' lists beside the calendar (the stylesheet's `--tc-all-lists`). */
-const ALL_LISTS = 3;
-
-/** The divider of All columns: the three lists against the calendar, a list's px a third of the divider's (F16). */
-function AllDivider({ ribbon, calendar }: { readonly ribbon: RefObject<HTMLDivElement | null>; readonly calendar: RefObject<HTMLElement | null> }) {
+/**
+ * A still layout's divider (All columns): dragged, it stands where the core's rule for the layout puts it
+ * (`layoutWidths`, `dividerAt`), the share saved its `layoutShareAt`; the place it is read at, from the view's left, is
+ * all but the calendar and the divider's own width.
+ */
+function StillDivider({ ribbon, calendar }: { readonly ribbon: RefObject<HTMLDivElement | null>; readonly calendar: RefObject<HTMLElement | null> }) {
 	const { haptics } = useHost();
-	/** A list as the browser draws it, over half the window: the share's own measure, so the middle is four equal columns. */
 	const drawn = () => {
 		const { view, calendar: beside } = drawnWidths(ribbon.current, calendar.current);
-		return { view: view / 2, list: (view - beside) / ALL_LISTS };
+		return { view, list: view - beside - DESIGN.dividerWidth };
 	};
-	const bind = useDivider(drawn, () => haptics.tap(), 1 / 3);
+	const bind = useDivider(drawn, () => haptics.tap());
 	const handlers = bind();
 	return (
 		<div className="tc-rule">
@@ -278,30 +301,7 @@ function AllDivider({ ribbon, calendar }: { readonly ribbon: RefObject<HTMLDivEl
 	);
 }
 
-/** Rows' day over the calendar (F17, F49): the arrows and the day's title, standing; the calendar switches day as the arrows turn it. */
-function CalendarNav() {
-	const api = useScreenApi();
-	const title = useScreen((s) => s.shown.lists.day.title);
-	return (
-		<header className="tc-stage-head">
-			<div className="tc-day-nav is-standing">
-				<button type="button" className="tc-btn is-icon is-quiet tc-arrow" aria-label="Previous day" onClick={() => api.getState().turnDay(-1)}>
-					<Icon name="chevronLeft" />
-				</button>
-				<div className="tc-head-title">
-					<button type="button" className="tc-btn tc-day-title" aria-label="Back to today" onClick={() => api.getState().backToToday()}>
-						{title}
-					</button>
-				</div>
-				<button type="button" className="tc-btn is-icon is-quiet tc-arrow" aria-label="Next day" onClick={() => api.getState().turnDay(1)}>
-					<Icon name="chevronRight" />
-				</button>
-			</div>
-		</header>
-	);
-}
-
-/** A day's title on its page (F41): a tap goes back to today (F42). */
+/** A day's title (F41): a tap goes back to today (F42). On a turning page, the page's day; over the calendar (Rows), the shown day's. */
 function DayTitle() {
 	const title = useData((d) => d.lists.day.title);
 	const api = useScreenApi();
@@ -313,20 +313,27 @@ function DayTitle() {
 }
 
 /**
- * The day's arrows (F41, the design's «Колонка дня»): a day back and on, standing still over the turning pages so a quick
- * second tap finds the same arrow (F46); the shown day's title, unseen, keeps the next arrow right after it.
+ * The day's arrows either side of its title (F41, the design's «Колонка дня»): a day back and on. Over the day's turning
+ * pages they stand still, the shown day's title drawn unseen between them for its width, so a quick second tap finds the
+ * same arrow (F46); over the calendar (Rows, F17) the title itself stands between them.
  */
-function DayNav() {
+function DayNav({ standing }: { readonly standing: boolean }) {
 	const api = useScreenApi();
 	const title = useScreen((s) => s.shown.lists.day.title);
 	return (
-		<div className="tc-day-nav">
+		<div className={`tc-day-nav${standing ? " is-standing" : ""}`}>
 			<button type="button" className="tc-btn is-icon is-quiet tc-arrow" aria-label="Previous day" onClick={() => api.getState().turnDay(-1)}>
 				<Icon name="chevronLeft" />
 			</button>
-			<span className="tc-day-nav-title" aria-hidden="true">
-				{title}
-			</span>
+			{standing ? (
+				<div className="tc-head-title">
+					<DayTitle />
+				</div>
+			) : (
+				<span className="tc-day-nav-title" aria-hidden="true">
+					{title}
+				</span>
+			)}
 			<button type="button" className="tc-btn is-icon is-quiet tc-arrow" aria-label="Next day" onClick={() => api.getState().turnDay(1)}>
 				<Icon name="chevronRight" />
 			</button>
@@ -345,27 +352,44 @@ function NoteColumn({ list }: { readonly list: ListId }) {
 /** A note's one column takes the whole block. */
 const WHOLE = 100;
 
-const ListColumn = memo(function ListColumn({ list, share = COLUMN_SHARE }: { readonly list: ListId; readonly share?: number | null }) {
-	const title = useData((d) => d.lists[list].title);
+const ListColumn = memo(function ListColumn({ list, share = COLUMN_SHARE }: { readonly list: ListId; readonly share?: number }) {
 	return (
 		<ColumnBox className={`is-${list}`} share={share}>
+			<ListLists list={list} />
+		</ColumnBox>
+	);
+});
+
+/** A list under its column's title. */
+function ListLists({ list }: { readonly list: ListId }) {
+	const title = useData((d) => d.lists[list].title);
+	return (
+		<>
 			<ColumnHead title={title} />
 			<div className="tc-stage-body">
 				<TaskList list={list} />
 			</div>
-		</ColumnBox>
+		</>
 	);
-});
+}
 
 /**
  * The ribbon's first column (the design's «Inbox над Backlog»): Inbox over Backlog, half and half, each list scrolling by
  * itself; Backlog's title stands in its half under a line, as a column's stands over it.
  */
-const InboxColumn = memo(function InboxColumn({ share = COLUMN_SHARE }: { readonly share?: number | null }) {
+const InboxColumn = memo(function InboxColumn() {
+	return (
+		<ColumnBox className="is-inbox">
+			<InboxLists />
+		</ColumnBox>
+	);
+});
+
+function InboxLists() {
 	const inbox = useData((d) => d.lists.inbox.title);
 	const backlog = useData((d) => d.lists.backlog.title);
 	return (
-		<ColumnBox className="is-inbox" share={share}>
+		<>
 			<ColumnHead title={inbox} />
 			<div className="tc-stage-body is-inbox-half">
 				<TaskList list="inbox" />
@@ -378,14 +402,14 @@ const InboxColumn = memo(function InboxColumn({ share = COLUMN_SHARE }: { readon
 					<TaskList list="backlog" />
 				</div>
 			</div>
-		</ColumnBox>
+		</>
 	);
-});
+}
 
-/** A column of the strip, `share` percent of it; null: as wide as the stylesheet sets it (All columns' lists). */
-function ColumnBox({ className, share = COLUMN_SHARE, children = null }: { readonly className: string; readonly share?: number | null; readonly children?: ReactNode }) {
+/** A column of the strip, `share` percent of it. */
+function ColumnBox({ className, share = COLUMN_SHARE, children = null }: { readonly className: string; readonly share?: number; readonly children?: ReactNode }) {
 	return (
-		<section className={`tc-stage-col ${className}`} style={share === null ? undefined : ({ width: `${share}%` } as CSSProperties)}>
+		<section className={`tc-stage-col ${className}`} style={{ width: `${share}%` } as CSSProperties}>
 			{children}
 		</section>
 	);

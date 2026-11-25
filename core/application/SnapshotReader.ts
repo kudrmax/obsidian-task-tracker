@@ -1,5 +1,5 @@
 import type { LocalDate, Slot } from "../domain/Task";
-import type { CarryState, ColumnList, DropColumn, DroppedTask, DropOrigin, DropPreview, DropTo, MenuFrom, ProjectsNodeId, ScreenReader, ScreenView, TaskItem, TaskMenuModel } from "./contracts";
+import type { CarryState, ColumnList, ViewChoice, DropColumn, DroppedTask, DropOrigin, DropPreview, DropTo, MenuFrom, ProjectsNodeId, ScreenReader, ScreenView, TaskItem, TaskMenuModel } from "./contracts";
 import type { TaskMenuActionId } from "./taskActions";
 import type { Read, TaskReads } from "./TaskReads";
 import type { TaskWrites } from "./TaskWrites";
@@ -27,6 +27,11 @@ export class SnapshotReader implements ScreenReader {
 		const screen = this.answer(this.reads.screenRead(date, this.filter));
 		this.screens.set(date, screen);
 		return screen;
+	}
+
+	view(wide: boolean, notePath: string | null): ViewChoice {
+		if (notePath === null) return this.answer(this.reads.viewInRead(this.filter, wide));
+		return this.answer(this.reads.projectNoteViewRead(notePath, wide))?.view ?? this.answer(this.reads.viewInRead(this.filter, wide, true));
 	}
 
 	columnView(column: DropColumn, date: LocalDate): ColumnList {

@@ -1,5 +1,5 @@
-import { type ColumnList, groupPlaceOf, SectionNameEntry, levelRange, sameSlot, type CalendarService, dividerAt, type DividerStop, LIST_WIDTHS, listShareOf, type ListWidths, listWidths, type Clock, type DayEvents, type DayChange, type DayService, type DropColumn, type DroppedTask, type DropTo, type LocalDate, listCardMenuFrom, type MenuFrom as CoreMenuFrom, originOf, type ScreenReader, type ShownChange, type TaskItem, type TaskService, type UndoOutcome, undoNotice, type ViewChoice, type ViewMode, projectNodeOf, type ProjectsNodeId, type UndoService } from "../../core/application/contracts";
-import type { ScreenContext, ScreenView, SectionNameEnd, Destination, Edge, EntryBar, EntryCommit, EntryDraft, EntryField, LevelRange, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, RenameStart, ScreenData, ScreenPort } from "../ui/engine/port";
+import { type ColumnList, groupPlaceOf, SectionNameEntry, levelRange, sameSlot, type CalendarService, dividerAt, type DividerStop, LIST_WIDTHS, listShareOf, type ListWidths, listWidths, type Clock, type DayEvents, type DayChange, type DayService, type DropColumn, type DroppedTask, type DropTo, type LocalDate, listCardMenuFrom, type MenuFrom as CoreMenuFrom, originOf, type ScreenReader, type ShownChange, type TaskItem, type TaskService, type UndoOutcome, undoNotice, type ViewChoice, type ViewMode, type ViewLayout, type LayoutWidths, layoutWidths, layoutShareAt, projectNodeOf, type ProjectsNodeId, type UndoService } from "../../core/application/contracts";
+import type { ScreenContext, SectionNameEnd, Destination, Edge, EntryBar, EntryCommit, EntryDraft, EntryField, LevelRange, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, RenameStart, ScreenData, ScreenPort } from "../ui/engine/port";
 import { CoreEntry } from "./CoreEntry";
 import { WriteQueue } from "./WriteQueue";
 import { ListCards } from "./ListCards";
@@ -29,16 +29,20 @@ type CoreMove =
 	| { readonly kind: "home" };
 
 /**
- * The core's view as the engine draws it. By project is not offered until the engine draws it (Decision 149): a kept By
- * project draws two columns, as the core's default.
+ * The core's view as it is, but for By project left out of the button's menu until the engine draws it (Decision 149): the
+ * one way it is changed on the way.
  */
-function screenViewOf(choice: ViewChoice): ScreenView {
-	const drawn = (mode: ViewMode): ViewMode => (mode === "byProject" ? "twoColumns" : mode);
-	const chosen = drawn(choice.chosen);
-	const modes = choice.modes.filter((option) => option.mode !== "byProject").map((option) => ({ ...option, checked: option.mode === chosen }));
-	const mode = drawn(choice.mode);
-	return { mode, modes, icon: modes.find((option) => option.checked)?.icon ?? choice.icon, ribbon: mode === "twoColumns", subprojects: choice.subprojects };
+function drawnView(choice: ViewChoice): ViewChoice {
+	return { ...choice, modes: choice.modes.filter((option) => option.mode !== "byProject") };
 }
+
+/** Where a screen stands, for its view: on a wide screen or not, and the note whose block it is (null: the main screen). */
+export interface ScreenPlace {
+	readonly wide: boolean;
+	readonly note: string | null;
+}
+
+const MAIN_NARROW: ScreenPlace = { wide: false, note: null };
 
 /** The context of every task: no project chosen. */
 const EVERY = "";
@@ -54,15 +58,11 @@ class CoreReads {
 	readonly drawing: ScreenDrawing;
 	readonly queue: WriteQueue;
 	private readonly screens = new Set<CorePort>();
-	/** The main screen's view, a wide screen's and a narrow one's, as last read. */
-	private readonly views = new Map<boolean, ScreenView>();
 	private readonly events = new Map<LocalDate, DayEvents>();
 	private readonly asked = new Set<LocalDate>();
 	private readonly offs: (() => void)[];
 	/** The same read within each project a screen is drawn in (`ScreenReader.within`), kept until the next read. */
 	private readonly readers = new Map<string, ScreenReader>();
-	/** The words of an empty list's plate under a filter (the core's `ViewChoice.emptyLabel`), once the core's view is read. */
-	plateWords: string | null = null;
 	/** The next held read asked for and not begun yet: every ask before it begins shares it. */
 	private queued: Promise<void> | null = null;
 	private reads: Promise<void> = Promise.resolve();
@@ -74,16 +74,12 @@ class CoreReads {
 	) {
 		this.drawing = new ScreenDrawing(core.tasks, core.days, core.calendars, core.tasksFile);
 		this.queue = new WriteQueue(core.onError);
-		void core.tasks.funnelView(true).then((view) => {
-			this.plateWords = view.view.emptyLabel;
-			this.changed();
-		});
 		this.offs = [core.tasks.onChange(() => void this.refresh()), core.tasks.onShownChange((change) => this.settingsChanged(change)), core.days.onDayChange((change) => this.dayChanged(change)), core.undo.onChange(() => this.changed()), core.calendars.onChange(() => this.forgetEvents())];
 	}
 
 	/** A screen's port in `context`, told of every change from now on. */
-	view(context: string): CorePort {
-		const view = new CorePort(this, context);
+	view(context: string, screen: ScreenPlace): CorePort {
+		const view = new CorePort(this, context, screen);
 		this.screens.add(view);
 		return view;
 	}
@@ -116,35 +112,16 @@ class CoreReads {
 			this.base = await this.core.tasks.reader(null);
 			this.readers.clear();
 			this.changed();
-			await Promise.all([...this.views.keys()].map((wide) => this.askView(wide)));
 		});
 		this.queued = run;
 		this.reads = run.catch(() => undefined);
 		return run;
 	}
 
-	/** The main screen's view on a `wide` screen or a narrow one: the device's as the core read it last, asked again in the background. */
-	viewOf(wide: boolean): ScreenView {
-		const kept = this.views.get(wide);
-		if (kept) return kept;
-		const first = screenViewOf(this.core.tasks.firstView(wide, false));
-		this.views.set(wide, first);
-		void this.askView(wide);
-		return first;
-	}
-
-	/** The view as the core reads it now; every screen told when it differs. */
-	async askView(wide: boolean): Promise<void> {
-		const next = screenViewOf((await this.core.tasks.funnelView(wide)).view);
-		if (JSON.stringify(next) === JSON.stringify(this.views.get(wide))) return;
-		this.views.set(wide, next);
-		this.changed();
-	}
-
-	/** A write of the device's view (the mode, Subprojects): every view asked again once it is kept. */
+	/** A write of the device's view (the mode, Subprojects): every screen reads its view again once it is kept. */
 	async keepView(write: Promise<void>): Promise<void> {
 		await write;
-		await this.refresh();
+		this.changed();
 	}
 
 	eventsOf(date: LocalDate): DayEvents | null {
@@ -209,18 +186,20 @@ export class CorePort implements ScreenPort {
 		private readonly shared: CoreReads,
 		/** The context this screen is drawn in: what its writes and menus go by. */
 		private context: string,
+		/** Where the screen stands: its view is the main screen's, or the block's of its note. */
+		private readonly screen: ScreenPlace,
 	) {
 		this.entry = new CoreEntry(shared.core, shared.drawing, () => this.reader, () => this.refresh(), shared.queue, () => this.filter());
 	}
 
 	/** The port over `core`, once the file is read, in every task's context. */
 	static async open(core: CorePortServices): Promise<CorePort> {
-		return new CoreReads(core, await core.tasks.reader(null)).view(EVERY);
+		return new CoreReads(core, await core.tasks.reader(null)).view(EVERY, MAIN_NARROW);
 	}
 
-	/** Another screen's port over the same read, in `context` (every task when absent). */
-	within(context?: ScreenContext): CorePort {
-		return this.shared.view(context?.project ?? EVERY);
+	/** Another screen's port over the same read, in `context` (every task when absent), standing at `screen` (the main screen, a narrow one, when absent). */
+	within(context?: ScreenContext, screen: ScreenPlace = MAIN_NARROW): CorePort {
+		return this.shared.view(context?.project ?? EVERY, screen);
 	}
 
 	/** This screen's port is let go: its screen is gone. */
@@ -270,18 +249,26 @@ export class CorePort implements ScreenPort {
 			if (this.cache.size > 16) this.cache.clear();
 			const date = this.dateOf(dayOffset);
 			const screen = this.reader.screen(date);
-			data = this.drawing.draw({ date, screen, lists: this.drawing.listsOf(screen), events: this.eventsOf(date) }, this.plate());
+			data = this.drawing.draw({ date, screen, lists: this.drawing.listsOf(screen), events: this.eventsOf(date) }, this.plates());
 			this.cache.set(key, data);
 		}
 		return data;
 	}
 
-	view(wide: boolean): ScreenView {
-		return this.shared.viewOf(wide);
+	view(): ViewChoice {
+		return drawnView(this.reader.view(this.screen.wide, this.screen.note));
 	}
 
 	setViewMode(mode: ViewMode): Promise<void> {
-		return this.shared.keepView(this.core.tasks.setViewMode(mode));
+		return this.shared.keepView(this.screen.note === null ? this.core.tasks.setViewMode(mode) : this.core.tasks.setNoteViewMode(mode));
+	}
+
+	layoutWidths(layout: ViewLayout, share: number, viewWidth: number, dividerWidth: number): LayoutWidths | null {
+		return layoutWidths(layout, share, viewWidth, dividerWidth);
+	}
+
+	layoutShareAt(layout: ViewLayout, at: number, viewWidth: number, dividerWidth: number): number | null {
+		return layoutShareAt(layout, at, viewWidth, dividerWidth);
 	}
 
 	toggleSubprojects(): Promise<void> {
@@ -315,7 +302,7 @@ export class CorePort implements ScreenPort {
 		if (!move || move.kind === "home") return this.read(to.dayOffset);
 		if (move.kind === "slot") return this.drawn(date, { id, ...this.core.days.boundary().spanOf(move.slot, date) });
 		const { screen } = this.reader.dropPreview(move.tasks, move.to, move.day);
-		return this.drawing.draw({ date, screen, lists: this.drawing.listsOf(screen), events: this.eventsOf(date) }, this.plate());
+		return this.drawing.draw({ date, screen, lists: this.drawing.listsOf(screen), events: this.eventsOf(date) }, this.plates());
 	}
 
 	/** Nothing changes where the core leaves the task as it is: a card let go where it was lifted (`placeOfDrop`), a time it has already (`sameSlot`). */
@@ -364,7 +351,7 @@ export class CorePort implements ScreenPort {
 		const date = this.dateOf(dayOffset);
 		if (!item) return this.read(dayOffset);
 		const screen = this.core.tasks.firstStepScreen(this.reader.screen(date), item.key);
-		return this.drawing.draw({ date, screen, lists: this.drawing.listsOf(screen), events: this.eventsOf(date) }, this.plate());
+		return this.drawing.draw({ date, screen, lists: this.drawing.listsOf(screen), events: this.eventsOf(date) }, this.plates());
 	}
 
 	async firstStep(id: string, text: string): Promise<void> {
@@ -618,7 +605,7 @@ export class CorePort implements ScreenPort {
 	/** The held read's screen of `date`, a task held by a dot drawn at `held`. */
 	private drawn(date: LocalDate, held: ScreenSource["held"] | null): ScreenData {
 		const screen = this.reader.screen(date);
-		return this.drawing.draw({ date, screen, lists: this.drawing.listsOf(screen), events: this.eventsOf(date), ...(held && { held }) }, this.plate());
+		return this.drawing.draw({ date, screen, lists: this.drawing.listsOf(screen), events: this.eventsOf(date), ...(held && { held }) }, this.plates());
 	}
 
 	private itemOf(id: string): TaskItem {
@@ -651,8 +638,8 @@ export class CorePort implements ScreenPort {
 	}
 
 	/** An empty list's plate (F64): the core's words under a filter, as its view's plates are; none for every task. */
-	private plate(): string | null {
-		return this.context === EVERY ? null : this.shared.plateWords;
+	private plates(): ViewChoice["plates"] {
+		return this.reader.view(this.screen.wide, this.screen.note).plates;
 	}
 
 	/** The screen drawn in `context` (every task when absent) from now on. */

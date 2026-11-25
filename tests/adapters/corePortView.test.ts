@@ -2,43 +2,61 @@ import { describe, expect, it } from "vitest";
 import { projectNodeOf } from "../../core/application/contracts";
 import { corePortOver, NOW, standText } from "./standCore";
 
-/** The view the main screen draws and its button's menu, as the core keeps it on the device (F10–F13; Decision 149). */
+const WIDE = { wide: true, note: null };
+const NARROW = { wide: false, note: null };
+const TREE = `${standText(NOW)}\n## Projects\n\n- Дом\n\t- Ремонт\n`;
+
+/** The view a screen draws, as the core gives it, in the screen's own context (F10–F14; Decisions 148, 149). */
 describe("CorePort's view", () => {
-	it("offers All columns on a wide screen only, By project not until the engine draws it, Two columns chosen first", async () => {
+	it("passes the core's choice: All columns on a wide screen only, Two columns chosen first, the layout and the wheel the core's", async () => {
 		const { port } = await corePortOver(standText(NOW), NOW);
-		expect(port.view(true).modes.map((m) => m.label)).toEqual(["Two columns", "All columns", "Rows"]);
-		expect(port.view(false).modes.map((m) => m.label)).toEqual(["Columns", "Rows"]);
-		expect(port.view(true)).toMatchObject({ mode: "twoColumns", ribbon: true, icon: "columns-2" });
-		expect(port.view(true).modes.filter((m) => m.checked).map((m) => m.mode)).toEqual(["twoColumns"]);
+		expect(port.within(undefined, WIDE).view().modes.map((m) => m.label)).toEqual(["Two columns", "All columns", "Rows"]);
+		expect(port.within(undefined, NARROW).view().modes.map((m) => m.label)).toEqual(["Columns", "Rows"]);
+		const view = port.within(undefined, WIDE).view();
+		expect(view).toMatchObject({ mode: "twoColumns", chosen: "twoColumns", wheel: true, icon: "columns-2", layout: { swipe: "pages" } });
 	});
 
-	it("keeps a mode picked, tells the screen, and the button wears its icon", async () => {
+	it("keeps a mode picked, tells the screen, the layout and the context change with it", async () => {
 		const { port } = await corePortOver(standText(NOW), NOW);
-		port.view(true);
+		const screen = port.within(undefined, WIDE);
+		const before = screen.view().context;
 		let told = 0;
-		port.subscribe(() => told++);
-		await port.setViewMode("rows");
+		screen.subscribe(() => told++);
+		await screen.setViewMode("rows");
 		expect(told).toBeGreaterThan(0);
-		expect(port.view(true)).toMatchObject({ mode: "rows", ribbon: false, icon: "rows-3" });
-		expect(port.view(false).mode).toBe("rows");
+		expect(screen.view()).toMatchObject({ mode: "rows", wheel: false, icon: "rows-3", layout: { swipe: "none", stack: { lists: ["inbox", "backlog", "soon", "day"] } } });
+		expect(screen.view().context).not.toBe(before);
+		expect(screen.view().plates).toMatchObject({ inbox: "No tasks", day: "No tasks" });
 	});
 
-	it("draws a kept By project as two columns until the engine draws it", async () => {
+	it("leaves By project out of the menu until the engine draws it", async () => {
 		const { port } = await corePortOver(standText(NOW), NOW);
-		await port.setViewMode("byProject");
-		expect(port.view(true)).toMatchObject({ mode: "twoColumns", ribbon: true });
-		expect(port.view(true).modes.find((m) => m.checked)?.mode).toBe("twoColumns");
+		expect(port.within(undefined, WIDE).view().modes.some((m) => m.mode === "byProject")).toBe(false);
 	});
 
-	it("offers the Subprojects row while a project with subprojects is chosen, and turns its check over (F13)", async () => {
-		const { port, core } = await corePortOver(`${standText(NOW)}\n## Projects\n\n- Дом\n\t- Ремонт\n`, NOW);
-		expect(port.view(true).subprojects).toBeNull();
+	it("reads the main screen's view in its own context, never the device's chosen node (review finding 5)", async () => {
+		const { port, core } = await corePortOver(TREE, NOW);
 		await core.tasks.pickProjectNode(projectNodeOf("Дом"), true);
-		await port.toggleSubprojects();
-		await port.toggleSubprojects();
-		expect(port.view(true).subprojects).toEqual({ label: "Subprojects", checked: true });
-		await port.toggleSubprojects();
-		expect(port.view(true).subprojects).toEqual({ label: "Subprojects", checked: false });
-		expect(port.view(true).mode).toBe("twoColumns");
+		expect(port.within(undefined, WIDE).view().subprojects).toBeNull();
+		await core.tasks.pickProjectNode(projectNodeOf("done"), true);
+		expect(port.within(undefined, WIDE).view().mode).toBe("twoColumns");
+	});
+
+	it("offers the Subprojects row in a project with subprojects, turns its check over, and tells the context apart (F13)", async () => {
+		const { port } = await corePortOver(TREE, NOW);
+		const home = port.within({ project: "Дом" }, WIDE);
+		const on = home.view();
+		expect(on.subprojects).toEqual({ label: "Subprojects", checked: true });
+		await home.toggleSubprojects();
+		expect(home.view().subprojects).toEqual({ label: "Subprojects", checked: false });
+		expect(home.view().context).not.toBe(on.context);
+		expect(home.view().mode).toBe(on.mode);
+	});
+
+	it("gives a note's block its own view, not the main screen's (review finding 8)", async () => {
+		const { port } = await corePortOver(TREE, NOW);
+		await port.within(undefined, WIDE).setViewMode("allColumns");
+		const note = port.within({ project: "Дом" }, { wide: true, note: "Дом.md" });
+		expect(note.view().mode).not.toBe("allColumns");
 	});
 });

@@ -186,8 +186,6 @@ body {
 	/* The view button's icon. */
 	--tc-view-icon: var(--tc-icon-m);
 	--tc-stroke-view: var(--tc-stroke-2);
-	/* All columns' lists beside the calendar: Inbox over Backlog, Soon, the day's. */
-	--tc-all-lists: 3;
 	--tc-chevron: 20px;
 	--tc-column-pad-near: 0 var(--tc-space-2) 0 var(--tc-space-10);
 	--tc-column-pad-far: 0 var(--tc-space-10) 0 var(--tc-space-2);
@@ -1295,24 +1293,24 @@ body.is-mobile .task-calendar > button.tc-view-btn { left: calc(var(--tc-foot-mi
 .tc-panel.is-view { z-index: var(--tc-layer-panel); }
 .tc-panel .tc-menu-title { height: var(--tc-menu-title-h); box-sizing: border-box; padding: 0 var(--tc-space-16); border-bottom: var(--tc-rule); display: flex; align-items: center; font-size: var(--tc-font-body); font-weight: var(--tc-weight-semibold); }
 
-/*
- * All columns (F16): the three lists side by side, each the list width the divider's share gives over half the window (so
- * all four columns are equal at its middle), never so wide the calendar falls under its least; the calendar the rest.
- */
-.tc-all-columns { height: 100%; display: flex; --tc-all-list-width: min(clamp(var(--tc-ribbon-list-least), calc(var(--tc-ribbon-list-share) * (50% - var(--tc-divider))), max(var(--tc-ribbon-list-most), calc(50% - var(--tc-divider) - var(--tc-ribbon-list-least)))), calc((100% - var(--tc-ribbon-list-least)) / var(--tc-all-lists))); }
-.tc-all-columns > .tc-stage-col:not(.is-timeline) { width: var(--tc-all-list-width); }
+/* A still layout (All columns, F16): its columns side by side, each list as wide as the core's widths set it (inline); the calendar the rest. */
+.tc-all-columns { height: 100%; display: flex; }
+.tc-all-columns > .tc-stage-col { flex: none; }
 .tc-all-columns > .tc-stage-col.is-day { overflow: clip; }
-.tc-all-columns > .tc-stage-col:not(.is-timeline) :is(.tc-stage-head, .tc-stage-body, .tc-backlog-head) { padding: var(--tc-column-pad-ribbon); }
-.tc-all-columns > .tc-stage-col.is-timeline { flex: 1 1 0; padding-left: calc(var(--tc-divider) / 2); box-sizing: border-box; }
+.tc-all-columns > .tc-stage-col:not(.is-timeline) :is(.tc-stage-head, .tc-stage-body, .tc-backlog-head) { padding: var(--tc-column-pad-near); }
+.tc-all-columns > .tc-stage-col.is-timeline { flex: 1 1 0; }
+/* The lines between the columns take their own width, as the core's widths count them. */
+.tc-all-columns > .tc-rule { width: var(--tc-divider); }
+.tc-all-columns > .tc-rule > .tc-rule-strip { left: 0; }
 
 /* Rows (F17, F18): the lists stacked under their small labels, each as tall as its cards while all fit; the day's list takes the rest and turns with the days. */
 .tc-rows-stack { height: 100%; box-sizing: border-box; padding: var(--tc-column-pad-ribbon); padding-bottom: var(--tc-foot-fade-day); display: flex; flex-direction: column; }
-.tc-row { flex: 0 1 auto; min-height: calc(var(--tc-group-head-h) + var(--tc-card-h) + var(--tc-card-gap)); display: flex; flex-direction: column; }
+.tc-row { flex: 0 1 auto; min-height: 0; display: flex; flex-direction: column; }
 .tc-row + .tc-row { margin-top: var(--tc-section-gap); }
 /* The day's pages lie in one cell, so the day's row is as tall as its page, as the other rows are as tall as their lists. */
 .tc-row > .tc-day-lane { flex: 0 1 auto; display: grid; grid-template-rows: minmax(0, 1fr); }
 .tc-row > .tc-day-lane > .tc-slide { position: relative; inset: auto; grid-area: 1 / 1; min-height: 0; }
-.tc-row > .tc-list, .tc-row .tc-slide > .tc-list { flex: 0 1 auto; padding-top: var(--tc-card-gap); }
+.tc-row > .tc-list, .tc-row .tc-slide > .tc-list { flex: 0 1 auto; min-height: calc(var(--tc-card-h) + var(--tc-card-gap)); padding-top: var(--tc-card-gap); }
 .tc-row .tc-list::after { content: none; }
 .tc-row-label { flex-shrink: 0; height: var(--tc-group-head-h); box-sizing: border-box; padding: 0 var(--tc-space-4) 0 var(--tc-card-pad-start); display: flex; align-items: flex-end; font-size: var(--tc-font-group); line-height: var(--tc-leading-group); font-weight: var(--tc-weight-semibold); color: var(--tc-pull-ink); white-space: nowrap; overflow: hidden; }
 .task-calendar.is-engine .tc-timeline { overflow-x: hidden; }

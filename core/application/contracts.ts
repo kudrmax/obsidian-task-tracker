@@ -613,6 +613,12 @@ export interface ScreenReader {
 	resizedSlot(id: string, day: LocalDate, edge: ResizeEdge, minute: number, minDurationMin: number): Slot | null;
 	/** A reader over the same read under another project filter, at once: no read of the file; itself for its own filter. */
 	within(filter: ProjectsNodeId | null): ScreenReader;
+	/**
+	 * The view a screen in this reader's filter draws, on a `wide` screen or not: the main screen's (`funnelView`'s choice,
+	 * but under this filter, never the device's chosen node), or, for the block of the note at `notePath`, that block's
+	 * (`projectNoteView`'s). The device's mode and Subprojects as kept now.
+	 */
+	view(wide: boolean, notePath: string | null): ViewChoice;
 }
 
 /** A quick move of a task menu: Today, Tomorrow, or Pick a date, which asks for the day. */

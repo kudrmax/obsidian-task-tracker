@@ -22,9 +22,9 @@ interface Press extends DrawnWidths {
  * width; brought slowly near the middle of the window it holds there with a light tap, and lets go the same way, each step
  * gliding; a fast drag passes by. Where it stands is the port's rule (`dividerAt`, the core's); the drag's speed is
  * @use-gesture's. It holds the gesture slot while it runs, so nothing else moves under it; the host keeps the share it
- * was let go at. `perPx`: how far the list's width goes for a px of the divider (All columns' three lists a third each).
+ * was let go at.
  */
-export function useDivider(drawn: () => DrawnWidths, onSnap: () => void, perPx = 1) {
+export function useDivider(drawn: () => DrawnWidths, onSnap: () => void) {
 	const api = useScreenApi();
 	const press = useRef<Press | null>(null);
 	useEffect(
@@ -47,7 +47,7 @@ export function useDivider(drawn: () => DrawnWidths, onSnap: () => void, perPx =
 			const held = press.current;
 			if (!held) return;
 			if (!first || mx !== 0) {
-				const stop = screen.dragDivider(held.list + mx * perPx, held.view, speed);
+				const stop = screen.dragDivider(held.list + mx, held.view, speed);
 				if (stop.snapped !== held.snapped) {
 					if (stop.snapped) onSnap();
 					held.glidesUntil = timeStamp + SNAP_MS;

@@ -544,7 +544,8 @@ describe("the Project page and «New project…» (Decision 134), ⌥Tab's offer
 		store.getState().nameEntryProject("Дача");
 		expect(store.getState().entryPanel).toBeNull();
 		store.getState().commitEntry("Сразу Enter", true);
-		await wait(120);
+		/** The two writes (the project, then the task) land 30 ms each after their turn: waited for, not timed, so a loaded run waits as long as it takes. */
+		for (let waited = 0; waited < 3000 && !lineOf(p, "Сразу Enter")?.includes("🗂️ Дача"); waited += 20) await wait(20);
 		expect(lineOf(p, "Сразу Enter")).toContain("🗂️ Дача");
 		expect(store.getState().draft.projects).toEqual(["Дача"]);
 	});
