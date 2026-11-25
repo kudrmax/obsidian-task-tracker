@@ -7138,6 +7138,40 @@ function dropMoves(tasks, to, day) {
   return { kind: "many", steps };
 }
 
+// core/application/picks.ts
+var NO_PICKS = { picking: false, picked: [], anchor: null };
+function togglePick(picks, id) {
+  if (picks.picked.includes(id)) return { ...picks, picked: picks.picked.filter((other) => other !== id), anchor: null };
+  return { ...picks, picked: [...picks.picked, id], anchor: id };
+}
+function pickRun(picks, id, cards) {
+  const from = picks.anchor === null ? -1 : cards.indexOf(picks.anchor);
+  const to = cards.indexOf(id);
+  if (from < 0 || to < 0) return togglePick(picks, id);
+  const run = cards.slice(Math.min(from, to), Math.max(from, to) + 1).filter((other) => other !== id && !picks.picked.includes(other));
+  return { ...picks, picked: [...picks.picked, ...run, ...picks.picked.includes(id) ? [] : [id]], anchor: id };
+}
+function tapPick(picks, id, from, cards, keys) {
+  const pickable = canPick(from);
+  if (picks.picking) return { took: true, picks: pickable ? togglePick(picks, id) : picks, opens: null };
+  if (pickable && keys.mod) return { took: true, picks: togglePick(picks, id), opens: null };
+  if (pickable && keys.shift && picks.picked.length > 0) return { took: true, picks: pickRun(picks, id, cards), opens: null };
+  if (picks.picked.includes(id) && picks.picked.length > 1) return { took: true, picks, opens: "bulk" };
+  return { took: false, picks: NO_PICKS, opens: "own" };
+}
+function setPicking(picks, on) {
+  return on ? { ...picks, picking: true } : NO_PICKS;
+}
+function pressedBeside(picks) {
+  return picks.picking ? picks : NO_PICKS;
+}
+function canLift(_picks, _id) {
+  return true;
+}
+function liftedPicks(picks, id) {
+  return picks.picking || picks.picked.includes(id) ? picks : NO_PICKS;
+}
+
 // core/application/projectsDrop.ts
 var COLUMN_OF = { now: "day", soon: "soon", inbox: "inbox", backlog: "backlog" };
 function listOf3(item) {
@@ -11419,12 +11453,19 @@ var RULES = {
   repeatSentence,
   onTheDay,
   canPick,
+  togglePick,
+  pickRun,
+  tapPick,
+  setPicking,
+  pressedBeside,
+  canLift,
+  liftedPicks,
   listCardMenuFrom,
   originOf,
   shownChange: (before, after) => shownChange(settingsOf(before), settingsOf(after)),
   undoNotice
 };
-var CONSTANTS = { PROJECTS_HOVER_MS, PROJECTS_INDENT, REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, CLEAR_COLOR, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS, DEFAULT_ZOOM_LEVELS, DEFAULT_ZOOM_HOUR, SHOWN_LISTS, FUNNEL_PLACES, ROW_LISTS, VIEW_WORDS, SWIPE_FLICK_SPEED, CARD_HEIGHTS, CARD_GAPS, DEFAULT_CARD_SIZE, LIST_WIDTHS, REPEAT_WORDS, DIVIDER_SNAP, MOST_CARD_COLORS, NO_DAY_EVENTS };
+var CONSTANTS = { PROJECTS_HOVER_MS, PROJECTS_INDENT, REMINDER_KINDS, MINUTES_PER_DAY, DESCRIPTION_TEMPLATE, PRIORITY_COLORS, CLEAR_COLOR, EVENT_BG_ALPHA, LISTS: GROUPED_LISTS, NO_PICKS, DEFAULT_ZOOM_LEVELS, DEFAULT_ZOOM_HOUR, SHOWN_LISTS, FUNNEL_PLACES, ROW_LISTS, VIEW_WORDS, SWIPE_FLICK_SPEED, CARD_HEIGHTS, CARD_GAPS, DEFAULT_CARD_SIZE, LIST_WIDTHS, REPEAT_WORDS, DIVIDER_SNAP, MOST_CARD_COLORS, NO_DAY_EVENTS };
 var TIMELINE = {
   zoomLevels: (c) => zoomLevelsOf(c.context.settings?.trim() ? JSON.parse(c.context.settings) : null)
 };

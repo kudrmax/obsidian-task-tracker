@@ -917,7 +917,19 @@ escapes and embeds stay text), `oneLine`, `sameLevels`, `labelTitle`, `sameLabel
 `usableLabelColor` (a colour a label may have: `usableColor`'s, or `"clear"`, no colour; `usableLabelColor("clear")` →
 `true`), `acceptsDrop`,
 `placesInGap`, `canPick(from)` (Select tasks picks a card drawn at `from`, a `MenuFrom`: a list column's, never the
-timeline's, Done's, a stack's or the full screen's), `originOf(item)` (the column a task's card is dragged from, its
+timeline's, Done's, a stack's or the full screen's), Select tasks' picks (`Picks` `{ picking, picked, anchor }`: on or
+off, the picked ids in the order picked, the card a Shift-click runs from; `rules.constants().NO_PICKS` is none, Select
+tasks off): `tapPick(picks, id, from, cards, keys)` (a list card drawn at `from` tapped with `keys` `{ mod, shift }`,
+`cards` its list's ids in order → `{ took, picks, opens }`: in Select tasks a tap picks or lets go, a card it can't pick
+changes nothing; ⌘ picks or lets go; Shift picks the run from `anchor` while something is picked; a tap on one of several
+picked opens `"bulk"`, their menu; otherwise `took: false`, the picks gone, `opens: "own"`, the card's own menu;
+`rules.tapPick({ picking: false, picked: ["a"], anchor: "a" }, "c", "inbox", ["a","b","c"], { mod: false, shift: true })`
+→ `{ took: true, picks: { picking: false, picked: ["a","b","c"], anchor: "c" }, opens: null }`), `togglePick(picks, id)`
+(picked, or let go, which leaves no `anchor`), `pickRun(picks, id, cards)` (the run from `anchor` to `id`, `id` last;
+without `anchor` in `cards`, `togglePick`), `setPicking(picks, on)` (on keeps the ⌘-picks; off is `NO_PICKS`),
+`pressedBeside(picks)` (a press beside the cards: the ⌘-picks go, Select tasks keeps its picks), `canLift(picks, id)`
+(any card may be lifted, picked or not, in Select tasks or not: `true`), `liftedPicks(picks, id)` (the picks once `id`
+is lifted: a card not picked, outside Select tasks, lets the ⌘-picks go), `originOf(item)` (the column a task's card is dragged from, its
 `DroppedTask.from`: `"timeline"` on a time, `"day"` for Now's and a dated Soon task, else its list; `null` for a closed
 task), `listCardMenuFrom(item)` (the `MenuFrom` of its card in its list column: Now's `"day"`, Done's `"done"`),
 `shownChange(before, after)` (two `data.json` texts, `""` for the defaults: what going from one to the other changes on the

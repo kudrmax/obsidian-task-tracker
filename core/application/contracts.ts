@@ -661,6 +661,8 @@ export type MenuFrom = DropColumn | "timeline" | "done" | "stack" | "full" | "fu
 export { canPick } from "./menus";
 /** The `MenuFrom` of a task's card in its list column: Now's in the day's list, Done's in Done. */
 export { listCardMenuFrom } from "./menus";
+/** Select tasks' picks (`Picks`) and what a tap, ⌘-click, Shift-click, a press beside the cards and a lift do to them; any card may be lifted. */
+export { canLift, liftedPicks, NO_PICKS, pickRun, type PickKeys, type Picks, type PickTap, pressedBeside, setPicking, tapPick, togglePick } from "./picks";
 
 /** A picked task of the bulk menu and the column its card stands in. */
 export interface PickedTask {

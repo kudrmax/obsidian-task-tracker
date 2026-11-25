@@ -465,6 +465,17 @@ describe("a label with no colour through the door", () => {
 	});
 });
 
+describe("the door's Select tasks", () => {
+	const ok = (answer: DoorAnswer) => (answer as Extract<DoorAnswer, { ok: true }>).result;
+	it("answers what a tap does to the picks and that any card may be lifted, from the picks as the app holds them", () => {
+		const none = ok(callDoor("rules.constants", [], context())) as { NO_PICKS: unknown };
+		expect(none.NO_PICKS).toEqual({ picking: false, picked: [], anchor: null });
+		const run = ok(callDoor("rules.tapPick", [{ picking: false, picked: ["a"], anchor: "a" }, "c", "inbox", ["a", "b", "c"], { mod: false, shift: true }], context()));
+		expect(run).toEqual({ took: true, picks: { picking: false, picked: ["a", "b", "c"], anchor: "c" }, opens: null });
+		expect(ok(callDoor("rules.canLift", [{ picking: true, picked: ["a"], anchor: "a" }, "b"], context()))).toBe(true);
+	});
+});
+
 describe("the door's timeline", () => {
 	const levels = (settings?: string) => callDoor("timeline.zoomLevels", [], { tasks: null, settings, nowMs: NOW.getTime() });
 
@@ -759,6 +770,13 @@ function everyCall(screen: ScreenView): { method: string; args: unknown[]; conte
 		plain("rules.dividerAt", 190, { width: 187, min: 110, max: 280, center: 187 }, 0.01),
 		plain("rules.dayMonth", "2026-11-05"),
 		plain("rules.canPick", "timeline"),
+		plain("rules.tapPick", { picking: false, picked: ["a"], anchor: "a" }, "c", "inbox", ["a", "b", "c"], { mod: false, shift: true }),
+		plain("rules.togglePick", { picking: true, picked: ["a"], anchor: "a" }, "a"),
+		plain("rules.pickRun", { picking: false, picked: ["c"], anchor: "c" }, "a", ["a", "b", "c"]),
+		plain("rules.setPicking", { picking: false, picked: ["a"], anchor: "a" }, true),
+		plain("rules.pressedBeside", { picking: false, picked: ["a"], anchor: "a" }),
+		plain("rules.canLift", { picking: true, picked: ["a"], anchor: "a" }, "b"),
+		plain("rules.liftedPicks", { picking: false, picked: ["a"], anchor: "a" }, "b"),
 		plain("rules.originOf", named(screen, "Morning run")),
 		plain("rules.shownChange", "", JSON.stringify({ cardGap: 4 })),
 		plain("rules.undoNotice", "redo", "conflict"),
