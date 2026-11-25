@@ -475,14 +475,6 @@ export interface ScreenPort {
 	 * (a name of nothing, a folder's).
 	 */
 	newProject(name: string): Promise<string | null>;
-	/**
-	 * First step's field open on the task `id` (null: closed): from now on the screen is read with that task folded, its
-	 * subtasks gone from the lists, its card two lines, its title small over an empty step line (the core's
-	 * `firstStepScreen`, F199); fires `subscribe`.
-	 */
-	firstStepOn(id: string | null): void;
-	/** First step's text written as the task's first subtask, the task folded on it (the core's `firstStep`, F200); the field closed. Resolves once written and read back. */
-	firstStep(id: string, text: string): Promise<void>;
 	/** The task `id` on the full screen, as the file now has it; null once it is gone from its place (F248). */
 	full(id: string): FullTask | null;
 	/** Where the full screen of `id` draws the open field (`EntryField.full`); null where it draws none. */

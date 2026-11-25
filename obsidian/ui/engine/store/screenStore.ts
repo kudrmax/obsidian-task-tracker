@@ -145,8 +145,6 @@ interface ScreenState {
 	 * the new section's name field; null while none does.
 	 */
 	readonly namingSection: string | null;
-	/** The task First step's field is open on (F199): its card's step line is the field; null while none is. */
-	readonly firstStep: string | null;
 	/** Something on the full screen is typed in: Done shows, the bottom row hides. */
 	readonly fullTyping: boolean;
 	/** A card to take the keyboard's focus, once per `seq`: the one a rename ended on by a key (Decision 58). */
@@ -309,10 +307,6 @@ interface ScreenActions {
 	startNewSection(): void;
 	/** The section's name ended: Enter (or a tap elsewhere) with `name` makes the section with the task in it (the core's `toSection`, a blank name writing nothing); null (Escape) puts the card back. */
 	endNewSection(name: string | null): void;
-	/** First step from the menu (F199): the menu closes and in the same tap the task folds, its card's step line the field. */
-	startFirstStep(): void;
-	/** First step's field ended: Enter or a tap elsewhere with `text` writes it as the first subtask (F200); null (Escape) writes nothing, the card as it was. */
-	endFirstStep(text: string | null): void;
 	/** The full screen's plus: a new last subtask of the task shown (F245). */
 	fullPlus(): void;
 	/** Undo, the button or ⌘Z (F267): the port takes its last step back, and the cards move as any change moves them. */
@@ -373,6 +367,19 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 			/** The field on the full screen stands where the port says once the bar has followed it there. */
 			const at = stale || full !== was.full ? { fullAt: entry?.full && full ? port.fullEntry(topOf(full)) : null } : {};
 			setRaw({ ...patch, ...bar, ...at });
+			if ("layer" in patch) leftRepeat(was.layer, patch.layer ?? null);
+		};
+		/** The last Repeat page's rule being written: what a tap in the menu writes waits for it. */
+		let repeatWritten: Promise<unknown> = Promise.resolve();
+		/**
+		 * The one exit of a menu's Repeat page (F120): whatever takes the menu away (a close, a tap that leaves it, another
+		 * menu over it, a field or the full screen opening), a rule changed there is written once, as it goes.
+		 */
+		const leftRepeat = (was: Layer | null, next: Layer | null) => {
+			const repeat = was?.repeat;
+			if (!was || !repeat?.changed || (next !== null && next.repeat !== null)) return;
+			repeatWritten = port.act(was.id, { kind: "repeat", rule: repeat.page.draft.rule }, was.from, get().dayOffset);
+			write(repeatWritten);
 		};
 		/** The full screen read again: each level as the file now has it, a level whose task left its place falling back (F248), none left closing it. */
 		const fullOver = (s: Screen): Partial<Screen> => {
@@ -544,7 +551,6 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 			reveal: null,
 			focusCard: null,
 			namingSection: null,
-			firstStep: null,
 			full: null,
 			fullAt: null,
 			fullTyping: false,
@@ -697,19 +703,6 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 				set({ namingSection: null });
 				if (name !== null) write(port.act(id, { kind: "section", name }, "list", get().dayOffset));
 			},
-			startFirstStep() {
-				const layer = get().layer;
-				if (!layer) return;
-				set({ ...closed(get()), firstStep: layer.id, selected: null });
-				port.firstStepOn(layer.id);
-			},
-			endFirstStep(text) {
-				const id = get().firstStep;
-				if (id === null) return;
-				set({ firstStep: null });
-				if (text === null) port.firstStepOn(null);
-				else write(port.firstStep(id, text));
-			},
 			fullPlus() {
 				const full = get().full;
 				if (!full) return;
@@ -734,13 +727,13 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 				const layer = get().layer;
 				if (!layer) return;
 				get().layerGone();
+				/** Remove repeat is the page's write itself: the rule changed there goes unwritten. */
+				if (action.kind === "repeat" && layer.repeat) set({ layer: { ...layer, repeat: { ...layer.repeat, changed: false } } });
 				set({ layer: null });
 				let done: () => void = () => undefined;
 				write(new Promise<void>((resolve) => (done = resolve)));
-				/** A Repeat page changed is written as the menu closes, before what closed it (F120); Remove repeat is that write itself. */
-				const held = action.kind !== "repeat" && layer.repeat?.changed ? [{ kind: "repeat", rule: layer.repeat.page.draft.rule } as const] : [];
-				const acts: readonly MenuAction[] = [...held, action];
-				picked = () => void acts.reduce<Promise<unknown>>((before, next) => before.then(() => port.act(layer.id, next, layer.from, get().dayOffset)), Promise.resolve()).finally(done);
+				const after = repeatWritten;
+				picked = () => void after.then(() => port.act(layer.id, action, layer.from, get().dayOffset)).finally(done);
 			},
 			layerGone() {
 				const run = picked;
@@ -762,8 +755,6 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 				else get().pick({ kind: "newProject", name });
 			},
 			closeLayer() {
-				const repeat = get().layer?.repeat;
-				if (repeat?.changed) return get().pick({ kind: "repeat", rule: repeat.page.draft.rule });
 				if (get().layer) set(closed(get()));
 			},
 			menuRepeat(change) {

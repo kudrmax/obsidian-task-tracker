@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
-import { mockFile } from "../../../obsidian/stand/mockData";
+import { calendarFile, mockFile } from "../../../obsidian/stand/mockData";
 import type { TaskMenuModel } from "../../../obsidian/ui/engine/port";
 import { createScreenStore } from "../../../obsidian/ui/engine/store";
 import { standPort } from "./standPort";
@@ -105,5 +105,30 @@ describe("the Repeat page (F120, F202–F204; the design's «Повторы»)",
 		store.getState().removeEntryRepeat();
 		expect(store.getState().draft.repeat).toBeNull();
 		expect(store.getState().entryPanel).toBeNull();
+	});
+
+	it("a changed rule is written however the menu goes: the notes in its copy opening the task full screen", async () => {
+		const { store, lineOf, task } = await screen();
+		store.getState().openMenu(task.id);
+		store.getState().menuPage("repeat");
+		store.getState().menuRepeat({ what: "unit", to: "day" });
+		store.getState().openFull(task.id);
+		await wait();
+		expect(store.getState().layer).toBeNull();
+		expect(lineOf(task.title)).toContain("🔁 every day");
+	});
+
+	it("a changed rule is written as a card of the calendar menu's stack opens its own menu", async () => {
+		const source = await standPort(NOW, calendarFile(NOW));
+		const store = createScreenStore(source.port);
+		const moving = Object.values(source.port.read(0).cards).find((c) => c.title === "Переезд")!;
+		store.getState().openMenu(moving.id, "calendar");
+		store.getState().menuPage("repeat");
+		store.getState().menuRepeat({ what: "unit", to: "day" });
+		const sub = (store.getState().layer!.model as TaskMenuModel).subtasks[0];
+		store.getState().openMenu(sub, "stack");
+		await wait();
+		expect(store.getState().layer?.id).toBe(sub);
+		expect(source.fileText().split("\n").find((l) => l.includes("Переезд"))).toContain("🔁 every day");
 	});
 });
