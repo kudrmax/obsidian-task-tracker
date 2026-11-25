@@ -44,7 +44,7 @@ export default class TaskCalendarStand extends Plugin {
 		(window as unknown as { __tcStand?: StandApi }).__tcStand = api;
 		this.register(() => delete (window as unknown as { __tcStand?: StandApi }).__tcStand);
 
-		this.registerMarkdownCodeBlockProcessor(BLOCK_LANGUAGE, (_source, el, ctx) => ctx.addChild(new ScreenBlock(el, host, ctx.sourcePath)));
+		this.registerMarkdownCodeBlockProcessor(BLOCK_LANGUAGE, (_source, el, ctx) => ctx.addChild(new ScreenBlock(el, host, ctx.sourcePath, { project: null, note: ctx.sourcePath })));
 		this.addRibbonIcon("flask-conical", "Task Calendar Stand", () => void host.open());
 		this.addCommand({ id: "open", name: "Open the screen", callback: () => void host.open() });
 		if (!Platform.isMobile) this.addCommand({ id: "open-window", name: "Open the screen in a new window", callback: () => void host.open(true) });

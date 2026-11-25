@@ -25,8 +25,10 @@ function fakeHost() {
 			return screen;
 		},
 	} as unknown as ScreenMounts;
-	const host = { look: LOOK, mounts: () => ready, opened: () => undefined, unmount: (screen: unknown) => screen && released.push(screen) } as unknown as ScreenHost;
-	return { host, mounted, released, arrive: () => arrive(mounts) };
+	const pushed: unknown[] = [];
+	const app = { keymap: { pushScope: (scope: unknown) => pushed.push(scope), popScope: (scope: unknown) => pushed.splice(pushed.indexOf(scope), 1) } };
+	const host = { look: LOOK, app, mounts: () => ready, opened: () => undefined, unmount: (screen: unknown) => screen && released.push(screen) } as unknown as ScreenHost;
+	return { host, mounted, released, pushed, arrive: () => arrive(mounts) };
 }
 
 describe("the host's leaf", () => {
@@ -104,9 +106,28 @@ describe("a project note's block", () => {
 		fake.arrive();
 		await settled();
 		await settled();
-		expect(fake.mounted.map(({ place, sourcePath, context }) => [place, sourcePath, context])).toEqual([["note", "Дружба.md", { project: "Близкие" }]]);
+		expect(fake.mounted.map(({ place, sourcePath, context }) => [place, sourcePath, context])).toEqual([["note", "Дружба.md", { project: "Близкие", note: "Дружба.md" }]]);
 		expect(project.containerEl.querySelector(".cm-sizer > .tc-project-block.tc-note-block")).not.toBeNull();
 		expect(plain.containerEl.querySelector(".tc-project-block")).toBeNull();
+	});
+
+	it("holds the screen's keys over the note's while the focus is in it: Undo and Redo, never the ribbon's arrows (F283)", async () => {
+		const fake = fakeHost();
+		const view = noteView("Дружба.md");
+		const { app } = fakeApp([view]);
+		const blocks = new NoteBlocks(app as never, { projectNoteView, onChange: () => () => undefined }, fake.host);
+		blocks.load();
+		fake.arrive();
+		await settled();
+		await settled();
+		const block = view.containerEl.querySelector<HTMLElement>(".tc-note-block")!;
+		expect(fake.pushed).toEqual([]);
+		block.dispatchEvent(new FocusEvent("focusin", { bubbles: true }));
+		expect(fake.pushed).toHaveLength(1);
+		const keys = (fake.pushed[0] as { keys: { modifiers: string[]; key: string }[] }).keys.map(({ modifiers, key }) => [...modifiers, key].join("+"));
+		expect(keys).toEqual(["Mod+z", "Mod+Shift+z"]);
+		block.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+		expect(fake.pushed).toEqual([]);
 	});
 
 	it("follows its note renamed, the same block, never a new one", async () => {

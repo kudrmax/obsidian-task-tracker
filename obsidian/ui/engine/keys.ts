@@ -2,8 +2,9 @@ import { stepped } from "./layout/columns";
 import type { Screen } from "./store";
 
 /**
- * The screen's keys (spec, «Keys»): one table, registered once by the host as Obsidian's commands and on the view's
- * `Scope`. A key does what the same gesture does. While a layer or a field is open the key is theirs (`useDismiss`
+ * The screen's keys (spec, «Keys»): one table, registered once by the host as Obsidian's commands (named as the palette
+ * shows them) and on each screen's `Scope`: the leaf's, and a note's block's while the focus is in it. A key does what
+ * the same gesture does. While a layer or a field is open the key is theirs (`useDismiss`
  * takes Escape, the editor its own keys), and the table's key does nothing.
  */
 export interface ScreenKey {
@@ -13,6 +14,8 @@ export interface ScreenKey {
 	readonly modifiers: readonly ("Mod" | "Shift" | "Alt")[];
 	readonly key: string;
 	readonly run: (screen: Screen) => void;
+	/** A note's block takes it too while the focus is in it (F283): it has no ribbon and no day to turn. */
+	readonly block: boolean;
 }
 
 /** The ribbon one place on or back, as a swipe lets it go one: a stop, and past the calendar a day; the ribbon lands there as from any place set from outside. In a mode with no ribbon, a day, as the arrows. */
@@ -24,11 +27,11 @@ const turn = (s: Screen, shift: -1 | 1) => {
 };
 
 export const KEYS: readonly ScreenKey[] = [
-	{ id: "step-on", name: "Ribbon: one stop on", modifiers: [], key: "ArrowRight", run: (s) => turn(s, 1) },
-	{ id: "step-back", name: "Ribbon: one stop back", modifiers: [], key: "ArrowLeft", run: (s) => turn(s, -1) },
+	{ id: "step-on", name: "Next column or day", modifiers: [], key: "ArrowRight", run: (s) => turn(s, 1), block: false },
+	{ id: "step-back", name: "Previous column or day", modifiers: [], key: "ArrowLeft", run: (s) => turn(s, -1), block: false },
 	/** ⌘Z does what the Undo button does, ⌘⇧Z does the step again (F268); in a field the field keeps them (the table takes no key while one is open). */
-	{ id: "undo", name: "Undo", modifiers: ["Mod"], key: "z", run: (s) => s.undo() },
-	{ id: "redo", name: "Redo", modifiers: ["Mod", "Shift"], key: "z", run: (s) => s.redo() },
+	{ id: "undo", name: "Undo", modifiers: ["Mod"], key: "z", run: (s) => s.undo(), block: true },
+	{ id: "redo", name: "Redo", modifiers: ["Mod", "Shift"], key: "z", run: (s) => s.redo(), block: true },
 ];
 
 /** Whether the screen takes keys now: no layer, no field, no gesture holding the pointer. */

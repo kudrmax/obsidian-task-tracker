@@ -37,14 +37,14 @@ const ALL_LISTS: readonly ListId[] = ["inbox", "backlog", "soon", "day"];
 
 /**
  * What each stop shows (the one place it is said): the lists a screen mounted at `place` shows at `stop`; a note's block
- * shows its Inbox alone; a mode that is no ribbon (`ribbon` false) every list at once.
+ * and a mode that is no ribbon (`ribbon` false) every list at once, stacked or side by side.
  */
 export function columnsOf(place: Place, stop: Stop, ribbon = true): readonly ListId[] {
-	if (place === "note") return ["inbox"];
+	if (place === "note") return ALL_LISTS;
 	return ribbon ? shownAt(stop).flatMap((column) => LISTS_OF[column]) : ALL_LISTS;
 }
 
-/** The lists a screen mounted at `place` can bring into sight: the ribbon turns to any; a note's block shows its Inbox. */
+/** The lists a screen mounted at `place` can bring into sight: the ribbon turns to any; a note's block shows them all. */
 export function reachOf(place: Place, ribbon = true): readonly ListId[] {
 	return [...new Set(STOPS.flatMap((stop) => columnsOf(place, stop, ribbon)))];
 }

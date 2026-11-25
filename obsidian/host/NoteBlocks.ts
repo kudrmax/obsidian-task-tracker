@@ -10,10 +10,10 @@ const BLOCK_LIFT = "--tc-block-lift";
 /** The block's own place at a note's end (boards D5, T6). */
 const PROJECT_BLOCK = "tc-project-block";
 
-/** The project a note's view shows (the core's own: its filter's project), as the screen's context; null where the note is no project's. */
-function contextOf(view: FunnelView | null): ScreenContext | null {
+/** The project a note's view shows (the core's own: its filter's project) and the note, as the screen's context; null where the note is no project's. */
+function contextOf(view: FunnelView | null, note: string): ScreenContext | null {
 	const project = view?.filter?.menu?.project.name;
-	return project === undefined ? null : { project };
+	return project === undefined ? null : { project, note };
 }
 
 /** A project note's block: `TaskScreen` in the note's project, and the note's path it was made for. */
@@ -88,7 +88,7 @@ export class NoteBlocks extends Component {
 		const ask = (this.asks.get(view) ?? 0) + 1;
 		this.asks.set(view, ask);
 		const path = view.file?.path ?? null;
-		const context = path === null ? null : contextOf(await this.tasks.projectNoteView(path, !view.containerEl.ownerDocument.body.classList.contains("is-mobile")));
+		const context = path === null ? null : contextOf(await this.tasks.projectNoteView(path, !view.containerEl.ownerDocument.body.classList.contains("is-mobile")), path);
 		if (this.asks.get(view) !== ask) return;
 		let block = this.blocks.get(view) ?? null;
 		if (block && (!context || block.path !== path || block.project !== context.project)) {

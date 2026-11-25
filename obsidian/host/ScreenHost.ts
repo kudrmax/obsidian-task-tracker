@@ -1,4 +1,4 @@
-import { Component, MarkdownRenderer, Notice, Platform, type Plugin, type WorkspaceLeaf } from "obsidian";
+import { type App, Component, MarkdownRenderer, Notice, Platform, type Plugin, type WorkspaceLeaf } from "obsidian";
 import type { CalendarPoll, ScreenSettingsStore } from "../../core/application/contracts";
 import type { CorePort } from "../adapters/CorePort";
 import type { DeviceSettings } from "../adapters/DeviceSettings";
@@ -57,6 +57,11 @@ export class ScreenHost {
 		plugin.registerView(this.look.type, (leaf) => new Leaf(leaf, this));
 		for (const key of KEYS) plugin.addCommand({ id: key.id, name: key.name, checkCallback: (checking) => this.onActiveLeaf(checking, (leaf) => leaf.runKey(key.id)) });
 		plugin.register(() => this.end());
+	}
+
+	/** Obsidian's app the host serves. */
+	get app(): App {
+		return this.plugin.app;
 	}
 
 	/** The screens' mounts, once the source is open and the fingers are heard (or known not to be). */

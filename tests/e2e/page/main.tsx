@@ -128,7 +128,7 @@ class StandPage {
 	}
 
 	private mount(el: HTMLElement, place: "leaf" | "note", sourcePath: string): MountedScreen {
-		return this.mounts.mount(el, place, sourcePath);
+		return this.mounts.mount(el, place, sourcePath, place === "note" ? { project: null, note: sourcePath } : undefined);
 	}
 
 	private clear(): void {

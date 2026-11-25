@@ -333,8 +333,6 @@ body {
 	--tc-block-inset: var(--tc-space-12);
 	--tc-block-lift: 0px;
 	--tc-block-max-h: min(640px, 78vh);
-	/* A note's block of the screen: the stand's code block and a project note's block, as tall as this until step 7 sizes it. */
-	--tc-note-block-h: 420px;
 	--tc-radius-block: var(--tc-radius-panel);
 
 	/* Sizes: the task menu, its due submenu and the month picker */
@@ -1230,7 +1228,18 @@ body:not(.is-mobile) .tc-stage-col.is-timeline > .tc-stage-head { padding: 0 var
 
 /* A project note's block (D5, T6): its view alone, rows or by project, the whole width, no titles and no timeline. */
 /* Live Preview stretches its text to fill a short note's view: with the block under it, the text keeps its own height and the block stands under its last line, the rest of the view under the block. */
-.tc-note-block { position: relative; height: var(--tc-note-block-h); }
+/*
+ * The block is as tall as its rows (F280): each list as tall as its cards, the stack under the block's own bottom row; past
+ * the tallest a block may be, the stack scrolls inside it and the note scrolls past it. Sizes are the browser's: nothing
+ * measures the block.
+ */
+.tc-note-block { position: relative; max-height: var(--tc-block-max-h); }
+.task-calendar.is-note { height: auto; max-height: var(--tc-block-max-h); display: flex; flex-direction: column; }
+.tc-note-rows { flex: 0 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; touch-action: pan-y; }
+.tc-note-rows::-webkit-scrollbar { display: none; }
+.tc-note-rows > .tc-rows-stack { height: auto; padding: var(--tc-block-inset) var(--tc-block-inset) var(--tc-foot-fade-day); }
+.tc-note-rows .tc-row, .tc-note-rows .tc-row > .tc-list { flex: none; }
+.tc-note-rows .tc-row > .tc-list { overflow: visible; }
 /* No tasks file (F6): what the screen says instead of its lists, over them, and the button that creates the file. */
 .tc-missing { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--tc-space-12); padding: var(--tc-space-16); background: var(--tc-bg); color: var(--tc-muted); text-align: center; }
 .task-calendar button.tc-btn.tc-missing-btn { height: var(--tc-card-h); padding: 0 var(--tc-space-16); border-radius: var(--tc-radius-card); background: var(--tc-card-bg); color: var(--tc-text); font-size: var(--tc-font-body); }
@@ -1441,7 +1450,6 @@ body:not(.is-mobile) .tc-drag-source:focus-visible > :is(.tc-card, .tc-block-car
 /* The field the plus opens, over the screen's foot, left of the plus. */
 /* The new task's field stands in its list as a row, at its level. */
 .tc-list-item > .tc-quick-row { margin-left: calc(var(--tc-level) * var(--tc-subtask-indent)); min-height: var(--tc-card-h); }
-.tc-note-column { position: absolute; inset: 0; display: flex; }
 
 /* The engine's task menu (E4). Floating UI places each part (its left and top inline, measured before it shows); the design's classes run the motion: the backdrop, the copy over it and the panel fade in together in --tc-duration-menu, the panel growing out from the copy, and fade out together in --tc-duration-collapse. */
 .tc-menu-over { position: fixed; z-index: var(--tc-layer-panel); width: max-content; max-width: calc(100% - 2 * var(--tc-whole-margin)); display: flex; flex-direction: column; pointer-events: none; opacity: 0; transition: opacity var(--tc-duration-menu) var(--tc-ease-out); }

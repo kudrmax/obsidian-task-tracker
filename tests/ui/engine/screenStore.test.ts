@@ -137,9 +137,9 @@ describe("what each stop shows, said once by the layout (review of part 1, findi
 		expect(columnsOf("leaf", "inbox")).toEqual(["inbox", "backlog", "soon"]);
 		expect(columnsOf("leaf", "soon")).toEqual(["soon", "day"]);
 		expect(columnsOf("leaf", "calendar")).toEqual(["day"]);
-		expect(columnsOf("note", "calendar")).toEqual(["inbox"]);
+		expect(columnsOf("note", "calendar")).toEqual(["inbox", "backlog", "soon", "day"]);
 		expect(reachOf("leaf")).toEqual(["inbox", "backlog", "soon", "day"]);
-		expect(reachOf("note")).toEqual(["inbox"]);
+		expect(reachOf("note")).toEqual(["inbox", "backlog", "soon", "day"]);
 		expect(stopShowing("calendar", "day")).toBe("calendar");
 		expect(stopShowing("calendar", "inbox")).toBe("inbox");
 		expect(stopShowing("calendar", "soon")).toBe("soon");

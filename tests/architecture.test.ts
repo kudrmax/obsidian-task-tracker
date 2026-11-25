@@ -643,9 +643,9 @@ describe("the engine's owners", () => {
 		expect(engineFiles().filter((file) => !ownedBy(file, PLACE_READERS) && readsPlace(source(file)))).toEqual([]);
 	});
 
-	it("leaves the key table to the host: registered once, as commands and on the leaf's scope, for the plugin and the stand alike", () => {
+	it("leaves the key table to the host: registered once, as commands and on each screen's scope (the leaf's, a note's block's), for the plugin and the stand alike", () => {
 		const registering = FILES.filter((file) => /\bKEYS\b/.test(withoutComments(source(file))) && !file.startsWith(`${ENGINE}keys.ts`));
-		expect(registering).toEqual([`${HOST}ScreenHost.ts`, `${HOST}ScreenLeaf.ts`]);
+		expect(registering).toEqual([`${HOST}ScreenHost.ts`, `${HOST}screenKeys.ts`]);
 	});
 });
 

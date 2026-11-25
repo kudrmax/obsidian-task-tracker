@@ -24,7 +24,7 @@ type RibbonAt = FollowGestures["at"];
 
 /**
  * Where things stand (spec, «The owners»): the place's columns. The only module that reads the place. A leaf shows the
- * ribbon of four columns, two at a time; a note's block shows one list. Sizes are CSS: each column is its share of the
+ * ribbon of four columns, two at a time; a note's block shows its lists stacked (Rows, F278). Sizes are CSS: each column is its share of the
  * strip, the strip slides by its own percent. At Inbox and at Soon the two columns split the window in half (CLAUDE.md,
  * «Behaviours Max had to ask for twice»); at the day's calendar the divider sets the list against the calendar (F51–F53).
  */
@@ -35,10 +35,10 @@ export const Layout = memo(function Layout({ place }: { readonly place: Place })
 	const shown = columnsOf(place, stop, ribbon);
 	return (
 		<>
-			{place === "leaf" ? <ModeColumns key={mode} mode={mode} /> : <NoteColumn list={shown[0]} />}
+			{place === "leaf" ? <ModeColumns key={mode} mode={mode} /> : <NoteRows key={mode} />}
 			<PlusButton shown={shown} />
 			<Capsule />
-			{place === "leaf" ? <ViewButton /> : null}
+			<ViewButton />
 			<TaskMenu />
 		</>
 	);
@@ -168,7 +168,7 @@ function StackedRows() {
 	);
 }
 
-const StackedRow = memo(function StackedRow({ list }: { readonly list: Exclude<ListId, "day"> }) {
+const StackedRow = memo(function StackedRow({ list }: { readonly list: ListId }) {
 	return (
 		<div className={`tc-row is-${list}`}>
 			<RowLabel list={list} />
@@ -334,16 +334,24 @@ function DayNav() {
 	);
 }
 
-function NoteColumn({ list }: { readonly list: ListId }) {
+/**
+ * A project note's block (F278–F280, the design's D5): its lists stacked under their labels as Rows draws them, no
+ * calendar beside them and no day turning, today's list last; each as tall as its cards, the block as tall as all of
+ * them (the stylesheet's `.tc-note-rows`).
+ */
+function NoteRows() {
 	return (
-		<div className="tc-note-column">
-			<ListColumn list={list} share={WHOLE} />
+		<div className="tc-note-rows">
+			<div className="tc-rows-stack">
+				{NOTE_LISTS.map((list) => (
+					<StackedRow key={list} list={list} />
+				))}
+			</div>
 		</div>
 	);
 }
 
-/** A note's one column takes the whole block. */
-const WHOLE = 100;
+const NOTE_LISTS = columnsOf("note", "calendar");
 
 const ListColumn = memo(function ListColumn({ list, share = COLUMN_SHARE }: { readonly list: ListId; readonly share?: number | null }) {
 	const title = useData((d) => d.lists[list].title);

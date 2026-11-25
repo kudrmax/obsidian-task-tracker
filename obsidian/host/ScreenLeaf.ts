@@ -1,7 +1,7 @@
-import { ItemView, Scope, type WorkspaceLeaf } from "obsidian";
-import { KEYS, takesKeys } from "../ui/engine/keys";
+import { ItemView, type WorkspaceLeaf } from "obsidian";
 import type { MountedScreen } from "../ui/engine/mount";
 import type { ScreenHost } from "./ScreenHost";
+import { runScreenKey, screenKeyScope } from "./screenKeys";
 import { StatusBarRoom } from "./StatusBarRoom";
 
 /** How a host's leaf presents itself in Obsidian: its view type, its tab's title and icon. */
@@ -39,8 +39,7 @@ export abstract class ScreenLeaf extends ItemView {
 		private readonly host: ScreenHost,
 	) {
 		super(leaf);
-		this.scope = new Scope(this.app.scope);
-		for (const key of KEYS) this.scope.register([...key.modifiers], key.key, () => this.runKey(key.id));
+		this.scope = screenKeyScope(this.app.scope, false, () => this.screen);
 	}
 
 	override getDisplayText(): string {
@@ -53,11 +52,7 @@ export abstract class ScreenLeaf extends ItemView {
 
 	/** A key of the table on this screen; false keeps the key from the page once taken. */
 	runKey(id: string): boolean {
-		const screen = this.screen?.store.getState();
-		const key = KEYS.find((k) => k.id === id);
-		if (!screen || !key || !takesKeys(screen)) return true;
-		key.run(screen);
-		return false;
+		return runScreenKey(this.screen, id);
 	}
 
 	override async onOpen(): Promise<void> {
