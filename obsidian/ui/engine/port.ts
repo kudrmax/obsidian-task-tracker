@@ -1,11 +1,11 @@
-import type { DividerStop, EntryBarGroup, FieldActionId, FieldGroup, ListWidths, MenuActionGroup, MenuStatusId, TaskActionId, TaskMenuActionId, TaskMenuGroup, UndoOutcome } from "../../../core/application/contracts";
+import type { DividerStop, EntryBarGroup, FieldActionId, FieldGroup, ListWidths, MenuActionGroup, MenuStatusId, SubprojectsOption, TaskActionId, TaskMenuActionId, TaskMenuGroup, UndoOutcome, ViewMode, ViewModeOption } from "../../../core/application/contracts";
 
 /**
  * The task actions are the core's (`core/application/taskActions.ts`, task actions spec): the ids, the groups and the
  * offered actions a surface lays out. The port answers with them; the engine keeps only each action's look and handler,
  * an exhaustive `Record` over the surface's ids. Types only: the engine runs no code of the core.
  */
-export type { DividerStop, EntryBarGroup, FieldActionId, FieldGroup, ListWidths, MenuActionGroup, MenuStatusId, TaskActionId, TaskMenuActionId, TaskMenuGroup, UndoOutcome };
+export type { DividerStop, EntryBarGroup, FieldActionId, FieldGroup, ListWidths, MenuActionGroup, MenuStatusId, SubprojectsOption, TaskActionId, TaskMenuActionId, TaskMenuGroup, UndoOutcome, ViewMode, ViewModeOption };
 
 /**
  * The screen's one port (docs/superpowers/specs/2026-11-18-ui-engine.md, «The owners», «Data and writes»): what the screen
@@ -358,11 +358,32 @@ export interface ScreenContext {
 /** Every task: no project chosen. */
 export const EVERY_TASK: ScreenContext = { project: null };
 
+/**
+ * The view the main screen draws and its button (the core's `ViewChoice`, F10–F14): the mode drawn, the modes the button's
+ * menu offers with the chosen one checked, the button's icon, whether the screen is the ribbon a swipe turns, and the
+ * menu's Subprojects row (null: none).
+ */
+export interface ScreenView {
+	readonly mode: ViewMode;
+	readonly modes: readonly ViewModeOption[];
+	readonly icon: string;
+	readonly ribbon: boolean;
+	readonly subprojects: SubprojectsOption | null;
+}
+
 export interface ScreenPort {
+	/** The main screen's view on a `wide` screen (the desktop offers All columns), as this device keeps it; a change fires `subscribe`. */
+	view(wide: boolean): ScreenView;
+	/** A mode picked in the view button's menu: kept on the device, every filter alike (F10, F15). */
+	setViewMode(mode: ViewMode): Promise<void>;
+	/** The menu's Subprojects row tapped: the chosen project's subprojects shown or not (F13, F14). */
+	toggleSubprojects(): Promise<void>;
 	/** The screen for the day `dayOffset` days from today, in `context` (every task when absent). */
 	read(dayOffset: number, context?: ScreenContext): ScreenData;
 	/** Fires after the data changed: a write, an edit from outside. Returns the unsubscribe. The screen reads again each minute too: what rides the now line and what is past changes with the clock. */
 	subscribe(listener: () => void): () => void;
+	/** Fires when the day starts at another hour (the settings' Day starts at): the screen opens today afresh (F50). Returns the unsubscribe. */
+	onDayStartMoved(listener: () => void): () => void;
 	/** The present minute from today's start and the clock's time as the now line writes it: «14:20». */
 	now(): Now;
 	/**

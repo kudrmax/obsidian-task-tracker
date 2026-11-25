@@ -2,9 +2,10 @@ import { googleLoggedIn } from "./googleLogin";
 import { LABEL_SWATCHES, type LabelColor, labelNameOf, usableLabelTag } from "../domain/Label";
 import { hexColor, type PresetColor } from "../domain/Priority";
 import { CARD_GAPS, CARD_HEIGHTS, DEFAULT_SETTINGS, type GoogleSettings, type GroupSettings, LABEL_PAINTS, type LabelLevel, PRIORITY_COLORS, type PriorityLevel, type SectionNames, type TaskCalendarSettings } from "../settings";
-import type { CountField, Marker, PriorityColor, SecretField, SettingsForm, SettingsService } from "./contracts";
+import type { CountField, DayStartChoice, Marker, PriorityColor, SecretField, SettingsForm, SettingsService } from "./contracts";
 import type { SettingsStore } from "./ports";
 import { formatZoomLevels, parseZoomLevels } from "./timelineZoom";
+import { minutesToHHMM } from "../domain/LocalDate";
 
 /** A count as typed: a number of zero or more, or nothing. */
 function countOf(text: string): number | null {
@@ -20,6 +21,8 @@ const MARKER_ORDER: readonly Marker[] = ["dueDateMarker", "slotMarker", "alarmSl
 
 /** Day starts at: any hour of the day. */
 const DAY_START_HOURS: readonly number[] = Array.from({ length: 24 }, (_, hour) => hour);
+/** Each hour Day starts at offers, as the clock writes it: `05:00`. */
+const DAY_START_CHOICES: readonly DayStartChoice[] = DAY_START_HOURS.map((hour) => ({ hour, label: minutesToHHMM(hour * 60) }));
 
 /** The settings tab's commands over the settings store; see SettingsService. */
 export class SettingsServiceImpl implements SettingsService {
@@ -63,6 +66,7 @@ export class SettingsServiceImpl implements SettingsService {
 			refreshSeconds: s.google.refreshSeconds,
 			workCalendarFile: s.workCalendarFile,
 			dayStartHours: DAY_START_HOURS,
+			dayStartChoices: DAY_START_CHOICES,
 			googleClientReady: s.google.clientId !== "",
 			googleLoggedIn: googleLoggedIn(s),
 		};

@@ -1,4 +1,4 @@
-import { placeOf, standAt } from "./layout/columns";
+import { stepped } from "./layout/columns";
 import type { Screen } from "./store";
 
 /**
@@ -15,8 +15,13 @@ export interface ScreenKey {
 	readonly run: (screen: Screen) => void;
 }
 
-/** The ribbon one place on or back, as a swipe lets it go one: a stop, and past the calendar a day; the ribbon lands there as from any place set from outside. */
-const turn = (s: Screen, shift: -1 | 1) => standAt(s, placeOf(s.stop, s.dayOffset) + shift);
+/** The ribbon one place on or back, as a swipe lets it go one: a stop, and past the calendar a day; the ribbon lands there as from any place set from outside. In a mode with no ribbon, a day, as the arrows. */
+const turn = (s: Screen, shift: -1 | 1) => {
+	if (!s.view.ribbon) return s.turnDay(shift);
+	const to = stepped(s.stop, s.dayOffset, shift);
+	s.setStop(to.stop);
+	s.showDay(to.day);
+};
 
 export const KEYS: readonly ScreenKey[] = [
 	{ id: "step-on", name: "Ribbon: one stop on", modifiers: [], key: "ArrowRight", run: (s) => turn(s, 1) },
@@ -27,4 +32,4 @@ export const KEYS: readonly ScreenKey[] = [
 ];
 
 /** Whether the screen takes keys now: no layer, no field, no gesture holding the pointer. */
-export const takesKeys = (s: Screen): boolean => s.layer === null && s.entry === null && s.gesture === null;
+export const takesKeys = (s: Screen): boolean => s.layer === null && !s.viewMenu && s.entry === null && s.gesture === null;
