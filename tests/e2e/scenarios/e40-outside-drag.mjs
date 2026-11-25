@@ -8,7 +8,7 @@ import { carry, cardBy } from "../lib/carry.mjs";
  * was let go and the edit is kept and drawn.
  */
 export default {
-	name: "e27-outside-drag",
+	name: "e40-outside-drag",
 	features: ["F7, F271: the file changed from outside while a card is carried"],
 	cases: ["held task deleted", "other tasks moved"],
 	async run(t, item) {

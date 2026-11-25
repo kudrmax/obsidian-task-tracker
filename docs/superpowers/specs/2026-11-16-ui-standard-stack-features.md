@@ -399,3 +399,8 @@ Companion to [`2026-11-16-ui-standard-stack.md`](2026-11-16-ui-standard-stack.md
 - F312. Best task's answer popup: under the explanation a field «What did Claude miss?» (grows with its text, card-wide); empty: Close alone; with text: Save and Save and ask again (main; ⌘Enter in the field); Esc or a click outside close and write nothing; a failed write keeps the popup and the text, «Couldn't save to this task.» under the field; no field on an error popup. [`docs/plugin/assistant.md` Что Claude не учёл]
 - F313. A menu over a card that fits nowhere keeps only its whole groups of tiles, never one cut mid-tile. [`obsidian/ui/menu/`] (code only)
 - F314. Settings: a priority's or label's colour code follows a theme changed while the settings are open. [`obsidian/ui/SettingsTab.ts`] (code only)
+
+## Added from master (0.4.216–0.4.217, merged in step 0)
+
+- F315. A task's time after midnight (before Day starts at) written with the next date stands on that night's calendar, after midnight, not on the next day's. [`docs/plugin/file.md` Начало дня; the core's `Days`, master f76f7d77]
+- F316. The agents read the tasks through `obsidian-task-calendar` in the vault; nothing of it is on the screen, the screen and the program answer from the same core. [`docs/plugin/agents.md`; `CLAUDE.md`] (no screen)
