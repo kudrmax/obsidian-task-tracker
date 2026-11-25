@@ -1,4 +1,4 @@
-import { type CSSProperties, memo, useState } from "react";
+import { type CSSProperties, memo, useRef, useState } from "react";
 import { DESIGN, PROPERTY } from "../../shared/design";
 import type { IconName } from "../../shared/icons";
 import type { FollowGestures } from "../gestures/FollowRibbon";
@@ -8,6 +8,7 @@ import { CALENDAR, offsetOf, standAt, type Stop, stopShowing } from "../layout/c
 import type { ListId } from "../port";
 import { useData, useScreenApi } from "../store";
 import { Icon } from "./Icon";
+import { SourcesWindow } from "./SourcesWindow";
 
 /** The wheel's icons, left to right: the columns of the strip, the day's list as Now. */
 const ICONS: readonly { readonly name: IconName; readonly label: string; readonly shows: ListId | null }[] = [
@@ -32,6 +33,9 @@ export const Wheel = memo(function Wheel({ at }: { readonly at: FollowGestures["
 	const alert = useData((d) => d.day.alert);
 	const [held, setHeld] = useState<number | null>(null);
 	const [settling, setSettling] = useState<number | null>(null);
+	const [element, setElement] = useState<HTMLDivElement | null>(null);
+	/** The click that ends a long press is no tap on an icon. */
+	const pressedLong = useRef(false);
 	const standing = () => offsetOf(api.getState().stop);
 	const go = (to: number) => {
 		setSettling(to === standing() ? null : to);
@@ -46,8 +50,16 @@ export const Wheel = memo(function Wheel({ at }: { readonly at: FollowGestures["
 			setHeld(null);
 			go(to ?? standing());
 		},
+		held: () => {
+			pressedLong.current = true;
+			api.getState().openSources();
+		},
 	});
 	const tap = (list: ListId | null) => {
+		if (pressedLong.current) {
+			pressedLong.current = false;
+			return;
+		}
 		const from = api.getState().stop;
 		const to = stopFor(list, from);
 		if (to !== from) go(offsetOf(to));
@@ -62,10 +74,25 @@ export const Wheel = memo(function Wheel({ at }: { readonly at: FollowGestures["
 			))}
 		</span>
 	);
-	return (
-		<StripWheel at={at} last={CALENDAR} held={held} settling={settling} onSettled={() => setSettling(null)} className="tc-seg" role="group" aria-label="Columns" tabIndex={0} {...bind()}>
+	const face = (
+		<>
 			<span className="tc-seg-view">{reel(false)}</span>
 			<span className="tc-seg-pill">{reel(true)}</span>
-		</StripWheel>
+		</>
+	);
+	return (
+		<>
+			<StripWheel ref={setElement} at={at} last={CALENDAR} held={held} settling={settling} onSettled={() => setSettling(null)} className="tc-seg" role="group" aria-label="Columns" tabIndex={0} onPointerDownCapture={() => (pressedLong.current = false)} {...bind()}>
+				{face}
+			</StripWheel>
+			<SourcesWindow
+				wheel={element}
+				copy={
+					<StripWheel at={at} last={CALENDAR} held={null} settling={null} onSettled={() => undefined} className="tc-seg" aria-hidden="true">
+						{face}
+					</StripWheel>
+				}
+			/>
+		</>
 	);
 });

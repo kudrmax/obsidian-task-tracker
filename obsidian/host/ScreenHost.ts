@@ -1,5 +1,5 @@
 import { Component, MarkdownRenderer, Notice, Platform, type Plugin, type WorkspaceLeaf } from "obsidian";
-import type { ScreenSettingsStore } from "../../core/application/contracts";
+import type { CalendarPoll, ScreenSettingsStore } from "../../core/application/contracts";
 import type { CorePort } from "../adapters/CorePort";
 import type { DeviceSettings } from "../adapters/DeviceSettings";
 import type { TrackpadFingers } from "../ui/engine/gestures/trackpadFollow";
@@ -39,6 +39,7 @@ export class ScreenHost {
 	private ready: Promise<ScreenMounts> | null = null;
 	private assembled: ScreenMounts | null = null;
 	private fingers: TrackpadFingers & { dispose(): void } | null = null;
+	private poll: CalendarPoll | null = null;
 	private ended = false;
 
 	constructor(
@@ -98,7 +99,10 @@ export class ScreenHost {
 		if (this.ended) {
 			fingers?.dispose();
 			source.port.dispose();
-		} else this.fingers = fingers;
+		} else {
+			this.fingers = fingers;
+			this.keepCalendarsFresh(source.port);
+		}
 		const app = this.plugin.app;
 		this.assembled = new ScreenMounts({
 			port: source.port,
@@ -129,6 +133,23 @@ export class ScreenHost {
 		});
 		this.fingers?.dispose();
 		this.fingers = null;
+		this.poll?.stop();
+		this.poll = null;
+	}
+
+	/**
+	 * The calendars kept fresh while a screen is on view (F109; the core's `keepFresh`, polling being the host's): a tick
+	 * every refresh interval, one when Obsidian or its window comes back, the missed one when a screen's tab is shown again.
+	 */
+	private keepCalendarsFresh(port: CorePort): void {
+		const shown = (screen: MountedScreen) => !screen.el.ownerDocument.hidden && screen.el.isShown();
+		const poll = port.keepFresh(() => !this.openScreens().some(shown));
+		this.poll = poll;
+		this.plugin.registerDomEvent(window, "focus", () => poll.wake());
+		this.plugin.registerDomEvent(document, "visibilitychange", () => {
+			if (!document.hidden) poll.wake();
+		});
+		this.plugin.registerEvent(this.plugin.app.workspace.on("active-leaf-change", () => poll.catchUp()));
 	}
 
 	/** The settings' levels, labels and card size on every window's body, as they change. */

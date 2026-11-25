@@ -128,6 +128,30 @@ export interface DayData {
 	readonly opensAt: number;
 	/** The dot on the wheel's calendar icon (F33, the core's `CalendarAlert`): a calendar in use gone old, or broken too; none while all is fresh. */
 	readonly alert: "none" | "old" | "broken";
+	/** The calendar sources window for the day (F273–F275): each source's row and the dot's words, ready from the core. */
+	readonly sources: DaySources;
+}
+
+/**
+ * A calendar's file in the sources window (the core's `SourceStatus`): which source it is (its icon), its tone (`plain`;
+ * `old` its time orange; `broken` its line red too; `spare` not in use, all grey), and its words: the name, the line under
+ * it, the time on the right and what its mark says (empty with none).
+ */
+export interface SourceRow {
+	readonly source: "google" | "iphone" | "work";
+	readonly tone: "plain" | "old" | "broken" | "spare";
+	readonly name: string;
+	readonly sub: string;
+	readonly time: string;
+	readonly alert: string;
+}
+
+/** The sources window's rows: those the day takes calendars from, then the spare ones under `notInUse`; `alert` the dot's words (empty with no dot). */
+export interface DaySources {
+	readonly inUse: readonly SourceRow[];
+	readonly spare: readonly SourceRow[];
+	readonly notInUse: string;
+	readonly alert: string;
 }
 
 export interface Now {
@@ -353,6 +377,8 @@ export type MenuAction =
  */
 export interface ScreenContext {
 	readonly project: string | null;
+	/** A project note's block: the note's path, whose block keeps its own view (the core's `projectNoteView`). */
+	readonly note?: string;
 }
 
 /** Every task: no project chosen. */
@@ -425,6 +451,8 @@ export interface ScreenPort {
 	levels(above: number | null, below: number | null): LevelRange;
 	/** Creates the tasks file with its five empty sections (F6); the screen reads it once written. */
 	createFile(): Promise<void>;
+	/** The sources window's Refresh now (F276): Google asked again and the phone's calendars refreshed; resolves once the day's events are read anew. */
+	refreshSources(): Promise<void>;
 	/** What a new task's field at `field` starts with set: in a project's screen its project, in a list's part that part's (the core's quick entry). */
 	entryDraft(field: EntryField): EntryDraft;
 	/** The bar of `field`, with what is set (`draft`) and typed (`text`). */

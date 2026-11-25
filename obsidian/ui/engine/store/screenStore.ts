@@ -72,6 +72,8 @@ interface ScreenState {
 	readonly view: ScreenView;
 	/** The view button's menu is open (F11): one layer at a time, a task's menu closed while it is. */
 	readonly viewMenu: boolean;
+	/** The calendar sources window is open over the wheel (F32, F273): one layer at a time, as the view button's menu. */
+	readonly sources: boolean;
 	/**
 	 * The field a task is typed in, open while not null (the plugin's one quick entry): a new task's or a rename's, where it
 	 * stands; in a list, on the calendar, or in an open menu's stack.
@@ -149,6 +151,11 @@ interface ScreenActions {
 	showDay(offset: number): void;
 	/** The view button tapped: its menu opens (F11). */
 	openViewMenu(): void;
+	/** The wheel held while the calendar shows (F32): the sources window opens over it; elsewhere nothing. */
+	openSources(): void;
+	closeSources(): void;
+	/** Refresh now (F276): the window closes and the sources are asked again. */
+	refreshSources(): void;
 	closeViewMenu(): void;
 	/** A mode picked: the menu closes, the mode is kept and the screen redraws in it, in place (F10, F23). */
 	pickViewMode(mode: ViewMode): void;
@@ -455,7 +462,18 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 			view: port.view(wide),
 			viewMenu: false,
 			openViewMenu() {
-				set({ viewMenu: true, layer: null, selected: null });
+				set({ viewMenu: true, sources: false, layer: null, selected: null });
+			},
+			sources: false,
+			openSources() {
+				if (get().stop === "calendar") set({ sources: true, viewMenu: false, layer: null, selected: null });
+			},
+			closeSources() {
+				if (get().sources) set({ sources: false });
+			},
+			refreshSources() {
+				set({ sources: false });
+				write(port.refreshSources());
 			},
 			closeViewMenu() {
 				if (get().viewMenu) set({ viewMenu: false });

@@ -1,5 +1,5 @@
-import { bgAlphaFor, cardDue, type CalendarEvent, type CalendarService, type ColumnList, type DayEvents, type DayService, dayTitle, type DropColumn, dueLabel, durationParts, eventColors, eventHex, type LocalDate, type ScreenView, type TaskItem, type TaskService, timeParts } from "../../core/application/contracts";
-import type { AllDayEvent, Block, CardFace, DayEvent, EventPaint, ListData, ListId, Row, ScreenData } from "../ui/engine/port";
+import { bgAlphaFor, cardDue, type CalendarEvent, type CalendarService, type ColumnList, type DayEvents, type DayService, dayTitle, type DropColumn, dueLabel, durationParts, eventColors, eventHex, type LocalDate, type ScreenView, type SourceStatus, type TaskItem, type TaskService, timeParts } from "../../core/application/contracts";
+import type { AllDayEvent, Block, CardFace, DayEvent, DaySources, EventPaint, SourceRow, ListData, ListId, Row, ScreenData } from "../ui/engine/port";
 
 /** What a screen of `date` is drawn from: the core's screen, its lists as `columnView` reads them, and the day's events. */
 export interface ScreenSource {
@@ -58,6 +58,7 @@ export class ScreenDrawing {
 				hours: this.days.hourLabels(),
 				opensAt: this.days.openAt(this.days.step(this.days.today(), 1)).minute,
 				alert: source.events?.alert ?? "none",
+				sources: sourcesOf(source.events),
 			},
 		};
 	}
@@ -126,4 +127,11 @@ function paintOf(event: CalendarEvent): EventPaint {
 	const hex = eventHex(event);
 	const alpha = bgAlphaFor(event.source);
 	return { dark: eventColors(hex, alpha, "dark"), light: eventColors(hex, alpha, "light") };
+}
+
+/** The sources window as the core words and tones it (`DayEvents.statuses`, `words`); none before the day's events are read. */
+function sourcesOf(events: DayEvents | null): DaySources {
+	if (!events) return { inUse: [], spare: [], notInUse: "", alert: "" };
+	const row = ({ source, tone, words }: SourceStatus): SourceRow => ({ source, tone, name: words.name, sub: words.sub, time: words.time, alert: words.alert });
+	return { inUse: events.statuses.filter((s) => s.used).map(row), spare: events.statuses.filter((s) => !s.used).map(row), notInUse: events.words.notInUse, alert: events.words.alert };
 }

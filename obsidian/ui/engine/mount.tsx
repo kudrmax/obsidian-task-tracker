@@ -32,6 +32,8 @@ export interface MountOptions {
 
 export interface MountedScreen {
 	readonly store: ScreenStore;
+	/** The element the screen is drawn in. */
+	readonly el: HTMLElement;
 	unmount(): void;
 }
 
@@ -48,6 +50,7 @@ export function mountScreen(el: HTMLElement, { port, place, app, sourcePath, hap
 	root.render(<TaskScreen store={store} place={place} host={{ doc, win: doc.defaultView ?? window, layerRoot: doc.body, app, sourcePath, haptics, zoomMost: zoom.most, markdown, desk, notice, fingers }} />);
 	return {
 		store,
+		el,
 		unmount: () => {
 			keep();
 			root.unmount();

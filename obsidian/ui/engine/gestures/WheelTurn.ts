@@ -1,5 +1,6 @@
 import { useDrag } from "@use-gesture/react";
 import { useEffect, useRef } from "react";
+import { LONG_PRESS_MS } from "../drag/sensors";
 import { useScreenApi } from "../store";
 
 /** Slower than this (px/ms, the divider's magnet's) for longer than `CAREFUL_MS`, the wheel turns freely to the gesture's end (the design's «Колёсико»). */
@@ -68,11 +69,13 @@ export class WheelTurn {
 /**
  * The wheel turned by a finger or the mouse (@use-gesture's drag, its taps left to the icons' clicks): `turned` while it
  * is held, the stop it is let go on `landed`; the columns stand still meanwhile and slide only once it lands. It holds
- * the gesture slot while it runs.
+ * the gesture slot while it turns. Held still for the long press (the drag's own `delay`: a press that moves first turns
+ * at once), it is `held` instead and turns no more until let go (F32).
  */
-export function useWheelTurn({ standing, last, step, turned, landed }: { readonly standing: () => number; readonly last: number; readonly step: () => number; readonly turned: (at: number) => void; readonly landed: (standing: number | null) => void }) {
+export function useWheelTurn({ standing, last, step, turned, landed, held }: { readonly standing: () => number; readonly last: number; readonly step: () => number; readonly turned: (at: number) => void; readonly landed: (standing: number | null) => void; readonly held: () => void }) {
 	const api = useScreenApi();
 	const turn = useRef<WheelTurn | null>(null);
+	const pressedLong = useRef(false);
 	useEffect(
 		() => () => {
 			if (turn.current) api.getState().release("wheel");
@@ -80,20 +83,28 @@ export function useWheelTurn({ standing, last, step, turned, landed }: { readonl
 		[api],
 	);
 	return useDrag(
-		({ first, last: ended, canceled, xy: [x], timeStamp, cancel, tap }) => {
-			if (tap) return;
-			if (first) {
+		({ first, last: ended, active, intentional, canceled, xy: [x], timeStamp, cancel, tap }) => {
+			if (first) pressedLong.current = false;
+			if (tap || pressedLong.current) return;
+			/** Still under the drag's threshold yet active: its delay ran out, the press held still all along. */
+			if (!intentional) {
+				if (active && !turn.current) {
+					pressedLong.current = true;
+					held();
+				}
+				return;
+			}
+			if (!turn.current) {
 				if (!api.getState().claim("wheel")) return cancel();
 				turn.current = new WheelTurn(standing(), last, step(), x, timeStamp);
 			}
-			const held = turn.current;
-			if (!held) return;
-			if (!ended) return turned(held.move(x, timeStamp));
-			held.move(x, timeStamp);
+			const wheel = turn.current;
+			if (!ended) return turned(wheel.move(x, timeStamp));
+			wheel.move(x, timeStamp);
 			turn.current = null;
 			api.getState().release("wheel");
-			landed(canceled ? null : held.land());
+			landed(canceled ? null : wheel.land());
 		},
-		{ filterTaps: true, axis: "x", pointer: { capture: true } },
+		{ filterTaps: true, axis: "x", pointer: { capture: true }, delay: LONG_PRESS_MS, triggerAllEvents: true },
 	);
 }

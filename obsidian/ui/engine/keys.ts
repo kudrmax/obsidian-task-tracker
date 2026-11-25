@@ -32,4 +32,4 @@ export const KEYS: readonly ScreenKey[] = [
 ];
 
 /** Whether the screen takes keys now: no layer, no field, no gesture holding the pointer. */
-export const takesKeys = (s: Screen): boolean => s.layer === null && !s.viewMenu && s.entry === null && s.gesture === null;
+export const takesKeys = (s: Screen): boolean => s.layer === null && !s.viewMenu && !s.sources && s.entry === null && s.gesture === null;

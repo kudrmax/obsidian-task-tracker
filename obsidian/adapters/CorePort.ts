@@ -1,4 +1,4 @@
-import { type ColumnList, groupPlaceOf, SectionNameEntry, levelRange, sameSlot, type CalendarService, dividerAt, type DividerStop, LIST_WIDTHS, listShareOf, type ListWidths, listWidths, type Clock, type DayEvents, type DayChange, type DayService, type DropColumn, type DroppedTask, type DropTo, type LocalDate, listCardMenuFrom, type MenuFrom as CoreMenuFrom, originOf, type ScreenReader, type ShownChange, type TaskItem, type TaskService, type UndoOutcome, undoNotice, type ViewChoice, type ViewMode, projectNodeOf, type ProjectsNodeId, type UndoService } from "../../core/application/contracts";
+import { type ColumnList, groupPlaceOf, SectionNameEntry, levelRange, sameSlot, type CalendarPoll, type CalendarService, dividerAt, type DividerStop, LIST_WIDTHS, listShareOf, type ListWidths, listWidths, type Clock, type DayEvents, type DayChange, type DayService, type DropColumn, type DroppedTask, type DropTo, type LocalDate, listCardMenuFrom, type MenuFrom as CoreMenuFrom, originOf, type ScreenReader, type ShownChange, type TaskItem, type TaskService, type UndoOutcome, undoNotice, type ViewChoice, type ViewMode, projectNodeOf, type ProjectsNodeId, type UndoService } from "../../core/application/contracts";
 import type { ScreenContext, ScreenView, SectionNameEnd, Destination, Edge, EntryBar, EntryCommit, EntryDraft, EntryField, LevelRange, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, RenameStart, ScreenData, ScreenPort } from "../ui/engine/port";
 import { CoreEntry } from "./CoreEntry";
 import { WriteQueue } from "./WriteQueue";
@@ -56,6 +56,10 @@ class CoreReads {
 	private readonly screens = new Set<CorePort>();
 	/** The main screen's view, a wide screen's and a narrow one's, as last read. */
 	private readonly views = new Map<boolean, ScreenView>();
+	/** Each project note's block's view, by the note's path and the screen's width, as last read. */
+	private readonly noteViews = new Map<string, { readonly path: string; readonly wide: boolean; view: ScreenView }>();
+	/** The calendars kept fresh while a screen is on view (`keepFresh`, the host's); none until the host asks. */
+	private poll: CalendarPoll | null = null;
 	private readonly events = new Map<LocalDate, DayEvents>();
 	private readonly asked = new Set<LocalDate>();
 	private readonly offs: (() => void)[];
@@ -82,8 +86,8 @@ class CoreReads {
 	}
 
 	/** A screen's port in `context`, told of every change from now on. */
-	view(context: string): CorePort {
-		const view = new CorePort(this, context);
+	view(context: string, note: string | null): CorePort {
+		const view = new CorePort(this, context, note);
 		this.screens.add(view);
 		return view;
 	}
@@ -95,6 +99,26 @@ class CoreReads {
 	dispose(): void {
 		for (const off of this.offs) off();
 		this.screens.clear();
+		this.poll?.stop();
+		this.poll = null;
+	}
+
+	/** The calendars kept fresh by the core's polling (F109) from now until `dispose`: each tick reads the shown days' events anew. */
+	keepFresh(hidden: () => boolean): CalendarPoll {
+		this.poll?.stop();
+		this.poll = this.core.calendars.keepFresh({ refresh: () => this.refreshEvents(), hidden });
+		return this.poll;
+	}
+
+	/** Refresh now (F276): through the polling, which asks the phone first; without it, the day's events fetched afresh. */
+	refreshSources(): Promise<void> {
+		return this.poll ? this.poll.refreshNow() : this.refreshEvents();
+	}
+
+	/** The sources refreshed and the files read again (the core's `events` for a refresh); every day drawn from them anew. */
+	private async refreshEvents(): Promise<void> {
+		await this.core.calendars.events(this.core.days.today(), "refresh").fresh?.();
+		this.forgetEvents();
 	}
 
 	/** The held read within `context`: the same read, another filter, at once. */
@@ -116,7 +140,7 @@ class CoreReads {
 			this.base = await this.core.tasks.reader(null);
 			this.readers.clear();
 			this.changed();
-			await Promise.all([...this.views.keys()].map((wide) => this.askView(wide)));
+			await Promise.all([...[...this.views.keys()].map((wide) => this.askView(wide)), ...[...this.noteViews.values()].map(({ path, wide }) => this.askNoteView(path, wide))]);
 		});
 		this.queued = run;
 		this.reads = run.catch(() => undefined);
@@ -131,6 +155,26 @@ class CoreReads {
 		this.views.set(wide, first);
 		void this.askView(wide);
 		return first;
+	}
+
+	/** A project note's block's view (the core's `projectNoteView`): rows unless another mode was picked in a note; the device's kept one first, asked again in the background. */
+	noteViewOf(path: string, wide: boolean): ScreenView {
+		const key = `${wide} ${path}`;
+		const kept = this.noteViews.get(key);
+		if (kept) return kept.view;
+		this.noteViews.set(key, { path, wide, view: screenViewOf(this.core.tasks.firstView(wide, true)) });
+		void this.askNoteView(path, wide);
+		return this.noteViews.get(key)!.view;
+	}
+
+	private async askNoteView(path: string, wide: boolean): Promise<void> {
+		const read = await this.core.tasks.projectNoteView(path, wide);
+		const kept = this.noteViews.get(`${wide} ${path}`);
+		if (!read || !kept) return;
+		const next = screenViewOf(read.view);
+		if (JSON.stringify(next) === JSON.stringify(kept.view)) return;
+		kept.view = next;
+		this.changed();
 	}
 
 	/** The view as the core reads it now; every screen told when it differs. */
@@ -209,18 +253,20 @@ export class CorePort implements ScreenPort {
 		private readonly shared: CoreReads,
 		/** The context this screen is drawn in: what its writes and menus go by. */
 		private context: string,
+		/** The project note whose block this screen is: its view is the note's own; null elsewhere. */
+		private readonly note: string | null = null,
 	) {
 		this.entry = new CoreEntry(shared.core, shared.drawing, () => this.reader, () => this.refresh(), shared.queue, () => this.filter());
 	}
 
 	/** The port over `core`, once the file is read, in every task's context. */
 	static async open(core: CorePortServices): Promise<CorePort> {
-		return new CoreReads(core, await core.tasks.reader(null)).view(EVERY);
+		return new CoreReads(core, await core.tasks.reader(null)).view(EVERY, null);
 	}
 
 	/** Another screen's port over the same read, in `context` (every task when absent). */
 	within(context?: ScreenContext): CorePort {
-		return this.shared.view(context?.project ?? EVERY);
+		return this.shared.view(context?.project ?? EVERY, context?.note ?? null);
 	}
 
 	/** This screen's port is let go: its screen is gone. */
@@ -277,11 +323,21 @@ export class CorePort implements ScreenPort {
 	}
 
 	view(wide: boolean): ScreenView {
-		return this.shared.viewOf(wide);
+		return this.note === null ? this.shared.viewOf(wide) : this.shared.noteViewOf(this.note, wide);
 	}
 
+	/** A mode picked: the main screen's, or in a note's block every block's (the core's `setNoteViewMode`). */
 	setViewMode(mode: ViewMode): Promise<void> {
-		return this.shared.keepView(this.core.tasks.setViewMode(mode));
+		return this.shared.keepView(this.note === null ? this.core.tasks.setViewMode(mode) : this.core.tasks.setNoteViewMode(mode));
+	}
+
+	/** The calendars kept fresh while the host's screens are on view (F109); the host wakes it and stops it with the plugin. */
+	keepFresh(hidden: () => boolean): CalendarPoll {
+		return this.shared.keepFresh(hidden);
+	}
+
+	refreshSources(): Promise<void> {
+		return this.shared.refreshSources();
 	}
 
 	toggleSubprojects(): Promise<void> {

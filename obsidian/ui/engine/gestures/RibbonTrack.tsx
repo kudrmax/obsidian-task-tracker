@@ -1,5 +1,5 @@
 import { motion, type MotionValue, useMotionValueEvent, useTransform } from "motion/react";
-import type { CSSProperties, HTMLAttributes, ReactNode } from "react";
+import type { CSSProperties, HTMLAttributes, ReactNode, Ref } from "react";
 import { PROPERTY } from "../../shared/design";
 
 /**
@@ -44,14 +44,14 @@ export function StripRule({ at, leftAt, children }: { readonly at: MotionValue<n
  * rolls to the place it landed on (`settling`, the stylesheet's glide) and follows the ribbon again once the ribbon
  * stands there too (`onSettled`).
  */
-export function StripWheel({ at, last, held, settling, onSettled, className, children, ...rest }: { readonly at: MotionValue<number>; readonly last: number; readonly held: number | null; readonly settling: number | null; readonly onSettled: () => void; readonly className: string; readonly children: ReactNode } & Omit<HTMLAttributes<HTMLDivElement>, "className" | "children">) {
+export function StripWheel({ ref, at, last, held, settling, onSettled, className, children, ...rest }: { readonly ref?: Ref<HTMLDivElement>; readonly at: MotionValue<number>; readonly last: number; readonly held: number | null; readonly settling: number | null; readonly onSettled: () => void; readonly className: string; readonly children: ReactNode } & Omit<HTMLAttributes<HTMLDivElement>, "className" | "children">) {
 	const turned = useTransform(at, (columns) => Math.min(last, Math.max(0, columns)));
 	useMotionValueEvent(turned, "change", (now) => {
 		if (settling !== null && Math.abs(now - settling) < ARRIVED) onSettled();
 	});
 	const shown = held ?? settling;
 	return (
-		<motion.div className={`${className}${settling !== null ? " is-settling" : ""}`} style={{ [PROPERTY.wheelAt]: shown ?? turned } as unknown as CSSProperties} {...(rest as object)}>
+		<motion.div ref={ref} className={`${className}${settling !== null ? " is-settling" : ""}`} style={{ [PROPERTY.wheelAt]: shown ?? turned } as unknown as CSSProperties} {...(rest as object)}>
 			{children}
 		</motion.div>
 	);
