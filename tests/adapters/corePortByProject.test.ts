@@ -50,4 +50,14 @@ describe("By project through CorePort (F229–F237, Decision 165)", () => {
 		expect(line).toContain("🗂️ Ремонт");
 		expect(line).not.toContain("🗂️ Дом");
 	});
+
+	it("the plus opens a field at the end of the chosen project's part, and none under Done (F237)", async () => {
+		const { port } = await byProject("Дом");
+		const at = port.newTaskPlace(0, ["projects"]);
+		expect(at?.list).toBe("projects");
+		await port.pickNode("done", true);
+		await settle();
+		port.read(0, port.projects(true)!.context);
+		expect(port.newTaskPlace(0, ["projects"])).toBeNull();
+	});
 });

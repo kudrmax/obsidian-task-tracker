@@ -531,8 +531,8 @@ export interface ScreenPort {
 	move(id: string, to: Destination): Promise<void>;
 	/** A minute from the day's start as the clock writes it: «14:15» (the day starts at the port's hour). */
 	clockAt(minute: number): string;
-	/** Where a tap on the plus puts a new task's field, on the screen showing the day `dayOffset` days from today and the lists `shown` (F174). */
-	newTaskPlace(dayOffset: number, shown: readonly ListId[]): Destination;
+	/** Where a tap on the plus puts a new task's field, on the screen showing the day `dayOffset` days from today and the lists `shown` (F174); null where it opens none (By project's Done and a folder's own part, F237). */
+	newTaskPlace(dayOffset: number, shown: readonly ListId[]): Destination | null;
 	/** The end of `list` (the day's of `dayOffset`), in its last section, at the top level: where a double click on its free room opens a new task's field. */
 	listEnd(list: ListId, dayOffset: number): Destination;
 	/** Where Add subtask opens the field of a new last subtask of `id` opened `from` there: in its list under its last subtask, a level deeper (F124); a calendar task's in its menu's stack (F108). */

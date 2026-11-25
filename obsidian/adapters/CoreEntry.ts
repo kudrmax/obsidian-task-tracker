@@ -60,10 +60,10 @@ export class CoreEntry {
 		this.session = new QuickEntrySession(core.tasks, this.viewOf(this.look), counted);
 	}
 
-	plus(dayOffset: number, shown: readonly ListId[]): Destination {
+	/** Where the plus opens a field on the screen showing `shown`; null where it opens none (a list writing by parts with none that takes it). */
+	plus(dayOffset: number, shown: readonly ListId[]): Destination | null {
 		const asked = this.asking(dayOffset, shown);
-		asked.openFromPlus();
-		return this.fieldOf(asked.state, dayOffset).at;
+		return asked.openFromPlus() ? this.fieldOf(asked.state, dayOffset).at : null;
 	}
 
 	end(list: ListId, dayOffset: number): Destination {

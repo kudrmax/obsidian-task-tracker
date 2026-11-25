@@ -208,8 +208,8 @@ export function describeScreenPort(name: string, make: PortMaker): void {
 
 		it("opens the plus's field in the day's list while it shows, else in Inbox", async () => {
 			const port = await make(0);
-			expect(port.newTaskPlace(0, ["day"]).list).toBe("day");
-			expect(port.newTaskPlace(0, ["inbox", "soon"]).list).toBe("inbox");
+			expect(port.newTaskPlace(0, ["day"])?.list).toBe("day");
+			expect(port.newTaskPlace(0, ["inbox", "soon"])?.list).toBe("inbox");
 		});
 	});
 }

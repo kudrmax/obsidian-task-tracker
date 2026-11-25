@@ -105,6 +105,15 @@ export default {
 			await t.sleep(300);
 			t.expect(treeOf(await t.file()).some((l) => l.includes("Отдых")) && (await filter()) === "Отдых", `Rename writes the tree's line and the filter shows the new name: ${await filter()}`);
 			await press(".tc-filter-title");
+			const attach = await t.cdp.eval(`[...document.querySelectorAll(".tc-panel.is-project-menu .tc-menu-row")].findIndex((r) => r.textContent.trim() === "Attach note…")`);
+			await press(`.tc-panel.is-project-menu .tc-menu-group:nth-of-type(${attach + 1}) .tc-menu-row`);
+			await t.sleep(400);
+			t.expect(treeOf(await t.file()).some((l) => l.includes("Отдых") && l.includes("[[Заметка о доме]]")), `Attach note… links the note on the project's tree line: ${JSON.stringify(treeOf(await t.file()))}`);
+			await press(".tc-filter-title");
+			const noted = await t.cdp.eval(`[...document.querySelectorAll(".tc-panel.is-project-menu .tc-menu-row")].map((r) => r.textContent.trim())`);
+			t.expect(noted.includes("Заметка о доме") && noted.includes("Detach"), `with a note: its name and Detach: ${JSON.stringify(noted)}`);
+			await key("Escape", "Escape", 27);
+			await press(".tc-filter-title");
 			const del = await t.cdp.eval(`[...document.querySelectorAll(".tc-panel.is-project-menu .tc-menu-row")].length`);
 			await press(`.tc-panel.is-project-menu .tc-menu-row.is-danger`);
 			t.expect((await t.cdp.eval(`document.querySelector(".tc-panel.is-project-menu .tc-menu-ask-question")?.textContent`)) === "Delete “Отдых”?", `Delete asks in place (${del} rows before)`);

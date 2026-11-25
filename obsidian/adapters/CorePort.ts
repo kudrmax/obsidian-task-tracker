@@ -635,7 +635,7 @@ export class CorePort implements ScreenPort {
 		return this.core.days.clockAt(minute);
 	}
 
-	newTaskPlace(dayOffset: number, shown: readonly ListId[]): Destination {
+	newTaskPlace(dayOffset: number, shown: readonly ListId[]): Destination | null {
 		return this.entry.plus(dayOffset, shown);
 	}
 
