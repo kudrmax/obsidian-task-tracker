@@ -393,6 +393,7 @@ const CONTRACT_RUNTIME: Readonly<Record<string, string>> = {
 	ROW_LISTS: "./viewModes",
 	VIEW_WORDS: "./viewModes",
 	viewEntryLists: "./viewModes",
+	viewPlates: "./viewModes",
 	wholeWidth: "./wholeCard",
 	grownStart: "./wholeCard",
 	CARD_HEIGHTS: "../settings",

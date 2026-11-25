@@ -155,6 +155,9 @@ TaskServiceImpl over the same text, as `tests/application/PhoneCalls.test.ts` ch
   is asked as for any screen, with `tasks` standing for the file. Then `tasks.drop`; the next read equals the preview
   unless the file changed meanwhile. Don't keep the `ids` an answer gives over `tasks` before the drop is written.
   Example: `tasks.dropPreview([{ key, from: "soon" }], { kind: "list", column: "day", before: null }, "2026-11-09")`.
+- `tasks.groupPreview(list, group, place, day, filter?)`: the `ScreenView` that `tasks.screen(day)` reads after
+  `tasks.moveGroup(list, group, place)`, writing nothing: draw it as a lifted section is let go, then write the move.
+  Example: `tasks.groupPreview("inbox", null, { before: "Идеи" }, "2026-11-09")`.
 - `tasks.toggleCollapsed(key)`: a tap on a card's subtask counter (offered while `item.can.fold`).
 - `tasks.firstStep(key, text)`: the menu's First step row (`firstStep` in `TaskMenuModel.edits`, offered while
   `item.can.firstStep`, from a list column or the timeline). `text` becomes the task's first subtask, before every one
@@ -920,6 +923,8 @@ escapes and embeds stay text), `oneLine`, `sameLevels`, `labelTitle`, `sameLabel
 timeline's, Done's, a stack's or the full screen's), `originOf(item)` (the column a task's card is dragged from, its
 `DroppedTask.from`: `"timeline"` on a time, `"day"` for Now's and a dated Soon task, else its list; `null` for a closed
 task), `listCardMenuFrom(item)` (the `MenuFrom` of its card in its list column: Now's `"day"`, Done's `"done"`),
+`viewPlates(node, mode)` (each funnel list's No tasks plate words under the filter `node` or in rows, `null` for none:
+`rules.viewPlates(null, "twoColumns").inbox` → `null`, `rules.viewPlates("project:Дом", "twoColumns").inbox` → `"No tasks"`),
 `shownChange(before, after)` (two `data.json` texts, `""` for the defaults: what going from one to the other changes on the
 screen, `ShownChange` `{ tasks, drawn, cards, timeline, gestures, calendars }`, each part true drawn anew; `null` when the
 screen shows none of it, the assistant's or Google's settings; `rules.shownChange("", '{"labelPaint":"blend"}')` →

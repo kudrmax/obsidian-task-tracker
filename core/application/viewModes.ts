@@ -66,6 +66,15 @@ export function viewContext(node: ProjectsNodeId | null, mode: ViewMode, note: b
 }
 
 /**
+ * Each funnel list's No tasks plate, drawn while it draws no card: its words under a filter (`node`) and in rows, none in
+ * two and all columns without a filter. What `ViewChoice.plates` gives; a screen drawn under its own filter asks it alone.
+ */
+export function viewPlates(node: ProjectsNodeId | null, mode: ViewMode): Readonly<Record<DropColumn, string | null>> {
+	const plate = node !== null || mode === "rows" ? PROJECTS_WORDS.noTasks : null;
+	return { inbox: plate, backlog: plate, soon: plate, day: plate };
+}
+
+/**
  * The view's mode and the modes its button offers: the button shows the kept one while it is offered (All columns on a
  * narrow screen is not), else the default (`chosen`). What is drawn (`mode`) is the chosen one, except under Done and a
  * done project, whose own content is their done list by project in any mode chosen.
@@ -77,8 +86,7 @@ export function viewChoice(state: ProjectsScreenState, ask: ViewAsk): ViewChoice
 	const mode: ViewMode = ask.closed && ask.node !== null ? "byProject" : chosen;
 	const label = (m: ViewMode) => (m === "twoColumns" && !ask.wide ? VIEW_WORDS.columns : VIEW_WORDS[m]);
 	const options: ViewModeOption[] = modes.map((m) => ({ mode: m, label: label(m), icon: ICONS[m], checked: m === chosen }));
-	const plate = ask.node !== null || mode === "rows" ? PROJECTS_WORDS.noTasks : null;
-	const plates = { inbox: plate, backlog: plate, soon: plate, day: plate };
+	const plates = viewPlates(ask.node, mode);
 	const ribbon = mode === "twoColumns" && !ask.note;
 	const subprojects: SubprojectsOption | null = ask.branches ? { label: SUBPROJECTS_WORD, checked: subprojectsOn(state) } : null;
 	return {

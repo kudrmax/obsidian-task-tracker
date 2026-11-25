@@ -69,7 +69,7 @@ import type { ViewLayout } from "./viewLayout";
 export { endsSelection } from "./projectsCarry";
 export { FUNNEL_PLACES, funnelPlaceOf, funnelPlaceShowing, stepFunnel, type FunnelAt, type FunnelPlace, type FunnelSpot } from "./screenPlaces";
 /** The view modes' words, the lists the rows mode stacks, and the lists a field can stand in for a mode and a place. */
-export { ROW_LISTS, VIEW_WORDS, viewContext, viewEntryLists } from "./viewModes";
+export { ROW_LISTS, VIEW_WORDS, viewContext, viewEntryLists, viewPlates } from "./viewModes";
 /** The Projects screen's list as the quick entry reads it: a list the field stands in, like a funnel's column. */
 export { projectsEntryLook, type EntryListLook, type EntryPart } from "./projectsEntry";
 /**
@@ -603,6 +603,8 @@ export interface ScreenReader {
 	item(id: string): TaskItem | null;
 	/** `TaskService.dropPreview(tasks, to, day, filter)`. */
 	dropPreview(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate): DropPreview;
+	/** The screen of `day` once the section `group` of `list` is moved to `place` (`TaskService.moveGroup`), writing nothing. */
+	groupPreview(list: GroupedList, group: GroupName, place: GroupPlace, day: LocalDate): ScreenView;
 	/** `TaskService.takes(origins, to)`. */
 	takes(origins: readonly DropOrigin[], to: DropTo): boolean;
 	/** `TaskService.menu` of the task `id`, opened `from` a place of the screen of `day`; null for no such task. */
@@ -1824,6 +1826,8 @@ export interface TaskService {
 	toSection(keys: readonly TaskKey[], name: GroupName): Promise<void>;
 	/** A lifted section let go (sections spec §5.4); No section moves too. */
 	moveGroup(list: GroupedList, group: GroupName, place: GroupPlace): Promise<void>;
+	/** The screen of `day` (under `filter`) once `moveGroup(list, group, place)` is written, writing nothing: what a lifted section let go draws until the write is read back. */
+	groupPreview(list: GroupedList, group: GroupName, place: GroupPlace, day: LocalDate, filter?: ProjectsNodeId | null): Promise<ScreenView>;
 	/**
 	 * The name as typed, trimmed: a blank one or the section's own writes nothing; a name the list has merges the two; the No
 	 * section name hands the tasks to it. Resolves true when it wrote.

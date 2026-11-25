@@ -23,7 +23,7 @@ import { eventLevels } from "./eventLevels";
 import { durationParts, eventLeft, overlayLeft, stackCorner, stackTasks, timeParts } from "./timelineStack";
 import { bgAlphaFor, contrast, EVENT_BG_ALPHA, eventColors, eventHex, inkOf, pastEventPaint, shadesOf } from "./paints";
 import { type EntryList, FUNNEL_PLACES, type FunnelAt, type FunnelPlace, type FunnelSpot, funnelPlaceOf, funnelPlaceShowing, SHOWN_LISTS, stepFunnel, SWIPE_FLICK_SPEED, swipeLanding } from "./screenPlaces";
-import { ROW_LISTS, VIEW_WORDS, toggledSubprojects, viewContext, viewEntryLists, withMode } from "./viewModes";
+import { ROW_LISTS, VIEW_WORDS, toggledSubprojects, viewContext, viewEntryLists, viewPlates, withMode } from "./viewModes";
 import { layoutShareAt, layoutWidths, viewLayout } from "./viewLayout";
 import { stackedLists, stackedRows } from "./stackedRows";
 import { sameNewPlace } from "./newTaskPlaces";
@@ -551,6 +551,7 @@ const TASKS: Readonly<Record<string, Handler>> = {
 	createGroup: (c, [key, list, name, date]) => c.run(c.writes.createGroup(key as A, list as A, name as string, (date ?? undefined) as A)),
 	toSection: (c, [keys, name]) => c.run(c.writes.toSection(KEPT(c), keys as A, (name ?? null) as A)),
 	moveGroup: (c, [list, group, place]) => c.run(c.writes.moveGroup(list as A, (group ?? null) as A, place as A)),
+	groupPreview: (c, [list, group, place, day, filter]) => c.ask(c.writes.groupPreview(list as A, (group ?? null) as A, place as A, day as string, filter as A)),
 	renameGroup: (c, [list, group, name]) => c.run(c.ask(c.writes.renameGroup(list as A, group as string, name as string))),
 	removeGroup: (c, [list, group]) => c.run(c.writes.removeGroup(list as A, group as string)),
 	createSection: (c, [name, place]) => c.run(c.writes.createSection(name as string, place as A)),
@@ -943,6 +944,7 @@ const RULES: Readonly<Record<string, (...args: A[]) => unknown>> = {
 	canPick,
 	listCardMenuFrom,
 	originOf,
+	viewPlates,
 	shownChange: (before: string, after: string) => shownChange(settingsOf(before), settingsOf(after)),
 	undoNotice,
 };

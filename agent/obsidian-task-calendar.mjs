@@ -6576,6 +6576,10 @@ function viewContext(node, mode, note, subprojects = true) {
   const base = note ? ["note", mode] : ["screen", node, mode];
   return JSON.stringify(subprojects ? base : [...base, "own"]);
 }
+function viewPlates(node, mode) {
+  const plate = node !== null || mode === "rows" ? PROJECTS_WORDS.noTasks : null;
+  return { inbox: plate, backlog: plate, soon: plate, day: plate };
+}
 function viewChoice(state, ask) {
   const modes = offered(ask);
   const kept = keptMode(state, ask);
@@ -6583,8 +6587,7 @@ function viewChoice(state, ask) {
   const mode = ask.closed && ask.node !== null ? "byProject" : chosen;
   const label = (m) => m === "twoColumns" && !ask.wide ? VIEW_WORDS.columns : VIEW_WORDS[m];
   const options = modes.map((m) => ({ mode: m, label: label(m), icon: ICONS[m], checked: m === chosen }));
-  const plate = ask.node !== null || mode === "rows" ? PROJECTS_WORDS.noTasks : null;
-  const plates = { inbox: plate, backlog: plate, soon: plate, day: plate };
+  const plates = viewPlates(ask.node, mode);
   const ribbon = mode === "twoColumns" && !ask.note;
   const subprojects = ask.branches ? { label: SUBPROJECTS_WORD, checked: subprojectsOn(state) } : null;
   return {
@@ -9517,6 +9520,17 @@ var TaskWrites = class {
   moveGroup(list, group, place) {
     return nothing(this.rules.moveGroup(list, group, place));
   }
+  /** The screen of `day` once `moveGroup(list, group, place)` is written, writing nothing: the move tried over the file as read, as `dropPreview` tries a drop. */
+  groupPreview(list, group, place, day, filter) {
+    const move = this.moveGroup(list, group, place);
+    return {
+      reads: true,
+      answer: (s) => {
+        const after = move.operation ? this.rules.trial(s.doc, move.operation).after : s.doc;
+        return this.reads.screen({ text: after.serialize(), doc: after, today: s.today, boundary: s.boundary }, day, filter);
+      }
+    };
+  }
   /** Reads first only when there is a name to write: a blank one or the section's own answers false at once. */
   renameGroup(list, group, name) {
     const operation = this.rules.renameGroup(list, group, name);
@@ -9828,6 +9842,9 @@ var SnapshotReader = class _SnapshotReader {
   }
   dropPreview(tasks, to, day) {
     return this.answer(this.writes.dropPreview(tasks, to, day, this.filter, this.carry()));
+  }
+  groupPreview(list, group, place, day) {
+    return this.answer(this.writes.groupPreview(list, group, place, day, this.filter));
   }
   takes(origins, to) {
     return this.answer(this.reads.takesRead(origins, to));
@@ -10296,6 +10313,9 @@ var TaskServiceImpl = class {
   }
   moveGroup(list, group, place) {
     return this.run(this.writes.moveGroup(list, group, place));
+  }
+  groupPreview(list, group, place, day, filter) {
+    return this.ask(this.writes.groupPreview(list, group, place, day, filter));
   }
   async renameGroup(list, group, name) {
     return this.run(await this.ask(this.writes.renameGroup(list, group, name)));
@@ -11101,6 +11121,7 @@ var TASKS = {
   createGroup: (c, [key, list, name, date]) => c.run(c.writes.createGroup(key, list, name, date ?? void 0)),
   toSection: (c, [keys, name]) => c.run(c.writes.toSection(KEPT(c), keys, name ?? null)),
   moveGroup: (c, [list, group, place]) => c.run(c.writes.moveGroup(list, group ?? null, place)),
+  groupPreview: (c, [list, group, place, day, filter]) => c.ask(c.writes.groupPreview(list, group ?? null, place, day, filter)),
   renameGroup: (c, [list, group, name]) => c.run(c.ask(c.writes.renameGroup(list, group, name))),
   removeGroup: (c, [list, group]) => c.run(c.writes.removeGroup(list, group)),
   createSection: (c, [name, place]) => c.run(c.writes.createSection(name, place)),
@@ -11421,6 +11442,7 @@ var RULES = {
   canPick,
   listCardMenuFrom,
   originOf,
+  viewPlates,
   shownChange: (before, after) => shownChange(settingsOf(before), settingsOf(after)),
   undoNotice
 };

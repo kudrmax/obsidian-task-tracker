@@ -1,5 +1,5 @@
 import type { LocalDate, Slot } from "../domain/Task";
-import type { CarryState, ColumnList, DropColumn, DroppedTask, DropOrigin, DropPreview, DropTo, MenuFrom, ProjectsNodeId, ScreenReader, ScreenView, TaskItem, TaskMenuModel } from "./contracts";
+import type { CarryState, ColumnList, DropColumn, GroupedList, GroupName, GroupPlace, DroppedTask, DropOrigin, DropPreview, DropTo, MenuFrom, ProjectsNodeId, ScreenReader, ScreenView, TaskItem, TaskMenuModel } from "./contracts";
 import type { TaskMenuActionId } from "./taskActions";
 import type { Read, TaskReads } from "./TaskReads";
 import type { TaskWrites } from "./TaskWrites";
@@ -40,6 +40,10 @@ export class SnapshotReader implements ScreenReader {
 
 	dropPreview(tasks: readonly DroppedTask[], to: DropTo, day: LocalDate): DropPreview {
 		return this.answer(this.writes.dropPreview(tasks, to, day, this.filter, this.carry()));
+	}
+
+	groupPreview(list: GroupedList, group: GroupName, place: GroupPlace, day: LocalDate): ScreenView {
+		return this.answer(this.writes.groupPreview(list, group, place, day, this.filter));
 	}
 
 	takes(origins: readonly DropOrigin[], to: DropTo): boolean {

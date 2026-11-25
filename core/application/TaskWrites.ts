@@ -12,6 +12,7 @@ import type {
 	ListPlace,
 	ProjectsDropPreview,
 	ProjectsPlace,
+	ScreenView,
 	GroupedList,
 	GroupName,
 	GroupPlace,
@@ -431,6 +432,18 @@ export class TaskWrites {
 
 	moveGroup(list: GroupedList, group: GroupName, place: GroupPlace): Write<void> {
 		return nothing(this.rules.moveGroup(list, group, place));
+	}
+
+	/** The screen of `day` once `moveGroup(list, group, place)` is written, writing nothing: the move tried over the file as read, as `dropPreview` tries a drop. */
+	groupPreview(list: GroupedList, group: GroupName, place: GroupPlace, day: LocalDate, filter?: ProjectsNodeId | null): Read<ScreenView> {
+		const move = this.moveGroup(list, group, place);
+		return {
+			reads: true,
+			answer: (s) => {
+				const after = move.operation ? this.rules.trial(s!.doc, move.operation).after : s!.doc;
+				return this.reads.screen({ text: after.serialize(), doc: after, today: s!.today, boundary: s!.boundary }, day, filter);
+			},
+		};
 	}
 
 	/** Reads first only when there is a name to write: a blank one or the section's own answers false at once. */

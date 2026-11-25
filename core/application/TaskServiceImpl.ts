@@ -678,6 +678,10 @@ export class TaskServiceImpl implements TaskService {
 		return this.run(this.writes.moveGroup(list, group, place));
 	}
 
+	groupPreview(list: GroupedList, group: GroupName, place: GroupPlace, day: LocalDate, filter?: ProjectsNodeId | null): Promise<ScreenView> {
+		return this.ask(this.writes.groupPreview(list, group, place, day, filter));
+	}
+
 	async renameGroup(list: GroupedList, group: string, name: string): Promise<boolean> {
 		return this.run(await this.ask(this.writes.renameGroup(list, group, name)));
 	}
