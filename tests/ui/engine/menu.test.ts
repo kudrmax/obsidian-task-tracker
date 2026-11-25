@@ -188,7 +188,7 @@ describe("the menu's fields and the plus, in the store", () => {
 		store.getState().plusTap(["inbox", "soon"]);
 		const entry = store.getState().entry!.at;
 		expect(entry.list).toBe("inbox");
-		expect(store.getState().shown.lists.inbox.rows.find((r) => r.kind === "section" && r.id === entry.section)).toMatchObject({ title: "Идеи" });
+		expect(store.getState().shown.lists.inbox.rows.find((r) => r.kind === "section" && r.section === entry.section)).toMatchObject({ title: "Идеи" });
 	});
 
 	/** Max, 2026-11-20: «Rename and creating a task are literally one interface». */

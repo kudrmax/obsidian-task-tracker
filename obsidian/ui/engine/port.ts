@@ -47,12 +47,20 @@ export type Row = { readonly kind: "task"; readonly id: string; readonly depth: 
  */
 export interface SectionRow {
 	readonly kind: "section";
+	/**
+	 * The header's row on the screen: one of its own in each list and day that draws it (No section heads a group in every
+	 * list, a Soon section in Soon and on every later day), so its row, its sortable item and its motion are its own.
+	 */
 	readonly id: string;
+	/** Who the section is (the core's `ListGroup.id`): what a destination, a menu and a move name it by. */
+	readonly section: string;
 	readonly title: string;
 	readonly tasks: number;
 	/** The tasks outside any section: its name in the quieter ink. */
 	readonly ungrouped: boolean;
 	readonly menu: { readonly rename: boolean; readonly remove: boolean } | null;
+	/** A long press lifts it to move it among its list's sections (the core's `ListGroup.reorder`). */
+	readonly reorder: boolean;
 }
 
 export interface ListData {
@@ -319,6 +327,8 @@ export interface EventMenuModel {
 export interface SectionMenuModel {
 	readonly kind: "section";
 	readonly list: ListId;
+	/** Who the section is (`SectionRow.section`). */
+	readonly section: string;
 	readonly title: string;
 	readonly rename: boolean;
 	readonly remove: boolean;
@@ -471,6 +481,8 @@ export interface ScreenPort {
 	moveSection(list: ListId, dayOffset: number, section: string, before: string | null): Promise<void>;
 	/** The screen as it will stand once `moveSection` is written: drawn at the drop, before the write's read-back. */
 	previewSection(list: ListId, dayOffset: number, section: string, before: string | null, context?: ScreenContext): ScreenData;
+	/** Slower than this, px/ms, a finger is careful (the core's `DIVIDER_SNAP.slowSpeed`): the divider holds to the middle, the wheel turns freely. */
+	readonly slowSpeed: number;
 	/** The day list's width beside the calendar (the core's `listWidth`, core audit pair E8): its bounds on a phone, the width `share` draws in a window `viewWidth` wide. */
 	readonly listBounds: { readonly min: number; readonly max: number };
 	listWidths(share: number, viewWidth: number, dividerWidth: number): ListWidths;

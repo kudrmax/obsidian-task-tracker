@@ -90,6 +90,8 @@ interface ScreenState {
 	readonly listFollow: boolean;
 	/** The list's bounds on a phone (the port's): the stylesheet draws a kept share within them as the window changes. */
 	readonly listBounds: { readonly min: number; readonly max: number };
+	/** The port's slow speed, px/ms: a finger slower than it is careful. */
+	readonly slowSpeed: number;
 	/** The calendar's selected task: its two dots show, to resize it (F102); a tap elsewhere lets it go. */
 	readonly selected: string | null;
 	/** The task being resized by a dot, and which: its moving edge's time shows on a pill. */
@@ -132,8 +134,8 @@ interface ScreenState {
 	readonly reveal: { readonly id: string; readonly seq: number } | null;
 	/** The task whose First step is typed on its own card (F199–F201): the screen drawn as the port folds it meanwhile. */
 	readonly firstStep: string | null;
-	/** A section's header renamed in place (F62): its list and its id while its name is typed, and the two as one key (`sectionKey`). */
-	readonly sectionField: { readonly key: string; readonly list: ListId; readonly id: string } | null;
+	/** A section's header renamed in place (F62): its row, its list and the section while its name is typed. */
+	readonly sectionField: { readonly row: string; readonly list: ListId; readonly section: string } | null;
 }
 
 interface ScreenActions {
@@ -314,9 +316,6 @@ const HOLDING: readonly (Gesture | null)[] = ["drag", "resize"];
 /** The share a device that kept none opens with: the divider in the middle, the day list and its calendar in halves. */
 const HALVES = 0.5;
 
-/** A section's header in a list, as one key: the same section may head a group in two lists (a later day's Soon). */
-export const sectionKey = (list: ListId, id: string): string => `${list}/${id}`;
-
 /** One store per mounted screen, over its port (spec, «Screen state»); `zoom`, the calendar's zoom the host kept. */
 export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, listShare = HALVES, opening: ScreenContext = EVERY_TASK): ScreenStore {
 	/** Writes of the screen's own not yet read back: their reads come together once the last is in. */
@@ -447,6 +446,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 			listShare,
 			listFollow: false,
 			listBounds: port.listBounds,
+			slowSpeed: port.slowSpeed,
 			dividerMiddle(viewWidth) {
 				return port.listWidths(get().listShare, viewWidth, DESIGN.dividerWidth).center;
 			},
@@ -569,10 +569,17 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 				get().release("drag");
 			},
 			dropSection(list, id, to) {
-				const { dayOffset, context } = get();
-				if (to && port.sectionMoves(list, dayOffset, id, to.before)) {
-					set({ shown: share(get().shown, port.previewSection(list, dayOffset, id, to.before, context)) });
-					write(port.moveSection(list, dayOffset, id, to.before));
+				const { dayOffset, context, shown } = get();
+				/** The screen's header rows by their own ids, the port's sections by who they are. */
+				const sectionOf = (row: string): string | null => {
+					const found = shown.lists[list].rows.find((r) => r.id === row);
+					return found?.kind === "section" ? found.section : null;
+				};
+				const section = sectionOf(id);
+				const before = to && to.before !== null ? sectionOf(to.before) : null;
+				if (to && section !== null && port.sectionMoves(list, dayOffset, section, before)) {
+					set({ shown: share(shown, port.previewSection(list, dayOffset, section, before, context)) });
+					write(port.moveSection(list, dayOffset, section, before));
 				} else get().carryHome();
 				home = null;
 				set({ lifted: null, liftedDepth: null });
@@ -618,7 +625,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 				if (layer?.model.kind !== "task") return;
 				const { dayOffset, context } = get();
 				const view = share(get().read, port.firstStepView(layer.id, dayOffset, context));
-				set({ layer: null, firstStep: layer.id, read: view, shown: share(get().shown, view), selected: null });
+				set({ ...closed(get()), firstStep: layer.id, read: view, shown: share(get().shown, view), selected: null });
 			},
 			endFirstStep(how, text) {
 				const id = get().firstStep;
@@ -633,24 +640,24 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 			openSectionMenu(list, id) {
 				const row = get().shown.lists[list].rows.find((r) => r.id === id);
 				if (row?.kind !== "section" || !row.menu) return;
-				set({ layer: { kind: "menu", id, from: "list", model: { kind: "section", list, title: row.title, ...row.menu }, page: "menu", asking: null, asked: null, stack: null }, selected: null });
+				set({ layer: { kind: "menu", id, from: "list", model: { kind: "section", list, section: row.section, title: row.title, ...row.menu }, page: "menu", asking: null, asked: null, stack: null }, selected: null });
 			},
 			startSectionRename() {
 				const layer = get().layer;
 				if (layer?.model.kind !== "section") return;
-				set({ layer: null, sectionField: { key: sectionKey(layer.model.list, layer.id), list: layer.model.list, id: layer.id } });
+				set({ layer: null, sectionField: { row: layer.id, list: layer.model.list, section: layer.model.section } });
 			},
 			removeSection() {
 				const layer = get().layer;
 				const model = layer?.model;
-				if (layer && model?.kind === "section") afterClose(() => port.removeSection(model.list, get().dayOffset, layer.id));
+				if (model?.kind === "section") afterClose(() => port.removeSection(model.list, get().dayOffset, model.section));
 			},
 			endSectionName(how, text) {
 				const field = get().sectionField;
 				if (!field) return;
 				set({ sectionField: null });
 				const name = port.sectionNameEnd(how, text);
-				if (name !== null) write(port.renameSection(field.list, get().dayOffset, field.id, name));
+				if (name !== null) write(port.renameSection(field.list, get().dayOffset, field.section, name));
 			},
 			layerGone() {
 				const run = picked;

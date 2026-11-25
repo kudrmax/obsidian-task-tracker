@@ -609,7 +609,6 @@ body {
 
 	/* Motion: the cards of a list step aside for a dragged card and the dashed place eases along; a dropped card flies to its place; the drop target slides between grid steps. */
 	--tc-ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
-	--tc-ease-in-out: cubic-bezier(0.42, 0, 0.58, 1);
 	/* The strip slides to the other pair of columns, the switch's pill with it; a column's padding and gap, which change with its side, slide along. */
 	--tc-duration-slide: 300ms;
 	--tc-duration-collapse: 150ms;
@@ -738,9 +737,6 @@ body.is-mobile .task-calendar > .tc-seg { left: calc(var(--tc-foot-mid) + (var(-
 .tc-seg-icon { --tc-seg-off: calc(2 * var(--tc-seg-i) - 2 * var(--tc-wheel-at) - 1); --tc-seg-depth: max(0, (max(var(--tc-seg-off), -1 * var(--tc-seg-off)) - 1) / 2); position: relative; width: var(--tc-seg-btn-w); height: var(--tc-wheel-btn-h); flex-shrink: 0; color: var(--tc-muted); display: flex; align-items: center; justify-content: center; transform: scale(calc(1 - var(--tc-seg-depth) * var(--tc-seg-shrink))); opacity: calc(1 - var(--tc-seg-depth) * var(--tc-seg-dim)); }
 .tc-seg-pill .tc-seg-icon { color: var(--tc-on-strong); }
 .tc-seg-icon svg { width: var(--tc-seg-icon); height: var(--tc-seg-icon); stroke-width: var(--tc-stroke-seg); }
-/* Let go, the wheel rolls on to its place and the track's ends follow; the columns slide meanwhile. */
-.task-calendar > .tc-seg.is-settling, .tc-seg.is-settling :is(.tc-seg-pill, .tc-seg-reel) { transition: left var(--tc-duration-slide) var(--tc-ease-in-out), width var(--tc-duration-slide) var(--tc-ease-in-out); }
-.tc-seg.is-settling .tc-seg-icon { transition: transform var(--tc-duration-slide) var(--tc-ease-in-out), opacity var(--tc-duration-slide) var(--tc-ease-in-out); }
 .tc-dot { position: absolute; top: var(--tc-dot-top); right: var(--tc-dot-right); width: var(--tc-dot); height: var(--tc-dot); border-radius: var(--tc-radius-circle); background: var(--tc-stale); }
 .tc-dot.is-broken { background: var(--tc-danger); }
 .task-calendar > :is(button.tc-plus, .tc-capsule) { transition: opacity var(--tc-duration-collapse) var(--tc-ease-out), transform var(--tc-duration-collapse) var(--tc-ease-out), visibility 0s linear 0s; }

@@ -6,13 +6,13 @@ import { descendantsOf } from "../drag/tree";
 import { pressedIn, useMenuFrom, useSectionMenuFrom } from "../layers/Layers";
 import { ROW_PX } from "../layout/columns";
 import type { EntryField as Field, ListId, Row, SectionRow } from "../port";
-import { DayContext, sectionKey, useData, useScreen, useScreenApi } from "../store";
+import { DayContext, useData, useScreen, useScreenApi } from "../store";
 import { Card } from "./Card";
 import { MovingRow, MovingRows } from "./MovingRow";
 import { ObsidianEditor } from "./ObsidianEditor";
 import { useHost } from "./host";
 import { EntryField } from "./QuickAdd";
-import { ScrollHold } from "./scrollHold";
+import { NO_HOLD, scrollHold } from "./scrollHold";
 
 /** Rows drawn past each edge of the list's room. */
 const OVERSCAN = 6;
@@ -120,8 +120,11 @@ const ContextList = memo(function ContextList({ list, context }: { readonly list
 	}, [reveal?.seq]);
 
 	const items = virtualizer.getVirtualItems();
-	const [hold] = useState(() => new ScrollHold());
-	const height = hold.height(virtualizer.getTotalSize(), virtualizer.scrollOffset ?? 0);
+	/** The room held under the rows (F66), kept from the last draw as React keeps information from previous renders. */
+	const [held, setHeld] = useState(NO_HOLD);
+	const hold = scrollHold(held, virtualizer.getTotalSize(), virtualizer.scrollOffset ?? 0);
+	if (hold !== held) setHeld(hold);
+	const height = Math.max(hold.total, hold.floor);
 	/** Whether the pointer that pressed last was a mouse: the phone has no double click. */
 	const mouse = useRef(false);
 	return (
@@ -160,7 +163,7 @@ const ContextList = memo(function ContextList({ list, context }: { readonly list
 										</MovingRow>
 									);
 								return (
-									<MovingRow key={row.id} id={row.kind === "section" ? sectionKey(list, row.id) : row.id} context={context} index={item.index} measure={virtualizer.measureElement} order={order} carried={lifted === row.id} fresh={fresh.has(row.id)} className="tc-list-item">
+									<MovingRow key={row.id} id={row.id} context={context} index={item.index} measure={virtualizer.measureElement} order={order} carried={lifted === row.id} fresh={fresh.has(row.id)} className="tc-list-item">
 										<RowFace list={list} row={row.kind === "task" && row.id === lifted && liftedDepth !== null ? { ...row, depth: liftedDepth } : row} />
 									</MovingRow>
 								);
@@ -200,7 +203,7 @@ const RowFace = memo(function RowFace({ list, row }: { readonly list: ListId; re
 function SectionHead({ list, row }: { readonly list: ListId; readonly row: SectionRow }) {
 	const api = useScreenApi();
 	const openSectionMenu = useSectionMenuFrom();
-	const renaming = useScreen((s) => s.sectionField?.key === sectionKey(list, row.id));
+	const renaming = useScreen((s) => s.sectionField?.row === row.id);
 	if (renaming)
 		return (
 			<div className="tc-group-slot is-rename">
@@ -208,7 +211,7 @@ function SectionHead({ list, row }: { readonly list: ListId; readonly row: Secti
 			</div>
 		);
 	return (
-		<SortableRow id={row.id} lifts onTap={row.menu ? (target) => openSectionMenu(list, row.id, pressedIn(target, ".tc-group-head")) : undefined}>
+		<SortableRow id={row.id} lifts={row.reorder} onTap={row.menu ? (target) => openSectionMenu(list, row.id, pressedIn(target, ".tc-group-head")) : undefined}>
 			<div className={`tc-group-head${row.ungrouped ? " is-ungrouped" : ""}`}>
 				<span className="tc-group-name">{row.title}</span>
 			</div>
@@ -238,7 +241,7 @@ function withEntry(all: readonly Drawn[], list: ListId, field: Field | null): re
 	if (!here) return rows;
 	let at = before === null ? -1 : rows.findIndex((row) => row.id === before);
 	if (at < 0) {
-		const head = section === null || section === undefined ? -1 : rows.findIndex((row) => row.id === section);
+		const head = section === null || section === undefined ? -1 : rows.findIndex((row) => row.kind === "section" && row.section === section);
 		const from = head + 1;
 		const next = rows.findIndex((row, i) => i >= from && row.kind === "section");
 		at = next < 0 ? rows.length : next;

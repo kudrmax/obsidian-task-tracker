@@ -1,5 +1,6 @@
-import { motion, type MotionValue, useMotionValueEvent, useTransform } from "motion/react";
-import type { CSSProperties, HTMLAttributes, ReactNode } from "react";
+import { motion, type MotionValue, useMotionValueEvent, useSpring, useTransform } from "motion/react";
+import { type CSSProperties, type HTMLAttributes, type ReactNode, useLayoutEffect } from "react";
+import { LANDING } from "./followPager";
 import { PROPERTY } from "../../shared/design";
 
 /**
@@ -40,22 +41,27 @@ export function StripRule({ at, leftAt, children }: { readonly at: MotionValue<n
 /**
  * The wheel at the screen's foot, turning with the ribbon (the design's «Колёсико»: «лента колёсика крутится синхронно»):
  * its place, `--tc-wheel-at` (0 Inbox–Soon to `last` the calendar; the days past it stand at the calendar), drawn by Motion
- * from the ribbon's place each frame. While a finger holds it, it stands where the finger has it (`held`); let go, it
- * rolls to the place it landed on (`settling`, the stylesheet's glide) and follows the ribbon again once the ribbon
- * stands there too (`onSettled`).
+ * from the ribbon's place each frame. While a finger holds it, it stands where the finger has it (`held`); let go towards
+ * `landing`, it lands there from where the finger left it by the ribbon's own spring (`LANDING`), and follows the ribbon
+ * again once both stand there (`onLanded`): no second curve, no wait on a stylesheet's glide.
  */
-export function StripWheel({ at, last, held, settling, onSettled, className, children, ...rest }: { readonly at: MotionValue<number>; readonly last: number; readonly held: number | null; readonly settling: number | null; readonly onSettled: () => void; readonly className: string; readonly children: ReactNode } & Omit<HTMLAttributes<HTMLDivElement>, "className" | "children">) {
+export function StripWheel({ at, last, held, landing, onLanded, className, children, ...rest }: { readonly at: MotionValue<number>; readonly last: number; readonly held: number | null; readonly landing: { readonly from: number; readonly to: number } | null; readonly onLanded: () => void; readonly className: string; readonly children: ReactNode } & Omit<HTMLAttributes<HTMLDivElement>, "className" | "children">) {
 	const turned = useTransform(at, (columns) => Math.min(last, Math.max(0, columns)));
-	useMotionValueEvent(turned, "change", (now) => {
-		if (settling !== null && Math.abs(now - settling) < ARRIVED) onSettled();
-	});
-	const shown = held ?? settling;
+	const lands = useSpring(turned.get(), LANDING);
+	useLayoutEffect(() => {
+		if (!landing) return;
+		lands.jump(landing.from);
+		lands.set(landing.to);
+	}, [landing, lands]);
+	const arrived = () => landing !== null && Math.abs(lands.get() - landing.to) < ARRIVED && Math.abs(turned.get() - landing.to) < ARRIVED;
+	useMotionValueEvent(lands, "change", () => arrived() && onLanded());
+	useMotionValueEvent(turned, "change", () => arrived() && onLanded());
 	return (
-		<motion.div className={`${className}${settling !== null ? " is-settling" : ""}`} style={{ [PROPERTY.wheelAt]: shown ?? turned } as unknown as CSSProperties} {...(rest as object)}>
+		<motion.div className={className} style={{ [PROPERTY.wheelAt]: held ?? (landing ? lands : turned) } as unknown as CSSProperties} {...(rest as object)}>
 			{children}
 		</motion.div>
 	);
 }
 
-/** The ribbon is at the wheel's place once this near it. */
+/** The ribbon and the wheel stand at the wheel's place once this near it. */
 const ARRIVED = 0.01;

@@ -6,7 +6,7 @@ import { StripWheel } from "../gestures/RibbonTrack";
 import { useWheelTurn } from "../gestures/WheelTurn";
 import { CALENDAR, offsetOf, standAt, type Stop, stopShowing } from "../layout/columns";
 import type { ListId } from "../port";
-import { useData, useScreenApi } from "../store";
+import { useData, useScreen, useScreenApi } from "../store";
 import { Icon } from "./Icon";
 
 /** The wheel's icons, left to right: the columns of the strip, the day's list as Now. */
@@ -31,26 +31,29 @@ export const Wheel = memo(function Wheel({ at }: { readonly at: FollowGestures["
 	const api = useScreenApi();
 	const alert = useData((d) => d.day.alert);
 	const [held, setHeld] = useState<number | null>(null);
-	const [settling, setSettling] = useState<number | null>(null);
+	const [landing, setLanding] = useState<{ readonly from: number; readonly to: number } | null>(null);
 	const standing = () => offsetOf(api.getState().stop);
-	const go = (to: number) => {
-		setSettling(to === standing() ? null : to);
+	const slowSpeed = useScreen((s) => s.slowSpeed);
+	/** The wheel lands on `to` from where it stood (`from`); a place other than the one shown turns the ribbon there. */
+	const go = (from: number, to: number) => {
+		setLanding({ from, to });
 		if (to !== standing()) standAt(api.getState(), to);
 	};
 	const bind = useWheelTurn({
 		standing,
 		last: CALENDAR,
 		step: () => DESIGN.wheelIcon,
+		slowSpeed,
 		turned: setHeld,
-		landed: (to) => {
+		landed: (from, to) => {
 			setHeld(null);
-			go(to ?? standing());
+			go(from, to ?? standing());
 		},
 	});
 	const tap = (list: ListId | null) => {
 		const from = api.getState().stop;
 		const to = stopFor(list, from);
-		if (to !== from) go(offsetOf(to));
+		if (to !== from) go(offsetOf(from), offsetOf(to));
 	};
 	const reel = (lens: boolean) => (
 		<span className="tc-seg-reel">
@@ -63,7 +66,7 @@ export const Wheel = memo(function Wheel({ at }: { readonly at: FollowGestures["
 		</span>
 	);
 	return (
-		<StripWheel at={at} last={CALENDAR} held={held} settling={settling} onSettled={() => setSettling(null)} className="tc-seg" role="group" aria-label="Columns" tabIndex={0} {...bind()}>
+		<StripWheel at={at} last={CALENDAR} held={held} landing={landing} onLanded={() => setLanding(null)} className="tc-seg" role="group" aria-label="Columns" tabIndex={0} {...bind()}>
 			<span className="tc-seg-view">{reel(false)}</span>
 			<span className="tc-seg-pill">{reel(true)}</span>
 		</StripWheel>

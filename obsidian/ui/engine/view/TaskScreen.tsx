@@ -95,8 +95,8 @@ const TYPING = ".tc-quick-row, .tc-quick-bar, .tc-quick-panel";
 
 /** The screen's element: its place's class, `is-entering` while a task is typed, new or renamed (Obsidian's phone toolbar stays away then, the design's «Полоса»). */
 function Root({ place, store }: { readonly place: Place; readonly store: ScreenStore }) {
-	/** A task typed: a new one, or one renamed in place (both the plugin's quick entry). */
-	const entering = useScreen((s) => s.entry !== null);
+	/** A task typed: a new one, one renamed in place (both the plugin's quick entry), or a first step on its card. */
+	const entering = useScreen((s) => s.entry !== null || s.firstStep !== null);
 	const touches = useTouchPresses();
 	useDrawn(store);
 	/**

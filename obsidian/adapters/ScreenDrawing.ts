@@ -35,17 +35,17 @@ export class ScreenDrawing {
 		return { inbox: this.column(screen, LIST_COLUMNS.inbox), backlog: this.column(screen, LIST_COLUMNS.backlog), soon: this.column(screen, LIST_COLUMNS.soon), day: this.column(screen, LIST_COLUMNS.day) };
 	}
 
-	/** The words of an empty list's plate: the core's, under a filter (`ViewChoice.plates`, `ProjectFilter.emptyLabel`); none without one. */
-	draw(source: ScreenSource, plate: string | null = null): ScreenData {
+	/** `plates`: each list's No tasks plate, the core's (`ViewChoice.plates`); none without them. */
+	draw(source: ScreenSource, plates: Readonly<Record<DropColumn, string | null>> | null = null): ScreenData {
 		const { date, screen, lists } = source;
 		const cards: Record<string, CardFace> = {};
 		const title = this.dayTitle(date);
 		return {
 			lists: {
-				inbox: this.list(this.tasks.listName("inbox"), lists.inbox, screen, cards, null, plate),
-				backlog: this.list(this.tasks.listName("backlog"), lists.backlog, screen, cards, null, plate),
-				soon: this.list(this.tasks.listName("soon"), lists.soon, screen, cards, null, plate),
-				day: this.list(title, lists.day, screen, cards, date, plate),
+				inbox: this.list("inbox", this.tasks.listName("inbox"), lists.inbox, screen, cards, null, plates?.inbox ?? null),
+				backlog: this.list("backlog", this.tasks.listName("backlog"), lists.backlog, screen, cards, null, plates?.backlog ?? null),
+				soon: this.list("soon", this.tasks.listName("soon"), lists.soon, screen, cards, null, plates?.soon ?? null),
+				day: this.list("day", title, lists.day, screen, cards, date, plates?.day ?? null),
 			},
 			cards,
 			missing: screen.missing ? { text: `No tasks file at ${this.tasksFile()}`, create: "Create file" } : null,
@@ -81,10 +81,10 @@ export class ScreenDrawing {
 		};
 	}
 
-	private list(title: string, column: ColumnList, screen: ScreenView, cards: Record<string, CardFace>, day: LocalDate | null, plate: string | null): ListData {
+	private list(which: ListId, title: string, column: ColumnList, screen: ScreenView, cards: Record<string, CardFace>, day: LocalDate | null, plate: string | null): ListData {
 		const rows: Row[] = [];
 		for (const group of column.groups) {
-			if (group.header) rows.push({ kind: "section", id: group.id, title: group.name ?? screen.offer.ungrouped, tasks: group.items.length, ungrouped: group.name === null, menu: group.menu && { rename: group.menu.rename, remove: group.menu.remove } });
+			if (group.header) rows.push({ kind: "section", id: `${which}@${day ?? ""}#${group.id}`, section: group.id, reorder: group.reorder, title: group.name ?? screen.offer.ungrouped, tasks: group.items.length, ungrouped: group.name === null, menu: group.menu && { rename: group.menu.rename, remove: group.menu.remove } });
 			for (const { item, level } of group.rows) {
 				cards[item.id] = this.face(item, day);
 				rows.push({ kind: "task", id: item.id, depth: level });

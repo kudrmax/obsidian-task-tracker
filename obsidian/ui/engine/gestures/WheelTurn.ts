@@ -2,9 +2,10 @@ import { useDrag } from "@use-gesture/react";
 import { useEffect, useRef } from "react";
 import { useScreenApi } from "../store";
 
-/** Slower than this (px/ms, the divider's magnet's) for longer than `CAREFUL_MS`, the wheel turns freely to the gesture's end (the design's «Колёсико»). */
-export const CAREFUL_SPEED = 0.08;
+/** Slower than the port's slow speed (px/ms, the divider's magnet's) for this long, the wheel turns freely to the gesture's end (the design's «Колёсико»). */
 export const CAREFUL_MS = 100;
+/** A finger that moves less than this is a tap on an icon, not a turn (the old plugin's press tolerance). */
+export const TAP_PX = 8;
 
 /**
  * How a finger turns the wheel (the design's «Колёсико»; the old plugin's `CarefulPace`): a quick swipe reaches no
@@ -27,6 +28,8 @@ export class WheelTurn {
 		private readonly last: number,
 		/** An icon's width, px: a finger travelling it turns the wheel one stop. */
 		private readonly step: number,
+		/** Slower than this, px/ms, the finger is careful. */
+		private readonly slowSpeed: number,
 		x: number,
 		t: number,
 	) {
@@ -41,7 +44,7 @@ export class WheelTurn {
 	move(x: number, t: number): number {
 		const speed = t > this.lastT ? Math.abs(x - this.lastX) / (t - this.lastT) : Infinity;
 		if (!this.careful) {
-			this.slowSince = speed < CAREFUL_SPEED ? (this.slowSince ?? this.lastT) : null;
+			this.slowSince = speed < this.slowSpeed ? (this.slowSince ?? this.lastT) : null;
 			if (this.slowSince !== null && t - this.slowSince >= CAREFUL_MS) {
 				this.careful = true;
 				this.base = this.at;
@@ -70,7 +73,7 @@ export class WheelTurn {
  * is held, the stop it is let go on `landed`; the columns stand still meanwhile and slide only once it lands. It holds
  * the gesture slot while it runs.
  */
-export function useWheelTurn({ standing, last, step, turned, landed }: { readonly standing: () => number; readonly last: number; readonly step: () => number; readonly turned: (at: number) => void; readonly landed: (standing: number | null) => void }) {
+export function useWheelTurn({ standing, last, step, slowSpeed, turned, landed }: { readonly standing: () => number; readonly last: number; readonly step: () => number; readonly slowSpeed: number; readonly turned: (at: number) => void; readonly landed: (from: number, to: number | null) => void }) {
 	const api = useScreenApi();
 	const turn = useRef<WheelTurn | null>(null);
 	useEffect(
@@ -84,16 +87,16 @@ export function useWheelTurn({ standing, last, step, turned, landed }: { readonl
 			if (tap) return;
 			if (first) {
 				if (!api.getState().claim("wheel")) return cancel();
-				turn.current = new WheelTurn(standing(), last, step(), x, timeStamp);
+				turn.current = new WheelTurn(standing(), last, step(), slowSpeed, x, timeStamp);
 			}
 			const held = turn.current;
 			if (!held) return;
 			if (!ended) return turned(held.move(x, timeStamp));
-			held.move(x, timeStamp);
+			const from = held.move(x, timeStamp);
 			turn.current = null;
 			api.getState().release("wheel");
-			landed(canceled ? null : held.land());
+			landed(from, canceled ? null : held.land());
 		},
-		{ filterTaps: true, axis: "x", pointer: { capture: true } },
+		{ filterTaps: true, threshold: TAP_PX, tapsThreshold: TAP_PX, axis: "x", pointer: { capture: true } },
 	);
 }

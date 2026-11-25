@@ -49,7 +49,7 @@ function FirstStepCard({ face, block, depth }: { readonly face: Face; readonly b
 	const own = (event: { stopPropagation(): void }) => event.stopPropagation();
 	const field = (
 		<div className="tc-first-step-line" onClick={own} onPointerDown={own} onMouseDown={own} onTouchStart={own}>
-			<ObsidianEditor text="" className="tc-quick-field tc-title-field tc-first-step-field" onEnter={(text) => api.getState().endFirstStep("enter", text)} onEscape={() => api.getState().endFirstStep("escape", "")} onLeave={(_, text) => api.getState().endFirstStep("blur", text())} />
+			<ObsidianEditor text="" className="tc-quick-field tc-title-field tc-first-step-field" placeholder="First step" onEnter={(text) => api.getState().endFirstStep("enter", text)} onEscape={() => api.getState().endFirstStep("escape", "")} onLeave={(_, text) => api.getState().endFirstStep("blur", text())} />
 		</div>
 	);
 	if (block)

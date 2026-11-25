@@ -71,6 +71,21 @@ export function describeScreenPort(name: string, make: PortMaker): void {
 		}
 
 		for (const delay of CONTRACT_DELAYS) {
+			it(`draws a section's move as the move's result (F63), the write landing after ${delay} ms`, async () => {
+				const port = await make(delay);
+				const heads = port.read(0).lists.soon.rows.flatMap((row) => (row.kind === "section" ? [row.section] : []));
+				if (heads.length < 2) throw new Error("Soon needs two sections");
+				const [first, , last = heads[1]] = heads;
+				expect(port.sectionMoves("soon", 0, last, first)).toBe(true);
+				expect(port.sectionMoves("soon", 0, first, heads[1])).toBe(false);
+				const preview = port.previewSection("soon", 0, last, first);
+				expect(shapeOf(preview)).not.toEqual(shapeOf(port.read(0)));
+				await port.moveSection("soon", 0, last, first);
+				expect(shapeOf(port.read(0))).toEqual(shapeOf(preview));
+			});
+		}
+
+		for (const delay of CONTRACT_DELAYS) {
 			it(`writes two tasks typed in a row in their order, the second a level in under the first, its write not awaited (${delay} ms)`, async () => {
 				const port = await make(delay);
 				const draft = { level: null, projects: [], descriptionLine: null, section: false };

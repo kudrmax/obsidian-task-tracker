@@ -91,7 +91,7 @@ export function slotOf(rows: readonly Row[], order: readonly string[], id: strin
 	for (let i = at - 1; i >= 0; i--) {
 		const row = kinds.get(order[i]);
 		if (row?.kind === "section") {
-			section = row.id;
+			section = row.section;
 			break;
 		}
 	}
