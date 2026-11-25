@@ -1,5 +1,5 @@
-import { levelRange, sameSlot, type CalendarService, dividerAt, type DividerStop, LIST_WIDTHS, listShareOf, type ListWidths, listWidths, type Clock, type DayEvents, type DayService, type DropColumn, type DroppedTask, type DropTo, type LocalDate, listCardMenuFrom, type MenuFrom as CoreMenuFrom, originOf, type ScreenReader, type ShownChange, type TaskItem, type TaskService, type UndoOutcome, undoNotice, projectNodeOf, type ProjectsNodeId, type UndoService } from "../../core/application/contracts";
-import type { ScreenContext, Destination, Edge, EntryBar, EntryCommit, EntryDraft, EntryField, LevelRange, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, RenameStart, ScreenData, ScreenPort } from "../ui/engine/port";
+import { type ColumnList, groupPlaceOf, SectionNameEntry, levelRange, sameSlot, type CalendarService, dividerAt, type DividerStop, LIST_WIDTHS, listShareOf, type ListWidths, listWidths, type Clock, type DayEvents, type DayChange, type DayService, type DropColumn, type DroppedTask, type DropTo, type LocalDate, listCardMenuFrom, type MenuFrom as CoreMenuFrom, originOf, type ScreenReader, type ShownChange, type TaskItem, type TaskService, type UndoOutcome, undoNotice, type ViewChoice, type ViewMode, projectNodeOf, type ProjectsNodeId, type UndoService } from "../../core/application/contracts";
+import type { ScreenContext, ScreenView, SectionNameEnd, Destination, Edge, EntryBar, EntryCommit, EntryDraft, EntryField, LevelRange, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, RenameStart, ScreenData, ScreenPort } from "../ui/engine/port";
 import { CoreEntry } from "./CoreEntry";
 import { WriteQueue } from "./WriteQueue";
 import { ListCards } from "./ListCards";
@@ -28,10 +28,22 @@ type CoreMove =
 	| { readonly kind: "slot"; readonly key: TaskItem["key"]; readonly slot: NonNullable<TaskItem["slot"]>; readonly day: LocalDate }
 	| { readonly kind: "home" };
 
+/**
+ * The core's view as the engine draws it. By project is not offered until the engine draws it (Decision 149): a kept By
+ * project draws two columns, as the core's default.
+ */
+function screenViewOf(choice: ViewChoice): ScreenView {
+	const drawn = (mode: ViewMode): ViewMode => (mode === "byProject" ? "twoColumns" : mode);
+	const chosen = drawn(choice.chosen);
+	const modes = choice.modes.filter((option) => option.mode !== "byProject").map((option) => ({ ...option, checked: option.mode === chosen }));
+	const mode = drawn(choice.mode);
+	return { mode, modes, icon: modes.find((option) => option.checked)?.icon ?? choice.icon, ribbon: mode === "twoColumns", subprojects: choice.subprojects };
+}
+
 /** The context of every task: no project chosen. */
 const EVERY = "";
 
-const COLUMNS: Readonly<Record<ListId, DropColumn>> = { inbox: "inbox", soon: "soon", day: "day" };
+const COLUMNS: Readonly<Record<ListId, DropColumn>> = { inbox: "inbox", backlog: "backlog", soon: "soon", day: "day" };
 
 /**
  * What every screen's port over the core shares (Decision 145): the core's held read of the file, taken anew when the
@@ -41,12 +53,16 @@ const COLUMNS: Readonly<Record<ListId, DropColumn>> = { inbox: "inbox", soon: "s
 class CoreReads {
 	readonly drawing: ScreenDrawing;
 	readonly queue: WriteQueue;
-	private readonly views = new Set<CorePort>();
+	private readonly screens = new Set<CorePort>();
+	/** The main screen's view, a wide screen's and a narrow one's, as last read. */
+	private readonly views = new Map<boolean, ScreenView>();
 	private readonly events = new Map<LocalDate, DayEvents>();
 	private readonly asked = new Set<LocalDate>();
 	private readonly offs: (() => void)[];
 	/** The same read within each project a screen is drawn in (`ScreenReader.within`), kept until the next read. */
 	private readonly readers = new Map<string, ScreenReader>();
+	/** The words of an empty list's plate under a filter (the core's `ViewChoice.emptyLabel`), once the core's view is read. */
+	plateWords: string | null = null;
 	/** The next held read asked for and not begun yet: every ask before it begins shares it. */
 	private queued: Promise<void> | null = null;
 	private reads: Promise<void> = Promise.resolve();
@@ -58,23 +74,27 @@ class CoreReads {
 	) {
 		this.drawing = new ScreenDrawing(core.tasks, core.days, core.calendars, core.tasksFile);
 		this.queue = new WriteQueue(core.onError);
-		this.offs = [core.tasks.onChange(() => void this.refresh()), core.tasks.onShownChange((change) => this.settingsChanged(change)), core.days.onDayChange(() => void this.refresh()), core.undo.onChange(() => this.changed()), core.calendars.onChange(() => this.forgetEvents())];
+		void core.tasks.funnelView(true).then((view) => {
+			this.plateWords = view.view.emptyLabel;
+			this.changed();
+		});
+		this.offs = [core.tasks.onChange(() => void this.refresh()), core.tasks.onShownChange((change) => this.settingsChanged(change)), core.days.onDayChange((change) => this.dayChanged(change)), core.undo.onChange(() => this.changed()), core.calendars.onChange(() => this.forgetEvents())];
 	}
 
 	/** A screen's port in `context`, told of every change from now on. */
 	view(context: string): CorePort {
 		const view = new CorePort(this, context);
-		this.views.add(view);
+		this.screens.add(view);
 		return view;
 	}
 
 	release(view: CorePort): void {
-		this.views.delete(view);
+		this.screens.delete(view);
 	}
 
 	dispose(): void {
 		for (const off of this.offs) off();
-		this.views.clear();
+		this.screens.clear();
 	}
 
 	/** The held read within `context`: the same read, another filter, at once. */
@@ -96,10 +116,35 @@ class CoreReads {
 			this.base = await this.core.tasks.reader(null);
 			this.readers.clear();
 			this.changed();
+			await Promise.all([...this.views.keys()].map((wide) => this.askView(wide)));
 		});
 		this.queued = run;
 		this.reads = run.catch(() => undefined);
 		return run;
+	}
+
+	/** The main screen's view on a `wide` screen or a narrow one: the device's as the core read it last, asked again in the background. */
+	viewOf(wide: boolean): ScreenView {
+		const kept = this.views.get(wide);
+		if (kept) return kept;
+		const first = screenViewOf(this.core.tasks.firstView(wide, false));
+		this.views.set(wide, first);
+		void this.askView(wide);
+		return first;
+	}
+
+	/** The view as the core reads it now; every screen told when it differs. */
+	async askView(wide: boolean): Promise<void> {
+		const next = screenViewOf((await this.core.tasks.funnelView(wide)).view);
+		if (JSON.stringify(next) === JSON.stringify(this.views.get(wide))) return;
+		this.views.set(wide, next);
+		this.changed();
+	}
+
+	/** A write of the device's view (the mode, Subprojects): every view asked again once it is kept. */
+	async keepView(write: Promise<void>): Promise<void> {
+		await write;
+		await this.refresh();
 	}
 
 	eventsOf(date: LocalDate): DayEvents | null {
@@ -129,6 +174,12 @@ class CoreReads {
 		if (change.drawn || change.cards || change.timeline || change.gestures) void this.refresh();
 	}
 
+	/** A day ended: the lists read anew. Another hour for the day's start: every screen opens today afresh, its lists read in the new day. */
+	private dayChanged(change: DayChange): void {
+		void this.refresh();
+		if (change === "moved") for (const view of this.screens) view.dayMoved();
+	}
+
 	private forgetEvents(): void {
 		this.events.clear();
 		this.asked.clear();
@@ -136,7 +187,7 @@ class CoreReads {
 	}
 
 	private changed(): void {
-		for (const view of this.views) view.changed();
+		for (const view of this.screens) view.changed();
 	}
 }
 
@@ -149,6 +200,7 @@ class CoreReads {
  */
 export class CorePort implements ScreenPort {
 	private readonly listeners = new Set<() => void>();
+	private readonly todayListeners = new Set<() => void>();
 	private readonly cache = new Map<string, ScreenData>();
 	private readonly entry: CoreEntry;
 
@@ -174,6 +226,7 @@ export class CorePort implements ScreenPort {
 	/** This screen's port is let go: its screen is gone. */
 	release(): void {
 		this.listeners.clear();
+		this.todayListeners.clear();
 		this.shared.release(this);
 	}
 
@@ -217,10 +270,32 @@ export class CorePort implements ScreenPort {
 			if (this.cache.size > 16) this.cache.clear();
 			const date = this.dateOf(dayOffset);
 			const screen = this.reader.screen(date);
-			data = this.drawing.draw({ date, screen, lists: this.drawing.listsOf(screen), events: this.eventsOf(date) });
+			data = this.drawing.draw({ date, screen, lists: this.drawing.listsOf(screen), events: this.eventsOf(date) }, this.plate());
 			this.cache.set(key, data);
 		}
 		return data;
+	}
+
+	view(wide: boolean): ScreenView {
+		return this.shared.viewOf(wide);
+	}
+
+	setViewMode(mode: ViewMode): Promise<void> {
+		return this.shared.keepView(this.core.tasks.setViewMode(mode));
+	}
+
+	toggleSubprojects(): Promise<void> {
+		return this.shared.keepView(this.core.tasks.toggleSubprojects());
+	}
+
+	onDayStartMoved(listener: () => void): () => void {
+		this.todayListeners.add(listener);
+		return () => this.todayListeners.delete(listener);
+	}
+
+	/** @internal The day starts at another hour now. */
+	dayMoved(): void {
+		for (const listener of this.todayListeners) listener();
 	}
 
 	subscribe(listener: () => void): () => void {
@@ -240,7 +315,7 @@ export class CorePort implements ScreenPort {
 		if (!move || move.kind === "home") return this.read(to.dayOffset);
 		if (move.kind === "slot") return this.drawn(date, { id, ...this.core.days.boundary().spanOf(move.slot, date) });
 		const { screen } = this.reader.dropPreview(move.tasks, move.to, move.day);
-		return this.drawing.draw({ date, screen, lists: this.drawing.listsOf(screen), events: this.eventsOf(date) });
+		return this.drawing.draw({ date, screen, lists: this.drawing.listsOf(screen), events: this.eventsOf(date) }, this.plate());
 	}
 
 	/** Nothing changes where the core leaves the task as it is: a card let go where it was lifted (`placeOfDrop`), a time it has already (`sameSlot`). */
@@ -281,6 +356,78 @@ export class CorePort implements ScreenPort {
 		if (move.kind === "slot") await this.core.tasks.setSlot(move.key, move.slot);
 		else await this.core.tasks.drop(move.tasks, move.to, move.day, this.filter()?.node ?? null);
 		await this.refresh();
+	}
+
+	firstStepView(id: string, dayOffset: number, context?: ScreenContext): ScreenData {
+		this.use(context);
+		const item = this.reader.item(id);
+		const date = this.dateOf(dayOffset);
+		if (!item) return this.read(dayOffset);
+		const screen = this.core.tasks.firstStepScreen(this.reader.screen(date), item.key);
+		return this.drawing.draw({ date, screen, lists: this.drawing.listsOf(screen), events: this.eventsOf(date) }, this.plate());
+	}
+
+	async firstStep(id: string, text: string): Promise<void> {
+		const item = this.reader.item(id);
+		if (!item) return;
+		await this.core.tasks.firstStep(item.key, text);
+		await this.refresh();
+	}
+
+	async fold(id: string): Promise<void> {
+		const item = this.reader.item(id);
+		if (!item) return;
+		await this.core.tasks.toggleCollapsed(item.key);
+		await this.refresh();
+	}
+
+	sectionNameEnd(how: SectionNameEnd, text: string): string | null {
+		let name: string | null = null;
+		const entry = new SectionNameEntry((ended) => (name = ended));
+		if (how === "enter") entry.enter(text);
+		else if (how === "escape") entry.escape();
+		else entry.blur();
+		return name;
+	}
+
+	async renameSection(list: ListId, dayOffset: number, section: string, name: string): Promise<void> {
+		const found = this.sectionOf(list, dayOffset, section);
+		if (!found?.group.menu?.rename) return;
+		await this.core.tasks.renameGroup(found.list, found.group.menu.section, name);
+		await this.refresh();
+	}
+
+	async removeSection(list: ListId, dayOffset: number, section: string): Promise<void> {
+		const found = this.sectionOf(list, dayOffset, section);
+		if (!found?.group.menu?.remove) return;
+		await this.core.tasks.removeGroup(found.list, found.group.menu.section);
+		await this.refresh();
+	}
+
+	sectionMoves(list: ListId, dayOffset: number, section: string, before: string | null): boolean {
+		return this.groupMove(list, dayOffset, section, before) !== null;
+	}
+
+	async moveSection(list: ListId, dayOffset: number, section: string, before: string | null): Promise<void> {
+		const move = this.groupMove(list, dayOffset, section, before);
+		if (!move) return;
+		await this.core.tasks.moveGroup(move.list, move.name, move.place);
+		await this.refresh();
+	}
+
+	/** The screen read now with the section's header and its rows standing before the header `before` (the list's end for null), as `moveGroup` leaves them. */
+	previewSection(list: ListId, dayOffset: number, section: string, before: string | null, context?: ScreenContext): ScreenData {
+		const data = this.read(dayOffset, context);
+		const rows = data.lists[list].rows;
+		const from = rows.findIndex((row) => row.id === section);
+		if (from < 0 || !this.sectionMoves(list, dayOffset, section, before)) return data;
+		let to = from + 1;
+		while (to < rows.length && rows[to].kind !== "section") to++;
+		const moved = rows.slice(from, to);
+		const rest = [...rows.slice(0, from), ...rows.slice(to)];
+		const at = before === null ? rest.length : rest.findIndex((row) => row.id === before);
+		const next = [...rest.slice(0, at < 0 ? rest.length : at), ...moved, ...rest.slice(at < 0 ? rest.length : at)];
+		return { ...data, lists: { ...data.lists, [list]: { ...data.lists[list], rows: next } } };
 	}
 
 	readonly listBounds = LIST_WIDTHS;
@@ -438,6 +585,31 @@ export class CorePort implements ScreenPort {
 		return this.reader.item(id) ? id : null;
 	}
 
+	/** The column `list` of the day `dayOffset` as it draws, and the grouped list whose sections it shows; null for one that shows none. */
+	private columnOf(list: ListId, dayOffset: number): { readonly column: ColumnList; readonly list: NonNullable<ColumnList["sections"]>["list"] } | null {
+		const column = this.drawing.column(this.reader.screen(this.dateOf(dayOffset)), COLUMNS[list]);
+		return column.sections ? { column, list: column.sections.list } : null;
+	}
+
+	/** The group of `list` whose header is `section`, and its grouped list. */
+	private sectionOf(list: ListId, dayOffset: number, section: string) {
+		const found = this.columnOf(list, dayOffset);
+		const group = found?.column.groups.find((g) => g.header && g.id === section);
+		return found && group ? { list: found.list, group } : null;
+	}
+
+	/** Where the section lifted goes let go before `before` (the core's `groupPlaceOf` over the headers the column draws); null at its own place. */
+	private groupMove(list: ListId, dayOffset: number, section: string, before: string | null) {
+		const found = this.columnOf(list, dayOffset);
+		if (!found) return null;
+		const groups = found.column.groups.filter((g) => g.header);
+		const lifted = groups.findIndex((g) => g.id === section);
+		const slot = before === null ? groups.length : groups.findIndex((g) => g.id === before);
+		if (lifted < 0 || slot < 0) return null;
+		const place = groupPlaceOf(groups.map((g) => g.name), lifted, slot);
+		return place && { list: found.list, name: groups[lifted].name, place };
+	}
+
 	/** The day `dayOffset` days from today, as the core steps days. */
 	private dateOf(dayOffset: number): LocalDate {
 		return this.core.days.step(this.core.days.today(), dayOffset);
@@ -446,7 +618,7 @@ export class CorePort implements ScreenPort {
 	/** The held read's screen of `date`, a task held by a dot drawn at `held`. */
 	private drawn(date: LocalDate, held: ScreenSource["held"] | null): ScreenData {
 		const screen = this.reader.screen(date);
-		return this.drawing.draw({ date, screen, lists: this.drawing.listsOf(screen), events: this.eventsOf(date), ...(held && { held }) });
+		return this.drawing.draw({ date, screen, lists: this.drawing.listsOf(screen), events: this.eventsOf(date), ...(held && { held }) }, this.plate());
 	}
 
 	private itemOf(id: string): TaskItem {
@@ -476,6 +648,11 @@ export class CorePort implements ScreenPort {
 		const place = new ListCards(this.drawing.column(this.reader.screen(day), column), id).dropOf(to);
 		if (place === null) return null;
 		return place === "home" ? { kind: "home" } : { kind: "drop", tasks, to: { kind: "place", column, place }, day };
+	}
+
+	/** An empty list's plate (F64): the core's words under a filter, as its view's plates are; none for every task. */
+	private plate(): string | null {
+		return this.context === EVERY ? null : this.shared.plateWords;
 	}
 
 	/** The screen drawn in `context` (every task when absent) from now on. */

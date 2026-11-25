@@ -338,7 +338,7 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 			.setName("Day starts at")
 			.setDesc("Before this hour it is still the day before: today, due dates and the timeline count from here.")
 			.addDropdown((d) => {
-				for (const hour of this.settings.dayStartHours) d.addOption(String(hour), `${String(hour).padStart(2, "0")}:00`);
+				for (const { hour, label } of this.settings.dayStartChoices) d.addOption(String(hour), label);
 				d.setValue(String(this.settings.dayStartHour)).onChange((value) => this.service.setDayStartHour(Number(value)));
 			});
 		this.count(el, "scrollToHour", "Scroll to hour", "Hour another day opens at.");

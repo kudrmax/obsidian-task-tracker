@@ -7,7 +7,7 @@
  * looks, change its token, or add one here with a name that says what it is for.
  *
  * Properties the code sets per element (--tc-list-width, --tc-grab-x, --tc-grab-y, --tc-landing-level, --tc-landing-w, --tc-landing-h, --tc-hour, --tc-allday-extra-rows, --tc-y, --tc-stack-z, --tc-lanes-after, --tc-block-top, --tc-label-room, --tc-anchor-offset, --tc-event-bg-dark, --tc-event-bar-dark, --tc-event-text-dark, --tc-event-bg-light, --tc-event-bar-light, --tc-event-text-light,
- * --tc-ribbon-list-share, --tc-ribbon-list-least, --tc-ribbon-list-most, --tc-len, --tc-x, --tc-level, --tc-pass, --tc-stack-end, --tc-room-top, --tc-room-bottom, --tc-scrolled, --tc-scrolled-below, --tc-event-bg, --tc-event-bar, --tc-event-text, and per priority colour --tc-priority-ink, --tc-priority-fill, --tc-priority-meta) carry a measure from the layout
+ * --tc-ribbon-list-share, --tc-ribbon-list-least, --tc-ribbon-list-most, --tc-len, --tc-x, --tc-level, --tc-pass, --tc-stack-end, --tc-room-top, --tc-room-bottom, --tc-scrolled, --tc-event-bg, --tc-event-bar, --tc-event-text, and per priority colour --tc-priority-ink, --tc-priority-fill, --tc-priority-meta) carry a measure from the layout
  * into these rules; the rules do the arithmetic.
  */
 body {
@@ -27,6 +27,7 @@ body {
 	/* The chosen segment's ground, the due day, the confirm button's ground, the ring of the chosen place tile. */
 	--tc-ink-strong: #E5E5EA;
 	--tc-muted: #8E8E93;
+	--tc-stale: #FF9F0A;
 	/* An event that is over, whatever its calendar's colour: the ground barely lifted, the bar and the title faded into it. The core's `pastEventPaint` (core/application/paints.ts, PAST_SHARES) holds the same shares for the apps: change both together. */
 	--tc-event-past-lift: 1.5%;
 	--tc-event-past-ink: 12.5%;
@@ -137,9 +138,26 @@ body {
 	--tc-seg-pad: 2px;
 	--tc-seg-btn-h: 28px;
 	/* The switch is a wheel: a window two icons wide stands still in the middle of the screen, and the four icons roll under it; the track holds one neighbour on either side. */
+	--tc-seg-btn-w: 38px;
+	--tc-seg-icon: var(--tc-icon-m);
 	/* Away from the window the wheel turns from the eye: per icon's width out, an icon shrinks and fades by these. */
+	--tc-seg-shrink: 0.14;
+	--tc-seg-dim: 0.28;
 	/* The wheel is as tall as Undo's capsule and the plus beside it, so the foot reads as one bar in three parts. */
 	--tc-wheel: var(--tc-plus-size);
+	--tc-wheel-pad: var(--tc-space-4);
+	--tc-wheel-btn-h: calc(var(--tc-wheel) - 2 * var(--tc-wheel-pad));
+	--tc-radius-wheel: calc(var(--tc-wheel) / 2);
+	--tc-radius-wheel-btn: calc(var(--tc-wheel-btn-h) / 2);
+	/* The dot on the wheel's calendar icon: a calendar in use gone old (orange) or broken (red), at the icon's top right. */
+	--tc-dot: 7px;
+	--tc-dot-rise: 3px;
+	--tc-dot-top: calc((var(--tc-wheel-btn-h) - var(--tc-seg-icon)) / 2 - var(--tc-dot-rise));
+	--tc-dot-right: 6px;
+	/* The wheel stands in the middle of the strip on the desktop; on the phone, with the view button left of it, in the middle of the room between Undo's capsule and the plus. */
+	--tc-stage-mid: calc(var(--tc-stage-left) + (100% - var(--tc-stage-left)) / 2);
+	--tc-view-gap: var(--tc-space-8);
+	--tc-foot-mid: calc(50% + var(--tc-capsule-btn) - var(--tc-plus-size) / 2);
 	/* The switch's row at the bottom, this far over Obsidian's phone navigation or status bar. */
 	--tc-foot-gap: 6px;
 	--tc-switch-row: calc(var(--tc-wheel) + var(--tc-foot-gap));
@@ -161,6 +179,16 @@ body {
 	--tc-divider: 16px;
 	/* Soon and Now share the window evenly on both sides of the fixed divider. */
 	--tc-half-column: calc((100% - var(--tc-stage-left) - var(--tc-divider)) / 2);
+	/* The day's arrows either side of its title (the design's «Колонка дня»): narrow beside the day's list, the chevron in them. */
+	--tc-arrow-narrow: 28px;
+	/* The View menu's title row over its modes. */
+	--tc-menu-title-h: 40px;
+	/* The view button's icon. */
+	--tc-view-icon: var(--tc-icon-m);
+	--tc-stroke-view: var(--tc-stroke-2);
+	/* All columns' lists beside the calendar: Inbox over Backlog, Soon, the day's. */
+	--tc-all-lists: 3;
+	--tc-chevron: 20px;
 	--tc-column-pad-near: 0 var(--tc-space-2) 0 var(--tc-space-10);
 	--tc-column-pad-far: 0 var(--tc-space-10) 0 var(--tc-space-2);
 	/* A column of the engine's ribbon holds half of the divider beside it: its near side's room, its far side's and that half. */
@@ -241,6 +269,8 @@ body {
 	--tc-foot-fade: 64px;
 	/* Its height, from over the switch. */
 	--tc-foot-fade-day: calc(var(--tc-switch-row) + var(--tc-chrome-room) + var(--tc-foot-fade));
+	/* Backlog's half of the first column is taller by the screen's foot lying over it, so both lists show as much (the design's «Inbox над Backlog»). */
+	--tc-backlog-extra: calc(var(--tc-space-8) + var(--tc-foot-fade-day));
 	/* The dragged card stands a little taller than the one it was lifted from. */
 	/* The stand's note block: the room the engine's screen takes in a note. */
 	/* Over the Projects screen's tree a carried card or project rides this far above the finger. */
@@ -466,7 +496,6 @@ body {
 	--tc-room-top: 0px;
 	--tc-room-bottom: 0px;
 	--tc-scrolled: 0px;
-	--tc-scrolled-below: 0px;
 	--tc-block-pad-top: calc((var(--tc-card-h) - var(--tc-leading-card)) / 2);
 	--tc-select-ring: 1.5px;
 	--tc-ring-selected: inset 0 0 0 var(--tc-select-ring) var(--tc-accent);
@@ -565,6 +594,7 @@ body {
 	--tc-layer-allday: 4;
 	--tc-layer-float: 1000;
 	--tc-layer-plus: 5;
+	--tc-layer-switch: 5;
 	/* The projects' panel lies over the lists and their fade, under the bottom row and the projects button. */
 	--tc-layer-bar: 6;
 	/* Inside the quick bar: its panels' shadows lie under its ground, its buttons over it. */
@@ -589,6 +619,7 @@ body {
 
 	/* Motion: the cards of a list step aside for a dragged card and the dashed place eases along; a dropped card flies to its place; the drop target slides between grid steps. */
 	--tc-ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+	--tc-ease-in-out: cubic-bezier(0.42, 0, 0.58, 1);
 	/* The strip slides to the other pair of columns, the switch's pill with it; a column's padding and gap, which change with its side, slide along. */
 	--tc-duration-slide: 300ms;
 	--tc-duration-collapse: 150ms;
@@ -629,6 +660,7 @@ body.theme-light {
 	--tc-shadow-under: 0 3px 20px 0 rgba(0, 0, 0, 0.09);
 	--tc-shadow-control: 0 6px 16px rgba(0, 0, 0, 0.12), 0 0 0 0.5px rgba(0, 0, 0, 0.1);
 	--tc-danger: #FF3B30;
+	--tc-stale: #FF9500;
 	--tc-ink-dim: #C7C7CC;
 	--tc-separator: #D1D1D6;
 	--tc-backdrop: rgba(0, 0, 0, 0.22);
@@ -668,7 +700,7 @@ button.tc-btn:not(:disabled):active { opacity: var(--tc-pressed); }
 	body:not(.is-mobile) button.tc-btn:not(:disabled):hover { background-image: linear-gradient(var(--tc-hover), var(--tc-hover)); }
 }
 /* The keyboard's focus (desktop only, and in the settings): a ring outside the button; inside it in the windows that clip their content. */
-body:not(.is-mobile) button.tc-btn:focus-visible, button.tc-btn.is-swatch:focus-visible { outline: var(--tc-focus-ring); outline-offset: var(--tc-focus-offset); }
+body:not(.is-mobile) button.tc-btn:focus-visible, body:not(.is-mobile) .tc-seg:focus-visible, button.tc-btn.is-swatch:focus-visible { outline: var(--tc-focus-ring); outline-offset: var(--tc-focus-offset); }
 body:not(.is-mobile) :is(.tc-panel, .tc-picker, .tc-capsule) button.tc-btn:focus-visible { outline-offset: calc(-1 * var(--tc-focus-offset)); }
 /*
  * The button's kinds. Obsidian pads a button on the iPad and greys a tapped one on the phone at (0,2,1): a kind's padding,
@@ -701,6 +733,26 @@ button.tc-btn.is-swatch.tc-swatch-clear.is-on { box-shadow: inset 0 0 0 var(--tc
 .task-calendar > button.tc-plus, .task-calendar > .tc-plus-ring, .task-calendar > .tc-capsule { position: absolute; bottom: calc(var(--tc-chrome-room) + var(--tc-foot-gap) + (var(--tc-wheel) - var(--tc-plus-size)) / 2 - var(--tc-keyboard-room)); z-index: var(--tc-layer-plus); }
 .task-calendar > button.tc-plus, .task-calendar > .tc-plus-ring { right: var(--tc-space-16); touch-action: none; }
 /* The controls of the foot never vanish in a frame: one going (the plus while a card is carried, Undo + ⋯ while tasks are selected) fades and shrinks, one coming grows back, on the overlay's curve. */
+/*
+ * The wheel (the design's «Колёсико»): its place, --tc-wheel-at, set as the ribbon stands, from 0 (Inbox and Soon in the
+ * window) to 2 (the day and its calendar). The window, two icons wide, stands still in the middle; the track holds one
+ * neighbour on either side where there is one; an icon shrinks and fades by its distance from the window.
+ */
+.task-calendar > .tc-seg { --tc-seg-before: min(1, var(--tc-wheel-at)); --tc-seg-after: min(1, calc(2 - var(--tc-wheel-at))); --tc-seg-w: calc((2 + var(--tc-seg-before) + var(--tc-seg-after)) * var(--tc-seg-btn-w) + 2 * var(--tc-wheel-pad)); position: absolute; left: calc(var(--tc-stage-mid) - var(--tc-seg-btn-w) - var(--tc-wheel-pad) - var(--tc-seg-before) * var(--tc-seg-btn-w)); bottom: calc(var(--tc-chrome-room) + var(--tc-foot-gap) - var(--tc-keyboard-room)); z-index: var(--tc-layer-switch); }
+body.is-mobile .task-calendar > .tc-seg { left: calc(var(--tc-foot-mid) + (var(--tc-plus-size) + var(--tc-view-gap)) / 2 - var(--tc-seg-w) / 2); }
+.tc-seg { width: var(--tc-seg-w); height: var(--tc-wheel); box-sizing: border-box; border-radius: var(--tc-radius-wheel); background: var(--tc-track-bg); box-shadow: var(--tc-shadow-control); overflow: hidden; touch-action: none; cursor: pointer; outline: none; -webkit-user-select: none; user-select: none; }
+.tc-seg-view { position: absolute; top: var(--tc-wheel-pad); left: var(--tc-wheel-pad); right: var(--tc-wheel-pad); height: var(--tc-wheel-btn-h); overflow: hidden; }
+.tc-seg-pill { position: absolute; top: var(--tc-wheel-pad); left: calc(var(--tc-wheel-pad) + var(--tc-seg-before) * var(--tc-seg-btn-w)); width: calc(2 * var(--tc-seg-btn-w)); height: var(--tc-wheel-btn-h); border-radius: var(--tc-radius-wheel-btn); background: var(--tc-ink-strong); overflow: hidden; pointer-events: none; }
+.tc-seg-reel { position: absolute; top: 0; left: calc((var(--tc-seg-before) - var(--tc-wheel-at)) * var(--tc-seg-btn-w)); display: flex; }
+.tc-seg-pill > .tc-seg-reel { left: calc(-1 * var(--tc-wheel-at) * var(--tc-seg-btn-w)); }
+.tc-seg-icon { --tc-seg-off: calc(2 * var(--tc-seg-i) - 2 * var(--tc-wheel-at) - 1); --tc-seg-depth: max(0, (max(var(--tc-seg-off), -1 * var(--tc-seg-off)) - 1) / 2); position: relative; width: var(--tc-seg-btn-w); height: var(--tc-wheel-btn-h); flex-shrink: 0; color: var(--tc-muted); display: flex; align-items: center; justify-content: center; transform: scale(calc(1 - var(--tc-seg-depth) * var(--tc-seg-shrink))); opacity: calc(1 - var(--tc-seg-depth) * var(--tc-seg-dim)); }
+.tc-seg-pill .tc-seg-icon { color: var(--tc-on-strong); }
+.tc-seg-icon svg { width: var(--tc-seg-icon); height: var(--tc-seg-icon); stroke-width: var(--tc-stroke-seg); }
+/* Let go, the wheel rolls on to its place and the track's ends follow; the columns slide meanwhile. */
+.task-calendar > .tc-seg.is-settling, .tc-seg.is-settling :is(.tc-seg-pill, .tc-seg-reel) { transition: left var(--tc-duration-slide) var(--tc-ease-in-out), width var(--tc-duration-slide) var(--tc-ease-in-out); }
+.tc-seg.is-settling .tc-seg-icon { transition: transform var(--tc-duration-slide) var(--tc-ease-in-out), opacity var(--tc-duration-slide) var(--tc-ease-in-out); }
+.tc-dot { position: absolute; top: var(--tc-dot-top); right: var(--tc-dot-right); width: var(--tc-dot); height: var(--tc-dot); border-radius: var(--tc-radius-circle); background: var(--tc-stale); }
+.tc-dot.is-broken { background: var(--tc-danger); }
 .task-calendar > :is(button.tc-plus, .tc-capsule) { transition: opacity var(--tc-duration-collapse) var(--tc-ease-out), transform var(--tc-duration-collapse) var(--tc-ease-out), visibility 0s linear 0s; }
 .task-calendar > button.tc-plus.is-hidden, .task-calendar > button.tc-plus.is-hidden ~ .tc-capsule, .task-calendar > .tc-capsule.is-hidden { opacity: 0; transform: scale(var(--tc-menu-scale)); visibility: hidden; pointer-events: none; transition: opacity var(--tc-duration-collapse) var(--tc-ease-out), transform var(--tc-duration-collapse) var(--tc-ease-out), visibility 0s linear var(--tc-duration-collapse); }
 .task-calendar > .tc-capsule { left: var(--tc-space-16); }
@@ -736,8 +788,15 @@ button.tc-btn.is-swatch.tc-swatch-clear.is-on { box-shadow: inset 0 0 0 var(--tc
 .task-calendar.is-entering .tc-list::after { height: max(var(--tc-foot-fade-day), var(--tc-entry-room)); }
 /* A scrolled list whose rows fold away keeps room under them for as long as its scroll needs it (obsidian/ui/motion/ScrollHold.ts). */
 .tc-list::-webkit-scrollbar { display: none; }
-/* Content scrolled under a list's or the calendar's edge fades out there instead of being cut by a line. Each fade is as deep as the content under its edge, up to its full height, so it grows in and out with the scroll and never appears in a step; a list at rest at an edge shows none there. */
-:is(.tc-list, .tc-timeline):is(.is-under-top, .is-under-bottom) { -webkit-mask-image: linear-gradient(to bottom, transparent, var(--tc-mask-ink) min(var(--tc-scrolled), var(--tc-scroll-fade)), var(--tc-mask-ink) calc(100% - min(var(--tc-scrolled-below), var(--tc-scroll-fade))), transparent); mask-image: linear-gradient(to bottom, transparent, var(--tc-mask-ink) min(var(--tc-scrolled), var(--tc-scroll-fade)), var(--tc-mask-ink) calc(100% - min(var(--tc-scrolled-below), var(--tc-scroll-fade))), transparent); }
+/*
+ * Content scrolled under a list's or the calendar's edge fades out there instead of being cut by a line (F65). Each fade
+ * is as deep as the content under its edge, up to half a card, so it grows in and out with the scroll and never appears in
+ * a step; a list at rest at an edge shows none there. The browser's own scroll timeline runs it: the first room of the
+ * scroll grows the top fade in, the last room takes the bottom fade away; a box that does not scroll fades nowhere.
+ */
+@keyframes tc-fade-top { from { --tc-fade-top: 0px; } to { --tc-fade-top: var(--tc-scroll-fade); } }
+@keyframes tc-fade-bottom { from { --tc-fade-bottom: var(--tc-scroll-fade); } to { --tc-fade-bottom: 0px; } }
+.task-calendar.is-engine :is(.tc-list, .tc-timeline) { -webkit-mask-image: linear-gradient(to bottom, transparent, var(--tc-mask-ink) var(--tc-fade-top), var(--tc-mask-ink) calc(100% - var(--tc-fade-bottom)), transparent); mask-image: linear-gradient(to bottom, transparent, var(--tc-mask-ink) var(--tc-fade-top), var(--tc-mask-ink) calc(100% - var(--tc-fade-bottom)), transparent); animation-name: tc-fade-top, tc-fade-bottom; animation-timing-function: linear; animation-fill-mode: both; animation-timeline: scroll(self), scroll(self); animation-range: 0px var(--tc-scroll-fade), calc(100% - var(--tc-scroll-fade)) 100%; }
 
 /* A card: the dot of a task in progress, the title fading out on the right, the due date. */
 .tc-card { position: relative; overflow: hidden; flex-shrink: 0; height: var(--tc-card-h); box-sizing: border-box; background: var(--tc-card-bg); border-radius: var(--tc-radius-card); padding: 0 var(--tc-card-pad-end) 0 var(--tc-card-pad-start); display: flex; align-items: center; gap: var(--tc-space-6); touch-action: pan-y; cursor: pointer; }
@@ -820,10 +879,12 @@ body:has(> .tc-backdrop.is-shown) > .suggestion-container, body:has(> .tc-backdr
 .tc-block.is-renaming .tc-block-card { visibility: hidden; }
 /* First step typed on the card itself: a list's card is the folded card, its step line the field, ringed as a field is; a block's line is the field, the block growing down with it. */
 .tc-card.is-first-step, .tc-block-card.is-first-step { box-shadow: var(--tc-ring-selected); cursor: text; }
-.tc-card.is-collapsed.is-first-step { box-shadow: var(--tc-ring-selected), var(--tc-shadow-fold); }
+.tc-card.is-collapsed.is-first-step, :is(.tc-list-item, .tc-drag-source) > .tc-card.is-first-step[data-collapsed="true"] { box-shadow: var(--tc-ring-selected), var(--tc-shadow-fold); }
 .tc-card.is-first-step { height: auto; min-height: var(--tc-card-h); padding-top: calc((var(--tc-card-h) - var(--tc-leading-card-over) - var(--tc-leading-card)) / 2); padding-bottom: calc((var(--tc-card-h) - var(--tc-leading-card-over) - var(--tc-leading-card)) / 2); }
 .tc-block-card.is-first-step { bottom: auto; min-height: 100%; padding-bottom: var(--tc-block-pad-top); }
-.tc-block:has(> .tc-block-card.is-first-step) { z-index: var(--tc-layer-selected); }
+.tc-block:has(.tc-block-card.is-first-step) { z-index: var(--tc-layer-selected); }
+.tc-first-step-line { flex: 1; min-width: 0; }
+.task-calendar :is(.tc-card, .tc-block-card) .tc-quick-field.tc-first-step-field { min-height: 0; padding: 0; border-radius: 0; background: none; box-shadow: none; font-size: var(--tc-font-body); line-height: var(--tc-leading-card); }
 /* A renamed task in progress keeps its dot at the field's left, over the field. */
 .tc-quick-row > .tc-progress-dot { z-index: var(--tc-layer-progress-dot); }
 
@@ -1189,7 +1250,7 @@ body:not(.is-mobile) .tc-stage-col.is-timeline > .tc-stage-head { padding: 0 var
  * `listWidths` draws it; the calendar takes the rest of the window (`50%` of the strip is the window). A step of the
  * divider into the middle or out of it glides.
  */
-.tc-ribbon-track > .tc-stage-col:not(.is-timeline) :is(.tc-stage-head, .tc-stage-body) { padding: var(--tc-column-pad-ribbon); }
+.tc-ribbon-track > .tc-stage-col:not(.is-timeline) :is(.tc-stage-head, .tc-stage-body, .tc-backlog-head) { padding: var(--tc-column-pad-ribbon); }
 .tc-ribbon-track > .tc-stage-col:is(.is-day, .is-timeline) { --tc-ribbon-list-width: clamp(var(--tc-ribbon-list-least), calc(var(--tc-ribbon-list-share) * (50% - var(--tc-divider))), max(var(--tc-ribbon-list-most), calc(50% - var(--tc-divider) - var(--tc-ribbon-list-least)))); }
 .tc-ribbon-track > .tc-stage-col.is-timeline { width: calc(50% - var(--tc-ribbon-list-width) - var(--tc-divider) / 2); padding-left: calc(var(--tc-divider) / 2); box-sizing: border-box; }
 .tc-ribbon-track > .tc-stage-col:is(.is-day, .is-timeline) { transition: --tc-ribbon-list-share var(--tc-duration-snap) var(--tc-ease-out); }
@@ -1197,10 +1258,63 @@ body:not(.is-mobile) .tc-stage-col.is-timeline > .tc-stage-head { padding: 0 var
 .tc-rule { flex: none; width: 0; position: relative; z-index: var(--tc-layer-rule); }
 .tc-rule-strip { position: absolute; left: calc(-1 * var(--tc-divider) / 2); top: var(--tc-columns-head); bottom: 0; width: var(--tc-divider); display: flex; justify-content: center; pointer-events: none; }
 .tc-rule-strip.is-divider { pointer-events: auto; touch-action: none; cursor: col-resize; }
+/* The first column is Inbox over Backlog, half and half, each list scrolling by itself; Backlog's title stands in its half under a line, as a column's stands over it; Inbox's list ends over the line. */
+.tc-backlog { position: relative; flex: 1 1 var(--tc-backlog-extra); min-height: 0; display: flex; flex-direction: column; border-top: var(--tc-hairline) solid var(--tc-line); }
+.tc-backlog-head { flex: none; height: var(--tc-day-row); margin: var(--tc-space-8) 0 var(--tc-space-12); box-sizing: border-box; display: flex; align-items: center; }
+.task-calendar .tc-stage-body.is-inbox-half .tc-list::after { height: var(--tc-space-8); }
 /* A region that slides (the shown day's list and its calendar): one layer filling its column, the next sliding in beside it. */
 .tc-slide { position: absolute; inset: 0; display: flex; flex-direction: column; }
 .tc-slide > .tc-stage-body > .tc-timeline { top: 0; }
 .tc-day-lane { position: relative; flex: 1 1 0; min-height: 0; overflow: clip; }
+/*
+ * The day's arrows stand still over its turning pages (F41, F46): the previous day's at the title's start, the next day's right
+ * after the shown day's title (drawn unseen between them for its width); each page's title starts past the first arrow.
+ */
+.tc-day-nav { position: absolute; top: 0; left: 0; right: 0; height: var(--tc-day-row); box-sizing: border-box; padding: var(--tc-column-pad-ribbon); display: flex; align-items: center; gap: var(--tc-space-2); pointer-events: none; }
+.tc-day-nav > button.tc-arrow { width: var(--tc-arrow-narrow); height: var(--tc-day-row); flex: none; pointer-events: auto; }
+.tc-day-nav > .tc-arrow svg { width: var(--tc-chevron); height: var(--tc-chevron); stroke-width: var(--tc-stroke-chevron); }
+.tc-day-nav-title { min-width: 0; padding: 0 var(--tc-space-4); font-size: var(--tc-font-title); font-weight: var(--tc-weight-bold); white-space: nowrap; overflow: hidden; visibility: hidden; }
+.tc-slide > .tc-stage-head > .tc-head-title { margin-left: calc(var(--tc-arrow-narrow) + var(--tc-space-2)); padding: 0; }
+.tc-head-title > button.tc-day-title { max-width: 100%; height: 100%; padding: 0 var(--tc-space-4); border-radius: var(--tc-radius-text-btn); color: var(--tc-text); font-weight: var(--tc-weight-bold); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Over the calendar (Rows): the arrows and the day's title standing in the calendar's head row. */
+.tc-day-nav.is-standing { position: relative; padding: 0; flex: 1 1 auto; min-width: 0; }
+.tc-day-nav.is-standing > .tc-head-title { padding: 0; }
+
+/* The view button (F11): round as the plus, on the bottom row in the wheel's place, the menu «View» over it. */
+.task-calendar > button.tc-view-btn { position: absolute; bottom: calc(var(--tc-chrome-room) + var(--tc-foot-gap) + (var(--tc-wheel) - var(--tc-plus-size)) / 2 - var(--tc-keyboard-room)); z-index: var(--tc-layer-plus); transition: opacity var(--tc-duration-collapse) var(--tc-ease-out), transform var(--tc-duration-collapse) var(--tc-ease-out); }
+.task-calendar > button.tc-view-btn { left: calc(var(--tc-stage-mid) - var(--tc-plus-size) / 2); }
+body.is-mobile .task-calendar > button.tc-view-btn { left: calc(var(--tc-foot-mid) - var(--tc-plus-size) / 2); }
+/* Beside the wheel (Two columns, F260): its right edge the gap left of the wheel's, as the wheel widens and narrows (CSS anchor positioning). */
+.task-calendar > .tc-seg { anchor-name: --tc-wheel-anchor; }
+.task-calendar:has(> .tc-seg) > button.tc-view-btn, body.is-mobile .task-calendar:has(> .tc-seg) > button.tc-view-btn { position-anchor: --tc-wheel-anchor; left: auto; right: calc(anchor(left) + var(--tc-view-gap)); }
+.task-calendar > button.tc-view-btn.is-hidden { opacity: 0; transform: scale(var(--tc-menu-scale)); visibility: hidden; pointer-events: none; }
+.tc-view-btn svg { width: var(--tc-view-icon); height: var(--tc-view-icon); stroke-width: var(--tc-stroke-view); }
+.tc-control-copy { pointer-events: none; opacity: 0; transition: opacity var(--tc-duration-menu) var(--tc-ease-out); }
+.tc-control-copy.is-shown { opacity: 1; }
+.tc-control-copy.is-closing { opacity: 0; transition-duration: var(--tc-duration-collapse); }
+.tc-panel.is-view { z-index: var(--tc-layer-panel); }
+.tc-panel .tc-menu-title { height: var(--tc-menu-title-h); box-sizing: border-box; padding: 0 var(--tc-space-16); border-bottom: var(--tc-rule); display: flex; align-items: center; font-size: var(--tc-font-body); font-weight: var(--tc-weight-semibold); }
+
+/*
+ * All columns (F16): the three lists side by side, each the list width the divider's share gives over half the window (so
+ * all four columns are equal at its middle), never so wide the calendar falls under its least; the calendar the rest.
+ */
+.tc-all-columns { height: 100%; display: flex; --tc-all-list-width: min(clamp(var(--tc-ribbon-list-least), calc(var(--tc-ribbon-list-share) * (50% - var(--tc-divider))), max(var(--tc-ribbon-list-most), calc(50% - var(--tc-divider) - var(--tc-ribbon-list-least)))), calc((100% - var(--tc-ribbon-list-least)) / var(--tc-all-lists))); }
+.tc-all-columns > .tc-stage-col:not(.is-timeline) { width: var(--tc-all-list-width); }
+.tc-all-columns > .tc-stage-col.is-day { overflow: clip; }
+.tc-all-columns > .tc-stage-col:not(.is-timeline) :is(.tc-stage-head, .tc-stage-body, .tc-backlog-head) { padding: var(--tc-column-pad-ribbon); }
+.tc-all-columns > .tc-stage-col.is-timeline { flex: 1 1 0; padding-left: calc(var(--tc-divider) / 2); box-sizing: border-box; }
+
+/* Rows (F17, F18): the lists stacked under their small labels, each as tall as its cards while all fit; the day's list takes the rest and turns with the days. */
+.tc-rows-stack { height: 100%; box-sizing: border-box; padding: var(--tc-column-pad-ribbon); padding-bottom: var(--tc-foot-fade-day); display: flex; flex-direction: column; }
+.tc-row { flex: 0 1 auto; min-height: calc(var(--tc-group-head-h) + var(--tc-card-h) + var(--tc-card-gap)); display: flex; flex-direction: column; }
+.tc-row + .tc-row { margin-top: var(--tc-section-gap); }
+/* The day's pages lie in one cell, so the day's row is as tall as its page, as the other rows are as tall as their lists. */
+.tc-row > .tc-day-lane { flex: 0 1 auto; display: grid; grid-template-rows: minmax(0, 1fr); }
+.tc-row > .tc-day-lane > .tc-slide { position: relative; inset: auto; grid-area: 1 / 1; min-height: 0; }
+.tc-row > .tc-list, .tc-row .tc-slide > .tc-list { flex: 0 1 auto; padding-top: var(--tc-card-gap); }
+.tc-row .tc-list::after { content: none; }
+.tc-row-label { flex-shrink: 0; height: var(--tc-group-head-h); box-sizing: border-box; padding: 0 var(--tc-space-4) 0 var(--tc-card-pad-start); display: flex; align-items: flex-end; font-size: var(--tc-font-group); line-height: var(--tc-leading-group); font-weight: var(--tc-weight-semibold); color: var(--tc-pull-ink); white-space: nowrap; overflow: hidden; }
 .task-calendar.is-engine .tc-timeline { overflow-x: hidden; }
 .tc-now-lane { position: absolute; top: 0; bottom: 0; left: var(--tc-items-left); right: var(--tc-items-right); z-index: var(--tc-layer-now); pointer-events: none; }
 .tc-now-lane > .tc-now { left: calc(-1 * var(--tc-items-left)); right: calc(-1 * var(--tc-items-right)); }
@@ -1213,7 +1327,18 @@ body:not(.is-mobile) .tc-stage-col.is-timeline > .tc-stage-head { padding: 0 var
 .tc-list-item { display: flow-root; padding-bottom: var(--tc-card-gap); }
 /* A row leaving (Decision 132): it fades where it stands and takes no press. */
 .task-calendar .is-leaving { pointer-events: none; }
-.tc-list-item > .tc-group-head, .tc-list-item > .tc-drag-source > .tc-group-head { margin-top: var(--tc-section-gap); }
+.tc-list-item > .tc-group-head, .tc-list-item > .tc-drag-source > .tc-group-head, .tc-list-item > .tc-group-slot { margin-top: var(--tc-section-gap); }
+/* A filtered list with nothing in it (F64): a dashed plate where its first card would stand, saying so. */
+.tc-group-empty { flex-shrink: 0; height: var(--tc-card-h); box-sizing: border-box; overflow: hidden; border: var(--tc-hairline) dashed var(--tc-dash); border-radius: var(--tc-radius-card); background: var(--tc-bg); padding: 0 var(--tc-card-pad-end) 0 var(--tc-card-pad-start); display: flex; align-items: center; white-space: nowrap; font-size: var(--tc-font-body); color: var(--tc-muted); cursor: pointer; }
+/* A section renamed where its header stands (F62): the field takes the header's height and place, so nothing under it moves. */
+.tc-group-slot.is-rename { height: var(--tc-group-head-h); margin-bottom: calc(-1 * var(--tc-card-gap)); }
+.task-calendar .tc-group-slot.is-rename > .tc-quick-field { min-height: 0; height: 100%; padding-top: 0; padding-bottom: 0; display: flex; align-items: center; }
+.tc-group-slot.is-rename > .tc-quick-field > * { flex: 1; min-width: 0; }
+/* A lifted section (F63): its place between the groups is a dashed capsule of a card's height, the gaps of a group around it. */
+.tc-drag-source.is-lifted > .tc-group-head { height: var(--tc-card-h); margin-bottom: 0; border-radius: var(--tc-radius-card); outline: var(--tc-hairline) dashed var(--tc-dash); outline-offset: calc(-1 * var(--tc-hairline)); }
+.tc-drag-source.is-lifted > .tc-group-head > * { visibility: hidden; }
+/* The lifted section's plate: a carried card's, its name in the header's weight, how many tasks it holds on the right. */
+.tc-section-plate > .tc-card-title { font-weight: var(--tc-weight-semibold); }
 /* The calendar's tasks and events lie over each other in the stack's order (--tc-stack-z), inside the items: the now line stays over them all. */
 .task-calendar.is-engine .tc-items { isolation: isolate; }
 .task-calendar.is-engine .tc-items > :is(.tc-block, .tc-event) { z-index: var(--tc-stack-z); }
@@ -1351,6 +1476,8 @@ body.theme-light .tc-menu-over .tc-event { --tc-event-bg: var(--tc-event-bg-ligh
 @property --tc-ribbon-list-width { syntax: "<length-percentage>"; inherits: false; initial-value: 0px; }
 @property --tc-fit-whole { syntax: "<length>"; inherits: true; initial-value: 0px; }
 @property --tc-fit-left { syntax: "<length>"; inherits: true; initial-value: 0px; }
+@property --tc-fade-top { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@property --tc-fade-bottom { syntax: "<length>"; inherits: false; initial-value: 0px; }
 .tc-menu-tile > .tc-tile-fit { --tc-tile-font: var(--tc-font-menu-tile); align-self: stretch; box-sizing: border-box; padding: 0 var(--tc-tile-room); display: flex; container-type: inline-size; }
 .tc-menu-tiles.is-edit .tc-menu-tile > .tc-tile-fit { --tc-tile-font: var(--tc-font-menu-tile-small); padding: 0 var(--tc-tile-room-small); }
 .tc-tile-fit > .tc-tile-room { flex: 1 1 0; min-width: 0; container-type: inline-size; --tc-fit-whole: var(--tc-cq-whole); }

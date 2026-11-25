@@ -36,6 +36,8 @@ export const DESIGN = {
 	menuGap: 12,
 	/** What a menu, the copy over it and a grown card keep from the window's edges. */
 	wholeMargin: 10,
+	/** An icon of the wheel at the screen's foot: a finger travelling its width turns the wheel one place. */
+	wheelIcon: 38,
 } as const;
 
 export type DesignMeasure = keyof typeof DESIGN;
@@ -61,10 +63,15 @@ export const DESIGN_TOKENS: Readonly<Record<DesignMeasure, string>> = {
 	gripEndLeft: "--tc-grip-end-left",
 	menuGap: "--tc-space-12",
 	wholeMargin: "--tc-space-10",
+	wheelIcon: "--tc-seg-btn-w",
 };
 
 /** The custom properties the code sets on elements; styles.css does the arithmetic with them. */
 export const PROPERTY = {
+	/** Where the wheel at the screen's foot stands, in places: the stylesheet turns its icons and sizes its track from it. */
+	wheelAt: "--tc-wheel-at",
+	/** A wheel icon's place on the wheel: how far from the window it stands, so how much it shrinks and fades. */
+	wheelIcon: "--tc-seg-i",
 	/** How far the menu's block stands above the task it opened from: it lifts from the task by that much as it opens. */
 	menuLift: "--tc-menu-lift",
 	/** The menu's copy at least the pressed thing's width; a copy with notes as wide as the menu. */

@@ -134,15 +134,16 @@ describe("the field's bar, ready in the store (review of part 1, finding 10)", (
 
 describe("what each stop shows, said once by the layout (review of part 1, finding 3)", () => {
 	it("gives the lists of each stop and place, what a place can reach, and the stop that brings a list into sight", () => {
-		expect(columnsOf("leaf", "inbox")).toEqual(["inbox", "soon"]);
+		expect(columnsOf("leaf", "inbox")).toEqual(["inbox", "backlog", "soon"]);
 		expect(columnsOf("leaf", "soon")).toEqual(["soon", "day"]);
 		expect(columnsOf("leaf", "calendar")).toEqual(["day"]);
 		expect(columnsOf("note", "calendar")).toEqual(["inbox"]);
-		expect(reachOf("leaf")).toEqual(["inbox", "soon", "day"]);
+		expect(reachOf("leaf")).toEqual(["inbox", "backlog", "soon", "day"]);
 		expect(reachOf("note")).toEqual(["inbox"]);
 		expect(stopShowing("calendar", "day")).toBe("calendar");
 		expect(stopShowing("calendar", "inbox")).toBe("inbox");
 		expect(stopShowing("calendar", "soon")).toBe("soon");
+		expect(stopShowing("calendar", "backlog")).toBe("inbox");
 		expect(stopShowing("inbox", "day")).toBe("soon");
 		expect(stopShowing("inbox", "soon")).toBe("inbox");
 	});

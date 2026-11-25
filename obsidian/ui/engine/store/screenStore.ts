@@ -2,7 +2,7 @@ import { DESIGN } from "../../shared/design";
 import { createStore, type StoreApi } from "zustand/vanilla";
 import { EVERY_TASK } from "../port";
 import { type Stop, stopShowing } from "../layout/columns";
-import type { Destination, DividerStop, Edge, ScreenContext, UndoOutcome, EntryBar, EntryDraft, EntryField, FieldActionId, LevelRange, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, MenuStatusId, ScreenData, ScreenPort } from "../port";
+import type { ScreenView, ViewMode, Destination, SectionNameEnd, DividerStop, Edge, ScreenContext, UndoOutcome, EntryBar, EntryDraft, EntryField, FieldActionId, LevelRange, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, MenuStatusId, ScreenData, ScreenPort } from "../port";
 import { share } from "./share";
 
 export type { Stop };
@@ -14,7 +14,7 @@ const NO_DRAFT: EntryDraft = { level: null, projects: [], descriptionLine: null,
 const NO_ENTRY = { entry: null, draft: NO_DRAFT, entryText: "", entryPanel: null } as const;
 
 /** The one gesture that holds the pointer (spec, «Which gesture holds the pointer»). */
-type Gesture = "drag" | "ribbon" | "resize" | "zoom" | "divider";
+type Gesture = "drag" | "ribbon" | "resize" | "zoom" | "divider" | "wheel";
 
 /** Where the calendar was zoomed to: an hour's height, or the whole day whatever the calendar's height. */
 export type Zoom = number | "wholeDay";
@@ -68,6 +68,10 @@ interface ScreenState {
 	/** The present minute from today's start, ticking each minute (spec, «Time»). */
 	readonly now: Now;
 	readonly layer: Layer | null;
+	/** The view the screen draws (the port's, F10–F14). */
+	readonly view: ScreenView;
+	/** The view button's menu is open (F11): one layer at a time, a task's menu closed while it is. */
+	readonly viewMenu: boolean;
 	/**
 	 * The field a task is typed in, open while not null (the plugin's one quick entry): a new task's or a rename's, where it
 	 * stands; in a list, on the calendar, or in an open menu's stack.
@@ -130,6 +134,10 @@ interface ScreenState {
 	readonly focusCard: { readonly id: string; readonly seq: number } | null;
 	/** A task to bring into sight in its list, once per `seq`. */
 	readonly reveal: { readonly id: string; readonly seq: number } | null;
+	/** The task whose First step is typed on its own card (F199–F201): the screen drawn as the port folds it meanwhile. */
+	readonly firstStep: string | null;
+	/** A section's header renamed in place (F62): its list and its id while its name is typed, and the two as one key (`sectionKey`). */
+	readonly sectionField: { readonly key: string; readonly list: ListId; readonly id: string } | null;
 }
 
 interface ScreenActions {
@@ -139,6 +147,17 @@ interface ScreenActions {
 	 * day turned away from kept for its page still in sight.
 	 */
 	showDay(offset: number): void;
+	/** The view button tapped: its menu opens (F11). */
+	openViewMenu(): void;
+	closeViewMenu(): void;
+	/** A mode picked: the menu closes, the mode is kept and the screen redraws in it, in place (F10, F23). */
+	pickViewMode(mode: ViewMode): void;
+	/** The Subprojects row tapped: the menu closes and the check turns over (F13). */
+	toggleSubprojects(): void;
+	/** A day arrow (F41): the day before or after the shown one, past the calendar where the days turn; the ribbon turns there as a swipe does, a tap while it turns waiting its turn (F46). */
+	turnDay(shift: -1 | 1): void;
+	/** The day's title tapped (F42): back to today, in one turn from however far (F45); today's title does nothing. */
+	backToToday(): void;
 	/** Reads the days `offsets` (other than the shown one) for the pages a finger draws into sight, kept as the days turned away from are. */
 	peekDays(offsets: readonly number[]): void;
 	/** Takes the pointer for `gesture` unless another holds it; whether it got it. A drag takes it from the ribbon (its long press already proved the ribbon still, dnd-kit's activation constraint), never from a pinch or a resize. */
@@ -158,12 +177,34 @@ interface ScreenActions {
 	/** The carried task let go at `to` (null: cancelled, or let go where nothing takes it). */
 	drop(id: string, to: Destination | null): void;
 	/**
+	 * The lifted section `id` of `list` let go before the header `to.before` (null: the list's end; `to` null: cancelled or
+	 * let go where it was): drawn there at once by the port's preview and written (F63).
+	 */
+	dropSection(list: ListId, id: string, to: { readonly before: string | null } | null): void;
+	/**
 	 * Opens the menu of the task or event `id`, opened `from` there (a list's card unless said). `reveal`: a tap, not a finger
 	 * still held: a card partly out of its list's sight is scrolled into it first (the design's «Полная карточка»). It opens
 	 * at once: no double click is waited out (Max, 2026-11-20: the wait felt like lag; double click withdrawn).
 	 */
 	openMenu(id: string, from?: MenuFrom, reveal?: boolean): void;
 	closeLayer(): void;
+	/**
+	 * First step from the menu (F199): the menu closes and in the same tap the task folds, its card's second line the field,
+	 * the screen drawn as the port draws it while the field is open.
+	 */
+	startFirstStep(): void;
+	/** First step's field ended (F200): Enter or a tap elsewhere write its text as the first subtask (a blank one writes nothing); Escape writes nothing; the card returns as the file has it. */
+	endFirstStep(how: "enter" | "blur" | "escape", text: string): void;
+	/** A tap on a list card's counter (F196): the task's subtasks fold away or show again, written through the port. */
+	fold(id: string): void;
+	/** A tap on a section's header (F62): its menu, Rename and Remove section as the port offers them; No section's offers none and opens nothing. */
+	openSectionMenu(list: ListId, id: string): void;
+	/** Rename in a section's menu: the menu closes and in the same tap the header becomes its name's field. */
+	startSectionRename(): void;
+	/** Remove section in a section's menu: the menu closes, and once it has faded out the heading goes, its tasks joining No section. */
+	removeSection(): void;
+	/** The section's name ended by Enter, Escape or a tap elsewhere: what the port says the end writes, written; the field closes. */
+	endSectionName(how: SectionNameEnd, text: string): void;
 	/** The open menu shows another page. */
 	menuPage(page: MenuPage): void;
 	/** The open menu asks before it acts (null: the question taken back, the menu as it was). */
@@ -288,8 +329,11 @@ const HOLDING: readonly (Gesture | null)[] = ["drag", "resize"];
 /** The share a device that kept none opens with: the divider in the middle, the day list and its calendar in halves. */
 const HALVES = 0.5;
 
+/** A section's header in a list, as one key: the same section may head a group in two lists (a later day's Soon). */
+export const sectionKey = (list: ListId, id: string): string => `${list}/${id}`;
+
 /** One store per mounted screen, over its port (spec, «Screen state»); `zoom`, the calendar's zoom the host kept. */
-export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, listShare = HALVES, opening: ScreenContext = EVERY_TASK): ScreenStore {
+export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, listShare = HALVES, opening: ScreenContext = EVERY_TASK, wide = false): ScreenStore {
 	/** Writes of the screen's own not yet read back: their reads come together once the last is in. */
 	let writing = 0;
 	/** The screen as it stood when the carried task was lifted: its place's home, a drop's in-flight write drawn in it. */
@@ -318,8 +362,18 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 		/** The open menu over `data`: it shows its task as it now stands (a subtask typed into its stack, F108); a menu whose task is no longer shown closes. */
 		const menuOver = (s: Screen, data: ScreenData): Partial<Screen> => {
 			const layer = s.layer;
+			if (layer?.model.kind === "section") return data.lists[layer.model.list].rows.some((row) => row.id === layer.id) ? {} : closed(s);
 			if (!layer || layer.model.kind !== "task") return {};
 			return layer.id in data.cards ? { layer: { ...layer, model: port.menu(layer.id, layer.from, s.dayOffset) } } : closed(s);
+		};
+		/**
+		 * The view as the port now gives it: another mode is another context, drawn in place (principle 3); a mode that is no
+		 * ribbon stands at the day and its calendar, where the day's list and the calendar turn.
+		 */
+		const viewed = (s: Screen): Partial<Screen> => {
+			const view = port.view(wide);
+			if (JSON.stringify(view) === JSON.stringify(s.view)) return {};
+			return view.mode === s.view.mode ? { view } : { view, contextSeq: s.contextSeq + 1, ...(view.ribbon ? {} : { stop: "calendar" as const }) };
 		};
 		/** The port's data again; held while a drag or a drop's write keeps the screen still (spec, principle 5). */
 		const refresh = () => {
@@ -328,14 +382,14 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 				if (!s.pending) set({ pending: true });
 				return;
 			}
-			const next = share(s.read, port.read(s.dayOffset, s.context));
+			const next = share(s.read, s.firstStep === null ? port.read(s.dayOffset, s.context) : port.firstStepView(s.firstStep, s.dayOffset, s.context));
 			const known = s.read.cards;
 			/** A read that changed nothing (a write's read-back after its own change came) keeps what came and went in the last one. */
 			const same = next === s.read;
 			const came = Object.keys(next.cards).filter((id) => !(id in known));
 			const went = Object.keys(known).filter((id) => !(id in next.cards));
 			const menu = menuOver(s, next);
-			const undo = { canUndo: port.canUndo(), canRedo: port.canRedo() };
+			const undo = { canUndo: port.canUndo(), canRedo: port.canRedo(), ...viewed(s) };
 			if (same) return set({ shown: share(s.shown, next), pending: false, ...menu, ...undo });
 			set({ read: next, shown: share(s.shown, next), pending: false, readSeq: s.readSeq + 1, fresh: came.length === 0 ? NONE : new Set(came), gone: went.length === 0 ? NONE : new Set(went), ...menu, ...undo });
 		};
@@ -381,6 +435,14 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 				}),
 			);
 		};
+		/** The menu closes at once, and what was tapped in it is written once it has faded out (F132): the screen's reads wait for it. */
+		const afterClose = (act: () => Promise<unknown>) => {
+			get().layerGone();
+			set({ layer: null });
+			let done: () => void = () => undefined;
+			write(new Promise<void>((resolve) => (done = resolve)));
+			picked = () => void act().finally(done);
+		};
 		/** The card `id` takes the focus back, as a menu closing gives it back (Decision 58). */
 		const focusOn = (id: string) => set({ focusCard: { id, seq: (get().focusCard?.seq ?? 0) + 1 } });
 
@@ -390,6 +452,22 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 			left: {},
 			dayOffset: 0,
 			stop: "calendar",
+			view: port.view(wide),
+			viewMenu: false,
+			openViewMenu() {
+				set({ viewMenu: true, layer: null, selected: null });
+			},
+			closeViewMenu() {
+				if (get().viewMenu) set({ viewMenu: false });
+			},
+			pickViewMode(mode) {
+				set({ viewMenu: false });
+				if (mode !== get().view.mode) write(port.setViewMode(mode));
+			},
+			toggleSubprojects() {
+				set({ viewMenu: false });
+				write(port.toggleSubprojects());
+			},
 			gesture: null,
 			lifted: null,
 			liftedDepth: null,
@@ -472,11 +550,21 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 			contextSeq: 0,
 			reveal: null,
 			focusCard: null,
+			sectionField: null,
+			firstStep: null,
 
 			setStop(stop) {
 				set({ stop });
 			},
 			showDay,
+			turnDay(shift) {
+				const day = get().dayOffset + shift;
+				set({ stop: "calendar" });
+				showDay(day);
+			},
+			backToToday() {
+				if (get().dayOffset !== 0) showDay(0);
+			},
 			peekDays(offsets) {
 				const { dayOffset, left } = get();
 				const read = offsets
@@ -528,6 +616,16 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 				set({ lifted: null, liftedDepth: null });
 				get().release("drag");
 			},
+			dropSection(list, id, to) {
+				const { dayOffset, context } = get();
+				if (to && port.sectionMoves(list, dayOffset, id, to.before)) {
+					set({ shown: share(get().shown, port.previewSection(list, dayOffset, id, to.before, context)) });
+					write(port.moveSection(list, dayOffset, id, to.before));
+				} else get().carryHome();
+				home = null;
+				set({ lifted: null, liftedDepth: null });
+				get().release("drag");
+			},
 			openMenu(id, from = "list", reveal = false) {
 				if (reveal) set({ reveal: { id, seq: (get().reveal?.seq ?? 0) + 1 } });
 				const over = get().layer;
@@ -561,12 +659,46 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 			},
 			pick(action) {
 				const layer = get().layer;
-				if (!layer) return;
-				get().layerGone();
-				set({ layer: null });
-				let done: () => void = () => undefined;
-				write(new Promise<void>((resolve) => (done = resolve)));
-				picked = () => void port.act(layer.id, action, layer.from, get().dayOffset).finally(done);
+				if (layer) afterClose(() => port.act(layer.id, action, layer.from, get().dayOffset));
+			},
+			startFirstStep() {
+				const layer = get().layer;
+				if (layer?.model.kind !== "task") return;
+				const { dayOffset, context } = get();
+				const view = share(get().read, port.firstStepView(layer.id, dayOffset, context));
+				set({ layer: null, firstStep: layer.id, read: view, shown: share(get().shown, view), selected: null });
+			},
+			endFirstStep(how, text) {
+				const id = get().firstStep;
+				if (id === null) return;
+				set({ firstStep: null });
+				if (how === "escape") refresh();
+				else write(port.firstStep(id, text));
+			},
+			fold(id) {
+				write(port.fold(id));
+			},
+			openSectionMenu(list, id) {
+				const row = get().shown.lists[list].rows.find((r) => r.id === id);
+				if (row?.kind !== "section" || !row.menu) return;
+				set({ layer: { kind: "menu", id, from: "list", model: { kind: "section", list, title: row.title, ...row.menu }, page: "menu", asking: null, asked: null, stack: null }, selected: null });
+			},
+			startSectionRename() {
+				const layer = get().layer;
+				if (layer?.model.kind !== "section") return;
+				set({ layer: null, sectionField: { key: sectionKey(layer.model.list, layer.id), list: layer.model.list, id: layer.id } });
+			},
+			removeSection() {
+				const layer = get().layer;
+				const model = layer?.model;
+				if (layer && model?.kind === "section") afterClose(() => port.removeSection(model.list, get().dayOffset, layer.id));
+			},
+			endSectionName(how, text) {
+				const field = get().sectionField;
+				if (!field) return;
+				set({ sectionField: null });
+				const name = port.sectionNameEnd(how, text);
+				if (name !== null) write(port.renameSection(field.list, get().dayOffset, field.id, name));
 			},
 			layerGone() {
 				const run = picked;
@@ -654,7 +786,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 				if (to.at.dayOffset !== get().dayOffset) get().showDay(to.at.dayOffset);
 				const where = to.at.list;
 				/** Another day than today stands past the calendar, where the ribbon turns the days (Decision 127); a list out of sight, the stop that shows it. */
-				const next = to.at.dayOffset !== 0 ? "calendar" : stopShowing(stop, where);
+				const next = to.at.dayOffset !== 0 || !get().view.ribbon ? "calendar" : stopShowing(stop, where);
 				/** The field opens again at its new place, with what was typed (a new field brought into sight, F193). */
 				set({ entry: to, entrySeq: get().entrySeq + 1, entryPanel: null, ...(next === stop ? {} : { stop: next }) });
 			},
@@ -721,6 +853,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 			},
 			start() {
 				const off = port.subscribe(refresh);
+				const offToday = port.onDayStartMoved(() => get().backToToday());
 				let timer = 0;
 				/** Each minute the clock moves and the screen reads again: what rides the now line moves with it, what is over fades. */
 				const tick = () => {
@@ -731,6 +864,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 				tick();
 				return () => {
 					off();
+					offToday();
 					window.clearTimeout(timer);
 					window.clearTimeout(scrollWait);
 					scrollEdge = null;

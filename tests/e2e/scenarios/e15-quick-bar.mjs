@@ -3,8 +3,8 @@
  * поля»): on the phone a bar on the view's bottom, on the Mac a capsule right under the field, right edges together, 8 px
  * from it. The level buttons move the field in and out, the focus staying in the field; the flag's levels colour the flag
  * and the field and are written with the task; a project picked lights its button, is written, and stays for the next
- * field; the place moves the field to the end of another list (the ribbon turning to it) or a picked day, or writes to
- * Backlog with the field where it stands; the calendar's field has the flag and the project only. While a task is typed
+ * field; the place moves the field to the end of another list (the ribbon turning to it; Backlog under Inbox, F27) or a
+ * picked day; the calendar's field has the flag and the project only. While a task is typed
  * the screen is `is-entering`, which keeps Obsidian's phone toolbar away.
  */
 export default {
@@ -109,7 +109,7 @@ export default {
 			await press(".tc-bar-place");
 			await tile("Backlog");
 			const stays = await field();
-			t.expect(stays?.list === "inbox" && (await box(".tc-bar-place"))?.text === "Backlog", `Backlog: the field stays, the button says Backlog: ${JSON.stringify(stays)}`);
+			t.expect(stays?.list === "backlog" && (await box(".tc-bar-place"))?.text === "Backlog", `Backlog: the field goes to the end of Backlog under Inbox, the button says Backlog: ${JSON.stringify(stays)}`);
 			await type("В бэклог");
 			await enter();
 			t.expect((await t.oracle.tasks("Backlog")).some((task) => task.title === "В бэклог"), "written to Backlog");

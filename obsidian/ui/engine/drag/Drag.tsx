@@ -10,7 +10,7 @@ import { cssEase, FLY } from "../layers/motion";
 import { useScreen, useScreenApi } from "../store";
 import { EdgeHeading } from "./edgeHeading";
 import { holdsPointer, LONG_PRESS_TOLERANCE_PX, NEW_SLOT, PLUS, PlusTouchSensor, type PressOptions, PressMouseSensor, PressTouchSensor, TouchPresses } from "./sensors";
-import { descendantsOf, finalOrder, levelAt, levelBetween, type Levels, spotKey, shiftOf, type Slot, slotOf, SwipeLevel } from "./tree";
+import { descendantsOf, finalOrder, levelAt, levelBetween, type Levels, sectionBefore, sectionOrder, spotKey, shiftOf, type Slot, slotOf, SwipeLevel } from "./tree";
 
 /**
  * Drag and drop (spec, «The owners»): one `DndContext` per screen, one `DragOverlay`, one `onDragEnd` that makes one write
@@ -151,6 +151,14 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 	const collision: CollisionDetection = useCallback((args) => {
 		pointer.current = args.pointerCoordinates;
 		rects.current = args.droppableRects;
+		/** A lifted section goes only between groups of its own list (the design's «Поднятая секция»): the header nearest it is the target. */
+		const sectionList = liftedSection(args.active);
+		if (sectionList !== null) {
+			const heads = sectionsOf(sectionList);
+			const nearest = closestCenter({ ...args, droppableContainers: args.droppableContainers.filter((c) => heads.has(String(c.id))) })[0]?.id ?? args.active.id;
+			lastOver.current = nearest;
+			return [{ id: nearest }];
+		}
 		const underPointer = pointerWithin(args);
 		/** Over the calendar the target is the calendar itself: the card's place there is at the minute under its top, among no rows. */
 		const onCalendar = underPointer.some((hit) => hit.id === CALENDAR_TARGET || hit.id === CALENDAR_ROOM);
@@ -196,6 +204,13 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 	const refusedNow = useRef(false);
 
 	const rowsOf = (list: string) => api.getState().shown.lists[list as ListId]?.rows ?? [];
+	/** The headers of `list`'s sections as drawn. */
+	const sectionsOf = (list: string): ReadonlySet<string> => new Set(rowsOf(list).flatMap((row) => (row.kind === "section" ? [row.id] : [])));
+	/** The list of the section lifted (F63), or null when what is lifted is no section's header. */
+	const liftedSection = (lifted: Sortable): string | null => {
+		const list = containerOf(lifted);
+		return list !== null && list !== CALENDAR && sectionsOf(list).has(String(lifted.id)) ? list : null;
+	};
 	/** The carried card's (or plus's) level on the place it stands at, by its sideways swipes there (`SwipeLevel`). */
 	const swipe = useRef(new SwipeLevel(null, 0, 0, 0));
 	const levels: Levels = (above, below) => api.getState().levels(above, below);
@@ -337,6 +352,7 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 		const { active: lifted, over } = event;
 		if (Math.hypot(event.delta.x, event.delta.y) > LONG_PRESS_TOLERANCE_PX) moved.current = true;
 		followEdge(over);
+		if (liftedSection(lifted) !== null) return;
 		if (isPlus(lifted.id)) {
 			plusOver(event, over);
 			if (lifted.id === NEW_SLOT || over?.id === CALENDAR_TARGET) return;
@@ -392,6 +408,7 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 	const overList = (event: DragOverEvent) => {
 		const { active: lifted, over } = event;
 		followEdge(over);
+		if (liftedSection(lifted) !== null) return;
 		if (isPlus(lifted.id)) return plusOver(event, over);
 		if (over?.id === CALENDAR_TARGET) return overCalendar(event, over);
 		const into = crossing(lifted, over);
@@ -431,6 +448,13 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 			const press = (lifted.data.current as RowData | undefined)?.press;
 			if (row && press) press(row, true);
 			return;
+		}
+		const sectionList = liftedSection(lifted);
+		if (sectionList !== null) {
+			const ids = itemsOf(lifted);
+			const heads = sectionsOf(sectionList);
+			const order = sectionOrder(ids, heads, ids.indexOf(id), over ? ids.indexOf(String(over.id)) : -1);
+			return api.getState().dropSection(sectionList as ListId, id, order === ids ? null : { before: sectionBefore(order, heads, id) });
 		}
 		if (container === CALENDAR) {
 			const at = carriedAt.current;
@@ -588,8 +612,8 @@ function crossing(active: Sortable & { readonly rect: { readonly current: { read
 }
 
 /** A list's sortable tasks: `ids` keeps its identity between draws, or dnd-kit stops gliding (stage 0, finding 4). */
-export function SortableList({ list, ids, children }: { readonly list: ListId; readonly ids: readonly string[]; readonly children: ReactNode }) {
-	const strategy = useMemo(() => finalOrderStrategy(ids), [ids]);
+export function SortableList({ list, ids, sections, children }: { readonly list: ListId; readonly ids: readonly string[]; readonly sections: ReadonlySet<string>; readonly children: ReactNode }) {
+	const strategy = useMemo(() => finalOrderStrategy(ids, sections), [ids, sections]);
 	return (
 		<SortableContext id={list} items={ids as string[]} strategy={strategy}>
 			{children}
@@ -618,8 +642,8 @@ interface RowData {
  * A section's header moves aside like cards but is not carried (`onTap` absent): a card goes after it into its section.
  * A calendar's block is `placed`: its box says where it stands, so dnd-kit never moves it (its box glides by CSS).
  */
-export const SortableRow = memo(function SortableRow({ id, onTap, gap = false, placed = false, children }: { readonly id: string; readonly onTap?: (row: Element, held: boolean) => void; readonly gap?: boolean; readonly placed?: boolean; readonly children: ReactNode }) {
-	const carried = onTap !== undefined;
+export const SortableRow = memo(function SortableRow({ id, onTap, lifts = onTap !== undefined, gap = false, placed = false, children }: { readonly id: string; readonly onTap?: (row: Element, held: boolean) => void; readonly lifts?: boolean; readonly gap?: boolean; readonly placed?: boolean; readonly children: ReactNode }) {
+	const carried = lifts;
 	const data = useMemo((): RowData => ({ press: onTap }), [onTap]);
 	const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({ id, data, disabled: { draggable: !carried, droppable: false }, animateLayoutChanges: placed ? STAY : undefined });
 	const style: CSSProperties = placed ? {} : { transform: CSS.Translate.toString(transform), transition };
@@ -634,7 +658,7 @@ export const SortableRow = memo(function SortableRow({ id, onTap, gap = false, p
 		[setNodeRef],
 	);
 	return (
-		<div ref={hold} className={`tc-drag-source${isDragging || gap ? " is-lifted" : ""}`} style={style} {...(carried ? attributes : {})} {...(carried ? listeners : {})} onClick={carried ? (event) => onTap(event.currentTarget, false) : undefined} onContextMenu={carried ? (event) => secondaryClick(event) && onTap(event.currentTarget, false) : undefined}>
+		<div ref={hold} className={`tc-drag-source${isDragging || gap ? " is-lifted" : ""}`} style={style} {...(carried ? attributes : {})} {...(carried ? listeners : {})} onClick={onTap ? (event) => onTap(event.currentTarget, false) : undefined} onContextMenu={onTap ? (event) => secondaryClick(event) && onTap(event.currentTarget, false) : undefined}>
 			{children}
 		</div>
 	);
@@ -662,7 +686,7 @@ export function CarriedPlus({ onTap, children, ring, hidden = false }: { readonl
  * another, so what the rows show while the card is held is what the list will be. Headers move aside like cards: under
  * an empty section's header the card's place opens as it does anywhere.
  */
-function finalOrderStrategy(ids: readonly string[]): SortingStrategy {
+function finalOrderStrategy(ids: readonly string[], sections: ReadonlySet<string>): SortingStrategy {
 	let key = "";
 	let final: readonly string[] = ids;
 	return ({ activeIndex, overIndex, index, rects, activeNodeRect }) => {
@@ -670,7 +694,7 @@ function finalOrderStrategy(ids: readonly string[]): SortingStrategy {
 		const nextKey = `${activeIndex}:${overIndex}`;
 		if (nextKey !== key) {
 			key = nextKey;
-			final = finalOrder(ids, activeIndex, overIndex);
+			final = sections.has(ids[activeIndex]) ? sectionOrder(ids, sections, activeIndex, overIndex) : finalOrder(ids, activeIndex, overIndex);
 		}
 		const id = ids[index];
 		const heightOf = (other: string) => {

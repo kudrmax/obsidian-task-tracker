@@ -10672,6 +10672,7 @@ function countOf(text) {
 var SECTION_ORDER = ["inbox", "now", "soon", "backlog", "done"];
 var MARKER_ORDER = ["dueDateMarker", "slotMarker", "alarmSlotMarker", "liveSlotMarker", "silentSlotMarker", "repeatMarker", "collapsedMarker"];
 var DAY_START_HOURS = Array.from({ length: 24 }, (_, hour) => hour);
+var DAY_START_CHOICES = DAY_START_HOURS.map((hour) => ({ hour, label: minutesToHHMM(hour * 60) }));
 var SettingsServiceImpl = class {
   constructor(store) {
     this.store = store;
@@ -10714,6 +10715,7 @@ var SettingsServiceImpl = class {
       refreshSeconds: s.google.refreshSeconds,
       workCalendarFile: s.workCalendarFile,
       dayStartHours: DAY_START_HOURS,
+      dayStartChoices: DAY_START_CHOICES,
       googleClientReady: s.google.clientId !== "",
       googleLoggedIn: googleLoggedIn(s)
     };

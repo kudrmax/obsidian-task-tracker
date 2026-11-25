@@ -1,11 +1,11 @@
-import type { DividerStop, EntryBarGroup, FieldActionId, FieldGroup, ListWidths, MenuActionGroup, MenuStatusId, TaskActionId, TaskMenuActionId, TaskMenuGroup, UndoOutcome } from "../../../core/application/contracts";
+import type { DividerStop, EntryBarGroup, FieldActionId, FieldGroup, ListWidths, MenuActionGroup, MenuStatusId, SubprojectsOption, TaskActionId, TaskMenuActionId, TaskMenuGroup, UndoOutcome, ViewMode, ViewModeOption } from "../../../core/application/contracts";
 
 /**
  * The task actions are the core's (`core/application/taskActions.ts`, task actions spec): the ids, the groups and the
  * offered actions a surface lays out. The port answers with them; the engine keeps only each action's look and handler,
  * an exhaustive `Record` over the surface's ids. Types only: the engine runs no code of the core.
  */
-export type { DividerStop, EntryBarGroup, FieldActionId, FieldGroup, ListWidths, MenuActionGroup, MenuStatusId, TaskActionId, TaskMenuActionId, TaskMenuGroup, UndoOutcome };
+export type { DividerStop, EntryBarGroup, FieldActionId, FieldGroup, ListWidths, MenuActionGroup, MenuStatusId, SubprojectsOption, TaskActionId, TaskMenuActionId, TaskMenuGroup, UndoOutcome, ViewMode, ViewModeOption };
 
 /**
  * The screen's one port (docs/superpowers/specs/2026-11-18-ui-engine.md, «The owners», «Data and writes»): what the screen
@@ -14,8 +14,8 @@ export type { DividerStop, EntryBarGroup, FieldActionId, FieldGroup, ListWidths,
  * made-up tasks (`MockPort`); part 2 serves it over the core. It grows step by step with the engine.
  */
 
-/** A list the screen shows: Inbox, Soon, the shown day's. */
-export type ListId = "inbox" | "soon" | "day";
+/** A list the screen shows: Inbox, Backlog under it, Soon, the shown day's. */
+export type ListId = "inbox" | "backlog" | "soon" | "day";
 
 /** A card as it is drawn. */
 export interface CardFace {
@@ -39,13 +39,27 @@ export interface CardFace {
 }
 
 /** A row of a list, top to bottom: a task's card at its depth (0 a task, 1 its subtask…), or a section's header. */
-export type Row =
-	| { readonly kind: "task"; readonly id: string; readonly depth: number }
-	| { readonly kind: "section"; readonly id: string; readonly title: string };
+export type Row = { readonly kind: "task"; readonly id: string; readonly depth: number } | SectionRow;
+
+/**
+ * A section's header (the core's `ListGroup`): its name (No section's word for the tasks outside any), how many tasks it
+ * holds, and what a tap on it offers; null for No section, whose tap does nothing. Any header may be lifted (F63).
+ */
+export interface SectionRow {
+	readonly kind: "section";
+	readonly id: string;
+	readonly title: string;
+	readonly tasks: number;
+	/** The tasks outside any section: its name in the quieter ink. */
+	readonly ungrouped: boolean;
+	readonly menu: { readonly rename: boolean; readonly remove: boolean } | null;
+}
 
 export interface ListData {
 	readonly title: string;
 	readonly rows: readonly Row[];
+	/** The No tasks plate drawn while the list draws nothing (F64): its words under a filter; null for none. A tap on it types a new task at the list's end. */
+	readonly plate: string | null;
 }
 
 /**
@@ -112,6 +126,8 @@ export interface DayData {
 	readonly hours: readonly string[];
 	/** The hour another day opens at, in minutes from the day's start (the «Scroll to hour» setting). */
 	readonly opensAt: number;
+	/** The dot on the wheel's calendar icon (F33, the core's `CalendarAlert`): a calendar in use gone old, or broken too; none while all is fresh. */
+	readonly alert: "none" | "old" | "broken";
 }
 
 export interface Now {
@@ -158,8 +174,6 @@ export interface Destination {
 	readonly end?: number | null;
 	/** When given, a new task goes as the last subtask of this task, wherever it stands (Add subtask on a calendar's task). */
 	readonly under?: string;
-	/** A new task written to Backlog, which the screen doesn't show: its field stays where it stands. */
-	readonly backlog?: boolean;
 	/** A new task written at the end of this list (the day's of `dayOffset`), which the screen as laid out can't show: its field stays where it stands. */
 	readonly away?: { readonly list: ListId; readonly dayOffset: number };
 }
@@ -301,7 +315,19 @@ export interface EventMenuModel {
 	readonly title: string;
 }
 
-export type MenuModel = TaskMenuModel | EventMenuModel;
+/** A section header's menu (F62; the design's «Меню заголовка»): Rename and Remove section, as the core offers them. */
+export interface SectionMenuModel {
+	readonly kind: "section";
+	readonly list: ListId;
+	readonly title: string;
+	readonly rename: boolean;
+	readonly remove: boolean;
+}
+
+export type MenuModel = TaskMenuModel | EventMenuModel | SectionMenuModel;
+
+/** What ends a section's name typed in place: Enter, Escape, or a tap elsewhere. */
+export type SectionNameEnd = "enter" | "escape" | "blur";
 
 /** What a tap in a menu writes; the port says what it means for the task. */
 export type MenuAction =
@@ -332,11 +358,32 @@ export interface ScreenContext {
 /** Every task: no project chosen. */
 export const EVERY_TASK: ScreenContext = { project: null };
 
+/**
+ * The view the main screen draws and its button (the core's `ViewChoice`, F10–F14): the mode drawn, the modes the button's
+ * menu offers with the chosen one checked, the button's icon, whether the screen is the ribbon a swipe turns, and the
+ * menu's Subprojects row (null: none).
+ */
+export interface ScreenView {
+	readonly mode: ViewMode;
+	readonly modes: readonly ViewModeOption[];
+	readonly icon: string;
+	readonly ribbon: boolean;
+	readonly subprojects: SubprojectsOption | null;
+}
+
 export interface ScreenPort {
+	/** The main screen's view on a `wide` screen (the desktop offers All columns), as this device keeps it; a change fires `subscribe`. */
+	view(wide: boolean): ScreenView;
+	/** A mode picked in the view button's menu: kept on the device, every filter alike (F10, F15). */
+	setViewMode(mode: ViewMode): Promise<void>;
+	/** The menu's Subprojects row tapped: the chosen project's subprojects shown or not (F13, F14). */
+	toggleSubprojects(): Promise<void>;
 	/** The screen for the day `dayOffset` days from today, in `context` (every task when absent). */
 	read(dayOffset: number, context?: ScreenContext): ScreenData;
 	/** Fires after the data changed: a write, an edit from outside. Returns the unsubscribe. The screen reads again each minute too: what rides the now line and what is past changes with the clock. */
 	subscribe(listener: () => void): () => void;
+	/** Fires when the day starts at another hour (the settings' Day starts at): the screen opens today afresh (F50). Returns the unsubscribe. */
+	onDayStartMoved(listener: () => void): () => void;
 	/** The present minute from today's start and the clock's time as the now line writes it: «14:20». */
 	now(): Now;
 	/**
@@ -421,6 +468,30 @@ export interface ScreenPort {
 	 * write, so a menu left open on its page goes on with it), null once it is gone.
 	 */
 	act(id: string, action: MenuAction, from: MenuFrom, dayOffset: number): Promise<string | null>;
+	/**
+	 * The screen while First step's field is open on the task `id` (F199, the core's `firstStepScreen`): the task folded,
+	 * its subtasks gone under its card, its card two lines, its own title small over an empty step.
+	 */
+	firstStepView(id: string, dayOffset: number, context?: ScreenContext): ScreenData;
+	/** First step's text written as the task's first subtask, the task folded on it (the core's `firstStep`; a blank text writes nothing). */
+	firstStep(id: string, text: string): Promise<void>;
+	/** A tap on a list card's counter (F196): the task's subtasks fold away under its card, or show again (the core's `toggleCollapsed`). */
+	fold(id: string): Promise<void>;
+	/** What a section's name typed in place ends with (the core's `sectionNameEnd`): the name to write, null for none (the old name stays). */
+	sectionNameEnd(how: SectionNameEnd, text: string): string | null;
+	/** Renames the section `section` of `list` (the day's of `dayOffset`) as typed (the core's `renameGroup`); resolves once written and read back. */
+	renameSection(list: ListId, dayOffset: number, section: string, name: string): Promise<void>;
+	/** Removes the section's heading, its tasks joining No section (the core's `removeGroup`). */
+	removeSection(list: ListId, dayOffset: number, section: string): Promise<void>;
+	/**
+	 * Whether letting the lifted section go before the header `before` (null: the list's end) moves it (the core's
+	 * `groupPlaceOf`): not at its own place.
+	 */
+	sectionMoves(list: ListId, dayOffset: number, section: string, before: string | null): boolean;
+	/** The section moved before the header `before` (null: the list's end), its tasks with it (the core's `moveGroup`). */
+	moveSection(list: ListId, dayOffset: number, section: string, before: string | null): Promise<void>;
+	/** The screen as it will stand once `moveSection` is written: drawn at the drop, before the write's read-back. */
+	previewSection(list: ListId, dayOffset: number, section: string, before: string | null, context?: ScreenContext): ScreenData;
 	/** The day list's width beside the calendar (the core's `listWidth`, core audit pair E8): its bounds on a phone, the width `share` draws in a window `viewWidth` wide. */
 	readonly listBounds: { readonly min: number; readonly max: number };
 	listWidths(share: number, viewWidth: number, dividerWidth: number): ListWidths;

@@ -15,6 +15,8 @@ function service(start: Partial<TaskCalendarSettings> = {}) {
 describe("the form's answers", () => {
 	it("offers every hour of the day for its start, and says whether Log in has a client id to go with", () => {
 		expect(service().svc.form().dayStartHours).toEqual(Array.from({ length: 24 }, (_, h) => h));
+		expect(service().svc.form().dayStartChoices.slice(0, 2)).toEqual([{ hour: 0, label: "00:00" }, { hour: 1, label: "01:00" }]);
+		expect(service().svc.form().dayStartChoices[23]).toEqual({ hour: 23, label: "23:00" });
 		expect(service().svc.form().googleClientReady).toBe(false);
 		expect(service({ google: { ...DEFAULT_SETTINGS.google, clientId: "id" } }).svc.form().googleClientReady).toBe(true);
 	});

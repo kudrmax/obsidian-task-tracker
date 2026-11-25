@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { FLICK_SPEED, FollowPager } from "../../../obsidian/ui/engine/gestures/followPager";
 import { WheelFollow } from "../../../obsidian/ui/engine/gestures/wheelFollow";
-import { COLUMN_SHARE, offsetOf, placeOf, shownAt, standAt, STRIP_WIDTH } from "../../../obsidian/ui/engine/layout/columns";
+import { COLUMN_SHARE, DayLine, offsetOf, placeOf, shownAt, STRIP_WIDTH } from "../../../obsidian/ui/engine/layout/columns";
 import { createScreenStore, type ScreenStore } from "../../../obsidian/ui/engine/store";
 import { standPort } from "./standPort";
 
@@ -22,10 +22,11 @@ function ribbon(store: ScreenStore) {
 	const width = 195;
 	const { stop, dayOffset } = store.getState();
 	const pager = new FollowPager(placeOf(stop, dayOffset), Infinity);
+	const line = DayLine.plain(dayOffset);
 	return {
 		step(shift: -1 | 1) {
 			pager.begin(pager.stop, true);
-			standAt(store.getState(), pager.release(pager.move(shift * width, width), 0, width));
+			line.standAt(store.getState(), pager.release(pager.move(shift * width, width), 0, width));
 		},
 	};
 }
@@ -38,7 +39,7 @@ async function screen() {
  * Max asked twice (CLAUDE.md, «Behaviours Max had to ask for twice»): one swipe of the lists moves them one place, never
  * two, from the very first swipe after launch. In the engine the swipe's rule is `FollowPager`, the ribbon's one pager on
  * every stop (moved here from the stage-0 pager's `swipeStep` and `store.step`, Decision 129), and where it lands is where
- * the store stands (`standAt`).
+ * the store stands (`DayLine.standAt`).
  */
 describe("one swipe, one place (Max)", () => {
 	it("a swipe goes at most one place whatever its length or speed", () => {
