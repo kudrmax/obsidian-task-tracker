@@ -61,3 +61,16 @@ The integration branch is `ui-engine`, cut from `ui-trackpad` in step 0. A long 
 - The frame audit's jank items: dropped — Max sees none (2026-11-21).
 - Double click: removed for now, Max decides later.
 - The iPhone app's new design: a task of its own after this release.
+
+## Paused by Max (2026-11-23, 23:00)
+
+Steps 0–6 merged in `ui-engine` (602b64cb; full run green: 3313 unit, 327 Swift, 398 e2e). Step 7's first wave committed and pushed, NOT merged, NOT reviewed, no full e2e yet:
+
+| Branch | Head | What |
+|---|---|---|
+| `ui-engine-7a` | f0c2772e | day arrows and title tap (F41–F48, F50), view modes and the view button, Subprojects, hosts F1–F4/F9; Decisions 146–149; has 7b merged in |
+| `ui-engine-7b` | 5e67ec40 | Backlog, section header menu and drag, folding, F79/F198, First step, the wheel, edge fades; Decisions 150–153 |
+| `ui-engine-7c` | 1d598439 | menu pages Repeat/Section/Open in Obsidian & Calendar, full-screen task, First step (duplicate); Decisions 154–157 |
+| `ui-engine-7d` | db1282d4 | «⋯», search ⌘F, Done, Select tasks and bulk, stack drag, assistant answers; Decisions 158–161; FollowPager got a `first` field |
+
+To resume: keep 7B's First step (stateless port) and remove 7C's (firstStepOn/firstStep in port and CorePort, startFirstStep/endFirstStep, Card stepField, view/FirstStep.tsx, firstStep.test.ts, e27's «first step» case); teach the wheel the Done stop (F257); bulk Repeat/Section via actAll; a blank card-high row above the first card (7A saw it, likely 7B's hidden section header); the core shows notes in the full screen's «⋯» copy (design: none). Then one reviewer pass per batch, merge in order 7b → 7a → 7c → 7d with a full run at each merge. Then the next wave: projects panel/tree/filter/By project, calendar sources window (+F32), note block details, keyboard commands, phone/desktop-only, motion, file/Sync/notices, settings rows (F300), F311–F314, Rows F18–F21.
