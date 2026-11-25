@@ -34,7 +34,7 @@ export default {
 
 		await press(".tc-view-btn");
 		const offered = await menuRows();
-		const want = t.platform === "phone" ? ["Columns", "Rows"] : ["Two columns", "All columns", "Rows"];
+		const want = t.platform === "phone" ? ["Columns", "Rows", "By project"] : ["Two columns", "All columns", "Rows", "By project"];
 		t.expect(JSON.stringify(offered.map((row) => row.label)) === JSON.stringify(want), `«View» offers ${JSON.stringify(want)}: ${JSON.stringify(offered)}`);
 		t.expect(offered[0]?.checked && offered.slice(1).every((row) => !row.checked), `the chosen mode alone is checked: ${JSON.stringify(offered)}`);
 		t.expect(await t.cdp.eval(`!!document.querySelector(".tc-control-copy .tc-view-btn")`), "a copy of the button stands over the backdrop");

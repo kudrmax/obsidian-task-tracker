@@ -1,5 +1,6 @@
-import { type PointerEvent, memo, type ReactNode, type RefObject, useRef, useState } from "react";
-import { DESIGN } from "../../shared/design";
+import { type CSSProperties, type PointerEvent, memo, type ReactNode, type RefObject, useMemo, useRef, useState } from "react";
+import { DESIGN, PROPERTY } from "../../shared/design";
+import { useTreeMeasure, useTreeRoom, useTreeRow } from "../drag/Drag";
 import { TREE_DIVIDER, useDivider } from "../gestures/Divider";
 import { ControlMenu } from "../layers/Layers";
 import { drawnWidths } from "../layout/columns";
@@ -170,14 +171,15 @@ function TreePanel() {
 	const { desk } = useHost();
 	const panel = useScreen((s) => s.projects?.panel ?? null);
 	const box = useRef<HTMLDivElement>(null);
+	const measure = useTreeMeasure();
 	if (!panel) return null;
 	return (
 		<>
 			{panel.docked ? null : <div className="tc-tree-dim" onClick={() => panel.dimCloses && api.getState().closePanel()} />}
-			<div ref={box} className="tc-tree-panel" aria-label="Projects" aria-hidden={!panel.open}>
+			<div ref={box} className="tc-tree-panel" aria-label="Projects" aria-hidden={!panel.open} onTransitionEnd={(event) => event.target === event.currentTarget && measure()}>
 				<div className="tc-tree-panel-title">Projects</div>
 				<div className="tc-tree-column">
-					<Tree rows={panel.rows} />
+					<Tree rows={panel.rows} shown={panel.open} />
 				</div>
 				{desk ? <TreeDivider panel={box} /> : null}
 			</div>
@@ -211,6 +213,8 @@ function TreeDivider({ panel }: { readonly panel: RefObject<HTMLDivElement | nul
 /** A branch of the tree: its rows at one depth, an open row's own rows in a branch under it with the thin line along them. */
 interface Branch {
 	readonly row: TreeRow;
+	/** The row's place among all the rows: the gap before it has its index. */
+	readonly index: number;
 	readonly children: Branch[];
 }
 
@@ -218,55 +222,93 @@ interface Branch {
 function branchesOf(rows: readonly TreeRow[]): Branch[] {
 	const top: Branch[] = [];
 	const open: Branch[][] = [top];
-	for (const row of rows) {
+	rows.forEach((row, index) => {
 		open.length = Math.min(open.length, row.depth + 1);
-		const branch: Branch = { row, children: [] };
+		const branch: Branch = { row, index, children: [] };
 		open[open.length - 1].push(branch);
 		if (row.hasBranch && !row.folded) open.push(branch.children);
-	}
+	});
 	return top;
 }
 
-/** The tree (F210–F214, board TreeC, variant В): All, the projects with their branches, No project and Done, one row per row of the port's. */
-function Tree({ rows }: { readonly rows: readonly TreeRow[] }) {
+/**
+ * The tree (F210–F215, board TreeC, variant В): All, the projects with their branches, No project and Done, one row per row
+ * of the port's; where a lifted project or the plus would land, a line at its gap and depth (F215, F226), and there a new
+ * project's name typed.
+ */
+function Tree({ rows, shown }: { readonly rows: readonly TreeRow[]; readonly shown: boolean }) {
+	const room = useTreeRoom(shown);
+	const carried = useScreen((s) => s.treeGap);
+	const name = useScreen((s) => s.treeName);
+	const mark = useMemo(() => (carried ? { ...carried, naming: false } : name && { gap: name.gap, depth: name.depth, naming: true }), [carried, name]);
 	return (
-		<div className="tc-tree" role="tree" aria-label="Projects">
-			<Branches branches={branchesOf(rows)} />
+		<div ref={room} className="tc-tree" role="tree" aria-label="Projects">
+			<Branches branches={branchesOf(rows)} depth={0} gap={mark} shown={shown} />
+			{mark && mark.gap >= rows.length ? <TreeGap depth={mark.depth} naming={mark.naming} /> : null}
 		</div>
 	);
 }
 
-function Branches({ branches }: { readonly branches: readonly Branch[] }) {
+type GapMark = { readonly gap: number; readonly depth: number; readonly naming: boolean } | null;
+
+function Branches({ branches, depth, gap, shown }: { readonly branches: readonly Branch[]; readonly depth: number; readonly gap: GapMark; readonly shown: boolean }) {
 	return (
 		<>
-			{branches.map(({ row, children }) => (
-				<BranchOf key={row.node} row={row}>
-					{children}
+			{branches.map(({ row, index, children }) => (
+				<BranchOf key={row.node} row={row} gap={gap?.gap === index ? gap : null} shown={shown} inner={children.length > 0 ? <Branches branches={children} depth={depth + 1} gap={gap} shown={shown} /> : null}>
+					{depth}
 				</BranchOf>
 			))}
 		</>
 	);
 }
 
-function BranchOf({ row, children }: { readonly row: TreeRow; readonly children: readonly Branch[] }) {
+function BranchOf({ row, gap, shown, inner, children: depth }: { readonly row: TreeRow; readonly gap: GapMark; readonly shown: boolean; readonly inner: ReactNode; readonly children: number }) {
 	return (
 		<>
-			<TreeRowView row={row} />
-			{children.length > 0 ? (
+			{gap ? <TreeGap depth={gap.depth - depth} naming={gap.naming} /> : null}
+			<TreeRowView row={row} shown={shown} />
+			{inner ? (
 				<div className="tc-tree-branch" role="group">
-					<Branches branches={children} />
+					{inner}
 				</div>
 			) : null}
 		</>
 	);
 }
 
-/** A row: a tile at the top, a line of text deeper; filled while chosen, grey with nothing open, a folded one's layer or ellipsis. */
-const TreeRowView = memo(function TreeRowView({ row }: { readonly row: TreeRow }) {
+/** Where a lifted project or the plus would land: a line `depth` steps in from the rows it stands among; the plus let go there, the new project's name. */
+function TreeGap({ depth, naming }: { readonly depth: number; readonly naming: boolean }) {
+	const style = { [PROPERTY.level]: String(depth) } as CSSProperties;
+	if (naming) return <TreeName style={style} />;
+	return <div className="tc-tree-gap" style={style} aria-hidden="true" />;
+}
+
+/** The new project's name at its gap (F226): Enter makes it there and chooses it, Escape and a tap elsewhere make none. */
+function TreeName({ style }: { readonly style: CSSProperties }) {
 	const api = useScreenApi();
-	const look = `tc-tree-row ${row.tile ? "is-tile" : "is-line"} is-${row.kind}${row.selected ? " is-selected" : ""}${row.muted ? " is-muted" : ""}${row.folded ? " is-folded" : ""}`;
+	const ended = useRef(false);
+	const end = (name: string | null) => {
+		if (ended.current) return;
+		ended.current = true;
+		api.getState().endTreeName(name);
+	};
 	return (
-		<button type="button" role="treeitem" aria-selected={row.selected} aria-expanded={row.hasBranch ? !row.folded : undefined} className={`tc-btn ${look}`} data-node={row.node} onClick={() => api.getState().pickNode(row.node)}>
+		<div className="tc-tree-field" style={style}>
+			<ObsidianEditor text="" className="tc-quick-field tc-title-field is-section" placeholder="Project name" onEnter={(text) => end(text)} onEscape={() => end(null)} onLeave={() => end(null)} />
+		</div>
+	);
+}
+
+/** A row: a tile at the top, a line of text deeper; filled while chosen, grey with nothing open, a folded one's layer or ellipsis; lit while a carried card would be let go on it, dim while it is lifted. */
+const TreeRowView = memo(function TreeRowView({ row, shown }: { readonly row: TreeRow; readonly shown: boolean }) {
+	const api = useScreenApi();
+	const drop = useScreen((s) => s.treeOver === row.node);
+	const lifted = useScreen((s) => s.liftedProject === row.node);
+	const { ref, handlers } = useTreeRow(row.node, row.lifts, shown);
+	const look = `tc-tree-row ${row.tile ? "is-tile" : "is-line"} is-${row.kind}${row.selected ? " is-selected" : ""}${row.muted ? " is-muted" : ""}${row.folded ? " is-folded" : ""}${drop ? " is-drop" : ""}${lifted ? " is-lifted" : ""}`;
+	return (
+		<button ref={ref} type="button" role="treeitem" aria-selected={row.selected} aria-expanded={row.hasBranch ? !row.folded : undefined} className={`tc-btn ${look}`} data-node={row.node} {...handlers} onClick={() => api.getState().pickNode(row.node)}>
 			<span className="tc-tree-name">{row.title}</span>
 			{row.folded && !row.tile ? (
 				<span className="tc-tree-more" aria-hidden="true">

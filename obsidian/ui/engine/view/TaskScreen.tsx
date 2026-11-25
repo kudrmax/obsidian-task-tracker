@@ -1,6 +1,6 @@
 import { type CSSProperties, type MouseEvent, type PointerEvent, type TouchEvent, useEffect, useId, useRef } from "react";
 import { PROPERTY } from "../../shared/design";
-import { Drag, type Grab, type Landing, useTouchPresses } from "../drag/Drag";
+import { Drag, type Grab, type Landing, useScreenRoom, useTouchPresses } from "../drag/Drag";
 import { Layers } from "../layers/Layers";
 import { Layout, listsOf, type Place, reachOf, useProjectsPlace } from "../layout/Layout";
 import { StoreContext, type ScreenStore, useScreen } from "../store";
@@ -34,6 +34,17 @@ const carried = (id: string, grab: Grab, landing: Landing) => (
 	</div>
 );
 
+/** A project lifted in the tree (F215): its row under the finger, lifted. */
+function CarriedProject({ node }: { readonly node: string }) {
+	const row = useScreen((s) => s.projects?.panel.rows.find((r) => r.node === node));
+	if (!row) return null;
+	return (
+		<div className={`tc-tree-row tc-tree-float ${row.tile ? "is-tile" : "is-line"}`}>
+			<span className="tc-tree-name">{row.title}</span>
+		</div>
+	);
+}
+
 /**
  * What is carried, as the card it lifted: a task's card, or a section's header drawn as a plate of a card's look, its
  * name and how many tasks it holds (the design's «Поднятая секция», F63).
@@ -66,7 +77,7 @@ export function TaskScreen({ store, host, place }: { readonly store: ScreenStore
 		<StoreContext.Provider value={store}>
 			<HostContext.Provider value={host}>
 				<Layers>
-					<Drag doc={host.doc} carried={carried} plus={CARRIED_PLUS} onLift={() => host.haptics.tap()}>
+					<Drag doc={host.doc} carried={carried} plus={CARRIED_PLUS} project={(node) => <CarriedProject node={node} />} onLift={() => host.haptics.tap()}>
 						<Root place={place} store={store} />
 					</Drag>
 				</Layers>
@@ -100,6 +111,7 @@ function Root({ place, store }: { readonly place: Place; readonly store: ScreenS
 	const lists = useScreen((s) => listsOf(s.view));
 	const touches = useTouchPresses();
 	const projects = useProjectsPlace();
+	const room = useScreenRoom();
 	useDrawn(store);
 	/**
 	 * A finger's tap elsewhere ends the typing and does only that (the audit's 17, as the menu's backdrop does, Decision 74):
@@ -117,7 +129,7 @@ function Root({ place, store }: { readonly place: Place; readonly store: ScreenS
 		if (s.entry && !s.entry.stack) s.commitEntry(s.entryText, false);
 	};
 	return (
-		<div className={`task-calendar is-engine is-${place}${entering ? " is-entering" : ""}${projects.className}`} style={projects.style} onPointerDownCapture={pressed} onClickCapture={clicked} {...touches} onTouchStart={keepTouch} onTouchMove={keepTouch} onTouchEnd={keepTouch} onClick={(event) => letSelectionGo(event, store)}>
+		<div ref={room} className={`task-calendar is-engine is-${place}${entering ? " is-entering" : ""}${projects.className}`} style={projects.style} onPointerDownCapture={pressed} onClickCapture={clicked} {...touches} onTouchStart={keepTouch} onTouchMove={keepTouch} onTouchEnd={keepTouch} onClick={(event) => letSelectionGo(event, store)}>
 			<Layout place={place} />
 			<QuickBar reach={reachOf(place, lists)} />
 			<MissingFile />

@@ -28,6 +28,16 @@ const gestureNow = (): number => performance.now();
 /** The plus, or the calendar's new place: either opens a new task's field where it is let go. */
 const isPlus = (id: UniqueIdentifier): boolean => id === PLUS || id === NEW_SLOT;
 
+/** A row of the projects' tree as a drop target (`tree:` and its node), the tree's own room, and a project lifted from it. */
+const TREE_ROW = "tree:";
+const TREE_ROOM = "tree-room:";
+const TREE_LIFT = "tree-lift:";
+/** A project lifted in the tree, by its node; null for anything else. */
+const liftedNode = (id: UniqueIdentifier): string | null => (String(id).startsWith(TREE_LIFT) ? String(id).slice(TREE_LIFT.length) : null);
+/** How near the narrow screen's left edge a carried card brings the projects' panel out (F222): the panel's own edge swipe width. */
+const CARRY_EDGE_PX = 24;
+const SCREEN_ROOM = "screen-room:";
+
 /** The touches the screen tells the drag of (`useTouchPresses`): the screen's root hears them, the sensors listen to nothing more. */
 const PressesContext = createContext<TouchPresses | null>(null);
 
@@ -110,12 +120,14 @@ export interface DragProps {
 	readonly carried: (id: string, grab: Grab, landing: Landing) => ReactNode;
 	/** How the carried plus is drawn. */
 	readonly plus: ReactNode;
+	/** How a project lifted in the tree is drawn, by its node (F215). */
+	readonly project: (node: string) => ReactNode;
 	/** A tick under the finger as a card lifts: the host's haptics. */
 	readonly onLift: () => void;
 	readonly children: ReactNode;
 }
 
-export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
+export function Drag({ doc, carried, plus, project, onLift, children }: DragProps) {
 	const api = useScreenApi();
 	const [presses] = useState(() => new TouchPresses());
 	const options = useMemo((): PressOptions & MouseSensorOptions => ({ busy: () => holdsPointer(api.getState().gesture), presses }), [api, presses]);
@@ -137,7 +149,7 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 	const lastOver = useRef<UniqueIdentifier | null>(null);
 	/** Where the pointer is and where the targets stand, as dnd-kit gives them to the collision detection. */
 	const pointer = useRef<{ readonly x: number; readonly y: number } | null>(null);
-	const rects = useRef<ReadonlyMap<UniqueIdentifier, { readonly top: number; readonly bottom: number; readonly height: number }>>(new Map());
+	const rects = useRef<ReadonlyMap<UniqueIdentifier, { readonly top: number; readonly bottom: number; readonly height: number; readonly left: number }>>(new Map());
 	const heading = useRef(new EdgeHeading());
 	/** The carried task went further than a long press's tolerance since it was lifted: let go, it is a drop, not a hold. */
 	const moved = useRef(false);
@@ -160,6 +172,13 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 			return [{ id: nearest }];
 		}
 		const underPointer = pointerWithin(args);
+		/** A project lifted in the tree has no target: its gap is the rows' (`treeGapAt`). Over the tree a card's target is the row under it, the plus's the tree. */
+		if (liftedNode(args.active.id) !== null) return [];
+		const treeHit = underPointer.find((hit) => String(hit.id).startsWith(TREE_ROW)) ?? underPointer.find((hit) => hit.id === TREE_ROOM);
+		if (treeHit && args.active.id !== NEW_SLOT) {
+			lastOver.current = null;
+			return [{ id: args.active.id === PLUS ? TREE_ROOM : treeHit.id }];
+		}
 		/** Over the calendar the target is the calendar itself: the card's place there is at the minute under its top, among no rows. */
 		const onCalendar = underPointer.some((hit) => hit.id === CALENDAR_TARGET || hit.id === CALENDAR_ROOM);
 		if (onCalendar) {
@@ -348,9 +367,50 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 		const edge = !box || y === undefined ? 0 : y < box.top + box.height * AUTO_SCROLL.threshold.y ? -1 : y > box.bottom - box.height * AUTO_SCROLL.threshold.y ? 1 : 0;
 		api.getState().scrollToward(heading.current.feed(room, y ?? 0, edge));
 	};
+	/** The gap of the tree's rows the pointer stands at (before the first row whose middle is below it), as dnd-kit measured the rows. */
+	const treeGapAt = (): number | null => {
+		const y = pointer.current?.y;
+		const rows = api.getState().projects?.panel.rows ?? [];
+		if (y === undefined || rows.length === 0) return null;
+		const box = rects.current.get(TREE_ROOM);
+		if (!box || y < box.top || y > box.bottom) return null;
+		const gap = rows.findIndex((row) => {
+			const rect = rects.current.get(`${TREE_ROW}${row.node}`);
+			return rect !== undefined && rect.top + rect.height / 2 > y;
+		});
+		return gap < 0 ? rows.length : gap;
+	};
+	/** How far sideways the pointer went since the lift: a step per the tree's indent nests a project or takes it out (F215). */
+	const shiftNow = (event: { readonly delta: { readonly x: number } }) => event.delta.x;
+	/**
+	 * Over the projects' tree (F215, F221–F226): a lifted project or the plus shows the gap it would land at; a card lights
+	 * the row that takes it, and the port opens a row it stays over, or the panel at the narrow screen's left edge.
+	 * Whether the pointer is the tree's now.
+	 */
+	const overTree = (event: DragMoveEvent): boolean => {
+		const screen = api.getState();
+		const { active: lifted, over } = event;
+		if (liftedNode(lifted.id) !== null) {
+			screen.setTreeGap(treeGapAt(), shiftNow(event));
+			return true;
+		}
+		if (lifted.id === PLUS) {
+			const gap = over?.id === TREE_ROOM ? treeGapAt() : null;
+			screen.setTreeGap(gap, shiftNow(event));
+			if (gap !== null) screen.setPlusAt(null);
+			return gap !== null;
+		}
+		const row = over && String(over.id).startsWith(TREE_ROW) ? String(over.id).slice(TREE_ROW.length) : null;
+		const panel = screen.projects?.panel;
+		const edge = row === null && !!panel && !panel.docked && !panel.open && (pointer.current?.x ?? Infinity) - (rects.current.get(SCREEN_ROOM)?.left ?? 0) < CARRY_EDGE_PX;
+		screen.setTreeOver(row);
+		screen.carryAt(edge, row);
+		return row !== null;
+	};
 	const move = (event: DragMoveEvent) => {
 		const { active: lifted, over } = event;
 		if (Math.hypot(event.delta.x, event.delta.y) > LONG_PRESS_TOLERANCE_PX) moved.current = true;
+		if (overTree(event)) return;
 		followEdge(over);
 		if (liftedSection(lifted) !== null) return;
 		if (isPlus(lifted.id)) {
@@ -382,14 +442,22 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 		liftAt.current = null;
 		homeTop.current = null;
 		swipe.current = new SwipeLevel(null, 0, liftX, gestureNow());
-		setFlies(lifted.id !== NEW_SLOT);
+		setFlies(lifted.id !== NEW_SLOT && liftedNode(lifted.id) === null);
+		const project = liftedNode(lifted.id);
+		if (project !== null) {
+			screen.liftProject(project);
+			setActive(String(lifted.id));
+			return onLift();
+		}
 		if (isPlus(lifted.id)) {
 			screen.openEntry(null);
 			screen.select(null);
+			if (lifted.id === PLUS) screen.startCarry([], true);
 			setActive(String(lifted.id));
 			return onLift();
 		}
 		screen.lift(String(lifted.id));
+		screen.startCarry([String(lifted.id)], false);
 		setActive(String(lifted.id));
 		const container = containerOf(lifted);
 		const rows = container === null ? [] : rowsOf(container);
@@ -409,6 +477,8 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 	 */
 	const overList = (event: DragOverEvent) => {
 		const { active: lifted, over } = event;
+		/** The tree's row or room under the pointer is the tree's: dnd-kit tells a new target here, between the pointer's moves. */
+		if (liftedNode(lifted.id) !== null || (over && (String(over.id).startsWith(TREE_ROW) || over.id === TREE_ROOM))) return void overTree(event);
 		followEdge(over);
 		if (liftedSection(lifted) !== null) return;
 		if (isPlus(lifted.id)) return plusOver(event, over);
@@ -432,7 +502,29 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 	const end = (event: DragEndEvent) => {
 		const { active: lifted, over } = event;
 		setActive(null);
+		const screen = api.getState();
+		if (liftedNode(lifted.id) !== null) {
+			screen.dropProject(treeGapAt(), shiftNow(event));
+			return screen.release("drag");
+		}
+		if (lifted.id === PLUS && screen.treeGap !== null) {
+			screen.openTreeName(screen.treeGap.gap, shiftNow(event));
+			return screen.release("drag");
+		}
+		if (lifted.id === PLUS) screen.endCarry("nowhere");
 		if (isPlus(lifted.id)) return dropPlus(event);
+		const onRow = screen.treeOver;
+		if (onRow !== null) {
+			screen.carryOnNode(onRow);
+			return screen.drop(String(lifted.id), null);
+		}
+		/** Let go over a list, the carry ends there and the filter it opened stays; anywhere else it ends nowhere, the lift's filter back (F225). */
+		screen.endCarry(containerOf(lifted) !== null && over !== null && !refusedNow.current ? "dropped" : "nowhere");
+		dropCard(event);
+	};
+	/** A card let go: where the list or the calendar under it puts it, or back home. */
+	const dropCard = (event: DragEndEvent) => {
+		const { active: lifted, over } = event;
 		const id = String(lifted.id);
 		const container = containerOf(lifted);
 		if (api.getState().gesture !== "drag") return;
@@ -470,7 +562,12 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 		api.getState().drop(id, !api.getState().changes(id, to) || !api.getState().takes(id, to) ? null : to);
 	};
 	const cancel = () => {
-		if (active !== null && isPlus(active)) {
+		api.getState().endCarry("nowhere");
+		api.getState().setTreeGap(null, 0);
+		if (active !== null && liftedNode(active) !== null) {
+			api.getState().dropProject(null, 0);
+			api.getState().release("drag");
+		} else if (active !== null && isPlus(active)) {
 			api.getState().setPlusAt(null);
 			api.getState().setPlusMinute(null);
 			api.getState().release("drag");
@@ -487,7 +584,7 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 			{children}
 			{createPortal(
 				<DragOverlay className="tc-overlay" dropAnimation={flies ? DROP_ANIMATION : null}>
-					{active === PLUS ? plus : active === NEW_SLOT ? null : active ? <Carried id={active} carried={carried} /> : null}
+					{active === PLUS ? plus : active === NEW_SLOT ? null : active && liftedNode(active) !== null ? project(liftedNode(active)!) : active ? <Carried id={active} carried={carried} /> : null}
 				</DragOverlay>,
 				doc.body,
 			)}
@@ -631,6 +728,42 @@ export function SortableList({ list, ids, sections, children }: { readonly list:
  */
 export function useListTarget(list: ListId, ids: readonly string[], away: number | null = null): (element: HTMLElement | null) => void {
 	return useDroppable({ id: away === null ? `${LIST_TARGET}${list}` : `${LIST_TARGET}${list}@${away}`, disabled: away !== null, data: { items: ids } }).setNodeRef;
+}
+
+/**
+ * A row of the projects' tree for the drag (F215, F221): a target a carried card is let go on, and, while it `lifts`, a
+ * project a long press (a mouse's drag) lifts to reorder or nest. `shown`: the panel is out; else it takes nothing.
+ */
+export function useTreeRow(node: string, lifts: boolean, shown: boolean): { readonly ref: (element: HTMLElement | null) => void; readonly handlers: object } {
+	const target = useDroppable({ id: `${TREE_ROW}${node}`, disabled: !shown });
+	const lift = useDraggable({ id: `${TREE_LIFT}${node}`, disabled: !lifts || !shown });
+	const ref = useCallback(
+		(element: HTMLElement | null) => {
+			target.setNodeRef(element);
+			lift.setNodeRef(element);
+		},
+		[target, lift],
+	);
+	return { ref, handlers: lifts ? { ...lift.attributes, ...lift.listeners } : {} };
+}
+
+/**
+ * The tree's targets measured again where they now stand (dnd-kit's `measureDroppableContainers`): the panel slid out
+ * under a carried card (F222) after the drag measured them hidden off the screen.
+ */
+export function useTreeMeasure(): () => void {
+	const { measureDroppableContainers, droppableContainers } = useDndContext();
+	return useCallback(() => measureDroppableContainers([...droppableContainers.keys()].filter((id) => String(id).startsWith(TREE_ROW) || id === TREE_ROOM)), [measureDroppableContainers, droppableContainers]);
+}
+
+/** The tree's own room, so the plus over it is over the tree, and the rows' gaps are read inside it. */
+export function useTreeRoom(shown: boolean): (element: HTMLElement | null) => void {
+	return useDroppable({ id: TREE_ROOM, disabled: !shown }).setNodeRef;
+}
+
+/** The screen's own room: where its left edge stands, for a carry brought to it (F222). */
+export function useScreenRoom(): (element: HTMLElement | null) => void {
+	return useDroppable({ id: SCREEN_ROOM }).setNodeRef;
 }
 
 /** What a carried row tells dnd-kit besides its place (its sortable `data`): how it opens its menu, from the row pressed, held or tapped. */

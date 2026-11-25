@@ -309,6 +309,11 @@ export class CorePort implements ScreenPort {
 
 	read(dayOffset: number, context?: ScreenContext): ScreenData {
 		this.use(context);
+		return this.drawnNow(dayOffset);
+	}
+
+	/** The screen of the day `dayOffset` in the context it is drawn in now: what the port's own answers start from, never another context's. */
+	private drawnNow(dayOffset: number): ScreenData {
 		const key = `${dayOffset}@${this.now().minute}#${this.context}`;
 		let data = this.cache.get(key);
 		if (!data) {
@@ -394,8 +399,8 @@ export class CorePort implements ScreenPort {
 		await this.core.tasks.startCarry({ keys, ...(plus ? { plus } : {}) }, wide);
 	}
 
-	async carryAt(edge: boolean, node: string | null, nowMs: number): Promise<number | null> {
-		const { wait } = await this.core.tasks.carryAt({ edge, node }, nowMs);
+	async carryAt(edge: boolean, node: string | null): Promise<number | null> {
+		const { wait } = await this.core.tasks.carryAt({ edge, node }, this.core.clock.now().getTime());
 		await this.shared.keepView(Promise.resolve());
 		return wait;
 	}
@@ -441,8 +446,8 @@ export class CorePort implements ScreenPort {
 		this.use(context);
 		const move = this.moveOf(id, to);
 		const date = this.dateOf(to.dayOffset);
-		if (!move || move.kind === "home") return this.read(to.dayOffset);
-		if (move.kind === "projects") return this.readied.get(readyKey(id, to)) ?? this.read(to.dayOffset);
+		if (!move || move.kind === "home") return this.drawnNow(to.dayOffset);
+		if (move.kind === "projects") return this.readied.get(readyKey(id, to)) ?? this.drawnNow(to.dayOffset);
 		if (move.kind === "slot") return this.drawn(date, { id, ...this.core.days.boundary().spanOf(move.slot, date) });
 		const { screen } = this.reader.dropPreview(move.tasks, move.to, move.day);
 		return this.drawing.draw({ date, screen, lists: this.drawing.listsOf(screen), events: this.eventsOf(date) }, this.plate());
@@ -450,7 +455,7 @@ export class CorePort implements ScreenPort {
 
 	/**
 	 * By project's drop as it will stand (`projectsDropPreview`, which reads the file) asked while the card is carried, so
-	 * the drop draws it at once (`preview`); a funnel's preview needs no asking.
+	 * the drop draws it at once (`preview`); a funnel's preview needs no asking. A place the core finds stale readies nothing.
 	 */
 	ready(id: string, to: Destination): void {
 		const move = this.moveOf(id, to);
@@ -459,8 +464,8 @@ export class CorePort implements ScreenPort {
 		const day = to.dayOffset;
 		void this.core.tasks.projectsDropPreview(move.cards, move.place, this.node()).then((ahead) => {
 			if (this.readied.size > 16) this.readied.clear();
-			this.readied.set(key, this.withProjects(this.read(day), new ProjectsList(ahead.view)));
-		});
+			this.readied.set(key, this.withProjects(this.drawnNow(day), new ProjectsList(ahead.view)));
+		}, () => undefined);
 	}
 
 	/** Nothing changes where the core leaves the task as it is: a card let go where it was lifted (`placeOfDrop`), a time it has already (`sameSlot`). */
@@ -510,7 +515,7 @@ export class CorePort implements ScreenPort {
 		this.use(context);
 		const item = this.item(id);
 		const date = this.dateOf(dayOffset);
-		if (!item) return this.read(dayOffset);
+		if (!item) return this.drawnNow(dayOffset);
 		const screen = this.core.tasks.firstStepScreen(this.reader.screen(date), item.key);
 		return this.drawing.draw({ date, screen, lists: this.drawing.listsOf(screen), events: this.eventsOf(date) }, this.plate());
 	}

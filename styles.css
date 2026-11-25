@@ -310,6 +310,8 @@ body {
 	--tc-tree-indent: 12px;
 	--tc-tree-branch-x: calc(var(--tc-tree-indent) / 2);
 	--tc-tree-branch-inset: var(--tc-space-4);
+	/* Where a lifted project or the plus lands in the tree: a line as thick as the now line. */
+	--tc-drop-line: var(--tc-now-line);
 	--tc-branch-w: 1.5px;
 	/* After an open branch the next tile stands as far down as after a folded one, under its peeking layer. */
 	--tc-tree-branch-after: var(--tc-stack-step-y);
@@ -1337,6 +1339,15 @@ body:not(.is-mobile) .tc-tree-column { padding: 0 var(--tc-desk-projects-near) 0
 .tc-tree-branch { position: relative; flex-shrink: 0; margin-left: var(--tc-tree-indent); display: flex; flex-direction: column; gap: var(--tc-tree-gap); }
 .tc-tree-branch::before { content: ""; position: absolute; left: calc(-1 * var(--tc-tree-branch-x)); top: var(--tc-tree-branch-inset); bottom: var(--tc-tree-branch-inset); width: var(--tc-branch-w); background: var(--tc-branch); }
 .tc-tree > .tc-tree-branch { margin-bottom: calc(var(--tc-tree-branch-after) - var(--tc-tree-gap)); }
+.task-calendar button.tc-tree-row.is-lifted { opacity: var(--tc-tile-off-opacity); }
+/* Where a lifted project or the plus lands in the tree: a line in the gap, as far in as the depth it would take; the new project's name typed there. */
+.tc-tree-gap { position: relative; flex-shrink: 0; height: 0; margin-left: calc(var(--tc-level) * var(--tc-tree-indent)); }
+.tc-tree-gap::after { content: ""; position: absolute; left: 0; right: 0; top: calc(-1 * (var(--tc-tree-gap) + var(--tc-drop-line)) / 2); height: var(--tc-drop-line); border-radius: var(--tc-radius-pill); background: var(--tc-accent); }
+.tc-tree-field { flex-shrink: 0; margin-left: calc(var(--tc-level) * var(--tc-tree-indent)); }
+/* A project carried in the tree: its row under the finger, lifted. */
+.tc-tree-float { box-sizing: border-box; display: flex; align-items: center; background: var(--tc-float-bg); color: var(--tc-text); box-shadow: var(--tc-shadow-lift); pointer-events: none; }
+.tc-tree-float.is-tile { height: var(--tc-tree-tile-h); padding: var(--tc-tree-tile-pad); border-radius: var(--tc-radius-tree-tile); font-size: var(--tc-font-tree-tile); font-weight: var(--tc-weight-semibold); }
+.tc-tree-float.is-line { height: var(--tc-tree-line-h); padding: var(--tc-tree-line-pad); border-radius: var(--tc-radius-tree-line); font-size: var(--tc-font-tree-line); }
 /* By project (F229–F233): a card's stage mark in the date's place. */
 .tc-stage-mark { width: var(--tc-stage-mark-w); flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: var(--tc-muted); }
 .tc-stage-mark svg { width: var(--tc-icon-s); height: var(--tc-icon-s); stroke-width: var(--tc-stroke-stage-mark); }

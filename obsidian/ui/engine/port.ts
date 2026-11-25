@@ -486,8 +486,8 @@ export interface ScreenPort {
 	createProject(name: string, gap: number, shift: number): Promise<boolean>;
 	/** Cards (or the plus, `plus`) lifted for a carry that may reach the tree (F221–F226): the port keeps what is carried and the filter it was lifted under. */
 	startCarry(ids: readonly string[], plus: boolean, wide: boolean): Promise<void>;
-	/** The carrying finger at the narrow screen's left edge (`edge`) or over the row `node`, `nowMs` the host's clock: resolves to how long until it should be told again (null: nothing waits). */
-	carryAt(edge: boolean, node: string | null, nowMs: number): Promise<number | null>;
+	/** The carrying finger at the narrow screen's left edge (`edge`) or over the row `node`, now by the port's clock: resolves to how long, ms, until it should be told again (null: nothing waits). */
+	carryAt(edge: boolean, node: string | null): Promise<number | null>;
 	/** The carried cards let go on the row `node` (F221): each gives up the project it was shown under for the row's. */
 	carryOnNode(node: string): Promise<void>;
 	/** The carry ends otherwise: nowhere (the lift's filter back), dropped in a list, or the plus let go in the tree. */

@@ -385,13 +385,19 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 		/** The port's data again; held while a drag or a drop's write keeps the screen still (spec, principle 5). */
 		const refresh = () => {
 			const s = get();
+			const projects = port.projects(wide);
 			if (HOLDING.includes(s.gesture) || writing > 0) {
-				if (!s.pending) set({ pending: true });
+				/**
+				 * The panel and the tree follow a carry at once: a card held at the edge brings the panel out, held over a row it
+				 * opens it (F222, F223), the screen drawn in that project under the card (the one context set while the finger holds, Decision 164).
+				 */
+				const opened = s.gesture === "drag" && projects && projects.context.node !== s.context.node;
+				if (opened) return drawIn(projects.context, true);
+				if (!s.pending || JSON.stringify(projects) !== JSON.stringify(s.projects)) set({ pending: true, projects });
 				return;
 			}
 			/** The device's filter chose another node: the screen is drawn in it, in place. */
-			const filtered = port.projects(wide)?.context;
-			if (filtered && filtered.node !== s.context.node) return get().setContext(filtered);
+			if (projects && projects.context.node !== s.context.node) return get().setContext(projects.context);
 			const next = share(s.read, s.firstStep === null ? port.read(s.dayOffset, s.context) : port.firstStepView(s.firstStep, s.dayOffset, s.context));
 			const known = s.read.cards;
 			/** A read that changed nothing (a write's read-back after its own change came) keeps what came and went in the last one. */
@@ -402,6 +408,15 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 			const undo = { canUndo: port.canUndo(), canRedo: port.canRedo(), ...viewed(s) };
 			if (same) return set({ shown: share(s.shown, next), pending: false, ...menu, ...undo });
 			set({ read: next, shown: share(s.shown, next), pending: false, readSeq: s.readSeq + 1, fresh: came.length === 0 ? NONE : new Set(came), gone: went.length === 0 ? NONE : new Set(went), ...menu, ...undo });
+		};
+
+		/** The screen drawn in `context`, in place; `held`: under a carried card, which stays carried (its place home, its drop not yet known). */
+		const drawIn = (context: ScreenContext, held: boolean) => {
+			const s = get();
+			const next = port.read(s.dayOffset, context);
+			const left = Object.fromEntries(Object.keys(s.left).map((day) => [day, ((data) => ({ shown: data, read: data }))(port.read(Number(day), context))]));
+			if (held) home = next;
+			set({ context, contextSeq: s.contextSeq + 1, read: next, shown: next, left, pending: false, readSeq: s.readSeq + 1, fresh: NONE, gone: NONE, selected: null, ...menuOver(s, next), ...viewed(s), canUndo: port.canUndo(), canRedo: port.canRedo() });
 		};
 
 		const write = (done: Promise<unknown>) => {
@@ -846,9 +861,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 				if (HOLDING.includes(s.gesture) || writing > 0) return void (waitingContext = context);
 				waitingContext = null;
 				if (s.context.node === context.node) return void (s.pending && refresh());
-				const next = port.read(s.dayOffset, context);
-				const left = Object.fromEntries(Object.keys(s.left).map((day) => [day, ((data) => ({ shown: data, read: data }))(port.read(Number(day), context))]));
-				set({ context, contextSeq: s.contextSeq + 1, read: next, shown: next, left, pending: false, readSeq: s.readSeq + 1, fresh: NONE, gone: NONE, selected: null, ...menuOver(s, next), ...viewed(s), canUndo: port.canUndo(), canRedo: port.canRedo() });
+				drawIn(context, false);
 			},
 			createFile() {
 				void port.createFile();

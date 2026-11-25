@@ -580,6 +580,7 @@ const BY_HAND_EXCEPTIONS: readonly { readonly file: string; readonly rule: strin
 	{ file: `${ENGINE}layout/columns.ts`, rule: "a size read from the page", call: /\.clientWidth\b/g, most: 2, why: "the ribbon's and its calendar's drawn widths as a gesture needs them, read in this one place (@use-gesture's pager example reads the window's)" },
 	{ file: `${ENGINE}store/screenStore.ts`, rule: "a timer", call: /\bsetTimeout\s*\(\s*tick\b/g, most: 1, why: "the store's one minute tick (spec, «Time»)" },
 	{ file: `${ENGINE}store/screenStore.ts`, rule: "a timer", call: /\bsetTimeout\s*\(\s*\(\)\s*=>\s*set\(\{\s*scrollArmed:/g, most: 1, why: "a carried card's quarter second at a room's edge before it scrolls (F162): dnd-kit's auto-scroll has no delay" },
+	{ file: `${ENGINE}store/projects.ts`, rule: "a timer", call: /\bsetTimeout\s*\(\s*\(\)\s*=>\s*carried === at && tell\(\)/g, most: 1, why: "the carry told again where the finger stays once the core's wait is over (`carryAt`'s `CarryWait`, F222–F224): the core keeps the time a row opens" },
 	{ file: `${ENGINE}store/screenStore.ts`, rule: "a clock read by hand", call: /\bDate\.now\s*\(\s*\)/g, most: 1, why: "the minute tick set on the clock's next minute: the port's clock tells minutes, not the milliseconds to the next" },
 	{ file: `${ENGINE}drag/Drag.tsx`, rule: "a clock read by hand", call: /\bperformance\.now\s*\(\s*\)/g, most: 1, why: "a sideways swipe's pace (`SwipeLevel`), the gesture's own time: dnd-kit's move events carry none" },
 ];
