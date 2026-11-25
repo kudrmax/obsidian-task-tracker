@@ -59,4 +59,13 @@ describe("CorePort's view", () => {
 		const note = port.within({ project: "Дом" }, { wide: true, note: "Дом.md" });
 		expect(note.view().mode).not.toBe("allColumns");
 	});
+
+	it("draws Rows' empty list with the core's No tasks plate, Two columns' without a filter none (F17, F64)", async () => {
+		const { port } = await corePortOver("## Inbox\n\n## Now\n\n## Soon\n\n## Backlog\n\n## Done\n", NOW);
+		const screen = port.within(undefined, WIDE);
+		expect(screen.read(0).lists.inbox.rows).toEqual([]);
+		expect(screen.read(0).lists.inbox.plate).toBeNull();
+		await screen.setViewMode("rows");
+		expect(screen.read(0).lists.inbox.plate).toBe("No tasks");
+	});
 });
