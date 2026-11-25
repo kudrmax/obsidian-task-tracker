@@ -1,5 +1,5 @@
 import { type CSSProperties, memo, type PointerEvent, type ReactNode, type RefObject, useContext, useRef } from "react";
-import { DESIGN } from "../../shared/design";
+import { DESIGN, PROPERTY } from "../../shared/design";
 import { useDivider } from "../gestures/Divider";
 import { DayTurnContext, type FollowGestures, useFollowRibbon } from "../gestures/FollowRibbon";
 import { RibbonTrack, StripColumn, StripRule } from "../gestures/RibbonTrack";
@@ -13,11 +13,28 @@ import { DaySlide } from "../view/Slide";
 import { TaskList } from "../view/TaskList";
 import { TaskMenu } from "../view/TaskMenu";
 import { ViewButton } from "../view/ViewButton";
+import { ProjectsChrome } from "../view/ProjectsPanel";
 import { Timeline } from "../view/Timeline";
 import { Wheel } from "../view/Wheel";
 import { COLUMN_SHARE, columnsOf, dayColumnWidth, drawnWidths, type Place, ruleShift, type Stop, STRIP_WIDTH } from "./columns";
 
 export { type Place, reachOf } from "./columns";
+
+/**
+ * Where the projects put the screen (F205–F208, F54): the panel shown, docked beside the lists, the top row over the
+ * columns or the folder button in the titles' row before the first column's title (the column the ribbon stands or goes
+ * at), and the tree's width its divider set. The root's classes and style; none on a screen fixed to its project.
+ */
+export function useProjectsPlace(): { readonly className: string; readonly style: CSSProperties | undefined } {
+	const projects = useScreen((s) => s.projects);
+	const lead = useScreen((s) => (s.view.ribbon ? s.stop : "inbox"));
+	const width = useScreen((s) => s.treeWidth);
+	const following = useScreen((s) => s.treeFollow);
+	if (!projects) return { className: "", style: undefined };
+	const { panel, topRow } = projects;
+	const classes = [panel.open ? "has-tree" : "", panel.open && panel.docked ? "has-dock" : "", topRow ? "has-top-row" : `has-head-lead is-lead-${lead}`, width === null ? "" : "has-tree-width", following ? "is-tree-following" : ""];
+	return { className: classes.filter(Boolean).map((c) => ` ${c}`).join(""), style: width === null ? undefined : ({ [PROPERTY.treeKept]: `${width}px` } as CSSProperties) };
+}
 
 /** Where the ribbon stands, in places: what moves its columns and dividers each frame. */
 type RibbonAt = FollowGestures["at"];
@@ -39,6 +56,7 @@ export const Layout = memo(function Layout({ place }: { readonly place: Place })
 			<PlusButton shown={shown} />
 			<Capsule />
 			{place === "leaf" ? <ViewButton /> : null}
+			{place === "leaf" ? <ProjectsChrome /> : null}
 			<TaskMenu />
 		</>
 	);

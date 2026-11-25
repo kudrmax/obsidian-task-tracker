@@ -5,6 +5,7 @@ import type { TrackpadFingers } from "../ui/engine/gestures/trackpadFollow";
 import type { Place } from "../ui/engine/layout/Layout";
 import { type MountedScreen, mountScreen } from "../ui/engine/mount";
 import type { ScreenContext } from "../ui/engine/port";
+import type { VaultNotes } from "../ui/engine/view/host";
 import type { Haptics } from "./haptics";
 
 /**
@@ -23,6 +24,8 @@ export interface ScreenParts {
 	/** Obsidian on the desktop (`Platform.isMobile` false). */
 	readonly desk: boolean;
 	readonly fingers: TrackpadFingers | null;
+	/** The vault's notes (a project's menu attaches one); null without a vault. */
+	readonly notes: VaultNotes | null;
 }
 
 /** The screens one host has mounted, each over the same parts: the plugin's, the stand's and the checks' page's one way to mount `TaskScreen`. */
@@ -33,9 +36,9 @@ export class ScreenMounts {
 
 	/** `TaskScreen` at `place` in `el`, in `context` (every task when absent), counted among the open screens. */
 	mount(el: HTMLElement, place: Place, sourcePath: string, context?: ScreenContext): MountedScreen {
-		const { device, app, haptics, markdown, notice, desk, fingers } = this.parts;
+		const { device, app, haptics, markdown, notice, desk, fingers, notes } = this.parts;
 		const port = this.parts.port.within(context);
-		const screen = mountScreen(el, { port, place, app, sourcePath, haptics, zoom: device.zoom(), listShare: { kept: device.listShare(), keep: (share) => void device.keepListShare(share) }, markdown, notice, desk, fingers, context });
+		const screen = mountScreen(el, { port, place, app, sourcePath, haptics, zoom: device.zoom(), listShare: { kept: device.listShare(), keep: (share) => void device.keepListShare(share) }, treeWidth: { kept: device.treeWidth(), keep: (width) => void device.keepTreeWidth(width) }, markdown, notice, desk, fingers, context, notes });
 		this.screens.set(screen, port);
 		return screen;
 	}

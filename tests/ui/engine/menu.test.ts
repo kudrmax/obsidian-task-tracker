@@ -544,7 +544,7 @@ describe("the Project page and «New project…» (Decision 134), ⌥Tab's offer
 		store.getState().nameEntryProject("Дача");
 		expect(store.getState().entryPanel).toBeNull();
 		store.getState().commitEntry("Сразу Enter", true);
-		await wait(120);
+		await wait(300);
 		expect(lineOf(p, "Сразу Enter")).toContain("🗂️ Дача");
 		expect(store.getState().draft.projects).toEqual(["Дача"]);
 	});

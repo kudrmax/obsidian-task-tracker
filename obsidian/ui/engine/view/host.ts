@@ -26,6 +26,14 @@ export interface ScreenHost {
 	readonly notice: (text: string) => void;
 	/** macOS's touch and lift of the fingers on the trackpad (Decision 126); null where the host can't hear them: the ribbon then reads them from the deltas. */
 	readonly fingers: TrackpadFingers | null;
+	/** The vault's notes; null where there is no vault (the checks' page): the menu offers no note then. */
+	readonly notes: VaultNotes | null;
+}
+
+/** The vault's notes as a project's menu reaches them (F218): one searched for and picked (its link; null: none), one opened by its link. */
+export interface VaultNotes {
+	pick(): Promise<string | null>;
+	open(link: string): void;
 }
 
 export const HostContext = createContext<ScreenHost | null>(null);

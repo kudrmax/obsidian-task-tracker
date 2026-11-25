@@ -13,6 +13,7 @@ import { addWindowDocument } from "../ui/paint/windowDocuments";
 import { detectHaptics, type HapticsHost } from "./haptics";
 import { type LeafLook, leafFor, ScreenLeaf } from "./ScreenLeaf";
 import { ScreenMounts } from "./ScreenMounts";
+import { vaultNotes } from "./vaultNotes";
 
 /** What a host's screens draw from: the port and what the device keeps, opened once, at the first screen. */
 export interface ScreenSource {
@@ -117,6 +118,7 @@ export class ScreenHost {
 			notice: (text) => new Notice(text),
 			desk: !Platform.isMobile,
 			fingers: this.fingers,
+			notes: vaultNotes(app),
 		});
 		return this.assembled;
 	}

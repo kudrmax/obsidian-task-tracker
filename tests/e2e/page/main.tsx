@@ -52,13 +52,15 @@ class StandPage {
 	private beside: HTMLElement | null = null;
 	/** The notices shown, in order, as Obsidian's `Notice` would show them. */
 	private readonly notices: string[] = [];
+	/** The notes opened by their links, in order, as Obsidian would open them in a new tab. */
+	private readonly opened: string[] = [];
 	private readonly mounts: ScreenMounts;
 
 	constructor(
 		private readonly leaf: HTMLElement,
 		private readonly source: StandSource,
 	) {
-		this.mounts = new ScreenMounts({ port: source.port, device: source.device, app: {} as App, haptics: detectHaptics(window as unknown as HapticsHost), markdown: plainMarkdown, notice: (text) => void this.notices.push(text), desk: !document.body.classList.contains("is-mobile"), fingers: null });
+		this.mounts = new ScreenMounts({ port: source.port, device: source.device, app: {} as App, haptics: detectHaptics(window as unknown as HapticsHost), markdown: plainMarkdown, notice: (text) => void this.notices.push(text), desk: !document.body.classList.contains("is-mobile"), fingers: null, notes: { pick: async () => NOTE_PATH.replace(/\.md$/, ""), open: (link) => void this.opened.push(link) } });
 	}
 
 	showLeaf(step: StandStep): void {
@@ -122,6 +124,7 @@ class StandPage {
 			...standApi(this.source, () => this.mounts.open),
 			step: (id: string) => this.showStep(id),
 			notices: () => [...this.notices],
+			opened: () => [...this.opened],
 			openNote: () => this.openNote(),
 			openNoteBeside: () => this.openNoteBeside(),
 		};

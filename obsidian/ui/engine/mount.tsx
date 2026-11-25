@@ -5,6 +5,7 @@ import type { Place } from "./layout/Layout";
 import type { TrackpadFingers } from "./gestures/trackpadFollow";
 import type { ScreenContext, ScreenPort } from "./port";
 import { createScreenStore, type ScreenStore, type Zoom } from "./store";
+import type { VaultNotes } from "./view/host";
 import { TaskScreen } from "./view/TaskScreen";
 
 export interface MountOptions {
@@ -18,6 +19,8 @@ export interface MountOptions {
 	readonly zoom: { readonly kept: Zoom | null; keep(zoom: Zoom): void; readonly most: number };
 	/** The day list's share beside the calendar kept on the device: the one the divider was let go at (null: none yet), and how to keep a new one. */
 	readonly listShare: { readonly kept: number | null; keep(share: number): void };
+	/** The docked tree's width kept on the device (F54): the one its divider was let go at (null: the design's), and how to keep a new one. */
+	readonly treeWidth?: { readonly kept: number | null; keep(width: number): void };
 	/** Obsidian on the desktop (`Platform.isMobile` false). */
 	readonly desk: boolean;
 	/** Draws markdown as Obsidian does: the start of a description by the menu. */
@@ -28,7 +31,12 @@ export interface MountOptions {
 	readonly fingers?: TrackpadFingers | null;
 	/** The context the screen opens in: a project note's block shows its project's tasks; every task when absent. */
 	readonly context?: ScreenContext;
+	/** The vault's notes, for a project's note (F218); none where there is no vault. */
+	readonly notes?: VaultNotes | null;
 }
+
+/** No tree width kept: the design's, never kept (a host without a device). */
+const NO_TREE_WIDTH = { kept: null, keep: () => undefined };
 
 export interface MountedScreen {
 	readonly store: ScreenStore;
@@ -36,16 +44,19 @@ export interface MountedScreen {
 }
 
 /** The engine's screen in `el`: its own store over the port, in the element's own document and window. */
-export function mountScreen(el: HTMLElement, { port, place, app, sourcePath, haptics, zoom, listShare, markdown, desk, notice, fingers = null, context }: MountOptions): MountedScreen {
+export function mountScreen(el: HTMLElement, { port, place, app, sourcePath, haptics, zoom, listShare, treeWidth = NO_TREE_WIDTH, markdown, desk, notice, fingers = null, context, notes = null }: MountOptions): MountedScreen {
 	const doc = el.ownerDocument;
-	const store = createScreenStore(port, zoom.kept ?? DESIGN.hourPx, listShare.kept ?? undefined, context, desk);
+	const store = createScreenStore(port, zoom.kept ?? DESIGN.hourPx, listShare.kept ?? undefined, context, desk, treeWidth.kept);
 	const keep = store.subscribe((s, was) => {
 		if (s.zoom !== was.zoom && s.gesture !== "zoom") zoom.keep(s.zoom);
 		else if (was.gesture === "zoom" && s.gesture !== "zoom") zoom.keep(s.zoom);
-		if (was.gesture === "divider" && s.gesture !== "divider") listShare.keep(s.listShare);
+		if (was.gesture === "divider" && s.gesture !== "divider") {
+			listShare.keep(s.listShare);
+			if (s.treeWidth !== null) treeWidth.keep(s.treeWidth);
+		}
 	});
 	const root = createRoot(el);
-	root.render(<TaskScreen store={store} place={place} host={{ doc, win: doc.defaultView ?? window, layerRoot: doc.body, app, sourcePath, haptics, zoomMost: zoom.most, markdown, desk, notice, fingers }} />);
+	root.render(<TaskScreen store={store} place={place} host={{ doc, win: doc.defaultView ?? window, layerRoot: doc.body, app, sourcePath, haptics, zoomMost: zoom.most, markdown, desk, notice, fingers, notes }} />);
 	return {
 		store,
 		unmount: () => {

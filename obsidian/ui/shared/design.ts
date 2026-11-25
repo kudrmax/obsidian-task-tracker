@@ -68,6 +68,8 @@ export const DESIGN_TOKENS: Readonly<Record<DesignMeasure, string>> = {
 
 /** The custom properties the code sets on elements; styles.css does the arithmetic with them. */
 export const PROPERTY = {
+	/** The docked tree's width as its divider set it (F54): the stylesheet builds the dock and the lists' room from it. */
+	treeKept: "--tc-tree-kept",
 	/** Where the wheel at the screen's foot stands, in places: the stylesheet turns its icons and sizes its track from it. */
 	wheelAt: "--tc-wheel-at",
 	/** A wheel icon's place on the wheel: how far from the window it stands, so how much it shrinks and fades. */

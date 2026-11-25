@@ -4,6 +4,7 @@ import { EVERY_TASK } from "../port";
 import { type Stop, stopShowing } from "../layout/columns";
 import type { ScreenView, ViewMode, Destination, SectionNameEnd, DividerStop, Edge, ScreenContext, UndoOutcome, EntryBar, EntryDraft, EntryField, FieldActionId, LevelRange, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, MenuStatusId, ScreenData, ScreenPort } from "../port";
 import { share } from "./share";
+import { type ProjectsActions, projectsSlice, type ProjectsState } from "./projects";
 
 export type { Stop };
 
@@ -315,7 +316,7 @@ interface ScreenActions {
 	start(): () => void;
 }
 
-export type Screen = ScreenState & ScreenActions;
+export type Screen = ScreenState & ScreenActions & ProjectsState & ProjectsActions;
 export type ScreenStore = StoreApi<Screen>;
 
 const MINUTE_MS = 60_000;
@@ -333,7 +334,7 @@ const HALVES = 0.5;
 export const sectionKey = (list: ListId, id: string): string => `${list}/${id}`;
 
 /** One store per mounted screen, over its port (spec, «Screen state»); `zoom`, the calendar's zoom the host kept. */
-export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, listShare = HALVES, opening: ScreenContext = EVERY_TASK, wide = false): ScreenStore {
+export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, listShare = HALVES, opening: ScreenContext = EVERY_TASK, wide = false, treeWidth: number | null = null): ScreenStore {
 	/** Writes of the screen's own not yet read back: their reads come together once the last is in. */
 	let writing = 0;
 	/** The screen as it stood when the carried task was lifted: its place's home, a drop's in-flight write drawn in it. */
@@ -345,7 +346,9 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 	let picked: (() => void) | null = null;
 	/** A context chosen while a drag or a resize held the screen still: set as it ends. */
 	let waitingContext: ScreenContext | null = null;
-	const first = port.read(0, opening);
+	/** The main screen opens in the device's filter; a screen fixed to its project in its own. */
+	const context = port.projects(wide)?.context ?? opening;
+	const first = port.read(0, context);
 	return createStore<Screen>()((setRaw, get) => {
 		/**
 		 * The store's one way to change: the field's bar is worked out again in the same change whenever the field, what the
@@ -371,9 +374,11 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 		 * ribbon stands at the day and its calendar, where the day's list and the calendar turn.
 		 */
 		const viewed = (s: Screen): Partial<Screen> => {
+			const projects = port.projects(wide);
+			const kept = JSON.stringify(projects) === JSON.stringify(s.projects) ? {} : { projects };
 			const view = port.view(wide);
-			if (JSON.stringify(view) === JSON.stringify(s.view)) return {};
-			return view.mode === s.view.mode ? { view } : { view, contextSeq: s.contextSeq + 1, ...(view.ribbon ? {} : { stop: "calendar" as const }) };
+			if (JSON.stringify(view) === JSON.stringify(s.view)) return kept;
+			return view.mode === s.view.mode ? { view, ...kept } : { view, ...kept, contextSeq: s.contextSeq + 1, ...(view.ribbon ? {} : { stop: "calendar" as const }) };
 		};
 		/** The port's data again; held while a drag or a drop's write keeps the screen still (spec, principle 5). */
 		const refresh = () => {
@@ -382,6 +387,9 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 				if (!s.pending) set({ pending: true });
 				return;
 			}
+			/** The device's filter chose another node: the screen is drawn in it, in place. */
+			const filtered = port.projects(wide)?.context;
+			if (filtered && filtered.node !== s.context.node) return get().setContext(filtered);
 			const next = share(s.read, s.firstStep === null ? port.read(s.dayOffset, s.context) : port.firstStepView(s.firstStep, s.dayOffset, s.context));
 			const known = s.read.cards;
 			/** A read that changed nothing (a write's read-back after its own change came) keeps what came and went in the last one. */
@@ -447,6 +455,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 		const focusOn = (id: string) => set({ focusCard: { id, seq: (get().focusCard?.seq ?? 0) + 1 } });
 
 		return {
+			...projectsSlice(port, wide, treeWidth, get, set, write),
 			shown: first,
 			read: first,
 			left: {},
@@ -455,7 +464,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 			view: port.view(wide),
 			viewMenu: false,
 			openViewMenu() {
-				set({ viewMenu: true, layer: null, selected: null });
+				set({ viewMenu: true, layer: null, selected: null, projectMenu: null });
 			},
 			closeViewMenu() {
 				if (get().viewMenu) set({ viewMenu: false });
@@ -546,7 +555,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 			canUndo: port.canUndo(),
 			canRedo: port.canRedo(),
 			notice: null,
-			context: opening,
+			context,
 			contextSeq: 0,
 			reveal: null,
 			focusCard: null,
@@ -631,7 +640,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 				const over = get().layer;
 				const stack = from !== "stack" || !over ? null : (over.stack ?? (over.model.kind === "task" ? { of: over.id, ids: over.model.subtasks } : null));
 				const model = port.menu(id, from, get().dayOffset);
-				set({ layer: { kind: "menu", id, from, model, page: "menu", asking: null, asked: null, stack }, ...(from === "list" ? { selected: null } : {}) });
+				set({ layer: { kind: "menu", id, from, model, page: "menu", asking: null, asked: null, stack }, projectMenu: null, ...(from === "list" ? { selected: null } : {}) });
 			},
 			startRename() {
 				const layer = get().layer;
@@ -831,10 +840,10 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 				/** What the finger holds stays still under it (principle 5): another context waits for the drag or the resize, and its write, to end. */
 				if (HOLDING.includes(s.gesture) || writing > 0) return void (waitingContext = context);
 				waitingContext = null;
-				if (s.context.project === context.project) return void (s.pending && refresh());
+				if (s.context.node === context.node) return void (s.pending && refresh());
 				const next = port.read(s.dayOffset, context);
 				const left = Object.fromEntries(Object.keys(s.left).map((day) => [day, ((data) => ({ shown: data, read: data }))(port.read(Number(day), context))]));
-				set({ context, contextSeq: s.contextSeq + 1, read: next, shown: next, left, pending: false, readSeq: s.readSeq + 1, fresh: NONE, gone: NONE, selected: null, ...menuOver(s, next) });
+				set({ context, contextSeq: s.contextSeq + 1, read: next, shown: next, left, pending: false, readSeq: s.readSeq + 1, fresh: NONE, gone: NONE, selected: null, ...menuOver(s, next), ...viewed(s), canUndo: port.canUndo(), canRedo: port.canRedo() });
 			},
 			createFile() {
 				void port.createFile();

@@ -12,8 +12,8 @@ const PROJECT_BLOCK = "tc-project-block";
 
 /** The project a note's view shows (the core's own: its filter's project), as the screen's context; null where the note is no project's. */
 function contextOf(view: FunnelView | null): ScreenContext | null {
-	const project = view?.filter?.menu?.project.name;
-	return project === undefined ? null : { project };
+	const filter = view?.filter;
+	return filter ? { node: filter.node, project: filter.project } : null;
 }
 
 /** A project note's block: `TaskScreen` in the note's project, and the note's path it was made for. */
@@ -24,7 +24,7 @@ class ProjectBlock {
 
 	constructor(
 		public path: string,
-		readonly project: string | null,
+		readonly node: string | null,
 		host: ScreenHost,
 		context: ScreenContext,
 	) {
@@ -91,13 +91,13 @@ export class NoteBlocks extends Component {
 		const context = path === null ? null : contextOf(await this.tasks.projectNoteView(path, !view.containerEl.ownerDocument.body.classList.contains("is-mobile")));
 		if (this.asks.get(view) !== ask) return;
 		let block = this.blocks.get(view) ?? null;
-		if (block && (!context || block.path !== path || block.project !== context.project)) {
+		if (block && (!context || block.path !== path || block.node !== context.node)) {
 			this.drop(view, block);
 			block = null;
 		}
 		if (!context || path === null) return;
 		if (!block) {
-			block = new ProjectBlock(path, context.project, this.host, context);
+			block = new ProjectBlock(path, context.node, this.host, context);
 			this.blocks.set(view, block);
 			this.watch(view, block);
 		}

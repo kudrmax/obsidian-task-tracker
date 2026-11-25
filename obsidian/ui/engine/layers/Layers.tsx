@@ -436,18 +436,18 @@ export function BarPanel({ open, onClose, reference, capsule, away, className, c
 }
 
 /**
- * A menu over a control of the bottom row (the view button's «View», F11; the old `ViewMenu` on the board V1DeskCols): the
+ * A menu over a control (the view button's «View», F11, the old `ViewMenu` on the board V1DeskCols; the filter's name, F216, `below`): the
  * backdrop, a copy of the control standing where it stands over it, and the panel over the control, centred on it and kept
  * inside the window (Floating UI's `top` and `shift`), its title over its groups. It fades in and out as every menu does;
  * Escape and a click on the backdrop close it (`useDismiss`).
  */
-export function ControlMenu({ open, onClose, root, reference, label, title, copy, groups }: { readonly open: boolean; readonly onClose: () => void; readonly root: HTMLElement; readonly reference: HTMLElement | null; readonly label: string; readonly title: string; readonly copy: ReactNode; readonly groups: readonly ReactNode[] }) {
+export function ControlMenu({ open, onClose, root, reference, label, title, copy, groups, below = false, panelClass = "is-view" }: { readonly open: boolean; readonly onClose: () => void; readonly root: HTMLElement; readonly reference: HTMLElement | null; readonly label: string; readonly title: string | null; readonly copy: ReactNode; readonly groups: readonly ReactNode[]; readonly below?: boolean; readonly panelClass?: string }) {
 	const { refs, context, floatingStyles, isPositioned } = useFloating({
 		open,
 		onOpenChange: (next) => {
 			if (!next) onClose();
 		},
-		placement: "top",
+		placement: below ? "bottom-start" : "top",
 		strategy: "fixed",
 		transform: false,
 		middleware: [offset(DESIGN.menuGap), shift({ padding: DESIGN.wholeMargin })],
@@ -467,8 +467,8 @@ export function ControlMenu({ open, onClose, root, reference, label, title, copy
 				{copy}
 			</div>
 			<FloatingFocusManager context={context} modal={false} initialFocus={-1}>
-				<div ref={refs.setFloating} style={floatingStyles} role="menu" aria-label={label} className={`tc-panel is-view tc-menu-layer${motion}`} {...getFloatingProps()}>
-					<div className="tc-menu-title">{title}</div>
+				<div ref={refs.setFloating} style={floatingStyles} role="menu" aria-label={label} className={`tc-panel ${panelClass} tc-menu-layer${motion}`} {...getFloatingProps()}>
+					{title === null ? null : <div className="tc-menu-title">{title}</div>}
 					{groups}
 				</div>
 			</FloatingFocusManager>

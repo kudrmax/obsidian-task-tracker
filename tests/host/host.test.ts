@@ -91,7 +91,7 @@ function fakeApp(views: MarkdownView[]) {
 }
 
 /** The core's answer for a note: «Дружба.md» is the project «Близкие»'s, any other none. */
-const projectNoteView = vi.fn(async (path: string) => (path === "Дружба.md" || path === "Друзья.md" ? ({ filter: { node: "project:Близкие", title: "Близкие", menu: { project: { name: "Близкие" } } } } as unknown as FunnelView) : null));
+const projectNoteView = vi.fn(async (path: string) => (path === "Дружба.md" || path === "Друзья.md" ? ({ filter: { node: "project:Близкие", project: "Близкие", title: "Близкие", menu: { project: { name: "Близкие" } } } } as unknown as FunnelView) : null));
 
 describe("a project note's block", () => {
 	it("stands at the end of a project's note, in that project; a note of no project has none", async () => {
@@ -104,7 +104,7 @@ describe("a project note's block", () => {
 		fake.arrive();
 		await settled();
 		await settled();
-		expect(fake.mounted.map(({ place, sourcePath, context }) => [place, sourcePath, context])).toEqual([["note", "Дружба.md", { project: "Близкие" }]]);
+		expect(fake.mounted.map(({ place, sourcePath, context }) => [place, sourcePath, context])).toEqual([["note", "Дружба.md", { node: "project:Близкие", project: "Близкие" }]]);
 		expect(project.containerEl.querySelector(".cm-sizer > .tc-project-block.tc-note-block")).not.toBeNull();
 		expect(plain.containerEl.querySelector(".tc-project-block")).toBeNull();
 	});

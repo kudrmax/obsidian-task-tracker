@@ -348,15 +348,91 @@ export type MenuAction =
 	| { readonly kind: "row"; readonly id: TaskActionId | "calendar" };
 
 /**
- * What the screen is drawn in besides the day: the chosen project (null: every task). Another one is a change of context,
- * drawn in place (spec, principle 3; F23). The view mode joins it when the modes come (Decision 132).
+ * What the screen is drawn in besides the day: the node of the projects' tree it is filtered by (null: every task), and
+ * the project a new task typed under it starts with, both as the port names them (`ProjectsData.context`). Another node
+ * is a change of context, drawn in place (spec, principle 3; F23); the view mode is one too (Decision 148).
  */
 export interface ScreenContext {
+	readonly node: string | null;
 	readonly project: string | null;
 }
 
-/** Every task: no project chosen. */
-export const EVERY_TASK: ScreenContext = { project: null };
+/** Every task: no node chosen. */
+export const EVERY_TASK: ScreenContext = { node: null, project: null };
+
+/**
+ * A row of the projects' tree (the core's `ProjectsRow`, F210–F215): All, a project at its depth (a tile at the top, a
+ * line of text deeper), No project, Done. What it shows and what a tap, a held card or a long press may do there, as the
+ * port says.
+ */
+export interface TreeRow {
+	readonly node: string;
+	readonly kind: "all" | "project" | "none" | "done";
+	readonly title: string;
+	readonly depth: number;
+	readonly tile: boolean;
+	/** Its name grey: nothing open under it. */
+	readonly muted: boolean;
+	readonly selected: boolean;
+	readonly hasBranch: boolean;
+	readonly folded: boolean;
+	/** A carried card may be let go on it. */
+	readonly takesTask: boolean;
+	/** A long press lifts it, to reorder or nest it. */
+	readonly lifts: boolean;
+	/** A card held over it a moment chooses it (`carryAt`), or unfolds its branch. */
+	readonly opensOnHold: boolean;
+	readonly unfoldsOnHold: boolean;
+}
+
+/** The projects' panel (the core's `ProjectsPanel`): its rows, shown or not, docked beside the lists (a wide screen) or over them with a dim. */
+export interface ProjectsPanelData {
+	readonly rows: readonly TreeRow[];
+	readonly open: boolean;
+	readonly docked: boolean;
+	/** A tap on the dim around it closes it. */
+	readonly dimCloses: boolean;
+}
+
+/** The project menu (the core's `ProjectMenu`, F216–F219): Rename, Folder, the note, Delete project, with its words. */
+export interface ProjectMenuData {
+	readonly name: string;
+	readonly renameLabel: string;
+	/** The note attached: its name the row shows, its link; null without one. */
+	readonly note: { readonly name: string; readonly link: string } | null;
+	readonly attachLabel: string;
+	readonly detachLabel: string;
+	readonly folder: { readonly label: string; readonly on: boolean; readonly disabled: boolean; readonly reason: string | null };
+	readonly remove: { readonly label: string; readonly title: string; readonly message: string; readonly confirm: string; readonly cancel: string };
+}
+
+/** The filter over the tasks (the core's `ProjectFilter`): the node's name, big; the cross that clears it; the chosen project's menu. */
+export interface FilterData {
+	readonly node: string;
+	readonly title: string;
+	readonly clearable: boolean;
+	readonly menu: ProjectMenuData | null;
+}
+
+/**
+ * The projects as the main screen shows them (F205–F214): the panel, the filter over the tasks, whether the top row stands
+ * over the columns (the folder button with the filter's name; else the button stands in the columns' titles' row), and the
+ * context the screen is drawn in. Null for a screen fixed to its project (a note's block).
+ */
+export interface ProjectsData {
+	readonly panel: ProjectsPanelData;
+	readonly filter: FilterData | null;
+	readonly topRow: boolean;
+	readonly context: ScreenContext;
+}
+
+/** Where a project lifted in the tree, or the plus, lands at a gap of its rows: the depth its line is drawn at; null where nothing lands. */
+export interface TreeLanding {
+	readonly depth: number;
+}
+
+/** What a carry over the tree ends with (the core's `CarryEnd`): let go nowhere or cancelled, dropped in a list, the plus let go in the tree. */
+export type CarryEnd = "nowhere" | "dropped" | "naming";
 
 /**
  * The view the main screen draws and its button (the core's `ViewChoice`, F10–F14): the mode drawn, the modes the button's
@@ -374,6 +450,36 @@ export interface ScreenView {
 export interface ScreenPort {
 	/** The main screen's view on a `wide` screen (the desktop offers All columns), as this device keeps it; a change fires `subscribe`. */
 	view(wide: boolean): ScreenView;
+	/** The projects' panel, the filter and the context on a `wide` screen, as this device keeps them; null for a screen fixed to its project. A change fires `subscribe`. */
+	projects(wide: boolean): ProjectsData | null;
+	/** A row of the tree tapped (F213): a node not chosen is chosen; the chosen one folds or unfolds its branch; on a narrow screen a pick closes the panel. */
+	pickNode(node: string, wide: boolean): Promise<void>;
+	/** The cross beside the filter's name (F208): every task again. */
+	clearFilter(): Promise<void>;
+	/** The folder button (F205): the panel shown or hidden, kept on the device. */
+	setPanel(open: boolean): Promise<void>;
+	/** The project menu's Rename (F216): whether the name was taken (a blank one, the same, another project's are not). */
+	renameProject(from: string, to: string): Promise<boolean>;
+	/** The project menu's Folder (F217). */
+	setProjectFolder(name: string, folder: boolean): Promise<void>;
+	/** The project menu's note (F218): attached by its link, or taken off (null). */
+	setProjectNote(name: string, link: string | null): Promise<void>;
+	/** The project menu's Delete project (F219): its tasks keep everything but it. */
+	deleteProject(name: string): Promise<void>;
+	/** Where a project lifted in the tree (`lifted`; null: the plus) let go at gap `gap` of the rows (before row `gap`), `shift` px sideways, lands; null where it can't. */
+	treeLanding(gap: number, shift: number, lifted: string | null): TreeLanding | null;
+	/** The project of `node` lifted in the tree and let go at gap `gap`, `shift` px sideways (F215): reordered, nested or taken out a level. */
+	moveProject(node: string, gap: number, shift: number): Promise<void>;
+	/** The plus let go in the tree at gap `gap`, `shift` px sideways (F226), its name typed: the project made there and chosen; whether it was (a blank name, one the tree has make none). */
+	createProject(name: string, gap: number, shift: number): Promise<boolean>;
+	/** Cards (or the plus, `plus`) lifted for a carry that may reach the tree (F221–F226): the port keeps what is carried and the filter it was lifted under. */
+	startCarry(ids: readonly string[], plus: boolean, wide: boolean): Promise<void>;
+	/** The carrying finger at the narrow screen's left edge (`edge`) or over the row `node`, `nowMs` the host's clock: resolves to how long until it should be told again (null: nothing waits). */
+	carryAt(edge: boolean, node: string | null, nowMs: number): Promise<number | null>;
+	/** The carried cards let go on the row `node` (F221): each gives up the project it was shown under for the row's. */
+	carryOnNode(node: string): Promise<void>;
+	/** The carry ends otherwise: nowhere (the lift's filter back), dropped in a list, or the plus let go in the tree. */
+	endCarry(how: CarryEnd): Promise<void>;
 	/** A mode picked in the view button's menu: kept on the device, every filter alike (F10, F15). */
 	setViewMode(mode: ViewMode): Promise<void>;
 	/** The menu's Subprojects row tapped: the chosen project's subprojects shown or not (F13, F14). */

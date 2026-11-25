@@ -1,9 +1,10 @@
-import { type ColumnList, groupPlaceOf, SectionNameEntry, levelRange, sameSlot, type CalendarService, dividerAt, type DividerStop, LIST_WIDTHS, listShareOf, type ListWidths, listWidths, type Clock, type DayEvents, type DayChange, type DayService, type DropColumn, type DroppedTask, type DropTo, type LocalDate, listCardMenuFrom, type MenuFrom as CoreMenuFrom, originOf, type ScreenReader, type ShownChange, type TaskItem, type TaskService, type UndoOutcome, undoNotice, type ViewChoice, type ViewMode, projectNodeOf, type ProjectsNodeId, type UndoService } from "../../core/application/contracts";
-import type { ScreenContext, ScreenView, SectionNameEnd, Destination, Edge, EntryBar, EntryCommit, EntryDraft, EntryField, LevelRange, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, RenameStart, ScreenData, ScreenPort } from "../ui/engine/port";
+import { type ColumnList, groupPlaceOf, SectionNameEntry, levelRange, sameSlot, type CalendarService, dividerAt, type DividerStop, LIST_WIDTHS, listShareOf, type ListWidths, listWidths, type Clock, type DayEvents, type DayChange, type DayService, type DropColumn, type DroppedTask, type DropTo, type LocalDate, listCardMenuFrom, type MenuFrom as CoreMenuFrom, originOf, type ScreenReader, type ShownChange, type TaskItem, type TaskService, type UndoOutcome, undoNotice, type ViewChoice, type ViewMode, projectNodeOf, projectsDrop, type ProjectsRow, type ProjectsNodeId, type UndoService } from "../../core/application/contracts";
+import type { CarryEnd, ProjectsData, TreeLanding, ScreenContext, ScreenView, SectionNameEnd, Destination, Edge, EntryBar, EntryCommit, EntryDraft, EntryField, LevelRange, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, RenameStart, ScreenData, ScreenPort } from "../ui/engine/port";
 import { CoreEntry } from "./CoreEntry";
 import { WriteQueue } from "./WriteQueue";
 import { ListCards } from "./ListCards";
 import { menuModelOf } from "./menuModel";
+import { NO_PROJECTS, projectsDataOf } from "./projectsModel";
 import { ScreenDrawing, type ScreenSource } from "./ScreenDrawing";
 
 /** The core's services `CorePort` forwards to, as `composeCore` gives them. */
@@ -56,6 +57,10 @@ class CoreReads {
 	private readonly screens = new Set<CorePort>();
 	/** The main screen's view, a wide screen's and a narrow one's, as last read. */
 	private readonly views = new Map<boolean, ScreenView>();
+	/** The main screen's projects (the panel, the filter), a wide screen's and a narrow one's, as last read. */
+	private readonly funnels = new Map<boolean, ProjectsData>();
+	/** The views a screen has asked for, a wide one and a narrow one: read again with every read of the file. */
+	private readonly wanted = new Set<boolean>();
 	private readonly events = new Map<LocalDate, DayEvents>();
 	private readonly asked = new Set<LocalDate>();
 	private readonly offs: (() => void)[];
@@ -82,7 +87,7 @@ class CoreReads {
 	}
 
 	/** A screen's port in `context`, told of every change from now on. */
-	view(context: string): CorePort {
+	view(context: ScreenContext | null): CorePort {
 		const view = new CorePort(this, context);
 		this.screens.add(view);
 		return view;
@@ -102,7 +107,7 @@ class CoreReads {
 		if (context === EVERY) return this.base;
 		let within = this.readers.get(context);
 		if (!within) {
-			within = this.base.within(projectNodeOf(context));
+			within = this.base.within(context);
 			this.readers.set(context, within);
 		}
 		return within;
@@ -116,7 +121,11 @@ class CoreReads {
 			this.base = await this.core.tasks.reader(null);
 			this.readers.clear();
 			this.changed();
-			await Promise.all([...this.views.keys()].map((wide) => this.askView(wide)));
+			for (const wide of [...this.views.keys()].filter((kept) => !this.wanted.has(kept))) {
+				this.views.delete(wide);
+				this.funnels.delete(wide);
+			}
+			await Promise.all([...this.wanted].map((wide) => this.askView(wide)));
 		});
 		this.queued = run;
 		this.reads = run.catch(() => undefined);
@@ -125,6 +134,7 @@ class CoreReads {
 
 	/** The main screen's view on a `wide` screen or a narrow one: the device's as the core read it last, asked again in the background. */
 	viewOf(wide: boolean): ScreenView {
+		this.wanted.add(wide);
 		const kept = this.views.get(wide);
 		if (kept) return kept;
 		const first = screenViewOf(this.core.tasks.firstView(wide, false));
@@ -133,13 +143,28 @@ class CoreReads {
 		return first;
 	}
 
-	/** The view as the core reads it now; every screen told when it differs. */
+	/** The main screen's projects on a `wide` screen or a narrow one: the device's as the core read it last, asked again in the background. */
+	projectsOf(wide: boolean): ProjectsData {
+		const kept = this.funnels.get(wide);
+		if (kept) return kept;
+		this.viewOf(wide);
+		return this.funnels.get(wide) ?? NO_PROJECTS;
+	}
+
+	/** The view and the projects as the core reads them now; every screen told when they differ. */
 	async askView(wide: boolean): Promise<void> {
-		const next = screenViewOf((await this.core.tasks.funnelView(wide)).view);
-		if (JSON.stringify(next) === JSON.stringify(this.views.get(wide))) return;
+		const funnel = await this.core.tasks.funnelView(wide);
+		const next = screenViewOf(funnel.view);
+		const projects = projectsDataOf(funnel);
+		if (JSON.stringify(next) === JSON.stringify(this.views.get(wide)) && JSON.stringify(projects) === JSON.stringify(this.funnels.get(wide))) return;
 		this.views.set(wide, next);
+		this.funnels.set(wide, projects);
+		this.treeRows = funnel.panel?.rows ?? [];
 		this.changed();
 	}
+
+	/** The tree's rows as the core read them last: what a gap of the tree is counted over. */
+	treeRows: readonly ProjectsRow[] = [];
 
 	/** A write of the device's view (the mode, Subprojects): every view asked again once it is kept. */
 	async keepView(write: Promise<void>): Promise<void> {
@@ -204,23 +229,32 @@ export class CorePort implements ScreenPort {
 	private readonly cache = new Map<string, ScreenData>();
 	private readonly entry: CoreEntry;
 
+	/** The node this screen is drawn in (`EVERY` for none): what its writes and menus go by. */
+	private context = EVERY;
+	/** The project a new task typed in this screen starts with. */
+	private project: string | null = null;
+
 	/** @internal Made by `CoreReads.view`. */
 	constructor(
 		private readonly shared: CoreReads,
-		/** The context this screen is drawn in: what its writes and menus go by. */
-		private context: string,
+		/** The context this screen is fixed to (a note's block); null: the main screen, drawn in the device's filter. */
+		private readonly fixed: ScreenContext | null,
 	) {
+		if (fixed) this.use(fixed);
 		this.entry = new CoreEntry(shared.core, shared.drawing, () => this.reader, () => this.refresh(), shared.queue, () => this.filter());
 	}
 
 	/** The port over `core`, once the file is read, in every task's context. */
 	static async open(core: CorePortServices): Promise<CorePort> {
-		return new CoreReads(core, await core.tasks.reader(null)).view(EVERY);
+		const reads = new CoreReads(core, await core.tasks.reader(null));
+		/** The device's view and filter read before the first screen draws: it opens in them, never in every task first. */
+		await Promise.all([reads.askView(true), reads.askView(false)]);
+		return reads.view(null);
 	}
 
-	/** Another screen's port over the same read, in `context` (every task when absent). */
+	/** Another screen's port over the same read, fixed to `context`; without one, a main screen in the device's filter. */
 	within(context?: ScreenContext): CorePort {
-		return this.shared.view(context?.project ?? EVERY);
+		return this.shared.view(context ?? null);
 	}
 
 	/** This screen's port is let go: its screen is gone. */
@@ -278,6 +312,90 @@ export class CorePort implements ScreenPort {
 
 	view(wide: boolean): ScreenView {
 		return this.shared.viewOf(wide);
+	}
+
+	projects(wide: boolean): ProjectsData | null {
+		return this.fixed ? null : this.shared.projectsOf(wide);
+	}
+
+	pickNode(node: string, wide: boolean): Promise<void> {
+		return this.shared.keepView(this.core.tasks.pickProjectNode(node, wide));
+	}
+
+	/** The project named `name` chosen, its branch unfolded so its row shows (the stand's command, a search hit's path); null: none. */
+	chooseProject(name: string | null): Promise<void> {
+		return this.shared.keepView(name === null ? this.core.tasks.clearProjectFilter() : this.core.tasks.selectProjectNode(projectNodeOf(name)));
+	}
+
+	clearFilter(): Promise<void> {
+		return this.shared.keepView(this.core.tasks.clearProjectFilter());
+	}
+
+	setPanel(open: boolean): Promise<void> {
+		return this.shared.keepView(this.core.tasks.setProjectsPanel(open));
+	}
+
+	async renameProject(from: string, to: string): Promise<boolean> {
+		const renamed = await this.core.tasks.renameProject(from, to);
+		await this.refresh();
+		return renamed;
+	}
+
+	async setProjectFolder(name: string, folder: boolean): Promise<void> {
+		await this.core.tasks.setProjectFolder(name, folder);
+		await this.refresh();
+	}
+
+	async setProjectNote(name: string, link: string | null): Promise<void> {
+		await this.core.tasks.setProjectNote(name, link);
+		await this.refresh();
+	}
+
+	async deleteProject(name: string): Promise<void> {
+		await this.core.tasks.deleteProject(name);
+		await this.refresh();
+	}
+
+	treeLanding(gap: number, shift: number, lifted: string | null): TreeLanding | null {
+		const rows = this.shared.treeRows;
+		if (lifted !== null && !rows.some((row) => row.node === lifted)) return null;
+		const landing = projectsDrop(rows, gap, shift, lifted);
+		return { depth: landing.depth };
+	}
+
+	async moveProject(node: string, gap: number, shift: number): Promise<void> {
+		const rows = this.shared.treeRows;
+		const name = rows.find((row) => row.node === node)?.project?.name;
+		if (name === undefined) return;
+		await this.core.tasks.moveProject(name, projectsDrop(rows, gap, shift, node).place);
+		await this.refresh();
+	}
+
+	async createProject(name: string, gap: number, shift: number): Promise<boolean> {
+		const made = await this.core.tasks.createProject(name, projectsDrop(this.shared.treeRows, gap, shift, null).place);
+		await this.core.tasks.endProjectName();
+		await this.refresh();
+		return made !== null;
+	}
+
+	async startCarry(ids: readonly string[], plus: boolean, wide: boolean): Promise<void> {
+		const keys = ids.flatMap((id) => this.reader.item(id)?.key ?? []);
+		await this.core.tasks.startCarry({ keys, ...(plus ? { plus } : {}) }, wide);
+	}
+
+	async carryAt(edge: boolean, node: string | null, nowMs: number): Promise<number | null> {
+		const { wait } = await this.core.tasks.carryAt({ edge, node }, nowMs);
+		await this.shared.keepView(Promise.resolve());
+		return wait;
+	}
+
+	async carryOnNode(node: string): Promise<void> {
+		await this.core.tasks.carryOnNode(node);
+		await this.shared.keepView(Promise.resolve());
+	}
+
+	endCarry(how: CarryEnd): Promise<void> {
+		return this.shared.keepView(this.core.tasks.endCarry(how));
 	}
 
 	setViewMode(mode: ViewMode): Promise<void> {
@@ -657,11 +775,12 @@ export class CorePort implements ScreenPort {
 
 	/** The screen drawn in `context` (every task when absent) from now on. */
 	private use(context: ScreenContext | undefined): void {
-		this.context = context?.project ?? EVERY;
+		this.context = context?.node ?? EVERY;
+		this.project = context?.project ?? null;
 	}
 
-	/** The project the screen is filtered by, as the quick entry and a drop take it; null for every task. */
+	/** The node the screen is filtered by and the project a new task starts with, as the quick entry and a drop take them; null for every task. */
 	private filter(): { readonly node: ProjectsNodeId; readonly project: string | null } | null {
-		return this.context === EVERY ? null : { node: projectNodeOf(this.context), project: this.context };
+		return this.context === EVERY ? null : { node: this.context, project: this.project };
 	}
 }

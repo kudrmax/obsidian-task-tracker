@@ -12,8 +12,8 @@ export interface StandApi {
 	moveFromOutside(title: string, list: ListKey, before: string | null): void;
 	/** Puts every open screen's ribbon at `stop`, as a scenario's setup. */
 	setStop(stop: Stop): void;
-	/** Chooses a made-up project on every open screen (null: none): a change of context, as the projects panel will make it. */
-	setProject(project: string | null): void;
+	/** Chooses a made-up project in the device's filter (null: none): a change of context on every main screen, as the projects panel makes it. */
+	setProject(project: string | null): Promise<void>;
 	/** Each open screen's stop, gesture slot, carried task, layer and the task its menu is open over (a check reads `menuOf` alone: whose menu a tap opened). */
 	debug(): readonly object[];
 }
@@ -27,7 +27,7 @@ export function standApi(source: StandSource, screens: () => readonly MountedScr
 		addFromOutside: (list, title) => source.addFromOutside(list, title),
 		moveFromOutside: (title, list, before) => source.moveFromOutside(title, list, before),
 		setStop: (stop) => screens().forEach((screen) => screen.store.getState().setStop(stop)),
-		setProject: (project) => screens().forEach((screen) => screen.store.getState().setContext({ project })),
+		setProject: (project) => source.port.chooseProject(project),
 		debug: () =>
 			screens().map((screen) => {
 				const { stop, gesture, lifted, layer, entry, pending, dayOffset, menuLifted, selected } = screen.store.getState();
