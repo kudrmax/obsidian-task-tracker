@@ -1,5 +1,5 @@
-import { type AssistantOffer, type AssistantOutcome, canPick, keyId, levelRange, sameSlot, type CalendarService, dividerAt, type DividerStop, LIST_WIDTHS, listShareOf, type ListWidths, listWidths, type Clock, type DayEvents, type DayService, type DropColumn, type DroppedTask, type DropTo, type LocalDate, listCardMenuFrom, type MenuFrom as CoreMenuFrom, originOf, type ScreenReader, type ShownChange, type TaskItem, type TaskService, type UndoOutcome, undoNotice, projectNodeOf, type ProjectsNodeId, type UndoService } from "../../core/application/contracts";
-import type { Answer, AnswerField, ShownList, FoundGroup, MoreRow, Revealed, TaskMenuModel, ScreenContext, Destination, Edge, EntryBar, EntryCommit, EntryDraft, EntryField, LevelRange, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, RenameStart, ScreenData, ScreenPort } from "../ui/engine/port";
+import { type AssistantOffer, type AssistantOutcome, canPick, endsSelection, keyId, levelRange, sameSlot, type CalendarService, dividerAt, type DividerStop, LIST_WIDTHS, listShareOf, type ListWidths, listWidths, type Clock, type DayEvents, type DayService, type DropColumn, type DroppedTask, type DropTo, type LocalDate, listCardMenuFrom, type MenuFrom as CoreMenuFrom, originOf, type ScreenReader, type ShownChange, type TaskItem, type TaskService, type UndoOutcome, undoNotice, projectNodeOf, type ProjectsNodeId, type UndoService } from "../../core/application/contracts";
+import type { Answer, AnswerField, ListAbilities, ShownList, FoundGroup, MoreRow, Revealed, TaskMenuModel, ScreenContext, Destination, Edge, EntryBar, EntryCommit, EntryDraft, EntryField, LevelRange, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, RenameStart, ScreenData, ScreenPort } from "../ui/engine/port";
 import { CoreEntry } from "./CoreEntry";
 import { WriteQueue } from "./WriteQueue";
 import { ListCards } from "./ListCards";
@@ -47,6 +47,8 @@ const EVERY = "";
 
 /** The lists a task is dropped into; Done takes none (F257: its cards are only tapped). */
 const COLUMNS: Readonly<Record<ListId, DropColumn>> = { inbox: "inbox", soon: "soon", day: "day" };
+/** The column of the core a list is, where a task is carried and typed into; Done is none (its cards are only tapped). */
+const DROP_COLUMNS: Readonly<Record<ShownList, DropColumn | null>> = { ...COLUMNS, done: null };
 /** Whether a found task's list draws Done in sight. */
 const SHOWS_DONE: Readonly<Record<ShownList, boolean>> = { done: true, inbox: false, soon: false, day: false };
 /** The list a found task's screen shows it in: Backlog's under Inbox. */
@@ -360,8 +362,8 @@ export class CorePort implements ScreenPort {
 		return this.entry.plus(dayOffset, shown);
 	}
 
-	listEnd(list: ListId, dayOffset: number): Destination {
-		return this.entry.end(list, dayOffset);
+	listEnd(list: ShownList, dayOffset: number): Destination | null {
+		return list === "done" ? null : this.entry.end(list, dayOffset);
 	}
 
 	subtaskPlace(id: string, dayOffset: number): EntryField {
@@ -422,41 +424,10 @@ export class CorePort implements ScreenPort {
 	/** The core's ids stay through every write it makes (`TaskItem.id`): the task's own id, null once it is gone. */
 	async act(id: string, action: MenuAction, from: MenuFrom, dayOffset: number): Promise<string | null> {
 		const item = this.reader.item(id);
-		if (action.kind === "row" || !item) return item ? id : null;
-		const tasks = this.core.tasks;
-		const keys = [item.key];
-		switch (action.kind) {
-			case "status": {
-				const model = this.reader.menu(id, this.coreFrom(item, from), this.dateOf(dayOffset));
-				await tasks.pickStatus((model?.statusTasks ?? [item]).map((task) => task.key), action.id);
-				break;
-			}
-			case "priority":
-				await tasks.togglePriority(keys, action.prefix);
-				break;
-			case "label":
-				await tasks.toggleLabel(keys, action.name);
-				break;
-			case "date":
-				await (action.date === null ? tasks.removeDue(keys) : tasks.postponeAll(keys, action.date));
-				break;
-			case "sendTo":
-				await tasks.sendTo(keys, { kind: action.list });
-				break;
-			case "reminder":
-				await tasks.setReminder(item.key, action.reminder);
-				break;
-			case "project":
-				await (action.name === null ? tasks.setProject(keys, null) : tasks.toggleProject(keys, action.name));
-				break;
-			case "newProject":
-				await tasks.newProject(action.name, keys);
-				break;
-			case "delete":
-				await tasks.remove(item.key);
-		}
-		await this.refresh();
-		return this.reader.item(id) ? id : null;
+		if (!item) return null;
+		const model = this.reader.menu(id, this.coreFrom(item, from), this.dateOf(dayOffset));
+		const [after] = await this.write([item], model?.statusTasks ?? [item], action);
+		return after;
 	}
 
 	async search(query: string): Promise<readonly FoundGroup[]> {
@@ -503,52 +474,23 @@ export class CorePort implements ScreenPort {
 		else assistant.press(id);
 	}
 
-	canPick(list: ShownList): boolean {
-		return canPick(list === "done" ? "done" : COLUMNS[list]);
+	listDoes(list: ShownList): ListAbilities {
+		const column = DROP_COLUMNS[list];
+		return { pick: canPick(column ?? "done"), carry: column !== null, type: column !== null };
+	}
+
+	endsPicking(landed: boolean): boolean {
+		return endsSelection(landed ? "dropped" : "nowhere");
 	}
 
 	bulkMenu(ids: readonly string[], dayOffset: number): TaskMenuModel {
-		const day = this.dateOf(dayOffset);
-		const screen = this.reader.screen(day);
-		const items = ids.flatMap((id) => this.reader.item(id) ?? []);
-		const model = this.core.tasks.bulkMenu(items.map((item) => ({ item, from: listCardMenuFrom(item) })), { today: this.core.days.today(), day, offer: screen.offer, projects: screen.projectTree });
-		return bulkMenuModelOf(items.length, model, (list) => this.core.tasks.listName(list), this.core.days.today());
+		const items = this.items(ids);
+		return bulkMenuModelOf(items.length, this.coreBulkMenu(items, dayOffset), (list) => this.core.tasks.listName(list), this.core.days.today());
 	}
 
-	async actAll(ids: readonly string[], action: MenuAction): Promise<readonly (string | null)[]> {
-		const items = ids.flatMap((id) => this.reader.item(id) ?? []);
-		const keys = items.map((item) => item.key);
-		const tasks = this.core.tasks;
-		switch (action.kind) {
-			case "status":
-				await tasks.pickStatus(keys, action.id);
-				break;
-			case "priority":
-				await tasks.togglePriority(keys, action.prefix);
-				break;
-			case "label":
-				await tasks.toggleLabel(keys, action.name);
-				break;
-			case "date":
-				await (action.date === null ? tasks.removeDue(keys) : tasks.postponeAll(keys, action.date));
-				break;
-			case "sendTo":
-				await tasks.sendTo(keys, { kind: action.list });
-				break;
-			case "project":
-				await (action.name === null ? tasks.setProject(keys, null) : tasks.toggleProject(keys, action.name));
-				break;
-			case "newProject":
-				await tasks.newProject(action.name, keys);
-				break;
-			case "delete":
-				await tasks.removeAll(keys);
-				break;
-			default:
-				return ids;
-		}
-		await this.refresh();
-		return ids.map((id) => (this.reader.item(id) ? id : null));
+	async actAll(ids: readonly string[], action: MenuAction, dayOffset: number): Promise<readonly (string | null)[]> {
+		const items = this.items(ids);
+		return this.write(items, this.coreBulkMenu(items, dayOffset).statusTasks, action);
 	}
 
 	carriedWith(lifted: string, picked: readonly string[]): readonly string[] {
@@ -567,6 +509,59 @@ export class CorePort implements ScreenPort {
 		const face = this.drawing.face(outcome.task, null);
 		const { over, title } = outcome.card;
 		return { kind: "task", title: outcome.title, face: { ...face, title: over ?? title, step: over === null ? null : title }, notice: outcome.notice, note: outcome.note, field };
+	}
+
+	/**
+	 * What a tap in a menu writes on its tasks `items` (one task's or the picked ones'), one write: a status on the tasks the
+	 * core's menu names for it (`statusTasks`: a folded card's shown step, never the folded task with its open subtasks),
+	 * anything else on the tasks themselves. Resolves to their ids as the file now has them, null for one gone.
+	 */
+	private async write(items: readonly TaskItem[], statusTasks: readonly TaskItem[], action: MenuAction): Promise<readonly (string | null)[]> {
+		const tasks = this.core.tasks;
+		const keys = items.map((item) => item.key);
+		switch (action.kind) {
+			case "row":
+				return items.map((item) => item.id);
+			case "status":
+				await tasks.pickStatus(statusTasks.map((task) => task.key), action.id);
+				break;
+			case "priority":
+				await tasks.togglePriority(keys, action.prefix);
+				break;
+			case "label":
+				await tasks.toggleLabel(keys, action.name);
+				break;
+			case "date":
+				await (action.date === null ? tasks.removeDue(keys) : tasks.postponeAll(keys, action.date));
+				break;
+			case "sendTo":
+				await tasks.sendTo(keys, { kind: action.list });
+				break;
+			case "reminder":
+				for (const key of keys) await tasks.setReminder(key, action.reminder);
+				break;
+			case "project":
+				await (action.name === null ? tasks.setProject(keys, null) : tasks.toggleProject(keys, action.name));
+				break;
+			case "newProject":
+				await tasks.newProject(action.name, keys);
+				break;
+			case "delete":
+				await tasks.removeAll(keys);
+		}
+		await this.refresh();
+		return items.map((item) => (this.reader.item(item.id) ? item.id : null));
+	}
+
+	/** The core's menu for the picked `items` over the screen of the day `dayOffset`, each from the column its card stands in. */
+	private coreBulkMenu(items: readonly TaskItem[], dayOffset: number) {
+		const day = this.dateOf(dayOffset);
+		const screen = this.reader.screen(day);
+		return this.core.tasks.bulkMenu(items.map((item) => ({ item, from: listCardMenuFrom(item) })), { today: this.core.days.today(), day, offer: screen.offer, projects: screen.projectTree });
+	}
+
+	private items(ids: readonly string[]): readonly TaskItem[] {
+		return ids.flatMap((id) => this.reader.item(id) ?? []);
 	}
 
 	/** The day `dayOffset` days from today, as the core steps days. */

@@ -106,7 +106,10 @@ export function useFollowRibbon(ribbon: RefObject<HTMLElement | null>, calendar:
 	const drawnDays = useRef(days);
 	const glide = useRef<AnimationPlaybackControls | null>(null);
 	const pager = useRef(new FollowPager(placeOf(stop, dayOffset), Infinity));
-	pager.current.first = firstPlace(stop);
+	/** Done is reached only while the screen stands at it (F257): a stroke from there may land on it, any other never. */
+	useEffect(() => {
+		pager.current.first = firstPlace(stop);
+	}, [stop]);
 	const wheelFingers = useRef(new WheelFollow());
 	/** Without macOS's signals: the wheel gesture has begun a stroke of the ribbon, so it scrolls nothing else until it ends. */
 	const wheelLocked = useRef(false);

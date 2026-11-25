@@ -1,11 +1,11 @@
 import { defaultRangeExtractor, type Range, useVirtualizer } from "@tanstack/react-virtual";
-import { type CSSProperties, memo, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, memo, type ReactNode, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { PROPERTY } from "../../shared/design";
 import { PLUS, SortableList, SortableRow, useListTarget } from "../drag/Drag";
 import { descendantsOf } from "../drag/tree";
 import { pressedIn, useMenuFrom, useOriginSetter } from "../layers/Layers";
 import { ROW_PX } from "../layout/columns";
-import type { EntryField as Field, ListId, Row, ShownList } from "../port";
+import type { EntryField as Field, Row, ShownList } from "../port";
 import { DayContext, useData, useScreen, useScreenApi } from "../store";
 import { Card } from "./Card";
 import { MovingRow, MovingRows } from "./MovingRow";
@@ -116,7 +116,7 @@ const ContextList = memo(function ContextList({ list, context }: { readonly list
 
 	const items = virtualizer.getVirtualItems();
 	/** Its cards show Select tasks' circle (the port's, F135): a list's, not Done's. */
-	const pickable = useMemo(() => api.getState().canPick(list), [api, list]);
+	const pickable = useMemo(() => api.getState().listDoes(list).pick, [api, list]);
 	/** Whether the pointer that pressed last was a mouse: the phone has no double click. */
 	const mouse = useRef(false);
 	return (
@@ -126,7 +126,7 @@ const ContextList = memo(function ContextList({ list, context }: { readonly list
 			data-list={list}
 			onPointerDown={(event) => void (mouse.current = event.pointerType === "mouse")}
 			/** A mouse's double click on the list's free room, between or under the cards, opens a new task at its end (F67); a card, a header or a field keeps its own. */
-			onDoubleClick={(event) => mouse.current && !(event.target as Element).closest(".tc-drag-source, .tc-group-head, .tc-quick-row") && typedInto(list) && api.getState().openAtEnd(list)}
+			onDoubleClick={(event) => mouse.current && !(event.target as Element).closest(".tc-drag-source, .tc-group-head, .tc-quick-row") && api.getState().openAtEnd(list)}
 		>
 			<div className="tc-list-items" style={{ height: virtualizer.getTotalSize() }}>
 				<div className="tc-list-block" style={{ transform: `translateY(${items[0]?.start ?? 0}px)` }}>
@@ -167,6 +167,8 @@ const RowFace = memo(function RowFace({ list, row }: { readonly list: ShownList;
 	const api = useScreenApi();
 	const openMenuFrom = useMenuFrom();
 	const standBy = useOriginSetter();
+	/** Whether its cards are carried (the port's): Done's are tapped for their menu only (F257). */
+	const carried = useMemo(() => api.getState().listDoes(list).carry, [api, list]);
 	if (row.kind === "section")
 		return (
 			<SortableRow id={row.id}>
@@ -178,7 +180,7 @@ const RowFace = memo(function RowFace({ list, row }: { readonly list: ShownList;
 	return (
 		<SortableRow
 			id={row.id}
-			still={list === DONE}
+			still={!carried}
 			onTap={(target, held, keys = NO_KEYS) => {
 				const card = pressedIn(target, "[data-id]");
 				standBy(card);
@@ -190,11 +192,8 @@ const RowFace = memo(function RowFace({ list, row }: { readonly list: ShownList;
 	);
 });
 
-/** Done's cards are tapped for their menu, never carried (F257). */
-const DONE: ShownList = "done";
+/** A touch's tap: no keys held. */
 const NO_KEYS = { mod: false, shift: false } as const;
-/** A list a task is typed into: any but Done. */
-const typedInto = (list: ShownList): list is ListId => list !== DONE;
 
 /** A row of the list as drawn: the list's own, or the new task's field. */
 type Drawn = Row | { readonly kind: "entry"; readonly id: string; readonly depth: number } | { readonly kind: "plus"; readonly id: string };
@@ -227,4 +226,31 @@ function withEntry(all: readonly Drawn[], list: ShownList, field: Field | null):
 	const depth = Math.min(entry.depth ?? 0, above?.kind === "task" ? above.depth + 1 : 0);
 	const slot: Drawn = { kind: "entry", id: "entry", depth };
 	return [...rows.slice(0, at), slot, ...rows.slice(at)];
+}
+
+/**
+ * A long list that only reads (the search's finds, F252): the same TanStack Virtual dynamic list as `TaskList` (spec,
+ * «Long lists»), rows in flow translated to the first one's start, each measured; the row `reveal` is brought into sight
+ * by the virtualizer's `scrollToIndex` (spec, «Scroll»), as the arrows walk to it.
+ */
+export function ReadingList({ count, keyOf, reveal, className, children }: { readonly count: number; readonly keyOf: (index: number) => string; readonly reveal: number | null; readonly className: string; readonly children: (index: number) => ReactNode }) {
+	const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
+	const virtualizer = useVirtualizer({ count, getScrollElement: () => scroller, estimateSize: useCallback(() => ROW_PX, []), getItemKey: keyOf, overscan: OVERSCAN });
+	useEffect(() => {
+		if (reveal !== null && reveal < count) virtualizer.scrollToIndex(reveal, { align: "auto" });
+	}, [reveal, count, virtualizer]);
+	const items = virtualizer.getVirtualItems();
+	return (
+		<div ref={setScroller} className={className}>
+			<div className="tc-list-items" style={{ height: virtualizer.getTotalSize() }}>
+				<div className="tc-list-block" style={{ transform: `translateY(${items[0]?.start ?? 0}px)` }}>
+					{items.map((item) => (
+						<div key={item.key} ref={virtualizer.measureElement} data-index={item.index} className="tc-list-item">
+							{children(item.index)}
+						</div>
+					))}
+				</div>
+			</div>
+		</div>
+	);
 }

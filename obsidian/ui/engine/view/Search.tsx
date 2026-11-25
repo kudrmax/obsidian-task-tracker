@@ -1,4 +1,4 @@
-import { Fragment, memo, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, memo, type ReactNode, useEffect, useMemo, useState } from "react";
 import { SearchLayer } from "../layers/Popover";
 import type { Found, FoundPart } from "../port";
 import { useScreen, useScreenApi } from "../store";
@@ -6,6 +6,10 @@ import { CardFace } from "./Card";
 import { useHost } from "./host";
 import { Icon } from "./Icon";
 import { ObsidianEditor } from "./ObsidianEditor";
+import { ReadingList } from "./TaskList";
+
+/** A row of the finds: a list's name, or a find under it. */
+type FoundRowOf = { readonly kind: "head"; readonly key: string; readonly title: string } | { readonly kind: "hit"; readonly key: string; readonly hit: Found };
 
 /** Where a task stands among the projects, top project first: «Дружба › iPhone». */
 const PATH_STEP = " › ";
@@ -31,7 +35,12 @@ export const Search = memo(function Search({ view }: { readonly view: Element | 
 function SearchBody({ desk, onCancel }: { readonly desk: boolean; readonly onCancel: () => void }) {
 	const api = useScreenApi();
 	const found = useScreen((s) => s.found);
-	const hits = useMemo(() => found.groups.flatMap((group) => group.hits), [found]);
+	/** The finds as the list draws them: each group's name over its finds. */
+	const rows = useMemo(
+		(): readonly FoundRowOf[] => found.groups.flatMap((group): FoundRowOf[] => [{ kind: "head", key: `head:${group.title}`, title: group.title }, ...group.hits.map((hit): FoundRowOf => ({ kind: "hit", key: `${group.title}:${hit.id}`, hit }))]),
+		[found],
+	);
+	const hits = useMemo(() => rows.flatMap((row) => (row.kind === "hit" ? [row] : [])), [rows]);
 	/** The row the arrows walked to: the first of each answer on the desktop, none on the phone. */
 	const [walked, setWalked] = useState(0);
 	useEffect(() => setWalked(0), [found]);
@@ -46,28 +55,33 @@ function SearchBody({ desk, onCancel }: { readonly desk: boolean; readonly onCan
 				onChange={(text) => api.getState().searchFor(text)}
 				onEnter={() => {
 					const hit = hits[walked];
-					if (desk && hit) pick(hit.id);
+					if (desk && hit) pick(hit.hit.id);
 				}}
 				onEscape={onCancel}
 				onArrow={(step) => setWalked((at) => Math.min(hits.length - 1, Math.max(0, at + step)))}
 			/>
 		</label>
 	);
-	const results = (
-		<div className="tc-search-results">
-			{found.groups.map((group) => (
-				<Fragment key={group.title}>
-					<div className="tc-group-head">
-						<div className="tc-group-name">{group.title}</div>
-					</div>
-					{group.hits.map((hit) => (
-						<FoundRow key={hit.id} hit={hit} walked={desk && hits[walked] === hit} onPick={() => pick(hit.id)} />
-					))}
-				</Fragment>
-			))}
-			{found.query !== "" && found.groups.length === 0 ? <div className="tc-search-empty">No tasks found</div> : null}
-		</div>
-	);
+	const walkedRow = desk && hits[walked] ? rows.indexOf(hits[walked]) : null;
+	const results =
+		found.query !== "" && rows.length === 0 ? (
+			<div className="tc-search-results">
+				<div className="tc-search-empty">No tasks found</div>
+			</div>
+		) : rows.length === 0 ? null : (
+			<ReadingList count={rows.length} keyOf={(index) => rows[index].key} reveal={walkedRow} className="tc-search-results">
+				{(index) => {
+					const row = rows[index];
+					return row.kind === "head" ? (
+						<div className="tc-group-head">
+							<div className="tc-group-name">{row.title}</div>
+						</div>
+					) : (
+						<FoundRow hit={row.hit} walked={index === walkedRow} onPick={() => pick(row.hit.id)} />
+					);
+				}}
+			</ReadingList>
+		);
 	if (desk)
 		return (
 			<>
@@ -90,7 +104,15 @@ function SearchBody({ desk, onCancel }: { readonly desk: boolean; readonly onCan
 
 /** The found words picked out of the text they stand in (the design: weight 600 on the selection's colour). */
 function Parts({ parts }: { readonly parts: readonly FoundPart[] }): ReactNode {
-	return parts.map((part, i) => (part.match ? <mark key={i} className="tc-hit">{part.text}</mark> : <Fragment key={i}>{part.text}</Fragment>));
+	return parts.map((part, i) =>
+		part.match ? (
+			<mark key={i} className="tc-hit">
+				{part.text}
+			</mark>
+		) : (
+			<Fragment key={i}>{part.text}</Fragment>
+		),
+	);
 }
 
 /**
@@ -98,18 +120,21 @@ function Parts({ parts }: { readonly parts: readonly FoundPart[] }): ReactNode {
  * its notes, that line under the title; a project chosen, the task's place among the projects small over the title.
  */
 function FoundRow({ hit, walked, onPick }: { readonly hit: Found; readonly walked: boolean; readonly onPick: () => void }) {
-	const row = useRef<HTMLDivElement>(null);
-	/** The row the arrows walked to is brought into sight in the panel's own scroll, as the browser reveals (the results are no virtual list). */
-	useEffect(() => {
-		if (walked) row.current?.scrollIntoView({ block: "nearest" });
-	}, [walked]);
 	const title = hit.title.length > 0 ? <Parts parts={hit.title} /> : null;
 	return (
 		<CardFace
-			ref={row}
 			face={hit.face}
 			className={`tc-card tc-hit-card${walked ? " is-picked" : ""}${hit.line ? " has-snippet" : ""}`}
-			lines={{ over: hit.path ? hit.path.join(PATH_STEP) : null, title, under: hit.line ? <div className={`tc-hit-desc${hit.line.kind === "project" ? " is-project" : ""}`}>{hit.line.kind === "notes" ? <Icon name="description" /> : null}<Parts parts={hit.line.parts} /></div> : null }}
+			lines={{
+				over: hit.path ? hit.path.join(PATH_STEP) : null,
+				title,
+				under: hit.line ? (
+					<div className={`tc-hit-desc${hit.line.kind === "project" ? " is-project" : ""}`}>
+						{hit.line.kind === "notes" ? <Icon name="description" /> : null}
+						<Parts parts={hit.line.parts} />
+					</div>
+				) : null,
+			}}
 			role="option"
 			aria-selected={walked}
 			onClick={onPick}

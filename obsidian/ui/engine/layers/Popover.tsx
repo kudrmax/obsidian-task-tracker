@@ -1,12 +1,10 @@
 import { autoUpdate, flip, FloatingFocusManager, FloatingOverlay, FloatingPortal, offset, type Placement, shift, size, useDismiss, useFloating, useInteractions, useRole, useTransitionStatus } from "@floating-ui/react";
-import { type CSSProperties, type ReactNode, useEffect, useRef } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { DESIGN } from "../../shared/design";
 import { LAYER_MS } from "./motion";
+import { motionClass, useGone } from "./transition";
 
 export type { Placement };
-
-/** How a part of a layer stands while it opens, is open and closes: the design's classes its CSS transitions run between. */
-const motionOf = (status: string, placed: boolean): string => (status === "open" && placed ? " is-shown" : status === "close" ? " is-closing" : "");
 
 export interface PopoverProps {
 	readonly open: boolean;
@@ -36,7 +34,13 @@ export interface PopoverProps {
  * layers' own time (`LAYER_MS`).
  */
 export function Popover({ open, onClose, root, reference, placement, label, className, onGone, copy = null, children }: PopoverProps) {
-	const { refs, context, floatingStyles, isPositioned, placement: placed } = useFloating({
+	const {
+		refs,
+		context,
+		floatingStyles,
+		isPositioned,
+		placement: placed,
+	} = useFloating({
 		open,
 		onOpenChange: (next) => {
 			if (!next) onClose();
@@ -57,18 +61,14 @@ export function Popover({ open, onClose, root, reference, placement, label, clas
 	const { isMounted, status } = useTransitionStatus(context, { duration: { open: LAYER_MS.open, close: LAYER_MS.close } });
 	/** The copy's place: the control's own box (its top left corner on the control's). */
 	const over = useFloating({ open, placement: "bottom-start", strategy: "fixed", transform: false, middleware: [offset(({ rects }) => -rects.reference.height)], whileElementsMounted: autoUpdate, elements: { reference } });
-	const gone = useRef(onGone);
-	gone.current = onGone;
-	useEffect(() => {
-		if (!isMounted) gone.current?.();
-	}, [isMounted]);
+	useGone(isMounted, onGone);
 	if (!isMounted) return null;
-	const motion = motionOf(status, isPositioned);
+	const motion = motionClass(status, isPositioned);
 	return (
 		<FloatingPortal root={root}>
 			<FloatingOverlay className={`tc-backdrop tc-menu-layer${motion}`} />
 			{copy ? (
-				<div ref={over.refs.setFloating} className={`tc-control-copy${motion}`} style={over.floatingStyles as CSSProperties} aria-hidden="true">
+				<div ref={over.refs.setFloating} className={`tc-control-copy${motion}`} style={over.floatingStyles as CSSProperties} aria-hidden="true" inert>
 					{copy}
 				</div>
 			) : null}
@@ -106,10 +106,7 @@ export function SearchLayer({ open, onClose, root, view, desk, children }: Searc
 		strategy: "fixed",
 		transform: false,
 		middleware: desk
-			? [
-					offset(({ rects }) => DESIGN.searchTop - rects.reference.height),
-					size({ padding: DESIGN.searchTop, apply: ({ availableHeight, elements }) => void elements.floating.style.setProperty("max-height", `${Math.max(0, availableHeight)}px`) }),
-				]
+			? [offset(({ rects }) => DESIGN.searchTop - rects.reference.height), size({ padding: DESIGN.searchTop, apply: ({ availableHeight, elements }) => void elements.floating.style.setProperty("max-height", `${Math.max(0, availableHeight)}px`) })]
 			: [],
 		whileElementsMounted: autoUpdate,
 		elements: { reference: view },
@@ -117,7 +114,7 @@ export function SearchLayer({ open, onClose, root, view, desk, children }: Searc
 	const { getFloatingProps } = useInteractions([useDismiss(context, { outsidePressEvent: "click", outsidePress: desk }), useRole(context, { role: "dialog" })]);
 	const { isMounted, status } = useTransitionStatus(context, { duration: { open: LAYER_MS.open, close: LAYER_MS.close } });
 	if (!isMounted) return null;
-	const motion = motionOf(status, !desk || isPositioned);
+	const motion = motionClass(status, !desk || isPositioned);
 	const panel = (
 		<FloatingFocusManager context={context} modal={false} initialFocus={-1}>
 			<div ref={refs.setFloating} aria-label="Search" className={`tc-search${desk ? " is-desk" : ""}${motion}`} style={desk ? (floatingStyles as CSSProperties) : undefined} {...getFloatingProps()}>
@@ -138,7 +135,23 @@ export function SearchLayer({ open, onClose, root, view, desk, children }: Searc
  * A panel in the middle of the window over the backdrop (the assistant's answer, F264): Escape and a press beside it close
  * it, the focus kept inside; it opens and closes in the layers' own time. Its place is its CSS (the window's middle).
  */
-export function CenterLayer({ open, onClose, onGone, root, label, className, children }: { readonly open: boolean; readonly onClose: () => void; readonly onGone: () => void; readonly root: HTMLElement; readonly label: string; readonly className: string; readonly children: ReactNode }) {
+export function CenterLayer({
+	open,
+	onClose,
+	onGone,
+	root,
+	label,
+	className,
+	children,
+}: {
+	readonly open: boolean;
+	readonly onClose: () => void;
+	readonly onGone: () => void;
+	readonly root: HTMLElement;
+	readonly label: string;
+	readonly className: string;
+	readonly children: ReactNode;
+}) {
 	const { refs, context } = useFloating({
 		open,
 		onOpenChange: (next) => {
@@ -147,16 +160,9 @@ export function CenterLayer({ open, onClose, onGone, root, label, className, chi
 	});
 	const { getFloatingProps } = useInteractions([useDismiss(context, { outsidePressEvent: "click" }), useRole(context, { role: "dialog" })]);
 	const { isMounted, status } = useTransitionStatus(context, { duration: { open: LAYER_MS.open, close: LAYER_MS.close } });
-	const gone = useRef(onGone);
-	gone.current = onGone;
-	/** Gone once it was there: never before its first frame. */
-	const shown = useRef(false);
-	if (isMounted) shown.current = true;
-	useEffect(() => {
-		if (!isMounted && shown.current) gone.current();
-	}, [isMounted]);
+	useGone(isMounted, onGone);
 	if (!isMounted) return null;
-	const motion = motionOf(status, true);
+	const motion = motionClass(status, true);
 	return (
 		<FloatingPortal root={root}>
 			<FloatingOverlay className={`tc-backdrop tc-menu-layer${motion}`} />

@@ -2,7 +2,31 @@ import { DESIGN } from "../../shared/design";
 import { createStore, type StoreApi } from "zustand/vanilla";
 import { EVERY_TASK } from "../port";
 import { type Stop, stopShowing } from "../layout/columns";
-import type { Destination, DividerStop, Edge, ScreenContext, UndoOutcome, EntryBar, EntryDraft, EntryField, FieldActionId, FoundGroup, LevelRange, ListId, MenuAction, MenuFrom, MenuModel, MoreRow, Now, PlaceId, MenuStatusId, ScreenData, ScreenPort, ShownList } from "../port";
+import type {
+	Destination,
+	DividerStop,
+	Edge,
+	ScreenContext,
+	UndoOutcome,
+	EntryBar,
+	EntryDraft,
+	EntryField,
+	FieldActionId,
+	FoundGroup,
+	LevelRange,
+	ListId,
+	ListAbilities,
+	MenuAction,
+	MenuFrom,
+	MenuModel,
+	MoreRow,
+	Now,
+	PlaceId,
+	MenuStatusId,
+	ScreenData,
+	ScreenPort,
+	ShownList,
+} from "../port";
 import { share } from "./share";
 
 export type { Stop };
@@ -152,6 +176,8 @@ interface ScreenState {
 	readonly picking: boolean;
 	/** The tasks picked, in the order they were picked (F135, F138); the menu for them all opens over them. */
 	readonly picked: readonly string[];
+	/** The card a Shift-click picks a run from: the one picked or run to last; none once a ⌘-click let one go (F138). */
+	readonly pickAnchor: string | null;
 }
 
 interface ScreenActions {
@@ -270,7 +296,7 @@ interface ScreenActions {
 	/** The plus tapped while the lists `shown` are on the screen: the field opens at the port's place for new tasks (F174). */
 	plusTap(shown: readonly ListId[]): void;
 	/** A mouse's double click on a list's free room: a new task's field at the list's end (F67, `docs/plugin/tasks.md`). */
-	openAtEnd(list: ListId): void;
+	openAtEnd(list: ShownList): void;
 	/** The field one level deeper (1) or shallower (-1), as Tab and Shift+Tab do. */
 	indentEntry(by: -1 | 1): void;
 	/**
@@ -313,8 +339,8 @@ interface ScreenActions {
 	pickRun(id: string, list: ShownList): void;
 	/** The picked tasks let go, and Select tasks ends (F137, F145). */
 	clearPicks(): void;
-	/** Whether a card of `list` can be picked (the port's, F135). */
-	canPick(list: ShownList): boolean;
+	/** What the cards of `list` take besides a tap (the port's, F135, F257). */
+	listDoes(list: ShownList): ListAbilities;
 	/** The menu for every picked task (F137, F139). */
 	openBulk(): void;
 	/**
@@ -386,8 +412,8 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 				return;
 			}
 			/** Done left behind (the ribbon went on to Inbox): it is drawn no more, in place, from the next read on (F257). */
-		const context = s.context.done && s.stop !== "done" ? { ...s.context, done: false } : s.context;
-		const next = share(s.read, port.read(s.dayOffset, context));
+			const context = s.context.done && s.stop !== "done" ? { ...s.context, done: false } : s.context;
+			const next = share(s.read, port.read(s.dayOffset, context));
 			const known = s.read.cards;
 			/** A read that changed nothing (a write's read-back after its own change came) keeps what came and went in the last one. */
 			const same = next === s.read;
@@ -397,7 +423,17 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 			const undo = { canUndo: port.canUndo(), canRedo: port.canRedo(), moreRows: port.moreRows(), busy: port.busy(), ...(context === s.context ? {} : { context }) };
 			if (same) return set({ shown: share(s.shown, next), pending: false, ...menu, ...undo });
 			const picked = s.picked.filter((id) => id in next.cards);
-		set({ read: next, shown: share(s.shown, next), pending: false, readSeq: s.readSeq + 1, ...(picked.length === s.picked.length ? {} : { picked }), fresh: came.length === 0 ? NONE : new Set(came), gone: went.length === 0 ? NONE : new Set(went), ...menu, ...undo });
+			set({
+				read: next,
+				shown: share(s.shown, next),
+				pending: false,
+				readSeq: s.readSeq + 1,
+				...(picked.length === s.picked.length ? {} : { picked }),
+				fresh: came.length === 0 ? NONE : new Set(came),
+				gone: went.length === 0 ? NONE : new Set(went),
+				...menu,
+				...undo,
+			});
 		};
 
 		const write = (done: Promise<unknown>) => {
@@ -540,6 +576,7 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 			busy: port.busy(),
 			picking: false,
 			picked: [],
+			pickAnchor: null,
 
 			setStop(stop) {
 				set({ stop });
@@ -599,8 +636,8 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 				const along = get().along;
 				letGo(id, to && along.length > 0 ? { ...to, along } : to);
 				set({ lifted: null, along: [], liftedDepth: null });
-				/** A stack that landed ends Select tasks (the core's `endsSelection`: one that landed does). */
-				if (to && along.length > 0) get().clearPicks();
+				/** A carry that landed ends Select tasks, however many it carried (the core's `endsSelection`). */
+				if (port.endsPicking(to !== null)) get().clearPicks();
 				get().release("drag");
 			},
 			openMenu(id, from = "list", reveal = false) {
@@ -642,8 +679,8 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 				let done: () => void = () => undefined;
 				write(new Promise<void>((resolve) => (done = resolve)));
 				const many = layer.many;
-			if (many) get().clearPicks();
-			picked = () => void (many ? port.actAll(many, action, get().dayOffset) : port.act(layer.id, action, layer.from, get().dayOffset)).finally(done);
+				if (many) get().clearPicks();
+				picked = () => void (many ? port.actAll(many, action, get().dayOffset) : port.act(layer.id, action, layer.from, get().dayOffset)).finally(done);
 			},
 			layerGone() {
 				const run = picked;
@@ -659,17 +696,17 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 					if (id !== null && now && now.id === layer.id && id !== layer.id) set({ layer: { ...now, id } });
 				};
 				if (layer.many) {
-				/** A label or a project on them all keeps the menu and the picks for the next (F143, F144): the menu drawn for them as they now stand. */
-				const many = layer.many;
-				return write(
-					port.actAll(many, action, get().dayOffset).then((ids) => {
-						const kept = ids.flatMap((id) => (id === null ? [] : [id]));
-						const now = get().layer;
-						if (now?.many === many && kept.length > 0) set({ layer: { ...now, many: kept, model: port.bulkMenu(kept, get().dayOffset) } });
-					}),
-				);
-			}
-			write(port.act(layer.id, action, layer.from, get().dayOffset).then(follow));
+					/** A label or a project on them all keeps the menu and the picks for the next (F143, F144): the menu drawn for them as they now stand. */
+					const many = layer.many;
+					return write(
+						port.actAll(many, action, get().dayOffset).then((ids) => {
+							const kept = ids.flatMap((id) => (id === null ? [] : [id]));
+							const now = get().layer;
+							if (now?.many === many && kept.length > 0) set({ layer: { ...now, many: kept, model: port.bulkMenu(kept, get().dayOffset) } });
+						}),
+					);
+				}
+				write(port.act(layer.id, action, layer.from, get().dayOffset).then(follow));
 			},
 			nameMenuProject(name) {
 				if (port.blankProjectName(name)) get().menuPage("projects");
@@ -750,7 +787,8 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 				get().openEntry(port.newTaskPlace(get().dayOffset, shown));
 			},
 			openAtEnd(list) {
-				get().openEntry(port.listEnd(list, get().dayOffset));
+				const at = port.listEnd(list, get().dayOffset);
+				if (at) get().openEntry(at);
 			},
 			indentEntry(by) {
 				const { entry, draft, entryText } = get();
@@ -773,7 +811,8 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 					entry: done.next,
 					draft: done.draft,
 					entryText: "",
-					entrySeq: get().entrySeq + 1, entryPanel: null,
+					entrySeq: get().entrySeq + 1,
+					entryPanel: null,
 					/** The new name on every card at once, until the write is read back (F298). */
 					...(face ? { shown: { ...shown, cards: { ...shown.cards, [face.id]: face } } } : {}),
 					/** A field in a menu's stack ends with the menu. */
@@ -832,22 +871,24 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 			},
 			togglePick(id) {
 				const { picked } = get();
-				set({ picked: picked.includes(id) ? picked.filter((other) => other !== id) : [...picked, id] });
+				/** A card let go leaves no card a run is picked from (the plugin's `TaskSelection.toggle`). */
+				if (picked.includes(id)) set({ picked: picked.filter((other) => other !== id), pickAnchor: null });
+				else set({ picked: [...picked, id], pickAnchor: id });
 			},
 			pickRun(id, list) {
 				const { picked, shown } = get();
 				const cards = shown.lists[list].rows.flatMap((row) => (row.kind === "task" ? [row.id] : []));
-				const from = cards.indexOf(picked[picked.length - 1] ?? "");
+				const from = cards.indexOf(get().pickAnchor ?? "");
 				const to = cards.indexOf(id);
 				if (from < 0 || to < 0) return get().togglePick(id);
 				const run = cards.slice(Math.min(from, to), Math.max(from, to) + 1).filter((other) => !picked.includes(other) && other !== id);
-				set({ picked: [...picked, ...run, ...(picked.includes(id) ? [] : [id])] });
+				set({ picked: [...picked, ...run, ...(picked.includes(id) ? [] : [id])], pickAnchor: id });
 			},
 			clearPicks() {
-				if (get().picking || get().picked.length > 0) set({ picking: false, picked: [] });
+				if (get().picking || get().picked.length > 0) set({ picking: false, picked: [], pickAnchor: null });
 			},
-			canPick(list) {
-				return port.canPick(list);
+			listDoes(list) {
+				return port.listDoes(list);
 			},
 			openBulk() {
 				const { picked, dayOffset } = get();
@@ -856,11 +897,25 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 			},
 			tapPick(id, list, keys) {
 				const s = get();
-				const pickable = port.canPick(list);
-				const took = s.picking ? (pickable ? () => s.togglePick(id) : () => undefined) : pickable && keys.mod ? () => s.togglePick(id) : pickable && keys.shift && s.picked.length > 0 ? () => s.pickRun(id, list) : s.picked.includes(id) && s.picked.length > 1 ? () => s.openBulk() : null;
-				if (took) took();
-				else s.clearPicks();
-				return took !== null;
+				const pickable = port.listDoes(list).pick;
+				if (s.picking) {
+					if (pickable) s.togglePick(id);
+					return true;
+				}
+				if (pickable && keys.mod) {
+					s.togglePick(id);
+					return true;
+				}
+				if (pickable && keys.shift && s.picked.length > 0) {
+					s.pickRun(id, list);
+					return true;
+				}
+				if (s.picked.includes(id) && s.picked.length > 1) {
+					s.openBulk();
+					return true;
+				}
+				s.clearPicks();
+				return false;
 			},
 			carriedWith(id) {
 				const { picked } = get();

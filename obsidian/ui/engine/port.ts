@@ -391,6 +391,13 @@ export type Answer =
 	| { readonly kind: "task"; readonly title: string; readonly face: CardFace; readonly notice: string | null; readonly note: string; readonly field: AnswerField | null }
 	| { readonly kind: "failed"; readonly title: string; readonly words: string };
 
+/** What a list's cards take besides a tap: picked (Select tasks, ⌘-click), carried, a new task typed among them. */
+export interface ListAbilities {
+	readonly pick: boolean;
+	readonly carry: boolean;
+	readonly type: boolean;
+}
+
 /** A row of «⋯» the assistant offers (the core's `AssistantOffer`, F261–F263): Best task, or Stop while its run waits, its icon a spinning ring then. */
 export interface MoreRow {
 	readonly id: string;
@@ -436,8 +443,8 @@ export interface ScreenPort {
 	clockAt(minute: number): string;
 	/** Where a tap on the plus puts a new task's field, on the screen showing the day `dayOffset` days from today and the lists `shown` (F174). */
 	newTaskPlace(dayOffset: number, shown: readonly ListId[]): Destination;
-	/** The end of `list` (the day's of `dayOffset`), in its last section, at the top level: where a double click on its free room opens a new task's field. */
-	listEnd(list: ListId, dayOffset: number): Destination;
+	/** The end of `list` (the day's of `dayOffset`), in its last section, at the top level: where a double click on its free room opens a new task's field; null for a list no task is typed into (Done). */
+	listEnd(list: ShownList, dayOffset: number): Destination | null;
 	/** Where Add subtask opens the field of a new last subtask of `id` opened `from` there: in its list under its last subtask, a level deeper (F124); a calendar task's in its menu's stack (F108). */
 	subtaskPlace(id: string, dayOffset: number, from: MenuFrom): EntryField;
 	/** The field shifted a level in (1) or out (-1) as the rules let it (its depth fitted between its neighbours), with what is set and typed; null where it can't go. */
@@ -501,8 +508,10 @@ export interface ScreenPort {
 	busy(): boolean;
 	/** A tap on an assistant's row of «⋯»: its run starts, or stops while it runs (F263); its answer comes as the host shows it. */
 	pressMore(id: string): void;
-	/** Whether a card of `list` can be picked for actions on several tasks (the core's `canPick`, F135): a list's, never Done's or the calendar's. */
-	canPick(list: ShownList): boolean;
+	/** What the cards of `list` take besides a tap (F135, F257): picked for actions on several tasks (the core's `canPick`), carried, a task typed in; Done's none of them. */
+	listDoes(list: ShownList): ListAbilities;
+	/** Whether a carry that ended so ends Select tasks (the core's `endsSelection`): one that landed does, whatever it carried. */
+	endsPicking(landed: boolean): boolean;
 	/** The menu for the tasks `ids` picked at once (the core's `bulkMenu`, F140–F144), opened over the screen of the day `dayOffset`. */
 	bulkMenu(ids: readonly string[], dayOffset: number): TaskMenuModel;
 	/** Writes what was tapped in the bulk menu on every picked task, in one write; resolves to their ids as the file now has them (null for one gone). */

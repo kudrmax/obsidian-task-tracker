@@ -30,6 +30,9 @@ export function menuModelOf(item: TaskItem, model: CoreMenuModel<TaskMenuActionI
 	};
 }
 
+/** How many tasks, as the menu's title and Delete name them: «1 task», «3 tasks». */
+const tasksCount = (count: number): string => (count === 1 ? "1 task" : `${count} tasks`);
+
 /**
  * The menu of `count` tasks picked at once (F140–F144) in the engine's words, from the core's bulk menu as it is: its title
  * «N tasks», the groups the table of task actions gives the bulk menu, the tiles and pages with what is on for them all.
@@ -37,8 +40,8 @@ export function menuModelOf(item: TaskItem, model: CoreMenuModel<TaskMenuActionI
 export function bulkMenuModelOf(count: number, model: CoreMenuModel<BulkActionId>, names: ListNames, today: LocalDate): TaskMenuModel {
 	return {
 		kind: "task",
-		title: `${count} tasks`,
-		statusTitle: `${count} tasks`,
+		title: tasksCount(count),
+		statusTitle: tasksCount(count),
 		layout: model.layout,
 		levels: model.levels.tiles.map((tile) => ({ prefix: tile.level.prefix, color: tile.level.color, on: tile.on })),
 		labels: model.labels.tiles.map((tile) => ({ name: tile.label.name, color: tile.label.color, on: tile.on })),
@@ -48,6 +51,6 @@ export function bulkMenuModelOf(count: number, model: CoreMenuModel<BulkActionId
 		project: projectPageOf(model.project),
 		peek: null,
 		subtasks: [],
-		deleteLabel: `Delete ${count} tasks`,
+		deleteLabel: `Delete ${tasksCount(count)}`,
 	};
 }

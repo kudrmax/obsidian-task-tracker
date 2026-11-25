@@ -482,6 +482,10 @@ describe("the field's description, projects and new section (task actions spec, 
 
 describe("the Project page and «New project…» (Decision 134), ⌥Tab's offer (Decision 133)", () => {
 	const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+	/** Until `done` holds, or a second has gone: two writes 30 ms each land in their own time on a loaded machine (a fixed wait failed under the full run). */
+	const until = async (done: () => boolean) => {
+		for (let waited = 0; !done() && waited < 1000; waited += 10) await wait(10);
+	};
 	const firstTask = (p: StandScreen) => Object.values(p.read(0).cards).find((c) => !/шаг/.test(c.title))!;
 	const lineOf = (p: StandScreen, title: string) => p.fileText().split("\n").find((l) => l.includes(title)) ?? "";
 
@@ -544,7 +548,7 @@ describe("the Project page and «New project…» (Decision 134), ⌥Tab's offer
 		store.getState().nameEntryProject("Дача");
 		expect(store.getState().entryPanel).toBeNull();
 		store.getState().commitEntry("Сразу Enter", true);
-		await wait(120);
+		await until(() => lineOf(p, "Сразу Enter").includes("🗂️ Дача"));
 		expect(lineOf(p, "Сразу Enter")).toContain("🗂️ Дача");
 		expect(store.getState().draft.projects).toEqual(["Дача"]);
 	});

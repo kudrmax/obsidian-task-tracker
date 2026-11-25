@@ -198,3 +198,28 @@ describe("the ribbon's drag, on @use-gesture's documented options (review of par
 		expect(source).toMatch(/drawnWidths\(/);
 	});
 });
+
+describe("Done, one place before Inbox (F257, Decision 159)", () => {
+	const width = 195;
+	it("from Done a swipe on lands on Inbox, and back never goes past Done", () => {
+		const pager = new FollowPager(offsetOf("done"), Infinity);
+		pager.first = -1;
+		pager.begin(-1, true);
+		expect(pager.move(-3 * width, width)).toBe(-1);
+		expect(pager.release(-1, -FLICK_SPEED, width)).toBe(-1);
+		pager.begin(-1, true);
+		expect(pager.release(pager.move(width, width), FLICK_SPEED, width)).toBe(0);
+	});
+
+	it("once the ribbon left Done (its first place Inbox's again), a swipe back from Inbox stays at Inbox", () => {
+		const pager = new FollowPager(0, Infinity);
+		pager.begin(0, true);
+		expect(pager.move(-width, width)).toBe(0);
+		expect(pager.release(0, -FLICK_SPEED, width)).toBe(0);
+	});
+
+	it("draws Done and Inbox at Done; the stop Done stands one column before Inbox's", () => {
+		expect(shownAt("done")).toEqual(["done", "inbox"]);
+		expect(offsetOf("done")).toBe(offsetOf("inbox") - 1);
+	});
+});

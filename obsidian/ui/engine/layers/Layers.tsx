@@ -5,6 +5,7 @@ import type { MenuFrom } from "../port";
 import { useScreenApi } from "../store";
 import { blockTop } from "./block";
 import { LAYER_MS } from "./motion";
+import { motionClass, useGone } from "./transition";
 
 /**
  * Layers and focus (spec, «The owners»): every menu, popover and sheet is a Floating UI element. It is placed against the
@@ -141,7 +142,6 @@ export interface MenuLayerProps {
 
 
 /** How a part of the menu stands while it opens, is open and closes: the design's classes, which its CSS transitions run between. */
-const motionClass = (status: string, ready: boolean) => (status === "open" && ready ? " is-shown" : status === "close" ? " is-closing" : "");
 
 /**
  * The menu over a pressed card, block or event (the plugin's `LiftedMenu`, F110, F297), as Floating UI builds a menu, and
@@ -197,12 +197,7 @@ export function MenuLayer({ open, onClose, escapes = true, root, reference, labe
 		if (page !== firstPage.current && lower && !lower.contains(lower.ownerDocument.activeElement)) lower.focus({ preventScroll: true });
 	}, [page]);
 	const { isMounted, status } = useTransitionStatus(block.context, { duration: { open: LAYER_MS.open, close: LAYER_MS.close } });
-	const gone = useRef(onGone);
-	gone.current = onGone;
-	useEffect(() => {
-		if (!isMounted) gone.current?.();
-	}, [isMounted]);
-	useEffect(() => () => gone.current?.(), []);
+	useGone(isMounted, onGone);
 	const shownOnce = useRef(false);
 	/** Closed by the click, not the press: the finger's tap ends on the backdrop, never on a card under the fading menu. */
 	const dismiss = useDismiss(block.context, { escapeKey: escapes, outsidePressEvent: "click", outsidePress: (event) => !(event.target instanceof Element && (block.refs.floating.current?.contains(event.target) || event.target.closest(".tc-quick-bar, .tc-quick-panel"))) });

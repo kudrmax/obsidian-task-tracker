@@ -63,7 +63,7 @@ type FaceAttributes = Omit<HTMLAttributes<HTMLDivElement>, "className" | "childr
  * step in a list; `children` after its insides (a task's notes in the menu's copy).
  */
 export function CardFace({ face, block, lines, className, children, ref, ...attributes }: { readonly face: Face; readonly block?: BlockLook; readonly lines?: FoundLines; readonly className: string; readonly children?: ReactNode; readonly ref?: Ref<HTMLDivElement> } & FaceAttributes) {
-	const twoLine = !block && (face.step !== null || (lines?.over ?? null) !== null);
+	const twoLine = !block && (lines ? lines.over !== null : face.step !== null);
 	return (
 		<div ref={ref} className={`${className}${twoLine ? " is-two-line" : ""}`} data-status={face.inProgress ? "inProgress" : "open"} data-priority={face.color ?? undefined} {...attributes}>
 			<CardInsides face={face} block={block} lines={lines} />
@@ -83,9 +83,10 @@ export interface FoundLines {
 	readonly under: ReactNode | null;
 }
 
+/** A folded task is found by its own title, its next step not shown (docs/plugin/screen.md: «В поиске … задача — своим названием»). */
 function FoundTitle({ face, lines }: { readonly face: Face; readonly lines: FoundLines }) {
-	const over = lines.over ?? (face.step === null ? null : face.title);
-	const title = <div className="tc-card-title">{face.step === null ? (lines.title ?? face.title) : face.step}</div>;
+	const over = lines.over;
+	const title = <div className="tc-card-title">{lines.title ?? face.title}</div>;
 	const main = lines.under ? (
 		<div className="tc-hit-text">
 			{title}

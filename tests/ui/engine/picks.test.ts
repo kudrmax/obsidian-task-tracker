@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
-import { mockFile, twoColumnsFile } from "../../../obsidian/stand/mockData";
+import { mockFile, subtasksFile, twoColumnsFile } from "../../../obsidian/stand/mockData";
 import { KEYS, takesKeys } from "../../../obsidian/ui/engine/keys";
 import type { ScreenPort } from "../../../obsidian/ui/engine/port";
 import { createScreenStore } from "../../../obsidian/ui/engine/store";
@@ -41,6 +41,40 @@ describe("Select tasks and ⌘-click (F135–F139, F145)", () => {
 		stop();
 	});
 
+	it("Done on a folded task among the picked closes its shown step, never the task with its open subtasks (the core's statusTasks)", async () => {
+		const file = subtasksFile();
+		const moving = file.soon[0].tasks.find((task) => task.title === "Переезд")!;
+		moving.folded = true;
+		const { port, source, store, stop } = await screen(file);
+		const soon = port.read(0).lists.soon.rows.flatMap((row) => (row.kind === "task" && row.depth === 0 ? [row.id] : []));
+		const folded = soon.find((id) => port.read(0).cards[id].title === "Переезд")!;
+		const other = soon.find((id) => id !== folded)!;
+		const otherTitle = port.read(0).cards[other].title;
+		const step = port.read(0).cards[folded].step!;
+		const rest = ["Найти грузчиков", "Упаковать книги", "Заказать машину"].filter((title) => title !== step);
+		store.getState().tapPick(folded, "soon", { mod: true, shift: false });
+		store.getState().tapPick(other, "soon", { mod: true, shift: false });
+		store.getState().openBulk();
+		store.getState().pick({ kind: "status", id: "done" });
+		store.getState().layerGone();
+		await settled(5);
+		const line = (title: string) => source.fileText().split("\n").find((text) => text.includes(title)) ?? "";
+		expect(line("Переезд")).toMatch(/^\s*- \[ \] Переезд/);
+		expect(line(step)).toMatch(/- \[x\] /);
+		for (const title of rest) expect(line(title)).not.toMatch(/- \[x\] /);
+		expect(line(otherTitle)).toMatch(/- \[x\] /);
+		stop();
+	});
+
+	it("names one picked task «1 task»", async () => {
+		const { port, store, stop } = await screen();
+		store.getState().tapPick(inbox(port)[0], "inbox", { mod: true, shift: false });
+		store.getState().openBulk();
+		const model = store.getState().layer!.model;
+		expect(model.kind === "task" && [model.title, model.deleteLabel]).toEqual(["1 task", "Delete 1 task"]);
+		stop();
+	});
+
 	it("⌘-clicks a card, Shift-clicks the run to another, and a click on one of them opens their menu; a plain click elsewhere lets them go", async () => {
 		const { port, store, stop } = await screen();
 		const [a, b, c, d] = inbox(port);
@@ -70,6 +104,31 @@ describe("Select tasks and ⌘-click (F135–F139, F145)", () => {
 		expect(store.getState().layer?.many).toHaveLength(2);
 		expect(after.kind === "task" && after.project.options.find((option) => option.name === project!.name)?.on).toBe(true);
 		expect(store.getState().picked).toEqual([a, b]);
+		stop();
+	});
+
+	it("picks a run from the card picked last, and from none once a ⌘-click let it go (the plugin's anchor)", async () => {
+		const { port, store, stop } = await screen();
+		const [a, b, c, d] = inbox(port);
+		store.getState().tapPick(a, "inbox", { mod: true, shift: false });
+		store.getState().tapPick(d, "inbox", { mod: true, shift: false });
+		store.getState().tapPick(d, "inbox", { mod: true, shift: false });
+		store.getState().tapPick(c, "inbox", { mod: false, shift: true });
+		expect(store.getState().picked).toEqual([a, c]);
+		store.getState().tapPick(a, "inbox", { mod: false, shift: true });
+		expect(store.getState().picked).toEqual([a, c, b]);
+		stop();
+	});
+
+	it("ends Select tasks with any carry that landed, one card too", async () => {
+		const { port, store, stop } = await screen();
+		const [a] = inbox(port);
+		store.getState().setPicking(true);
+		store.getState().claim("drag");
+		store.getState().lift(a);
+		expect(store.getState().picking).toBe(true);
+		store.getState().drop(a, { list: "soon", before: null, dayOffset: 0 });
+		expect(store.getState().picking).toBe(false);
 		stop();
 	});
 

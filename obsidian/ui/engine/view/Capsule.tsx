@@ -125,7 +125,14 @@ export const PickedButton = memo(function PickedButton() {
 
 function PickedCircle({ off, hidden, onPress }: { readonly off: boolean; readonly hidden: boolean; readonly onPress: (button: HTMLElement) => void }) {
 	return (
-		<button type="button" data-picked-menu="" className={`tc-btn is-round is-accent tc-select-menu${off ? " is-off" : ""}${hidden ? " is-hidden" : ""}`} aria-label="Actions for picked tasks" aria-disabled={off} onClick={(event) => onPress(event.currentTarget)}>
+		<button
+			type="button"
+			data-picked-menu=""
+			className={`tc-btn is-round is-accent tc-select-menu${off ? " is-off" : ""}${hidden ? " is-hidden" : ""}`}
+			aria-label="Actions for picked tasks"
+			aria-disabled={off}
+			onClick={(event) => onPress(event.currentTarget)}
+		>
 			<Icon name="more" />
 		</button>
 	);

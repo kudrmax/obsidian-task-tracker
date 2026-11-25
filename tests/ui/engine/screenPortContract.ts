@@ -74,7 +74,7 @@ export function describeScreenPort(name: string, make: PortMaker): void {
 			it(`writes two tasks typed in a row in their order, the second a level in under the first, its write not awaited (${delay} ms)`, async () => {
 				const port = await make(delay);
 				const draft = { level: null, projects: [], descriptionLine: null, section: false };
-				const first = { at: port.listEnd("inbox", 0), renaming: null, stack: false };
+				const first = { at: port.listEnd("inbox", 0)!, renaming: null, stack: false };
 				const typed = port.commit(first, "AAA", draft, true);
 				if (!typed.next) throw new Error("no next field");
 				await new Promise((resolve) => setTimeout(resolve, delay / 2));
@@ -115,7 +115,7 @@ export function describeScreenPort(name: string, make: PortMaker): void {
 			expect(port.read(0).cards[id]?.inProgress).toBe(true);
 			await port.move(id, { list: "day", before: null, dayOffset: 0, at: 23 * 60 });
 			expect(port.read(0).day.blocks.some((block) => block.id === id)).toBe(true);
-			const typed = port.commit({ at: port.listEnd("inbox", 0), renaming: null, stack: false }, "Совсем новая", { level: null, projects: [], descriptionLine: null, section: false }, false);
+			const typed = port.commit({ at: port.listEnd("inbox", 0)!, renaming: null, stack: false }, "Совсем новая", { level: null, projects: [], descriptionLine: null, section: false }, false);
 			await typed.write;
 			const fresh = Object.keys(port.read(0).cards).find((key) => port.read(0).cards[key].title === "Совсем новая");
 			expect(fresh !== undefined && !seen.has(fresh)).toBe(true);
@@ -150,7 +150,7 @@ export function describeScreenPort(name: string, make: PortMaker): void {
 		it("shifts a field a level in under the card above and back out; never past what the rules let it", async () => {
 			const port = await make(0);
 			const draft = { level: null, projects: [], descriptionLine: null, section: false };
-			const field = { at: port.listEnd("inbox", 0), renaming: null, stack: false };
+			const field = { at: port.listEnd("inbox", 0)!, renaming: null, stack: false };
 			const shifted = port.entryShift(field, draft, "", 1);
 			expect(shifted?.at.depth).toBe(1);
 			expect(port.entryShift(shifted!, draft, "", 1)).toBeNull();

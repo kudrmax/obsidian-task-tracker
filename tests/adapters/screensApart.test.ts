@@ -12,7 +12,7 @@ async function typedInLeaf(withBlock: boolean): Promise<string> {
 	const leaf = source.port.within();
 	if (withBlock) source.port.within(HOME).read(0, HOME);
 	leaf.read(0);
-	const field = { at: leaf.listEnd("inbox", 0), renaming: null, stack: false };
+	const field = { at: leaf.listEnd("inbox", 0)!, renaming: null, stack: false };
 	await leaf.commit(field, "Из главного экрана", leaf.entryDraft(field), false).write;
 	await settled();
 	return source.fileText();
@@ -41,7 +41,7 @@ describe("each screen's port keeps its own context", () => {
 		const source = await standPort(NOW);
 		const block = source.port.within(HOME);
 		block.read(0, HOME);
-		const field = { at: block.listEnd("inbox", 0), renaming: null, stack: false };
+		const field = { at: block.listEnd("inbox", 0)!, renaming: null, stack: false };
 		const draft = block.entryDraft(field);
 		expect(draft.projects).toEqual(["Дом"]);
 		await block.commit(field, "Из блока заметки", draft, false).write;
@@ -53,6 +53,6 @@ describe("each screen's port keeps its own context", () => {
 		const source = await standPort(NOW);
 		const leaf = source.port.within();
 		leaf.read(0);
-		expect(leaf.entryDraft({ at: leaf.listEnd("inbox", 0), renaming: null, stack: false })).toEqual(NO_DRAFT);
+		expect(leaf.entryDraft({ at: leaf.listEnd("inbox", 0)!, renaming: null, stack: false })).toEqual(NO_DRAFT);
 	});
 });

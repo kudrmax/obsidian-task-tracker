@@ -29,7 +29,7 @@ export default {
 			await t.sleep(400);
 		};
 		const searchOpen = () => t.cdp.eval(`!!document.querySelector(".tc-search.is-shown")`);
-		const found = () => t.cdp.eval(`[...document.querySelectorAll(".tc-search .tc-search-results > *")].map((e) => e.classList.contains("tc-group-head") ? "## " + e.textContent.trim() : e.querySelector(".tc-card-title")?.textContent ?? e.textContent.trim())`);
+		const found = () => t.cdp.eval(`[...document.querySelectorAll(".tc-search .tc-search-results .tc-list-item > *, .tc-search .tc-search-results > .tc-search-empty")].map((e) => e.classList.contains("tc-group-head") ? "## " + e.textContent.trim() : e.querySelector(".tc-card-title")?.textContent ?? e.textContent.trim())`);
 		const ringed = () => t.cdp.eval(`[...document.querySelectorAll(".task-calendar .tc-card.is-found, .task-calendar .tc-block-card.is-found")].map((e) => e.querySelector(".tc-card-title").textContent)`);
 
 		if (item === "more") {
@@ -104,7 +104,7 @@ export default {
 		/** A task of Done: Done comes into sight left of Inbox. */
 		const done = (await t.oracle.tasks("Done"))[0].title;
 		await type(done);
-		const doneRow = await t.cdp.eval(`(() => { let inDone = false; for (const e of document.querySelectorAll(".tc-search .tc-search-results > *")) { if (e.classList.contains("tc-group-head")) inDone = e.textContent.trim() === "Done"; else if (inDone && e.querySelector(".tc-card-title")?.textContent === ${JSON.stringify(done)}) { const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; } } return null; })()`);
+		const doneRow = await t.cdp.eval(`(() => { let inDone = false; for (const e of document.querySelectorAll(".tc-search .tc-search-results .tc-list-item > *, .tc-search .tc-search-results > .tc-search-empty")) { if (e.classList.contains("tc-group-head")) inDone = e.textContent.trim() === "Done"; else if (inDone && e.querySelector(".tc-card-title")?.textContent === ${JSON.stringify(done)}) { const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; } } return null; })()`);
 		if (!t.expect(doneRow !== null, `«${done}» is found under Done`)) return;
 		await tap(doneRow);
 		await t.sleep(1000);
