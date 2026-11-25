@@ -27,7 +27,7 @@ export interface ScreenParts {
 
 /** The screens one host has mounted, each over the same parts: the plugin's, the stand's and the checks' page's one way to mount `TaskScreen`. */
 export class ScreenMounts {
-	private readonly screens = new Map<MountedScreen, CorePort>();
+	private readonly screens = new Map<MountedScreen, { readonly port: CorePort; readonly el: HTMLElement }>();
 
 	constructor(readonly parts: ScreenParts) {}
 
@@ -36,17 +36,22 @@ export class ScreenMounts {
 		const { device, app, haptics, markdown, notice, desk, fingers } = this.parts;
 		const port = this.parts.port.within(context);
 		const screen = mountScreen(el, { port, place, app, sourcePath, haptics, zoom: device.zoom(), listShare: { kept: device.listShare(), keep: (share) => void device.keepListShare(share) }, markdown, notice, desk, fingers, context });
-		this.screens.set(screen, port);
+		this.screens.set(screen, { port, el });
 		return screen;
 	}
 
 	/** A screen this host mounted, taken off and no longer counted. */
 	unmount(screen: MountedScreen | null): void {
-		const port = screen && this.screens.get(screen);
-		if (!screen || !port) return;
+		const mounted = screen && this.screens.get(screen);
+		if (!screen || !mounted) return;
 		this.screens.delete(screen);
 		screen.unmount();
-		port.release();
+		mounted.port.release();
+	}
+
+	/** Some screen is in sight: its window's page shown and the screen itself laid out (not in a tab behind another, not folded away). */
+	get anyShown(): boolean {
+		return [...this.screens.values()].some(({ el }) => !el.ownerDocument.hidden && el.isConnected && el.getClientRects().length > 0);
 	}
 
 	/** Every open screen. */

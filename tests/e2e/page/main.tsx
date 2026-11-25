@@ -1,4 +1,5 @@
 import type { App } from "obsidian";
+import { failureText } from "../../../obsidian/host/failureText";
 import { detectHaptics, type HapticsHost } from "../../../obsidian/host/haptics";
 import { ScreenMounts } from "../../../obsidian/host/ScreenMounts";
 import { keptDevice } from "../../../obsidian/memoryCore";
@@ -50,13 +51,13 @@ class StandPage {
 	private leafScreen: MountedScreen | null = null;
 	/** A note's block open beside the leaf, ahead of it in the page (`openNoteBeside`). */
 	private beside: HTMLElement | null = null;
-	/** The notices shown, in order, as Obsidian's `Notice` would show them. */
-	private readonly notices: string[] = [];
 	private readonly mounts: ScreenMounts;
 
 	constructor(
 		private readonly leaf: HTMLElement,
 		private readonly source: StandSource,
+		/** The notices shown, in order, as Obsidian's `Notice` would show them: the screen's and a failed write's, as the plugin shows both. */
+		private readonly notices: string[],
 	) {
 		this.mounts = new ScreenMounts({ port: source.port, device: source.device, app: {} as App, haptics: detectHaptics(window as unknown as HapticsHost), markdown: plainMarkdown, notice: (text) => void this.notices.push(text), desk: !document.body.classList.contains("is-mobile"), fingers: null });
 	}
@@ -146,9 +147,10 @@ document.body.classList.add(params.get("theme") === "light" ? "theme-light" : "t
 const leaf = document.createElement("div");
 leaf.className = "workspace-leaf-content";
 document.body.appendChild(leaf);
-void standSource(keptDevice(() => load(DEVICE_KEY), (value) => save(DEVICE_KEY, value)), (error) => console.error("write failed", error)).then((source) => {
+const notices: string[] = [];
+void standSource(keptDevice(() => load(DEVICE_KEY), (value) => save(DEVICE_KEY, value)), (error) => void notices.push(failureText(error))).then((source) => {
 	showScreenPaint(source.paint.get());
-	const stand = new StandPage(leaf, source);
+	const stand = new StandPage(leaf, source, notices);
 	window.addEventListener("keydown", stand.onKey);
 	(window as unknown as { __tcStand: ReturnType<StandPage["api"]> }).__tcStand = stand.api();
 	stand.showLeaf(WHOLE_SCREEN);

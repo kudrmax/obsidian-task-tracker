@@ -27,6 +27,8 @@ export interface StandSource {
 	addFromOutside(list: ListKey, title: string): void;
 	/** A task moved from outside: the one titled `title` before the one titled `before` (null: its list's first section's end). */
 	moveFromOutside(title: string, list: ListKey, before: string | null): void;
+	/** The task titled `title` and its subtasks deleted from outside, as a hand edit or Sync deletes them. */
+	removeFromOutside(title: string): void;
 }
 
 /** The made-up file as the core reads it: its lists, then the made-up projects' tree (`## Projects`, a folder marked 🗃️). */
@@ -58,6 +60,7 @@ export async function standSource(device: DeviceViewKeys, onError: (error: unkno
 		setDelay: (delay) => (file.delay = delay),
 		addFromOutside: (list, title) => file.replace(withLine(file, list, `- [ ] ${title}${list === "now" ? ` 📅 ${dateOf(dayOf(clock()))}` : ""}`)),
 		moveFromOutside: (title, list, before) => file.replace(movedLine(file, title, list, before)),
+		removeFromOutside: (title) => file.replace(withoutTask(file, title)),
 	};
 }
 const isTaskOf = (line: string, title: string) => new RegExp(`^\\s*- \\[.\\] (?:p\\d )?${title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?: |$)`).test(line);
@@ -80,13 +83,26 @@ function withLine(file: MemoryTasksFile, list: ListKey, line: string): string {
 	return lines.join("\n");
 }
 
-function movedLine(file: MemoryTasksFile, title: string, list: ListKey, before: string | null): string {
-	const lines = (file.text ?? "").split("\n");
+/** The task titled `title`'s line and the lines of its subtasks under it. */
+function taskLines(lines: readonly string[], title: string): { readonly from: number; readonly to: number; readonly depth: number } {
 	const from = lines.findIndex((line) => isTaskOf(line, title));
 	if (from < 0) throw new Error(`no task «${title}»`);
 	const depth = /^\t*/.exec(lines[from])![0].length;
 	let to = from + 1;
 	while (to < lines.length && /^\t*/.exec(lines[to])![0].length > depth && lines[to].trim() !== "") to++;
+	return { from, to, depth };
+}
+
+function withoutTask(file: MemoryTasksFile, title: string): string {
+	const lines = (file.text ?? "").split("\n");
+	const { from, to } = taskLines(lines, title);
+	lines.splice(from, to - from);
+	return lines.join("\n");
+}
+
+function movedLine(file: MemoryTasksFile, title: string, list: ListKey, before: string | null): string {
+	const lines = (file.text ?? "").split("\n");
+	const { from, to, depth } = taskLines(lines, title);
 	const moved = lines.splice(from, to - from).map((line) => line.slice(depth));
 	const at = before === null ? listBounds(lines, list).firstEnd : lines.findIndex((line) => isTaskOf(line, before));
 	if (at < 0) throw new Error(`no task «${before}»`);

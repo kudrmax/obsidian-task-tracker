@@ -1,4 +1,4 @@
-import { levelRange, sameSlot, type CalendarService, dividerAt, type DividerStop, LIST_WIDTHS, listShareOf, type ListWidths, listWidths, type Clock, type DayEvents, type DayService, type DropColumn, type DroppedTask, type DropTo, type LocalDate, listCardMenuFrom, type MenuFrom as CoreMenuFrom, originOf, type ScreenReader, type ShownChange, type TaskItem, type TaskService, type UndoOutcome, undoNotice, projectNodeOf, type ProjectsNodeId, type UndoService } from "../../core/application/contracts";
+import { levelRange, sameSlot, type CalendarPoll, type CalendarService, StaleTaskError, dividerAt, type DividerStop, LIST_WIDTHS, listShareOf, type ListWidths, listWidths, type Clock, type DayEvents, type DayService, type DropColumn, type DroppedTask, type DropTo, type LocalDate, listCardMenuFrom, type MenuFrom as CoreMenuFrom, originOf, type ScreenReader, type ShownChange, type TaskItem, type TaskService, type UndoOutcome, undoNotice, projectNodeOf, type ProjectsNodeId, type UndoService } from "../../core/application/contracts";
 import type { ScreenContext, Destination, Edge, EntryBar, EntryCommit, EntryDraft, EntryField, LevelRange, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, RenameStart, ScreenData, ScreenPort } from "../ui/engine/port";
 import { CoreEntry } from "./CoreEntry";
 import { WriteQueue } from "./WriteQueue";
@@ -115,6 +115,21 @@ class CoreReads {
 		return ask.cached;
 	}
 
+	/**
+	 * The calendars kept fresh while a screen is in sight (F109): the core's polling every refresh interval of the
+	 * settings, the shown days' events fetched afresh at each tick; `hidden` is the host's word that no screen shows.
+	 */
+	keepEventsFresh(hidden: () => boolean): CalendarPoll {
+		return this.core.calendars.keepFresh({ refresh: () => this.refreshEvents(), hidden });
+	}
+
+	/** Both sources fetched afresh (`refresh`), then every day drawn asks for its events again. */
+	private async refreshEvents(): Promise<void> {
+		const day = this.asked.values().next().value ?? this.core.days.today();
+		await this.core.calendars.events(day, "refresh").fresh?.();
+		this.forgetEvents();
+	}
+
 	eventNamed(id: string) {
 		for (const day of this.events.values()) {
 			const found = day.events.find((event) => event.id === id);
@@ -150,6 +165,8 @@ class CoreReads {
 export class CorePort implements ScreenPort {
 	private readonly listeners = new Set<() => void>();
 	private readonly cache = new Map<string, ScreenData>();
+	/** What each day was last read as, in each context: what the screen draws while a drag holds it still. */
+	private readonly given = new Map<string, ScreenData>();
 	private readonly entry: CoreEntry;
 
 	/** @internal Made by `CoreReads.view`. */
@@ -169,6 +186,11 @@ export class CorePort implements ScreenPort {
 	/** Another screen's port over the same read, in `context` (every task when absent). */
 	within(context?: ScreenContext): CorePort {
 		return this.shared.view(context?.project ?? EVERY);
+	}
+
+	/** The calendars kept fresh while `hidden` says no screen is in sight (F109): one polling for every screen of the host. */
+	keepEventsFresh(hidden: () => boolean): CalendarPoll {
+		return this.shared.keepEventsFresh(hidden);
 	}
 
 	/** This screen's port is let go: its screen is gone. */
@@ -205,6 +227,25 @@ export class CorePort implements ScreenPort {
 		return this.shared.refresh();
 	}
 
+	/**
+	 * A write of the core's, in the one write queue: one that fails reaches the host's notice (`onError`: the core's
+	 * «the task changed in the file», «tasks file not found»), and the file is read anew after it either way.
+	 */
+	private async written<T>(job: () => Promise<T>, otherwise: T): Promise<T> {
+		let result = otherwise;
+		this.shared.queue.push(async () => {
+			result = await job();
+		});
+		await this.shared.queue.idle();
+		await this.refresh();
+		return result;
+	}
+
+	/** A task the screen drew that the file no longer has as it was: changed or gone from outside since (`TaskItem.id`). */
+	private changedOutside(id: string): boolean {
+		return this.reader.item(id) === null && this.shared.eventNamed(id) === null;
+	}
+
 	private eventsOf(date: LocalDate): DayEvents | null {
 		return this.shared.eventsOf(date);
 	}
@@ -220,6 +261,8 @@ export class CorePort implements ScreenPort {
 			data = this.drawing.draw({ date, screen, lists: this.drawing.listsOf(screen), events: this.eventsOf(date) });
 			this.cache.set(key, data);
 		}
+		if (this.given.size > 16) this.given.clear();
+		this.given.set(this.givenKey(dayOffset), data);
 		return data;
 	}
 
@@ -235,6 +278,7 @@ export class CorePort implements ScreenPort {
 
 	preview(id: string, to: Destination, context?: ScreenContext): ScreenData {
 		this.use(context);
+		if (this.changedOutside(id)) return this.given.get(this.givenKey(to.dayOffset)) ?? this.read(to.dayOffset);
 		const move = this.moveOf(id, to);
 		const date = this.dateOf(to.dayOffset);
 		if (!move || move.kind === "home") return this.read(to.dayOffset);
@@ -245,6 +289,7 @@ export class CorePort implements ScreenPort {
 
 	/** Nothing changes where the core leaves the task as it is: a card let go where it was lifted (`placeOfDrop`), a time it has already (`sameSlot`). */
 	changes(id: string, to: Destination): boolean {
+		if (this.changedOutside(id)) return true;
 		const move = this.moveOf(id, to);
 		const item = this.reader.item(id);
 		if (!move || !item || move.kind === "home") return false;
@@ -254,7 +299,9 @@ export class CorePort implements ScreenPort {
 		return !(landed?.kind === "timeline" && sameSlot(landed.item.slot, item.slot));
 	}
 
+	/** A task changed from outside while it is carried is taken anywhere: its drop is the core's to refuse, with its notice. */
 	takes(id: string, to: Destination): boolean {
+		if (this.changedOutside(id)) return true;
 		const move = this.moveOf(id, to);
 		if (!move) return false;
 		return move.kind !== "drop" || this.reader.takes(move.tasks.map((task) => task.from), move.to);
@@ -275,12 +322,14 @@ export class CorePort implements ScreenPort {
 		return { list: "day", before: null, dayOffset, at: span.start, end: span.end };
 	}
 
-	async move(id: string, to: Destination): Promise<void> {
-		const move = this.moveOf(id, to);
-		if (!move || move.kind === "home") return;
-		if (move.kind === "slot") await this.core.tasks.setSlot(move.key, move.slot);
-		else await this.core.tasks.drop(move.tasks, move.to, move.day, this.filter()?.node ?? null);
-		await this.refresh();
+	move(id: string, to: Destination): Promise<void> {
+		return this.written(async () => {
+			if (this.changedOutside(id)) throw new StaleTaskError();
+			const move = this.moveOf(id, to);
+			if (!move || move.kind === "home") return;
+			if (move.kind === "slot") await this.core.tasks.setSlot(move.key, move.slot);
+			else await this.core.tasks.drop(move.tasks, move.to, move.day, this.filter()?.node ?? null);
+		}, undefined);
 	}
 
 	readonly listBounds = LIST_WIDTHS;
@@ -301,10 +350,11 @@ export class CorePort implements ScreenPort {
 		return this.core.tasks.isBlankProjectName(name);
 	}
 
-	async newProject(name: string): Promise<string | null> {
-		const made = await this.core.tasks.newProject(name, []);
-		await this.refresh();
-		return made && !made.folder ? made.name : null;
+	newProject(name: string): Promise<string | null> {
+		return this.written(async () => {
+			const made = await this.core.tasks.newProject(name, []);
+			return made && !made.folder ? made.name : null;
+		}, null);
 	}
 
 	canUndo(): boolean {
@@ -315,16 +365,12 @@ export class CorePort implements ScreenPort {
 		return this.core.undo.canRedo();
 	}
 
-	async undo(): Promise<UndoOutcome> {
-		const outcome = await this.core.undo.undo();
-		await this.refresh();
-		return outcome;
+	undo(): Promise<UndoOutcome> {
+		return this.written(() => this.core.undo.undo(), "nothing");
 	}
 
-	async redo(): Promise<UndoOutcome> {
-		const outcome = await this.core.undo.redo();
-		await this.refresh();
-		return outcome;
+	redo(): Promise<UndoOutcome> {
+		return this.written(() => this.core.undo.redo(), "nothing");
 	}
 
 	undoNotice(step: "undo" | "redo", outcome: UndoOutcome): string | null {
@@ -360,9 +406,8 @@ export class CorePort implements ScreenPort {
 		return levelRange(cards, above === null ? 0 : 1, null);
 	}
 
-	async createFile(): Promise<void> {
-		await this.core.tasks.createFile();
-		await this.refresh();
+	createFile(): Promise<void> {
+		return this.written(() => this.core.tasks.createFile(), undefined);
 	}
 
 	entryDraft(field: EntryField): EntryDraft {
@@ -400,8 +445,15 @@ export class CorePort implements ScreenPort {
 
 	/** The core's ids stay through every write it makes (`TaskItem.id`): the task's own id, null once it is gone. */
 	async act(id: string, action: MenuAction, from: MenuFrom, dayOffset: number): Promise<string | null> {
+		if (action.kind === "row") return this.reader.item(id) ? id : null;
+		await this.written(() => this.acted(id, action, from, dayOffset), undefined);
+		return this.reader.item(id) ? id : null;
+	}
+
+	/** The core's write a menu's pick makes; a task changed from outside since the menu opened is the core's refusal. */
+	private async acted(id: string, action: Exclude<MenuAction, { kind: "row" }>, from: MenuFrom, dayOffset: number): Promise<void> {
 		const item = this.reader.item(id);
-		if (action.kind === "row" || !item) return item ? id : null;
+		if (!item) throw new StaleTaskError();
 		const tasks = this.core.tasks;
 		const keys = [item.key];
 		switch (action.kind) {
@@ -434,8 +486,10 @@ export class CorePort implements ScreenPort {
 			case "delete":
 				await tasks.remove(item.key);
 		}
-		await this.refresh();
-		return this.reader.item(id) ? id : null;
+	}
+
+	private givenKey(dayOffset: number): string {
+		return `${dayOffset}#${this.context}`;
 	}
 
 	/** The day `dayOffset` days from today, as the core steps days. */

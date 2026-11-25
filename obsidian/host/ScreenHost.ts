@@ -1,5 +1,5 @@
 import { Component, MarkdownRenderer, Notice, Platform, type Plugin, type WorkspaceLeaf } from "obsidian";
-import type { ScreenSettingsStore } from "../../core/application/contracts";
+import type { CalendarPoll, ScreenSettingsStore } from "../../core/application/contracts";
 import type { CorePort } from "../adapters/CorePort";
 import type { DeviceSettings } from "../adapters/DeviceSettings";
 import type { TrackpadFingers } from "../ui/engine/gestures/trackpadFollow";
@@ -39,6 +39,7 @@ export class ScreenHost {
 	private ready: Promise<ScreenMounts> | null = null;
 	private assembled: ScreenMounts | null = null;
 	private fingers: TrackpadFingers & { dispose(): void } | null = null;
+	private poll: CalendarPoll | null = null;
 	private ended = false;
 
 	constructor(
@@ -100,7 +101,7 @@ export class ScreenHost {
 			source.port.dispose();
 		} else this.fingers = fingers;
 		const app = this.plugin.app;
-		this.assembled = new ScreenMounts({
+		const mounts = new ScreenMounts({
 			port: source.port,
 			device: source.device,
 			app,
@@ -118,11 +119,35 @@ export class ScreenHost {
 			desk: !Platform.isMobile,
 			fingers: this.fingers,
 		});
-		return this.assembled;
+		this.assembled = mounts;
+		if (!this.ended) this.keepCalendarsFresh(source.port, mounts);
+		return mounts;
+	}
+
+	/**
+	 * The calendars' events kept fresh while a screen is in sight (F109, Decision 170): the core's polling at the settings'
+	 * refresh interval; woken when a window gets the focus or Obsidian comes back, a tick missed off screen caught up when
+	 * a leaf comes to the front.
+	 */
+	private keepCalendarsFresh(port: CorePort, mounts: ScreenMounts): void {
+		const poll = port.keepEventsFresh(() => !mounts.anyShown);
+		this.poll = poll;
+		const { workspace } = this.plugin.app;
+		const wakeOn = (win: Window) => {
+			this.plugin.registerDomEvent(win, "focus", () => poll.wake());
+			this.plugin.registerDomEvent(win.document, "visibilitychange", () => {
+				if (!win.document.hidden) poll.wake();
+			});
+		};
+		wakeOn(window);
+		this.plugin.registerEvent(workspace.on("window-open", (win) => wakeOn(win.win)));
+		this.plugin.registerEvent(workspace.on("active-leaf-change", () => poll.catchUp()));
 	}
 
 	private end(): void {
 		this.ended = true;
+		this.poll?.stop();
+		this.poll = null;
 		void this.ready?.then((mounts) => {
 			mounts.dispose();
 			mounts.parts.port.dispose();

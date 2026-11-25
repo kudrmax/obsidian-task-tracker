@@ -10,6 +10,7 @@ export interface StandApi {
 	setDelay(delay: WriteDelay): void;
 	addFromOutside(list: ListKey, title: string): void;
 	moveFromOutside(title: string, list: ListKey, before: string | null): void;
+	removeFromOutside(title: string): void;
 	/** Puts every open screen's ribbon at `stop`, as a scenario's setup. */
 	setStop(stop: Stop): void;
 	/** Chooses a made-up project on every open screen (null: none): a change of context, as the projects panel will make it. */
@@ -26,6 +27,7 @@ export function standApi(source: StandSource, screens: () => readonly MountedScr
 		setDelay: (delay) => source.setDelay(delay),
 		addFromOutside: (list, title) => source.addFromOutside(list, title),
 		moveFromOutside: (title, list, before) => source.moveFromOutside(title, list, before),
+		removeFromOutside: (title) => source.removeFromOutside(title),
 		setStop: (stop) => screens().forEach((screen) => screen.store.getState().setStop(stop)),
 		setProject: (project) => screens().forEach((screen) => screen.store.getState().setContext({ project })),
 		debug: () =>
