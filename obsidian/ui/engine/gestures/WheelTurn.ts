@@ -83,17 +83,17 @@ export function useWheelTurn({ standing, last, step, turned, landed, held }: { r
 		[api],
 	);
 	return useDrag(
-		({ first, last: ended, active, intentional, canceled, xy: [x], timeStamp, cancel, tap }) => {
-			if (first) pressedLong.current = false;
-			if (tap || pressedLong.current) return;
-			/** Still under the drag's threshold yet active: its delay ran out, the press held still all along. */
-			if (!intentional) {
-				if (active && !turn.current) {
+		({ type, last: ended, intentional, canceled, xy: [x], timeStamp, cancel, tap }) => {
+			/** The press itself, and again when the drag's delay runs out with no move: the long press. */
+			if (type === "pointerdown") {
+				if (!intentional) pressedLong.current = false;
+				else if (!turn.current) {
 					pressedLong.current = true;
 					held();
 				}
 				return;
 			}
+			if (tap || pressedLong.current || !intentional) return;
 			if (!turn.current) {
 				if (!api.getState().claim("wheel")) return cancel();
 				turn.current = new WheelTurn(standing(), last, step(), x, timeStamp);

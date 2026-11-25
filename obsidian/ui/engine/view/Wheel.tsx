@@ -1,4 +1,4 @@
-import { type CSSProperties, memo, useRef, useState } from "react";
+import { type CSSProperties, memo, type TouchEvent, useRef, useState } from "react";
 import { DESIGN, PROPERTY } from "../../shared/design";
 import type { IconName } from "../../shared/icons";
 import type { FollowGestures } from "../gestures/FollowRibbon";
@@ -55,6 +55,10 @@ export const Wheel = memo(function Wheel({ at }: { readonly at: FollowGestures["
 			api.getState().openSources();
 		},
 	});
+	/** A finger let go after the long press sends no click: the window just opened under it stays (the mouse's click goes to the wheel it holds). */
+	const endTouch = (event: TouchEvent) => {
+		if (pressedLong.current) event.preventDefault();
+	};
 	const tap = (list: ListId | null) => {
 		if (pressedLong.current) {
 			pressedLong.current = false;
@@ -82,7 +86,7 @@ export const Wheel = memo(function Wheel({ at }: { readonly at: FollowGestures["
 	);
 	return (
 		<>
-			<StripWheel ref={setElement} at={at} last={CALENDAR} held={held} settling={settling} onSettled={() => setSettling(null)} className="tc-seg" role="group" aria-label="Columns" tabIndex={0} onPointerDownCapture={() => (pressedLong.current = false)} {...bind()}>
+			<StripWheel ref={setElement} at={at} last={CALENDAR} held={held} settling={settling} onSettled={() => setSettling(null)} className="tc-seg" role="group" aria-label="Columns" tabIndex={0} onPointerDownCapture={() => (pressedLong.current = false)} onTouchEnd={endTouch} {...bind()}>
 				{face}
 			</StripWheel>
 			<SourcesWindow
