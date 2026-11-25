@@ -617,9 +617,10 @@ describe("the engine's owners", () => {
 		expect(ownerViolations(engineAndStand(), importsOf)).toEqual([]);
 	});
 
-	it("has one DndContext", () => {
+	/** One for the screen; the settings' reorderable rows are a surface of their own, on the same owner (F300, Decision 172). */
+	it("has one DndContext for the screen and one for the settings' rows", () => {
 		const contexts = engineFiles().flatMap((file) => [...withoutComments(source(file)).matchAll(/<DndContext\b/g)].map(() => file));
-		expect(contexts).toHaveLength(1);
+		expect(contexts.sort()).toEqual([`${ENGINE}drag/Drag.tsx`, `${ENGINE}drag/SortableRows.tsx`]);
 	});
 
 	it("touches the page by hand nowhere", () => {

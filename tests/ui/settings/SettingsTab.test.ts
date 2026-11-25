@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { App, Plugin } from "obsidian";
 import { type CalendarService, type GoogleAccount, PRIORITY_COLORS, type ShownCalendar, type WorkCalendarSetup } from "../../../core/application/contracts";
 import { SettingsServiceImpl } from "../../../core/application/SettingsServiceImpl";
@@ -78,6 +78,42 @@ class KnownCalendars implements Pick<CalendarService, "known" | "setShown"> {
 	}
 }
 let calendars: KnownCalendars;
+
+/** A row's height in the page the test lays out: happy-dom lays nothing out, dnd-kit measures the rows. */
+const ROW_PX = 40;
+
+/**
+ * The first row carried by its grip `by` rows down and let go, as a finger does: the rows laid out one under another for
+ * dnd-kit to measure, the pointer's press, moves and lift on the grip's document.
+ */
+async function dragDown(rows: readonly HTMLElement[], by: number): Promise<void> {
+	const tops = new Map(rows.map((row, i) => [row, i * ROW_PX]));
+	const box = (top: number) => ({ top, bottom: top + ROW_PX, left: 0, right: 300, width: 300, height: ROW_PX, x: 0, y: top, toJSON: () => ({}) });
+	const original = HTMLElement.prototype.getBoundingClientRect;
+	HTMLElement.prototype.getBoundingClientRect = function (this: HTMLElement) {
+		const row = this.closest<HTMLElement>(".tc-level-row");
+		const top = row ? tops.get(row) : undefined;
+		return (top === undefined ? box(0) : box(top)) as DOMRect;
+	};
+	try {
+		const grip = rows[0].querySelector<HTMLElement>(".tc-row-grip")!;
+		const at = (y: number) => ({ pointerId: 1, isPrimary: true, button: 0, clientX: 20, clientY: y, bubbles: true });
+		grip.dispatchEvent(new PointerEvent("pointerdown", at(ROW_PX / 2)));
+		const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+		await settle();
+		const end = ROW_PX / 2 + by * ROW_PX + ROW_PX / 4;
+		for (let y = ROW_PX / 2; y <= end; y += ROW_PX / 4) {
+			document.dispatchEvent(new PointerEvent("pointermove", at(y)));
+			await settle();
+		}
+		/** The row it is let go over has slid aside: dnd-kit has measured the rows and found where it goes. */
+		await vi.waitFor(() => expect(rows[by].style.transform).toMatch(/translate3d\(0px, -\d/));
+		document.dispatchEvent(new PointerEvent("pointerup", at(end)));
+		await settle();
+	} finally {
+		HTMLElement.prototype.getBoundingClientRect = original;
+	}
+}
 
 let disk: Disk;
 let settings: PluginSettings<StoredSettings>;
@@ -388,22 +424,16 @@ describe("the settings tab: the sections", () => {
 	});
 
 	it("moves a level by its grip", async () => {
-		const grip = levelRows()[0].querySelector<HTMLElement>(".tc-row-grip")!;
-		await writes(() => {
-			grip.dispatchEvent(new PointerEvent("pointerdown", { pointerId: 1, isPrimary: true, button: 0, bubbles: true }));
-			document.dispatchEvent(new PointerEvent("pointermove", { pointerId: 1, clientY: 10 }));
-			document.dispatchEvent(new PointerEvent("pointerup", { pointerId: 1, clientY: 10 }));
-		}, { priorities: [START.priorities[1], START.priorities[0]] });
+		await dragDown(levelRows(), 1);
+		await writes(() => undefined, { priorities: [START.priorities[1], START.priorities[0]] });
 		expect(levelRows().map((row) => row.querySelector<HTMLInputElement>(".tc-level-prefix")!.value)).toEqual(["p2", "p1"]);
+		await writes(() => type(levelRows()[0].querySelector<HTMLInputElement>(".tc-level-prefix")!, "p9"), { priorities: [{ ...START.priorities[1], prefix: "p9" }, START.priorities[0]] });
 	});
 
 	it("moves a preset by its grip", async () => {
-		const grip = presetRows()[0].querySelector<HTMLElement>(".tc-row-grip")!;
-		await writes(() => {
-			grip.dispatchEvent(new PointerEvent("pointerdown", { pointerId: 1, isPrimary: true, button: 0, bubbles: true }));
-			document.dispatchEvent(new PointerEvent("pointermove", { pointerId: 1, clientY: 10 }));
-			document.dispatchEvent(new PointerEvent("pointerup", { pointerId: 1, clientY: 10 }));
-		}, { groups: { ...START.groups, presets: ["Afternoon", "Evening", "Morning"] } });
+		await dragDown(presetRows(), 2);
+		await writes(() => undefined, { groups: { ...START.groups, presets: ["Afternoon", "Evening", "Morning"] } });
+		expect(presetRows().map((row) => row.querySelector<HTMLInputElement>(".tc-preset-name")!.value)).toEqual(["Afternoon", "Evening", "Morning"]);
 	});
 
 	it("writes No section's name, a blank one as the default", async () => {

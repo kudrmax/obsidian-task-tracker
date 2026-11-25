@@ -1,9 +1,10 @@
-import { ExtraButtonComponent, Notice, Plugin, PluginSettingTab, Setting, TextComponent, type App, type EventRef } from "obsidian";
+import { ExtraButtonComponent, Notice, Plugin, PluginSettingTab, Setting, setIcon, TextComponent, type App, type EventRef } from "obsidian";
 import { type AssistantService, type CalendarService, type CountField, type GoogleAccount, isPresetColor, type LabelColor, type LabelPaint, labelTitle, type Marker, PRIORITY_COLORS, type PresetColor, type PriorityColor, type SectionNames, type SettingsForm, type SettingsService, type Theme, type WorkCalendarSetup } from "../../../core/application/contracts";
 import { inkOf, showPriorityColors, tintOf } from "../paint/priorityColors";
 import { Swatch } from "./Swatch";
 import { el } from "./dom";
-import { RowReorder } from "./RowReorder";
+import { mountSortableRows } from "../engine/drag/SortableRows";
+import { DURATION, tokenMs } from "../shared/design";
 import { SettingsPage } from "./SettingsPage";
 import { AssistantSettingsPage } from "./AssistantPage";
 
@@ -66,6 +67,8 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 	/** The theme the colour rows were drawn in: their circles and codes are that theme's shades. */
 	private drawnTheme: Theme | null = null;
 	private themeWatch: EventRef | null = null;
+	/** The reorderable lists drawn now, each taken off when the tab is drawn anew or closes. */
+	private readonly sortables: (() => void)[] = [];
 
 	constructor(
 		app: App,
@@ -77,6 +80,7 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 
 	override display(): void {
 		const { containerEl } = this;
+		this.takeOffSortables();
 		containerEl.empty();
 		this.drawnTheme = this.theme;
 		this.themeWatch ??= this.app.workspace.on("css-change", () => {
@@ -128,10 +132,35 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 	/** The settings closed: the page shown over them closes too. */
 	override hide(): void {
 		this.closePage();
+		this.takeOffSortables();
 		if (this.themeWatch) this.app.workspace.offref(this.themeWatch);
 		this.themeWatch = null;
 		this.drawnTheme = null;
 		super.hide();
+	}
+
+	private takeOffSortables(): void {
+		for (const off of this.sortables.splice(0)) off();
+	}
+
+	/**
+	 * Rows put in order by their grips on the engine's one drag owner (F300, Decision 172): `fill` draws a row's content
+	 * after its grip, its place in the list read when asked, so a move draws nothing anew.
+	 */
+	private sortableRows(rows: HTMLElement, count: number, rowClass: string, fill: (row: HTMLElement, at: () => number) => void, move: (from: number, to: number) => Promise<void>): void {
+		this.sortables.push(
+			mountSortableRows(rows, {
+				count,
+				rowClass,
+				gripLabel: "Drag to reorder",
+				glide: { duration: tokenMs(rows, DURATION.snap), easing: "var(--tc-ease-out)" },
+				fill: (row, grip, at) => {
+					setIcon(grip, "menu");
+					fill(row, at);
+				},
+				move: (from, to) => void move(from, to),
+			}),
+		);
 	}
 
 	/** Closes the page shown, if any: with the settings, and when the plugin unloads. */
@@ -168,7 +197,7 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 			typed: (index, text) => this.service.typedColour("level", index, text, this.shades),
 			remove: (index) => this.service.removeLevel(index),
 			move: (from, to) => this.service.moveLevel(from, to),
-			preview: (index, color) => showPriorityColors(levels.map((level, i) => (i === index ? { ...level, color } : level)), this.settings.labels),
+			preview: (index, color) => showPriorityColors(this.settings.priorities.map((level, i) => (i === index ? { ...level, color } : level)), this.settings.labels),
 			deleteTooltip: "Delete level",
 		});
 		new Setting(group)
@@ -189,7 +218,7 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 			typed: (index, text) => this.service.typedColour("label", index, text, this.shades),
 			remove: (index) => this.service.removeLabel(index),
 			move: (from, to) => this.service.moveLabel(from, to),
-			preview: (index, color) => showPriorityColors(this.settings.priorities, labels.map((label, i) => (i === index ? { ...label, color } : label))),
+			preview: (index, color) => showPriorityColors(this.settings.priorities, this.settings.labels.map((label, i) => (i === index ? { ...label, color } : label))),
 			deleteTooltip: "Delete label",
 		});
 		new Setting(group)
@@ -213,11 +242,9 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 	private colourRows<C extends LabelColor>(group: HTMLElement, spec: ColourRows<C>): void {
 		const rows = group.createDiv("tc-level-rows");
 		wrapWhenNarrow(rows);
-		const reorder = new RowReorder(rows, (from, to) => void this.redrawn(spec.move(from, to)));
-		spec.rows.forEach((level, index) => {
-			const row = rows.createDiv("setting-item tc-level-row");
-			reorder.grip(row, index);
-			const name = new TextComponent(row).setValue(level.name).onChange((value) => void spec.rename(index, value));
+		this.sortableRows(rows, spec.rows.length, "setting-item tc-level-row", (row, at) => {
+			const level = spec.rows[at()];
+			const name = new TextComponent(row).setValue(level.name).onChange((value) => void spec.rename(at(), value));
 			name.inputEl.addClass(spec.nameClass);
 			const swatches = row.createDiv("tc-swatches");
 			for (const color of spec.swatches) {
@@ -225,7 +252,7 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 				const swatch = new Swatch(swatches, {
 					label: tint ?? "No colour",
 					cls: tint ? undefined : "tc-swatch-clear",
-					onPress: () => void this.redrawn(spec.recolour(index, color)),
+					onPress: () => void this.redrawn(spec.recolour(at(), color)),
 				});
 				if (tint) swatch.el.dataset.priority = tint;
 				swatch.setOn(color === level.color);
@@ -247,7 +274,7 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 			el(preview, "span", "tc-progress-dot");
 			el(preview, "span", "tc-level-preview-title", "Call mom");
 			el(preview, "span", "tc-level-preview-time", "10:00");
-			new ExtraButtonComponent(row).setIcon("trash-2").setTooltip(spec.deleteTooltip).onClick(() => void this.redrawn(spec.remove(index)));
+			new ExtraButtonComponent(row).setIcon("trash-2").setTooltip(spec.deleteTooltip).onClick(() => void this.redrawn(spec.remove(at())));
 			const paint = (color: C | PriorityColor) => {
 				const tint = tintOf(color);
 				if (tint) preview.dataset.priority = tint;
@@ -260,7 +287,7 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 			paint(level.color);
 			code.setValue(codeOf(level.color));
 			const show = (color: C | PriorityColor, withCode?: TextComponent) => {
-				spec.preview(index, color);
+				spec.preview(at(), color);
 				paint(color);
 				withCode?.setValue(codeOf(color));
 			};
@@ -270,21 +297,21 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 			});
 			picker.addEventListener("change", () => {
 				const color = this.colorOf(picker.value);
-				if (color) void this.redrawn(spec.recolour(index, color));
+				if (color) void this.redrawn(spec.recolour(at(), color));
 			});
 			code.onChange((value) => {
 				const color = this.colorOf(value);
 				if (color) show(color);
 			});
 			code.inputEl.addEventListener("blur", () => {
-				const color = spec.typed(index, code.getValue());
-				if (color) void this.redrawn(spec.recolour(index, color));
+				const color = spec.typed(at(), code.getValue());
+				if (color) void this.redrawn(spec.recolour(at(), color));
 				else show(level.color, code);
 			});
 			code.inputEl.addEventListener("keydown", (e) => {
 				if (e.key === "Enter") code.inputEl.blur();
 			});
-		});
+		}, (from, to) => spec.move(from, to));
 	}
 
 	private get theme(): Theme {
@@ -305,14 +332,12 @@ export class TaskCalendarSettingsTab extends PluginSettingTab {
 	private sectionsGroup(el: HTMLElement): void {
 		new Setting(el).setName("Sections").setHeading();
 		const rows = el.createDiv("tc-preset-rows");
-		const reorder = new RowReorder(rows, (from, to) => void this.redrawn(this.service.movePreset(from, to)));
-		this.settings.presets.forEach((name, index) => {
-			const row = rows.createDiv("setting-item tc-level-row tc-preset-row");
-			reorder.grip(row, index);
-			const field = new TextComponent(row).setValue(name).onChange((value) => void this.service.renamePreset(index, value));
+		const presets = this.settings.presets;
+		this.sortableRows(rows, presets.length, "setting-item tc-level-row tc-preset-row", (row, at) => {
+			const field = new TextComponent(row).setValue(presets[at()]).onChange((value) => void this.service.renamePreset(at(), value));
 			field.inputEl.addClass("tc-preset-name");
-			new ExtraButtonComponent(row).setIcon("trash-2").setTooltip("Delete preset").onClick(() => void this.redrawn(this.service.removePreset(index)));
-		});
+			new ExtraButtonComponent(row).setIcon("trash-2").setTooltip("Delete preset").onClick(() => void this.redrawn(this.service.removePreset(at())));
+		}, (from, to) => this.service.movePreset(from, to));
 		new Setting(el)
 			.setDesc("While a task is dragged, presets the list doesn’t have yet show under it as places to drop, in this order.")
 			.addButton((b) => b.setButtonText("Add preset").onClick(() => void this.redrawn(this.service.addPreset())));

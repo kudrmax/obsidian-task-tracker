@@ -221,6 +221,11 @@ export class ToggleComponent {
 	}
 }
 
+/** Obsidian's icon in `el`: the fake names it. */
+export function setIcon(el: HTMLElement, name: string): void {
+	el.dataset.icon = name;
+}
+
 export class ExtraButtonComponent {
 	readonly extraSettingsEl: HTMLElement;
 
