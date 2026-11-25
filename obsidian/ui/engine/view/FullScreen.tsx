@@ -69,6 +69,10 @@ function FullColumn({ task, notesFocus }: { readonly task: FullTask; readonly no
 	const api = useScreenApi();
 	const at = useScreen((s) => s.fullAt);
 	const entrySeq = useScreen((s) => s.entrySeq);
+	/** The caret goes into the notes only on a new ask (Notes, Add description), never as the editor is made again for a change read back. */
+	const asked = useRef(0);
+	const focus = notesFocus > asked.current;
+	asked.current = notesFocus;
 	return (
 		<div className="tc-full-column">
 			{task.parent ? (
@@ -85,7 +89,7 @@ function FullColumn({ task, notesFocus }: { readonly task: FullTask; readonly no
 				</button>
 			) : null}
 			<FullList task={task} />
-			<FullNotes key={`${task.id}:${task.notes.seq}:${notesFocus}`} text={task.notes.text} focus={notesFocus > 0} />
+			<FullNotes key={`${task.id}:${task.notes.seq}:${notesFocus}`} text={task.notes.text} focus={focus} />
 		</div>
 	);
 }
@@ -111,7 +115,7 @@ function FullCard({ row, task }: { readonly row: FullRow; readonly task: FullTas
 			<button
 				type="button"
 				className="tc-pick"
-				aria-label="Done"
+				aria-label={row.open ? "Done" : "Not done"}
 				onClick={(event) => {
 					event.stopPropagation();
 					api.getState().tick(row.id);

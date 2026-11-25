@@ -10,7 +10,7 @@ import { menuButton, menuNow } from "../lib/menu.mjs";
 export default {
 	name: "e28-full-screen",
 	features: ["Step 7 C: the full-screen task (F239–F249)"],
-	cases: ["tree and circles", "levels and close", "plus", "notes in the copy"],
+	cases: ["tree and circles", "levels and close", "plus", "notes in the copy", "keys"],
 	async run(t, item) {
 		const tap = (p) => (t.platform === "phone" ? t.input.tap(p.x, p.y) : t.input.click(p.x, p.y));
 		const key = async (k, code = k, vk = 0) => {
@@ -79,6 +79,22 @@ export default {
 			else await pressAt(".tc-sheet-bar > button");
 			await t.sleep(400);
 			t.expect((await sheet()) === null && !(await t.cdp.eval(`!!document.querySelector(".tc-full")`)), `${t.platform === "desktop" ? "Escape" : "Close"} returns to the main screen`);
+		}
+		if (item === "keys") {
+			if (t.platform !== "desktop") return;
+			for (let i = 0; i < 12; i++) await key("Tab", "Tab", 9);
+			t.expect(await t.cdp.eval(`!!document.activeElement?.closest(".tc-full")`), "Tab goes round the sheet's own controls");
+			/** Tabbed into the notes, the bottom row gives way to Done: Done puts the typing away. */
+			if (await t.cdp.eval(`!!document.querySelector(".tc-full.is-typing")`)) await pressAt(".tc-sheet-bar > button:last-child");
+			await pressAt(".tc-full .tc-more-open");
+			await press("Delete");
+			const asked = await menuNow(t);
+			t.expect(asked?.question?.startsWith("Delete"), `Delete asks: ${JSON.stringify(asked?.question)} focus ${asked?.focused}`);
+			await t.cdp.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13, text: "\r" });
+			await t.cdp.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13 });
+			await t.sleep(600);
+			t.expect(!(await t.file()).includes("Спланировать отпуск"), "the menu over the sheet takes the keys: Enter confirms Delete");
+			t.expect((await sheet()) === null, "the task gone, the sheet closes");
 		}
 		if (item === "plus") {
 			await pressAt(".tc-full button.tc-plus");

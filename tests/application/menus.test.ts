@@ -268,3 +268,12 @@ describe("the order of the groups", () => {
 		expect(taskMenu([item(), item()], T, [], [], null, { kind: "bulk" }).groups).toEqual(order);
 	});
 });
+
+describe("the notes by one task's menu", () => {
+	it("stand by its copy, but not in the menu of the task the full screen shows, whose notes stand on the screen", () => {
+		const task = item({ description: "- заметка" });
+		expect(taskMenu([task], T, [], [], null, { kind: "task", from: "day" }).peek?.id).toBe(task.id);
+		expect(taskMenu([task], T, [], [], null, { kind: "task", from: "fullSubtask" }).peek?.id).toBe(task.id);
+		expect(taskMenu([task], T, [], [], null, { kind: "task", from: "full" }).peek).toBeNull();
+	});
+});

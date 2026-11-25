@@ -205,14 +205,15 @@ describe("renaming a section", () => {
 describe("the description over a folded card's menu", () => {
 	const screenOf = async (svc: TaskServiceImpl) => ({ today: T, day: T, offer: await svc.sectionOffer(T) });
 	/** Max, 11-17: a folded card shows its next step, so the description by its menu is the step's, never the whole task's. */
-	it("is the shown step's; a step without one shows none", async () => {
+	it("is the shown step's; a step without one shows none, nor the full screen's own menu, whose notes stand on the screen", async () => {
 		const { svc } = setup("## Now\n\n- [ ] Порядок 📁\n  План целиком\n  - [ ] Проверить\n    Что проверить\n  - [ ] Раскидать\n");
 		const [folded] = (await svc.dayView(T)).list;
 		const screen = await screenOf(svc);
 		expect(svc.menu(folded, "day", screen).peek?.text).toBe("Проверить");
 		expect(svc.menu(folded, "day", screen).peek?.description).toBe("Что проверить");
 		expect(svc.menu(folded, "timeline", screen).peek?.text).toBe("Проверить");
-		expect(svc.menu(folded, "full", screen).peek?.text).toBe("Порядок");
+		expect(svc.menu(folded, "full", screen).peek).toBeNull();
+		expect(svc.menu(folded, "full", screen).statusTasks[0]?.text).toBe("Порядок");
 		expect(svc.bulkMenu([{ item: folded, from: "day" }], screen).peek).toBeNull();
 		const { svc: bare } = setup("## Now\n\n- [ ] Порядок 📁\n  План целиком\n  - [ ] Проверить\n");
 		const [plain] = (await bare.dayView(T)).list;

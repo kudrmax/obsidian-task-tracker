@@ -498,7 +498,13 @@ export class CorePort implements ScreenPort {
 	private async open(id: string, item: TaskItem | null, row: string): Promise<string | null> {
 		const event = this.shared.eventNamed(id);
 		if (row === "calendar" && event) this.core.opens.event(event);
-		if (row === "openInObsidian" && item) await this.core.opens.line(await this.core.tasks.lineOf(item.key));
+		if (row === "openInObsidian" && item) {
+			try {
+				await this.core.opens.line(await this.core.tasks.lineOf(item.key));
+			} catch (error) {
+				this.core.onError(error);
+			}
+		}
 		return item ? id : null;
 	}
 

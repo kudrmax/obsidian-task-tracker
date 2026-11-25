@@ -804,7 +804,7 @@ export interface TaskMenuModel<Id extends TaskActionId = TaskActionId> {
 	/**
 	 * The task whose description stands by one task's menu, a tap on it opening that task on the whole screen: the task
 	 * the status tiles write (a folded card's shown step, else the task itself), when it has a description. Null without
-	 * one, and in the bulk menu.
+	 * one, in the bulk menu, and in the menu of the task the full screen shows (its «⋯»: the notes stand on the screen).
 	 */
 	readonly peek: TaskItem | null;
 	/** In the settings' order; `disabled` while none of the tasks may have a priority (they carry labels). */

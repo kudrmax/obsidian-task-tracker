@@ -1051,7 +1051,7 @@ const REPEAT_PAGE: Readonly<Record<string, Handler>> = {
 const DESCRIPTION: Readonly<Record<string, Handler>> = {
 	open: (_c, [description]) => descriptionOpen((description ?? null) as string | null),
 	typed: (_c, [state]) => descriptionTyped(state as A),
-	save: (_c, [state]) => descriptionSave(state as A),
+	save: (_c, [state, text]) => descriptionSave(state as A, text === undefined || text === null ? undefined : String(text)),
 	read: (_c, [state, description, editor]) => descriptionRead(state as A, (description ?? null) as string | null, editor as A),
 };
 

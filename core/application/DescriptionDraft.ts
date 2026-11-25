@@ -24,10 +24,12 @@ export function descriptionTyped(state: DescriptionState): DescriptionState {
 
 /**
  * Whether what the editor holds is written now: only once something was typed in it since the last write, so an editor
- * left untouched never writes an old text back over a change made elsewhere.
+ * left untouched never writes an old text back over a change made elsewhere. `text`, what the editor holds: once it is
+ * written it is the file's, so reading it back is no change made elsewhere (without it, as before: the old file kept).
  */
-export function descriptionSave(state: DescriptionState): { readonly state: DescriptionState; readonly write: boolean } {
-	return { state: { ...state, typed: false }, write: state.typed };
+export function descriptionSave(state: DescriptionState, text?: string): { readonly state: DescriptionState; readonly write: boolean } {
+	const write = state.typed;
+	return { state: { file: write && text !== undefined ? text : state.file, typed: false }, write };
 }
 
 /**
@@ -56,9 +58,9 @@ export class DescriptionDraft {
 		this.state = descriptionTyped(this.state);
 	}
 
-	/** True: write what the editor holds now. */
-	save(): boolean {
-		const next = descriptionSave(this.state);
+	/** True: write what the editor holds now, `text`, which is the file's from then on. */
+	save(text?: string): boolean {
+		const next = descriptionSave(this.state, text);
 		this.state = next.state;
 		return next.write;
 	}

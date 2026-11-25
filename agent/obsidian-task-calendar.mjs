@@ -3333,7 +3333,7 @@ function taskMenu(items, today, levels, labels, offer, of = A_LIST_CARD, project
     repeatOf: repeatOf(items, today),
     statuses: menuStatuses(layout),
     statusTasks: statusFor,
-    peek: of.kind === "task" && statusFor[0]?.description != null ? statusFor[0] : null,
+    peek: of.kind === "task" && of.from !== "full" && statusFor[0]?.description != null ? statusFor[0] : null,
     levels: { tiles: levels.map((level) => ({ level, on: levelOn(items, level.prefix) })), disabled: priorityHolders(items).length === 0 },
     labels: { tiles: labels.map((label) => ({ label, on: labelOn(items, label.name) })), disabled: labelHolders(items).length === 0 },
     moves,
@@ -6789,8 +6789,9 @@ function descriptionOpen(description) {
 function descriptionTyped(state) {
   return { ...state, typed: true };
 }
-function descriptionSave(state) {
-  return { state: { ...state, typed: false }, write: state.typed };
+function descriptionSave(state, text) {
+  const write = state.typed;
+  return { state: { file: write && text !== void 0 ? text : state.file, typed: false }, write };
 }
 function descriptionRead(state, description, editor) {
   const elsewhere = description !== state.file;
@@ -11503,7 +11504,7 @@ var REPEAT_PAGE = {
 var DESCRIPTION = {
   open: (_c, [description]) => descriptionOpen(description ?? null),
   typed: (_c, [state]) => descriptionTyped(state),
-  save: (_c, [state]) => descriptionSave(state),
+  save: (_c, [state, text]) => descriptionSave(state, text === void 0 || text === null ? void 0 : String(text)),
   read: (_c, [state, description, editor]) => descriptionRead(state, description ?? null, editor)
 };
 var NOTES = {

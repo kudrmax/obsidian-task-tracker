@@ -34,4 +34,12 @@ describe("the full screen's description editor", () => {
 		expect(draft.read("- c", idle)).toBeNull();
 		expect(draft.read("- d", idle)).toBe("- d");
 	});
+
+	it("its own write read back is no change made elsewhere: the editor keeps its text", () => {
+		const draft = new DescriptionDraft("- a");
+		draft.typed();
+		expect(draft.save("- a и ещё")).toBe(true);
+		expect(draft.read("- a и ещё", idle)).toBeNull();
+		expect(draft.read("- b", idle)).toBe("- b");
+	});
 });

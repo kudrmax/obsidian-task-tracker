@@ -51,7 +51,11 @@ export class FullScreens {
 	async tick(id: string): Promise<void> {
 		const item = this.reader().item(id);
 		if (!item) return;
-		await this.tasks.toggleDone(item.key);
+		try {
+			await this.tasks.toggleDone(item.key);
+		} catch (error) {
+			this.onError(error);
+		}
 		await this.written();
 	}
 
@@ -98,7 +102,7 @@ export class FullScreens {
 		if (open.timer !== null) clearTimeout(open.timer);
 		open.timer = null;
 		const item = this.reader().item(id);
-		if (!item || !open.draft.save()) return;
+		if (!item || !open.draft.save(open.text)) return;
 		try {
 			await this.tasks.setDescription(item.key, open.text);
 			await this.written();

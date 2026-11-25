@@ -424,7 +424,8 @@ export function BarPanel({ open, onClose, reference, capsule, away, className, c
 
 /**
  * A sheet over the whole screen (the full-screen task, F239): one layer of the layer stack, a Floating UI element with
- * the menu's transition status (`is-shown`, `is-closing`, mounted while it fades); Escape closes it while `escapes` (no
+ * the menu's transition status (`is-shown`, `is-closing`, mounted while it fades) and its focus kept inside
+ * (`FloatingFocusManager`: Tab goes round the sheet's own controls); Escape closes it while `escapes` (no
  * menu over it, nothing typed in it: `useDismiss`, the key table takes no Escape then). It stands in the screen's own
  * element, under the menus' layers.
  */
@@ -439,8 +440,10 @@ export function Sheet({ open, onClose, escapes, className, children }: { readonl
 	const { isMounted, status } = useTransitionStatus(context, { duration: { open: LAYER_MS.open, close: LAYER_MS.close } });
 	if (!isMounted) return null;
 	return (
-		<div ref={refs.setFloating} className={`tc-sheet ${className}${motionClass(status, true)}`} {...getFloatingProps()}>
-			{children}
-		</div>
+		<FloatingFocusManager context={context} modal initialFocus={refs.floating} returnFocus={false} closeOnFocusOut={false}>
+			<div ref={refs.setFloating} tabIndex={-1} className={`tc-sheet ${className}${motionClass(status, true)}`} {...getFloatingProps()}>
+				{children}
+			</div>
+		</FloatingFocusManager>
 	);
 }
