@@ -362,7 +362,9 @@ export function Drag({ doc, carried, plus, onLift, children }: DragProps) {
 		if (container === null) return api.getState().setLiftedDepth(null);
 		if (container === CALENDAR) return api.getState().setLiftedDepth(0);
 		const allowed = (wanted: number) => (lifted.id === PLUS ? plusLevel(lifted, over, wanted) : projected(lifted, over, wanted)) ?? 0;
-		api.getState().setLiftedDepth(sideLevel(event, spotKey(container, orderAfter(lifted, over), String(lifted.id)), allowed));
+		const depth = sideLevel(event, spotKey(container, orderAfter(lifted, over), String(lifted.id)), allowed);
+		api.getState().setLiftedDepth(depth);
+		if (lifted.id !== PLUS) api.getState().aim(String(lifted.id), { list: container as ListId, ...slotOf(rowsOf(container), orderAfter(lifted, over), String(lifted.id)), dayOffset: api.getState().dayOffset, depth });
 	};
 
 	const start = (event: DragStartEvent) => {

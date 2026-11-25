@@ -136,6 +136,10 @@ function CardInsides({ face, block, onFold }: { readonly face: Face; readonly bl
 					<span className="tc-due-day">{face.due.day}</span>
 					<span className="tc-due-mon">{face.due.month}</span>
 				</span>
+			) : face.stage ? (
+				<span className="tc-stage-mark">
+					<Icon name={face.stage} />
+				</span>
 			) : null}
 		</>
 	);

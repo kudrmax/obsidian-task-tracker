@@ -1,5 +1,5 @@
 import { DESIGN } from "../../shared/design";
-import type { ListId } from "../port";
+import type { FunnelList, ListId } from "../port";
 import type { Screen } from "../store";
 
 /** Where the ribbon stands: Inbox–Soon, Soon–the day, the day–its calendar. */
@@ -13,7 +13,7 @@ export type Place = "leaf" | "note";
 export const ROW_PX = DESIGN.cardHeight + DESIGN.cardGap;
 
 /** The strip of columns the ribbon slides, left to right: the first is Inbox over Backlog. */
-export type Column = Exclude<ListId, "backlog"> | "timeline";
+export type Column = Exclude<FunnelList, "backlog"> | "timeline";
 const STRIP: readonly Column[] = ["inbox", "soon", "day", "timeline"];
 
 /** The lists a column of the strip shows: Inbox over Backlog in the first, one list in the others, none on the calendar. */
@@ -35,19 +35,26 @@ export function shownAt(stop: Stop): readonly [Column, Column] {
 /** Every list, as the modes without the ribbon show them side by side or stacked (All columns, Rows; F16, F17). */
 const ALL_LISTS: readonly ListId[] = ["inbox", "backlog", "soon", "day"];
 
+/** How the main screen lays its lists out: the ribbon's two columns, every funnel list at once (All columns, Rows), or By project's one list. */
+export type Lists = "ribbon" | "all" | "byProject";
+
 /**
  * What each stop shows (the one place it is said): the lists a screen mounted at `place` shows at `stop`; a note's block
- * shows its Inbox alone; a mode that is no ribbon (`ribbon` false) every list at once.
+ * shows its Inbox alone; a mode that is no ribbon every list at once, By project its one list.
  */
-export function columnsOf(place: Place, stop: Stop, ribbon = true): readonly ListId[] {
+export function columnsOf(place: Place, stop: Stop, lists: Lists = "ribbon"): readonly ListId[] {
 	if (place === "note") return ["inbox"];
-	return ribbon ? shownAt(stop).flatMap((column) => LISTS_OF[column]) : ALL_LISTS;
+	if (lists === "byProject") return ["projects"];
+	return lists === "ribbon" ? shownAt(stop).flatMap((column) => LISTS_OF[column]) : ALL_LISTS;
 }
 
 /** The lists a screen mounted at `place` can bring into sight: the ribbon turns to any; a note's block shows its Inbox. */
-export function reachOf(place: Place, ribbon = true): readonly ListId[] {
-	return [...new Set(STOPS.flatMap((stop) => columnsOf(place, stop, ribbon)))];
+export function reachOf(place: Place, lists: Lists = "ribbon"): readonly ListId[] {
+	return [...new Set(STOPS.flatMap((stop) => columnsOf(place, stop, lists)))];
 }
+
+/** How a view lays its lists out. */
+export const listsOf = (view: { readonly mode: string; readonly ribbon: boolean }): Lists => (view.mode === "byProject" ? "byProject" : view.ribbon ? "ribbon" : "all");
 
 /** The stop that brings `list` into sight from `stop`: the same while it shows it, else the last of the lists' own stops (Inbox–Soon, Soon–day) that does. */
 export function stopShowing(stop: Stop, list: ListId): Stop {

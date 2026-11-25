@@ -1,6 +1,7 @@
 import { type DayService, type DropColumn, type EntryList, type EntryState, type LocalDate, type MenuProject, type ProjectsNodeId, type Placement, type QuickEntryView, QuickEntrySession, type ScreenReader, type TaskItem, type TaskService, type WriteLine } from "../../core/application/contracts";
 import type { WriteQueue } from "./WriteQueue";
-import type { Destination, EntryBar, EntryCommit, EntryDraft, EntryField, ListId, MenuFrom, PlaceId, RenameStart } from "../ui/engine/port";
+import type { Destination, EntryBar, EntryCommit, EntryDraft, EntryField, FunnelList, ListId, MenuFrom, PlaceId, RenameStart } from "../ui/engine/port";
+import type { ProjectsList } from "./ProjectsList";
 import { ListCards } from "./ListCards";
 import { projectPageOf } from "./menuModel";
 import type { ScreenDrawing } from "./ScreenDrawing";
@@ -43,6 +44,10 @@ export class CoreEntry {
 		/** The one write queue every screen's field writes through, in the order typed. */
 		private readonly queue: WriteQueue,
 		private readonly filter: () => { readonly node: ProjectsNodeId; readonly project: string | null } | null = () => null,
+		/** By project's list as the screen draws it; null while the mode draws none. */
+		private readonly projects: () => ProjectsList | null = () => null,
+		/** The task a card of the screen names (By project's rows by their own ids). */
+		private readonly taskOf: (id: string) => TaskItem | null = (id) => this.reader().item(id),
 	) {
 		this.look = { date: core.days.today(), shown: ENTRY_LISTS };
 		const counted: WriteLine = {
@@ -251,10 +256,11 @@ export class CoreEntry {
 	/** What the quick entry reads of the screen: each list's cards and sections as the core's held read draws them on `look`'s day. */
 	private viewOf(look: Look): QuickEntryView {
 		const column = (list: EntryList) => this.drawing.column(this.reader().screen(look.date), list as DropColumn);
-		const cards = (list: EntryList) => (list === "projects" ? [] : new ListCards(column(list)).cards);
+		const cards = (list: EntryList) => (list === "projects" ? (this.projects()?.entryLook().cards ?? []) : new ListCards(column(list)).cards);
 		return {
 			cards,
-			sections: (list) => (list === "projects" ? [] : column(list).groups.filter((group) => group.header).map((group) => group.name)),
+			sections: (list) => (list === "projects" ? (this.projects()?.entryLook().sections ?? []) : column(list).groups.filter((group) => group.header).map((group) => group.name)),
+			parts: (list) => (list === "projects" ? (this.projects()?.entryLook().parts ?? []) : []),
 			sectioned: (list) => list !== "projects" && column(list).sections !== null,
 			day: () => look.date,
 			today: () => this.core.days.today(),
@@ -269,6 +275,7 @@ export class CoreEntry {
 	}
 
 	private cards(list: ListId, dayOffset: number): ListCards {
+		if (list === "projects") return this.projects()?.cards() ?? new ListCards({ groups: [] });
 		const date = this.dateOf(dayOffset);
 		return new ListCards(this.drawing.column(this.reader().screen(date), list));
 	}
@@ -278,12 +285,13 @@ export class CoreEntry {
 		return { kind: choice };
 	}
 
-	private placementOfList(list: ListId, dayOffset: number): Placement {
-		return list === "day" ? this.core.tasks.placementOfDay(this.dateOf(dayOffset)) : { kind: list };
+	private placementOfList(list: ListId, dayOffset: number): Placement | null {
+		if (list === "projects") return null;
+		return list === "day" ? this.core.tasks.placementOfDay(this.dateOf(dayOffset)) : { kind: list satisfies Exclude<FunnelList, "day"> };
 	}
 
 	private item(id: string): TaskItem {
-		const item = this.reader().item(id);
+		const item = this.taskOf(id);
 		if (!item) throw new Error(`no task ${id}`);
 		return item;
 	}

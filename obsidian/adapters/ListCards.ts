@@ -1,5 +1,10 @@
-import { type ColumnList, fitLevel, type GapPlace, type GroupName, type ListCard, type ListPlace, placeOfDrop } from "../../core/application/contracts";
+import { fitLevel, type GapPlace, type GroupName, type ListCard, type ListPlace, placeOfDrop } from "../../core/application/contracts";
 import type { Destination } from "../ui/engine/port";
+
+/** A list's groups as `ListCards` reads them: a funnel column's (`ColumnList`), or By project's parts (`ProjectsList`). */
+export interface CardGroups {
+	readonly groups: readonly { readonly id: string; readonly name: GroupName; readonly header: boolean; readonly rows: readonly { readonly item: { readonly id: string; readonly key: ListCard["key"] }; readonly level: number }[] }[];
+}
 
 /**
  * A column's cards as the core's nesting rules read them (`ListCard`: a level, a section, a key), and the gap a
@@ -17,7 +22,7 @@ export class ListCards {
 	/** Where the card left out stood among the others: letting it go there changes nothing. */
 	private readonly home: GapPlace | null = null;
 
-	constructor(column: ColumnList, without: string | null = null) {
+	constructor(column: CardGroups, without: string | null = null) {
 		const cards: ListCard[] = [];
 		const names = new Map<string, GroupName>();
 		const ids = new Map<GroupName, string>();

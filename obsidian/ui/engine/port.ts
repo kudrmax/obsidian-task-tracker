@@ -14,8 +14,14 @@ export type { DividerStop, EntryBarGroup, FieldActionId, FieldGroup, ListWidths,
  * made-up tasks (`MockPort`); part 2 serves it over the core. It grows step by step with the engine.
  */
 
-/** A list the screen shows: Inbox, Backlog under it, Soon, the shown day's. */
-export type ListId = "inbox" | "backlog" | "soon" | "day";
+/** A list of the funnel: Inbox, Backlog under it, Soon, the shown day's. */
+export type FunnelList = "inbox" | "backlog" | "soon" | "day";
+
+/** A list the screen shows: the funnel's, or By project's (F229), the chosen node's tasks in parts; empty in other modes. */
+export type ListId = FunnelList | "projects";
+
+/** Where a card of By project stands in the funnel (F232): the stage's mark on its right; a dated Soon task shows its date instead (`due`). */
+export type StageMark = "inbox" | "backlog" | "soon" | "now" | "done";
 
 /** A card as it is drawn. */
 export interface CardFace {
@@ -36,6 +42,8 @@ export interface CardFace {
 	readonly step: string | null;
 	/** Its subtasks are folded away under its card: a card peeks out under it in a list (F81). */
 	readonly folded: boolean;
+	/** By project's mark of its stage, in the date's place (F232); null elsewhere. */
+	readonly stage: StageMark | null;
 }
 
 /** A row of a list, top to bottom: a task's card at its depth (0 a task, 1 its subtask…), or a section's header. */
@@ -53,6 +61,10 @@ export interface SectionRow {
 	/** The tasks outside any section: its name in the quieter ink. */
 	readonly ungrouped: boolean;
 	readonly menu: { readonly rename: boolean; readonly remove: boolean } | null;
+	/** By project: the No tasks plate under an empty part's header (F233), its words; null for none. A tap on it types a new task there. */
+	readonly plate: string | null;
+	/** A long press lifts it to move the section with its tasks (F63): a list's section; never a part of By project. */
+	readonly lifts: boolean;
 }
 
 export interface ListData {
@@ -497,6 +509,8 @@ export interface ScreenPort {
 	 * the write's read-back. Writes made and not yet read back are in it already.
 	 */
 	preview(id: string, to: Destination, context?: ScreenContext): ScreenData;
+	/** The carried task's place as it stands now, told as it changes: a port whose previews take a read of the file readies that one, so the drop draws it at once (By project's). */
+	ready(id: string, to: Destination): void;
 	/** Whether `to` takes the task: a place that refuses opens no place for it, and the card's place stays where it was. */
 	takes(id: string, to: Destination): boolean;
 	/** Whether letting the task go at `to` changes anything: false where it stands already (a card let go where it was lifted, a block at its own minute), and nothing is written. */

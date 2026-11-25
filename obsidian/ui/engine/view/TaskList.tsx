@@ -208,10 +208,19 @@ function SectionHead({ list, row }: { readonly list: ListId; readonly row: Secti
 			</div>
 		);
 	return (
-		<SortableRow id={row.id} lifts onTap={row.menu ? (target) => openSectionMenu(list, row.id, pressedIn(target, ".tc-group-head")) : undefined}>
+		<SortableRow id={row.id} lifts={row.lifts} onTap={row.menu ? (target) => openSectionMenu(list, row.id, pressedIn(target, ".tc-group-head")) : undefined}>
 			<div className={`tc-group-head${row.ungrouped ? " is-ungrouped" : ""}`}>
 				<span className="tc-group-name">{row.title}</span>
 			</div>
+			{row.plate === null ? null : (
+				/** An empty part of By project says so under its header (F233); a tap types a new task in it. */
+				<div className="tc-group-empty" role="button" onClick={(event) => {
+					event.stopPropagation();
+					api.getState().openEntry({ list, before: null, section: row.id, dayOffset: api.getState().dayOffset });
+				}}>
+					{row.plate}
+				</div>
+			)}
 		</SortableRow>
 	);
 }

@@ -1,17 +1,20 @@
 import { bgAlphaFor, cardDue, type CalendarEvent, type CalendarService, type ColumnList, type DayEvents, type DayService, dayTitle, type DropColumn, dueLabel, durationParts, eventColors, eventHex, type LocalDate, type ScreenView, type TaskItem, type TaskService, timeParts } from "../../core/application/contracts";
-import type { AllDayEvent, Block, CardFace, DayEvent, EventPaint, ListData, ListId, Row, ScreenData } from "../ui/engine/port";
+import type { AllDayEvent, Block, CardFace, DayEvent, EventPaint, FunnelList, ListData, Row, ScreenData } from "../ui/engine/port";
 
 /** What a screen of `date` is drawn from: the core's screen, its lists as `columnView` reads them, and the day's events. */
 export interface ScreenSource {
 	readonly date: LocalDate;
 	readonly screen: ScreenView;
-	readonly lists: Readonly<Record<ListId, ColumnList>>;
+	readonly lists: Readonly<Record<FunnelList, ColumnList>>;
 	readonly events: DayEvents | null;
 	/** A task held by a dot, drawn at the span the core stretches it to instead of its own. */
 	readonly held?: { readonly id: string; readonly start: number; readonly end: number | null };
 }
 
-const LIST_COLUMNS: Readonly<Record<ListId, DropColumn>> = { inbox: "inbox", backlog: "backlog", soon: "soon", day: "day" };
+/** By project's list where the mode doesn't draw it: nothing. */
+const NO_LIST: ListData = { title: "", rows: [], plate: null };
+
+const LIST_COLUMNS: Readonly<Record<FunnelList, DropColumn>> = { inbox: "inbox", backlog: "backlog", soon: "soon", day: "day" };
 
 /**
  * The core's answers in the engine's words (`engine/port.ts`): each list as `columnView` reads it, each card as its
@@ -31,7 +34,7 @@ export class ScreenDrawing {
 		return this.tasks.columnView(screen, column);
 	}
 
-	listsOf(screen: ScreenView): Readonly<Record<ListId, ColumnList>> {
+	listsOf(screen: ScreenView): Readonly<Record<FunnelList, ColumnList>> {
 		return { inbox: this.column(screen, LIST_COLUMNS.inbox), backlog: this.column(screen, LIST_COLUMNS.backlog), soon: this.column(screen, LIST_COLUMNS.soon), day: this.column(screen, LIST_COLUMNS.day) };
 	}
 
@@ -46,6 +49,7 @@ export class ScreenDrawing {
 				backlog: this.list(this.tasks.listName("backlog"), lists.backlog, screen, cards, null, plate),
 				soon: this.list(this.tasks.listName("soon"), lists.soon, screen, cards, null, plate),
 				day: this.list(title, lists.day, screen, cards, date, plate),
+				projects: NO_LIST,
 			},
 			cards,
 			missing: screen.missing ? { text: `No tasks file at ${this.tasksFile()}`, create: "Create file" } : null,
@@ -78,13 +82,14 @@ export class ScreenDrawing {
 			due: due === null ? null : dueLabel(due),
 			step: item.card.over === null ? null : item.card.title,
 			folded: item.collapsed,
+			stage: null,
 		};
 	}
 
 	private list(title: string, column: ColumnList, screen: ScreenView, cards: Record<string, CardFace>, day: LocalDate | null, plate: string | null): ListData {
 		const rows: Row[] = [];
 		for (const group of column.groups) {
-			if (group.header) rows.push({ kind: "section", id: group.id, title: group.name ?? screen.offer.ungrouped, tasks: group.items.length, ungrouped: group.name === null, menu: group.menu && { rename: group.menu.rename, remove: group.menu.remove } });
+			if (group.header) rows.push({ kind: "section", id: group.id, title: group.name ?? screen.offer.ungrouped, tasks: group.items.length, ungrouped: group.name === null, menu: group.menu && { rename: group.menu.rename, remove: group.menu.remove }, plate: null, lifts: true });
 			for (const { item, level } of group.rows) {
 				cards[item.id] = this.face(item, day);
 				rows.push({ kind: "task", id: item.id, depth: level });

@@ -16,9 +16,9 @@ import { ViewButton } from "../view/ViewButton";
 import { ProjectsChrome } from "../view/ProjectsPanel";
 import { Timeline } from "../view/Timeline";
 import { Wheel } from "../view/Wheel";
-import { COLUMN_SHARE, columnsOf, dayColumnWidth, drawnWidths, type Place, ruleShift, type Stop, STRIP_WIDTH } from "./columns";
+import { COLUMN_SHARE, columnsOf, listsOf, dayColumnWidth, drawnWidths, type Place, ruleShift, type Stop, STRIP_WIDTH } from "./columns";
 
-export { type Place, reachOf } from "./columns";
+export { listsOf, type Place, reachOf } from "./columns";
 
 /**
  * Where the projects put the screen (F205–F208, F54): the panel shown, docked beside the lists, the top row over the
@@ -48,8 +48,8 @@ type RibbonAt = FollowGestures["at"];
 export const Layout = memo(function Layout({ place }: { readonly place: Place }) {
 	const stop = useScreen((s) => s.stop);
 	const mode = useScreen((s) => s.view.mode);
-	const ribbon = useScreen((s) => s.view.ribbon);
-	const shown = columnsOf(place, stop, ribbon);
+	const lists = useScreen((s) => listsOf(s.view));
+	const shown = columnsOf(place, stop, lists);
 	return (
 		<>
 			{place === "leaf" ? <ModeColumns key={mode} mode={mode} /> : <NoteColumn list={shown[0]} />}
@@ -76,7 +76,7 @@ function ModeColumns({ mode }: { readonly mode: ViewMode }) {
 	return (
 		<>
 			<div className={`tc-ribbon is-${mode}`} ref={ribbon} {...bind()}>
-				<DayTurnContext.Provider value={turn}>{mode === "allColumns" ? <AllColumns ribbon={ribbon} calendar={calendar} /> : <RibbonStrip at={at} rows={mode === "rows"} ribbon={ribbon} calendar={calendar} />}</DayTurnContext.Provider>
+				<DayTurnContext.Provider value={turn}>{mode === "allColumns" ? <AllColumns ribbon={ribbon} calendar={calendar} /> : <RibbonStrip at={at} still={mode === "rows" || mode === "byProject" ? mode : null} ribbon={ribbon} calendar={calendar} />}</DayTurnContext.Provider>
 			</div>
 			{mode === "twoColumns" ? <Wheel at={at} /> : null}
 		</>
@@ -84,21 +84,30 @@ function ModeColumns({ mode }: { readonly mode: ViewMode }) {
 }
 
 /**
- * Two columns' strip (F24) and Rows' (F17): Rows is the strip standing at the day and its calendar, the day's column holding
- * the lists stacked and the day's title with its arrows over the calendar; the strip's own Inbox and Soon stand empty there,
- * never in sight.
+ * Two columns' strip (F24), Rows' (F17) and By project's (F229): Rows and By project are the strip standing at the day and
+ * its calendar, the day's column holding the lists stacked or By project's one list, the day's title with its arrows over
+ * the calendar; the strip's own Inbox and Soon stand empty there, never in sight.
  */
-function RibbonStrip({ at, rows, ribbon, calendar }: { readonly at: RibbonAt; readonly rows: boolean; readonly ribbon: RefObject<HTMLDivElement | null>; readonly calendar: RefObject<HTMLElement | null> }) {
+function RibbonStrip({ at, still, ribbon, calendar }: { readonly at: RibbonAt; readonly still: "rows" | "byProject" | null; readonly ribbon: RefObject<HTMLDivElement | null>; readonly calendar: RefObject<HTMLElement | null> }) {
 	return (
 		<RibbonTrack at={at} className="tc-ribbon-track" width={STRIP_WIDTH} share={COLUMN_SHARE}>
-			{rows ? <ColumnBox className="is-inbox" /> : <InboxColumn />}
+			{still ? <ColumnBox className="is-inbox" /> : <InboxColumn />}
 			<ColumnRule at={at} stop="inbox" />
-			{rows ? <ColumnBox className="is-soon" /> : <ListColumn list="soon" />}
+			{still ? <ColumnBox className="is-soon" /> : <ListColumn list="soon" />}
 			<ColumnRule at={at} stop="soon" />
-			<DayColumnBox at={at}>{rows ? <StackedRows /> : <TurningDay />}</DayColumnBox>
+			<DayColumnBox at={at}>{still === "rows" ? <StackedRows /> : still === "byProject" ? <ByProjectList /> : <TurningDay />}</DayColumnBox>
 			<ListDivider at={at} ribbon={ribbon} calendar={calendar} />
-			<CalendarColumn ref={calendar} nav={rows} />
+			<CalendarColumn ref={calendar} nav={still !== null} />
 		</RibbonTrack>
+	);
+}
+
+/** By project (F229–F237): the chosen node's tasks in their parts, one list scrolling by itself, beside the calendar. */
+function ByProjectList() {
+	return (
+		<div className="tc-stage-body tc-projects-body">
+			<TaskList list="projects" />
+		</div>
 	);
 }
 

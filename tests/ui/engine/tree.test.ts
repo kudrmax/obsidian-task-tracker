@@ -17,7 +17,7 @@ describe("a carried card's level where it stands", () => {
 	});
 	it("at the top of a list, or right under a section's header, a task", () => {
 		expect(levelAt(coreLevels, rows, "c", "a", 3)).toBe(0);
-		expect(levelBetween(coreLevels, { kind: "section", id: "s", title: "Идеи", tasks: 0, ungrouped: false, menu: null }, task("x"), 3)).toBe(0);
+		expect(levelBetween(coreLevels, { kind: "section", id: "s", title: "Идеи", tasks: 0, ungrouped: false, menu: null, plate: null, lifts: true }, task("x"), 3)).toBe(0);
 	});
 	it("takes the level asked for where it now stands", () => {
 		expect(levelAt(coreLevels, rows, "a", "b2", 2)).toBe(2);
@@ -26,7 +26,7 @@ describe("a carried card's level where it stands", () => {
 });
 
 describe("where a card stands among a list's rows", () => {
-	const rows: Row[] = [task("a"), { kind: "section", id: "s1", title: "Идеи", tasks: 0, ungrouped: false, menu: null }, task("x"), { kind: "section", id: "s2", title: "Пустая", tasks: 0, ungrouped: false, menu: null }];
+	const rows: Row[] = [task("a"), { kind: "section", id: "s1", title: "Идеи", tasks: 0, ungrouped: false, menu: null, plate: null, lifts: true }, task("x"), { kind: "section", id: "s2", title: "Пустая", tasks: 0, ungrouped: false, menu: null, plate: null, lifts: true }];
 	it("right after an empty section's header: in that section, at its end", () => {
 		expect(slotOf(rows, ["a", "s1", "x", "s2", "c"], "c")).toEqual({ section: "s2", before: null });
 	});
@@ -45,7 +45,7 @@ describe("a carried card's subtasks", () => {
 });
 
 describe("the list's final order while a card is held (the sorting strategy)", () => {
-	const rows: Row[] = [task("a"), task("b"), { kind: "section", id: "s", title: "Пустая", tasks: 0, ungrouped: false, menu: null }, { kind: "section", id: "t", title: "Дальше", tasks: 0, ungrouped: false, menu: null }, task("x")];
+	const rows: Row[] = [task("a"), task("b"), { kind: "section", id: "s", title: "Пустая", tasks: 0, ungrouped: false, menu: null, plate: null, lifts: true }, { kind: "section", id: "t", title: "Дальше", tasks: 0, ungrouped: false, menu: null, plate: null, lifts: true }, task("x")];
 	const ids = rows.map((row) => row.id);
 	it("is dnd-kit's: the card moves to where it stands, an empty section's header like any row", () => {
 		expect(finalOrder(ids, 0, 2)).toEqual(["b", "s", "a", "t", "x"]);

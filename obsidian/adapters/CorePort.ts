@@ -1,10 +1,11 @@
-import { type ColumnList, groupPlaceOf, SectionNameEntry, levelRange, sameSlot, type CalendarService, dividerAt, type DividerStop, LIST_WIDTHS, listShareOf, type ListWidths, listWidths, type Clock, type DayEvents, type DayChange, type DayService, type DropColumn, type DroppedTask, type DropTo, type LocalDate, listCardMenuFrom, type MenuFrom as CoreMenuFrom, originOf, type ScreenReader, type ShownChange, type TaskItem, type TaskService, type UndoOutcome, undoNotice, type ViewChoice, type ViewMode, projectNodeOf, projectsDrop, type ProjectsRow, type ProjectsNodeId, type UndoService } from "../../core/application/contracts";
-import type { CarryEnd, ProjectsData, TreeLanding, ScreenContext, ScreenView, SectionNameEnd, Destination, Edge, EntryBar, EntryCommit, EntryDraft, EntryField, LevelRange, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, RenameStart, ScreenData, ScreenPort } from "../ui/engine/port";
+import { type ColumnList, groupPlaceOf, SectionNameEntry, levelRange, sameSlot, type CalendarService, dividerAt, type DividerStop, LIST_WIDTHS, listShareOf, type ListWidths, listWidths, type Clock, type DayEvents, type DayChange, type DayService, type DropColumn, type DroppedTask, type DropTo, type LocalDate, listCardMenuFrom, type MenuFrom as CoreMenuFrom, originOf, type ScreenReader, type ShownChange, type TaskItem, type TaskService, type UndoOutcome, undoNotice, type ViewChoice, type ViewMode, type FunnelView, type ListPlace, type ProjectsDrop, projectsTakes, projectNodeOf, projectsDrop, type ProjectsRow, type ProjectsNodeId, type UndoService } from "../../core/application/contracts";
+import type { FunnelList, CarryEnd, ProjectsData, TreeLanding, ScreenContext, ScreenView, SectionNameEnd, Destination, Edge, EntryBar, EntryCommit, EntryDraft, EntryField, LevelRange, ListId, MenuAction, MenuFrom, MenuModel, Now, PlaceId, RenameStart, ScreenData, ScreenPort } from "../ui/engine/port";
 import { CoreEntry } from "./CoreEntry";
 import { WriteQueue } from "./WriteQueue";
 import { ListCards } from "./ListCards";
 import { menuModelOf } from "./menuModel";
 import { NO_PROJECTS, projectsDataOf } from "./projectsModel";
+import { ProjectsList } from "./ProjectsList";
 import { ScreenDrawing, type ScreenSource } from "./ScreenDrawing";
 
 /** The core's services `CorePort` forwards to, as `composeCore` gives them. */
@@ -27,24 +28,21 @@ export interface CorePortServices {
 type CoreMove =
 	| { readonly kind: "drop"; readonly tasks: readonly DroppedTask[]; readonly to: DropTo; readonly day: LocalDate }
 	| { readonly kind: "slot"; readonly key: TaskItem["key"]; readonly slot: NonNullable<TaskItem["slot"]>; readonly day: LocalDate }
+	| { readonly kind: "projects"; readonly cards: readonly ProjectsDrop[]; readonly place: ListPlace }
 	| { readonly kind: "home" };
 
-/**
- * The core's view as the engine draws it. By project is not offered until the engine draws it (Decision 149): a kept By
- * project draws two columns, as the core's default.
- */
+/** The core's view as the engine draws it: every field the core's. */
 function screenViewOf(choice: ViewChoice): ScreenView {
-	const drawn = (mode: ViewMode): ViewMode => (mode === "byProject" ? "twoColumns" : mode);
-	const chosen = drawn(choice.chosen);
-	const modes = choice.modes.filter((option) => option.mode !== "byProject").map((option) => ({ ...option, checked: option.mode === chosen }));
-	const mode = drawn(choice.mode);
-	return { mode, modes, icon: modes.find((option) => option.checked)?.icon ?? choice.icon, ribbon: mode === "twoColumns", subprojects: choice.subprojects };
+	return { mode: choice.mode, modes: choice.modes, icon: choice.icon, ribbon: choice.ribbon, subprojects: choice.subprojects };
 }
 
 /** The context of every task: no project chosen. */
 const EVERY = "";
 
-const COLUMNS: Readonly<Record<ListId, DropColumn>> = { inbox: "inbox", backlog: "backlog", soon: "soon", day: "day" };
+/** A card and its place, as one key. */
+const readyKey = (id: string, to: Destination): string => JSON.stringify([id, to.before, to.depth ?? null, to.section ?? null]);
+
+const COLUMNS: Readonly<Record<FunnelList, DropColumn>> = { inbox: "inbox", backlog: "backlog", soon: "soon", day: "day" };
 
 /**
  * What every screen's port over the core shares (Decision 145): the core's held read of the file, taken anew when the
@@ -154,6 +152,7 @@ class CoreReads {
 	/** The view and the projects as the core reads them now; every screen told when they differ. */
 	async askView(wide: boolean): Promise<void> {
 		const funnel = await this.core.tasks.funnelView(wide);
+		await this.askProjects(funnel);
 		const next = screenViewOf(funnel.view);
 		const projects = projectsDataOf(funnel);
 		if (JSON.stringify(next) === JSON.stringify(this.views.get(wide)) && JSON.stringify(projects) === JSON.stringify(this.funnels.get(wide))) return;
@@ -163,8 +162,17 @@ class CoreReads {
 		this.changed();
 	}
 
+	/** By project's list of the node the main screen is filtered by, read again while the mode draws it (F229); dropped otherwise. */
+	private async askProjects(funnel: FunnelView): Promise<void> {
+		if (funnel.view.source !== "projectsScreen") return void this.projectLists.clear();
+		const node = funnel.filter?.node;
+		this.projectLists.set(node ?? EVERY, new ProjectsList(await this.core.tasks.projectsScreen(node)));
+	}
+
 	/** The tree's rows as the core read them last: what a gap of the tree is counted over. */
 	treeRows: readonly ProjectsRow[] = [];
+	/** By project's list of each node the main screen draws it for (`EVERY` for All), as the core read it last; none while the mode draws none. */
+	readonly projectLists = new Map<string, ProjectsList>();
 
 	/** A write of the device's view (the mode, Subprojects): every view asked again once it is kept. */
 	async keepView(write: Promise<void>): Promise<void> {
@@ -227,6 +235,8 @@ export class CorePort implements ScreenPort {
 	private readonly listeners = new Set<() => void>();
 	private readonly todayListeners = new Set<() => void>();
 	private readonly cache = new Map<string, ScreenData>();
+	/** By project's drops as they will stand, asked while carried (`ready`), by the card and its place. */
+	private readonly readied = new Map<string, ScreenData>();
 	private readonly entry: CoreEntry;
 
 	/** The node this screen is drawn in (`EVERY` for none): what its writes and menus go by. */
@@ -241,7 +251,7 @@ export class CorePort implements ScreenPort {
 		private readonly fixed: ScreenContext | null,
 	) {
 		if (fixed) this.use(fixed);
-		this.entry = new CoreEntry(shared.core, shared.drawing, () => this.reader, () => this.refresh(), shared.queue, () => this.filter());
+		this.entry = new CoreEntry(shared.core, shared.drawing, () => this.reader, () => this.refresh(), shared.queue, () => this.filter(), () => this.projectsList(), (id) => this.item(id));
 	}
 
 	/** The port over `core`, once the file is read, in every task's context. */
@@ -273,6 +283,7 @@ export class CorePort implements ScreenPort {
 	/** @internal The read changed: drawn anew. */
 	changed(): void {
 		this.cache.clear();
+		this.readied.clear();
 		for (const listener of this.listeners) listener();
 	}
 
@@ -304,7 +315,7 @@ export class CorePort implements ScreenPort {
 			if (this.cache.size > 16) this.cache.clear();
 			const date = this.dateOf(dayOffset);
 			const screen = this.reader.screen(date);
-			data = this.drawing.draw({ date, screen, lists: this.drawing.listsOf(screen), events: this.eventsOf(date) }, this.plate());
+			data = this.withProjects(this.drawing.draw({ date, screen, lists: this.drawing.listsOf(screen), events: this.eventsOf(date) }, this.plate()));
 			this.cache.set(key, data);
 		}
 		return data;
@@ -379,7 +390,7 @@ export class CorePort implements ScreenPort {
 	}
 
 	async startCarry(ids: readonly string[], plus: boolean, wide: boolean): Promise<void> {
-		const keys = ids.flatMap((id) => this.reader.item(id)?.key ?? []);
+		const keys = ids.flatMap((id) => this.item(id)?.key ?? []);
 		await this.core.tasks.startCarry({ keys, ...(plus ? { plus } : {}) }, wide);
 	}
 
@@ -431,16 +442,33 @@ export class CorePort implements ScreenPort {
 		const move = this.moveOf(id, to);
 		const date = this.dateOf(to.dayOffset);
 		if (!move || move.kind === "home") return this.read(to.dayOffset);
+		if (move.kind === "projects") return this.readied.get(readyKey(id, to)) ?? this.read(to.dayOffset);
 		if (move.kind === "slot") return this.drawn(date, { id, ...this.core.days.boundary().spanOf(move.slot, date) });
 		const { screen } = this.reader.dropPreview(move.tasks, move.to, move.day);
 		return this.drawing.draw({ date, screen, lists: this.drawing.listsOf(screen), events: this.eventsOf(date) }, this.plate());
 	}
 
+	/**
+	 * By project's drop as it will stand (`projectsDropPreview`, which reads the file) asked while the card is carried, so
+	 * the drop draws it at once (`preview`); a funnel's preview needs no asking.
+	 */
+	ready(id: string, to: Destination): void {
+		const move = this.moveOf(id, to);
+		const key = readyKey(id, to);
+		if (move?.kind !== "projects" || this.readied.has(key)) return;
+		const day = to.dayOffset;
+		void this.core.tasks.projectsDropPreview(move.cards, move.place, this.node()).then((ahead) => {
+			if (this.readied.size > 16) this.readied.clear();
+			this.readied.set(key, this.withProjects(this.read(day), new ProjectsList(ahead.view)));
+		});
+	}
+
 	/** Nothing changes where the core leaves the task as it is: a card let go where it was lifted (`placeOfDrop`), a time it has already (`sameSlot`). */
 	changes(id: string, to: Destination): boolean {
 		const move = this.moveOf(id, to);
-		const item = this.reader.item(id);
+		const item = this.item(id);
 		if (!move || !item || move.kind === "home") return false;
+		if (move.kind === "projects") return true;
 		if (move.kind === "slot") return !sameSlot(item.slot, move.slot);
 		if (move.to.kind !== "time") return true;
 		const landed = this.reader.dropPreview(move.tasks, move.to, move.day).landings[0];
@@ -450,6 +478,7 @@ export class CorePort implements ScreenPort {
 	takes(id: string, to: Destination): boolean {
 		const move = this.moveOf(id, to);
 		if (!move) return false;
+		if (move.kind === "projects") return projectsTakes(this.projectsList()!.view, move.cards, move.place);
 		return move.kind !== "drop" || this.reader.takes(move.tasks.map((task) => task.from), move.to);
 	}
 
@@ -472,13 +501,14 @@ export class CorePort implements ScreenPort {
 		const move = this.moveOf(id, to);
 		if (!move || move.kind === "home") return;
 		if (move.kind === "slot") await this.core.tasks.setSlot(move.key, move.slot);
+		else if (move.kind === "projects") await this.core.tasks.dropInProjects(move.cards, move.place, this.node());
 		else await this.core.tasks.drop(move.tasks, move.to, move.day, this.filter()?.node ?? null);
 		await this.refresh();
 	}
 
 	firstStepView(id: string, dayOffset: number, context?: ScreenContext): ScreenData {
 		this.use(context);
-		const item = this.reader.item(id);
+		const item = this.item(id);
 		const date = this.dateOf(dayOffset);
 		if (!item) return this.read(dayOffset);
 		const screen = this.core.tasks.firstStepScreen(this.reader.screen(date), item.key);
@@ -486,14 +516,14 @@ export class CorePort implements ScreenPort {
 	}
 
 	async firstStep(id: string, text: string): Promise<void> {
-		const item = this.reader.item(id);
+		const item = this.item(id);
 		if (!item) return;
 		await this.core.tasks.firstStep(item.key, text);
 		await this.refresh();
 	}
 
 	async fold(id: string): Promise<void> {
-		const item = this.reader.item(id);
+		const item = this.item(id);
 		if (!item) return;
 		await this.core.tasks.toggleCollapsed(item.key);
 		await this.refresh();
@@ -643,7 +673,7 @@ export class CorePort implements ScreenPort {
 	}
 
 	entryDescription(field: EntryField): string {
-		return field.renaming === null ? "" : (this.reader.item(field.renaming)?.description ?? "");
+		return field.renaming === null ? "" : (this.item(field.renaming)?.description ?? "");
 	}
 
 	rename(id: string, from: MenuFrom, dayOffset: number): RenameStart {
@@ -658,14 +688,15 @@ export class CorePort implements ScreenPort {
 		const event = this.shared.eventNamed(id);
 		if (event) return { kind: "event", title: event.title };
 		const item = this.itemOf(id);
-		const model = this.reader.menu(id, this.coreFrom(item, from), this.dateOf(dayOffset));
+		const row = this.projectsList()?.rowOf(id);
+		const model = this.reader.menu(item.id, row?.card?.menuFrom ?? this.coreFrom(item, from), this.dateOf(dayOffset));
 		if (!model) throw new Error(`no task ${id}`);
 		return menuModelOf(item, model, from === "calendar" ? item.subtasks.map((sub) => sub.id) : [], (list) => this.core.tasks.listName(list), this.core.days.today());
 	}
 
 	/** The core's ids stay through every write it makes (`TaskItem.id`): the task's own id, null once it is gone. */
 	async act(id: string, action: MenuAction, from: MenuFrom, dayOffset: number): Promise<string | null> {
-		const item = this.reader.item(id);
+		const item = this.item(id);
 		if (action.kind === "row" || !item) return item ? id : null;
 		const tasks = this.core.tasks;
 		const keys = [item.key];
@@ -700,11 +731,12 @@ export class CorePort implements ScreenPort {
 				await tasks.remove(item.key);
 		}
 		await this.refresh();
-		return this.reader.item(id) ? id : null;
+		return this.item(id) ? id : null;
 	}
 
 	/** The column `list` of the day `dayOffset` as it draws, and the grouped list whose sections it shows; null for one that shows none. */
 	private columnOf(list: ListId, dayOffset: number): { readonly column: ColumnList; readonly list: NonNullable<ColumnList["sections"]>["list"] } | null {
+		if (list === "projects") return null;
 		const column = this.drawing.column(this.reader.screen(this.dateOf(dayOffset)), COLUMNS[list]);
 		return column.sections ? { column, list: column.sections.list } : null;
 	}
@@ -740,7 +772,7 @@ export class CorePort implements ScreenPort {
 	}
 
 	private itemOf(id: string): TaskItem {
-		const item = this.reader.item(id);
+		const item = this.item(id);
 		if (!item) throw new Error(`no task ${id}`);
 		return item;
 	}
@@ -754,23 +786,57 @@ export class CorePort implements ScreenPort {
 	 * calendar, or a list's gap; none for a task it can't carry or a place that is gone (`ListCards.gapOf`).
 	 */
 	private moveOf(id: string, to: Destination): CoreMove | null {
-		const item = this.reader.item(id);
+		const item = this.item(id);
 		const from = item && originOf(item);
 		if (!item || !from) return null;
 		const day = this.dateOf(to.dayOffset);
+		if (to.at === undefined && this.projectsList()?.rowOf(id)) return this.projectsMove(id, to);
 		if (to.at !== undefined && to.end !== undefined) return { kind: "slot", key: item.key, slot: this.core.days.boundary().slotAt(day, to.at, to.end), day };
 		const tasks = [{ key: item.key, from }];
 		if (to.at !== undefined) return { kind: "drop", tasks, to: { kind: "time", start: to.at }, day };
-		const column = COLUMNS[to.list];
+		const column: DropColumn | undefined = COLUMNS[to.list as FunnelList];
+		if (!column) return null;
 		if (!this.core.tasks.opensGaps([from], column, day)) return { kind: "drop", tasks, to: { kind: "place", column, place: null }, day };
 		const place = new ListCards(this.drawing.column(this.reader.screen(day), column), id).dropOf(to);
 		if (place === null) return null;
 		return place === "home" ? { kind: "home" } : { kind: "drop", tasks, to: { kind: "place", column, place }, day };
 	}
 
+	/** A card of By project let go at `to` (F235, F236): its row's drop at the gap the core's nesting finds; home where it was lifted; none for a part that is gone. */
+	private projectsMove(id: string, to: Destination): CoreMove | null {
+		const list = this.projectsList();
+		const row = list?.rowOf(id);
+		if (!list || !row) return null;
+		const place = list.cards(id).dropOf(to);
+		if (place === null) return null;
+		return place === "home" ? { kind: "home" } : { kind: "projects", cards: [row.drop], place };
+	}
+
+	/** By project's list as this screen draws it; null while the mode draws none. */
+	private projectsList(): ProjectsList | null {
+		return this.fixed ? null : (this.shared.projectLists.get(this.context) ?? null);
+	}
+
+	/** `data` with By project's list drawn in it, from `list` (the one read now when absent). */
+	private withProjects(data: ScreenData, list: ProjectsList | null = this.projectsList()): ScreenData {
+		if (!list) return data;
+		const { list: drawn, cards } = list.draw(this.drawing, this.shared.plateWords ?? "");
+		return { ...data, lists: { ...data.lists, projects: drawn }, cards: { ...data.cards, ...cards } };
+	}
+
+	/** The task a card of the screen names: By project's rows by their own ids, every other card by its task's. */
+	private item(id: string): TaskItem | null {
+		return this.projectsList()?.rowOf(id)?.item ?? this.reader.item(id);
+	}
+
 	/** An empty list's plate (F64): the core's words under a filter, as its view's plates are; none for every task. */
 	private plate(): string | null {
 		return this.context === EVERY ? null : this.shared.plateWords;
+	}
+
+	/** The node By project's list is read for: the screen's, none for All. */
+	private node(): ProjectsNodeId | undefined {
+		return this.context === EVERY ? undefined : this.context;
 	}
 
 	/** The screen drawn in `context` (every task when absent) from now on. */

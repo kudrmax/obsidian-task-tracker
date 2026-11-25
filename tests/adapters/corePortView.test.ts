@@ -4,10 +4,10 @@ import { corePortOver, NOW, standText } from "./standCore";
 
 /** The view the main screen draws and its button's menu, as the core keeps it on the device (F10–F13; Decision 149). */
 describe("CorePort's view", () => {
-	it("offers All columns on a wide screen only, By project not until the engine draws it, Two columns chosen first", async () => {
+	it("offers All columns on a wide screen only, By project everywhere (Decision 165), Two columns chosen first", async () => {
 		const { port } = await corePortOver(standText(NOW), NOW);
-		expect(port.view(true).modes.map((m) => m.label)).toEqual(["Two columns", "All columns", "Rows"]);
-		expect(port.view(false).modes.map((m) => m.label)).toEqual(["Columns", "Rows"]);
+		expect(port.view(true).modes.map((m) => m.label)).toEqual(["Two columns", "All columns", "Rows", "By project"]);
+		expect(port.view(false).modes.map((m) => m.label)).toEqual(["Columns", "Rows", "By project"]);
 		expect(port.view(true)).toMatchObject({ mode: "twoColumns", ribbon: true, icon: "columns-2" });
 		expect(port.view(true).modes.filter((m) => m.checked).map((m) => m.mode)).toEqual(["twoColumns"]);
 	});
@@ -23,11 +23,17 @@ describe("CorePort's view", () => {
 		expect(port.view(false).mode).toBe("rows");
 	});
 
-	it("draws a kept By project as two columns until the engine draws it", async () => {
+	it("draws By project as the core reads it: the chosen node's parts in one list, its cards known by their tasks (F229, Decision 165)", async () => {
 		const { port } = await corePortOver(standText(NOW), NOW);
+		port.view(true);
 		await port.setViewMode("byProject");
-		expect(port.view(true)).toMatchObject({ mode: "twoColumns", ribbon: true });
-		expect(port.view(true).modes.find((m) => m.checked)?.mode).toBe("twoColumns");
+		expect(port.view(true)).toMatchObject({ mode: "byProject", ribbon: false });
+		expect(port.view(true).modes.find((m) => m.checked)?.mode).toBe("byProject");
+		const list = port.read(0).lists.projects;
+		const tasks = list.rows.filter((row) => row.kind === "task");
+		expect(tasks.length).toBeGreaterThan(0);
+		expect(tasks.every((row) => row.id in port.read(0).cards)).toBe(true);
+		expect(list.rows.some((row) => row.kind === "section")).toBe(true);
 	});
 
 	it("offers the Subprojects row while a project with subprojects is chosen, and turns its check over (F13)", async () => {

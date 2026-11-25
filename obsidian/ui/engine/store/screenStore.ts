@@ -169,6 +169,8 @@ interface ScreenActions {
 	setLiftedDepth(depth: number | null): void;
 	/** The carried task drawn in another list while carried: the port's preview of it there (dnd-kit's «multiple containers»). */
 	carryInto(id: string, to: Destination): void;
+	/** The carried task's place as it stands now (the port readies its preview). */
+	aim(id: string, to: Destination): void;
 	/** Whether `to` takes the carried task (the port's answer): a place that refuses opens no place. */
 	takes(id: string, to: Destination): boolean;
 	/** Whether letting the task go at `to` changes anything (the port's answer). */
@@ -606,6 +608,9 @@ export function createScreenStore(port: ScreenPort, zoom: Zoom = DESIGN.hourPx, 
 			},
 			setLiftedDepth(liftedDepth) {
 				if (get().liftedDepth !== liftedDepth) set({ liftedDepth });
+			},
+			aim(id, to) {
+				port.ready(id, to);
 			},
 			takes(id, to) {
 				return port.takes(id, to);
